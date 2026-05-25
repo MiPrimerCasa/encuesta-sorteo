@@ -649,8 +649,15 @@
 /* Variante de ancho completo (cuando el calendario está abierto inline) */
 .fecha-picker__calendar--full {
   width: 100%;
+  max-width: 100%;
   min-width: 0;
   margin-top: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.fecha-picker__calendar--full,
+.fecha-picker__calendar--full * {
   box-sizing: border-box;
 }
 
@@ -693,9 +700,10 @@
 
 .fecha-picker__cal-semana {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 2px;
   margin-bottom: 4px;
+  width: 100%;
 }
 
 .fecha-picker__cal-dia-header {
@@ -713,8 +721,9 @@
 
 .fecha-picker__cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 3px;
+  width: 100%;
 }
 
 .fecha-picker__cal-celda-vacia {
@@ -724,7 +733,9 @@
 /* Botón de día — estética igual a boton-opcion */
 .fecha-picker__dia-btn {
   aspect-ratio: 1;
-  padding: 4px;
+  width: 100%;
+  min-width: 0;
+  padding: 2px;
   background: var(--color-blanco);
   border: 2px solid var(--color-rojo);
   border-radius: var(--radio-boton);
@@ -737,6 +748,33 @@
   justify-content: center;
   cursor: pointer;
   transition: box-shadow 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+@media (max-width: 480px) {
+  .fecha-picker__calendar--full {
+    padding: 10px 8px;
+  }
+
+  .fecha-picker__cal-mes-titulo {
+    font-size: 14px;
+  }
+
+  .fecha-picker__cal-dia-header {
+    font-size: 10px;
+    padding: 1px 0;
+  }
+
+  .fecha-picker__cal-grid,
+  .fecha-picker__cal-semana {
+    gap: 2px;
+  }
+
+  .fecha-picker__dia-btn {
+    font-size: 12px;
+    padding: 1px;
+    border-width: 1.5px;
+    border-radius: 8px;
+  }
 }
 
 .fecha-picker__dia-btn:hover:not(:disabled):not(.fecha-picker__dia-btn--sel) {

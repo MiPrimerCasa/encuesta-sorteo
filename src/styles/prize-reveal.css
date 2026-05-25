@@ -296,6 +296,8 @@
 .pr-wrap .card-principal {
   max-width: 560px;
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 /* ── Animaciones ── */

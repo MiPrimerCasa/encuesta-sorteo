@@ -41,12 +41,12 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         </div>
 
         <label className="block">
-          <span className="text-sm font-semibold text-neutral-700">Login (email)</span>
+          <span className="text-sm font-semibold text-neutral-700">Correo electrónico</span>
           <input
             type="email"
             value={usuario}
             onChange={(e) => setUsuario(e.target.value)}
-            placeholder="pablo.strauss@gmail.com"
+            placeholder="Ingrese su correo electrónico"
             className="mt-1 w-full min-h-12 rounded-xl border-2 border-neutral-200 px-3"
             autoComplete="username"
             required

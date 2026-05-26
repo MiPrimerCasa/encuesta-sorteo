@@ -74,6 +74,12 @@ try {
   console.log('\n=== Primera fila cruda ===\n');
   console.log(JSON.stringify(serializeEncuestaRow(rows[0]), null, 2));
 
+  console.log('\n=== Teléfonos (columna telefono del SP) ===\n');
+  for (const r of rows.slice(0, 15)) {
+    const nombre = r['Apellido y nombres'] ?? r['Apellido y nombres '];
+    console.log(`  ${nombre}: SP=${JSON.stringify(r.telefono)} → app=${mapEncuestaRowToLead(r).telefono || '(vacío)'}`);
+  }
+
   console.log('\n=== Primera fila mapeada a Lead (app) ===\n');
   console.log(JSON.stringify(mapEncuestaRowToLead(rows[0]), null, 2));
 

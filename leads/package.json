@@ -18,7 +18,8 @@
     "start:api": "node server/index.js",
     "iniciar:api": "node server/index.js",
     "inspect:login": "node scripts/inspect-login-sp.js",
-    "inspect:leads": "node scripts/inspect-leads-sp.js"
+    "inspect:leads": "node scripts/inspect-leads-sp.js",
+    "deploy:vps": "bash scripts/deploy-vps-remote.sh"
   },
   "dependencies": {
     "better-sqlite3": "^12.9.0",

@@ -1,12 +1,14 @@
 import {
-  formatFechaReagenda,
   getProductoNombre,
   getPromotorNombre,
   leadCompro,
+  leadEnEntrevistaPendiente,
   leadReagendaEntrevista,
 } from '../../domain/leads';
 import { etiquetaPagoProducto } from '../../domain/venta';
 import type { Barrio, Lead, Producto, Promotor } from '../../types';
+import { EntrevistaAgendaBadge } from './EntrevistaAgendaBadge';
+import { WhatsAppLeadButton } from './WhatsAppLeadButton';
 
 interface LeadCardProps {
   lead: Lead;
@@ -40,23 +42,41 @@ export function LeadCard({
   const esArchivo = variante === 'compro' || compro;
   const esSeguimiento =
     variante === 'seguimiento' || (variante !== 'compro' && reagenda && !esArchivo);
+  const mostrarAgendaEntrevista =
+    !esArchivo &&
+    (leadEnEntrevistaPendiente(lead) ||
+      (reagenda && Boolean(lead.seguimiento?.fechaReagenda)));
+
+  const estiloTarjeta = esArchivo
+    ? 'border-black/20 bg-neutral-50'
+    : esSeguimiento
+      ? 'border-brand/40 bg-brand-light'
+      : 'border-neutral-200 bg-white';
 
   return (
-    <button
-      type="button"
-      onClick={() => onClick(lead)}
-      className={`w-full rounded-2xl border-2 p-4 text-left shadow-sm transition active:scale-[0.98] touch-manipulation ${
-        esArchivo
-          ? 'border-black/20 bg-neutral-50 hover:border-black/40'
-          : esSeguimiento
-            ? 'border-brand/40 bg-brand-light hover:border-brand hover:shadow-md'
-            : 'border-neutral-200 bg-white hover:border-brand hover:shadow-md'
-      }`}
+    <div
+      className={`flex w-full overflow-hidden rounded-2xl border-2 text-left shadow-sm ${estiloTarjeta}`}
     >
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => onClick(lead)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick(lead);
+          }
+        }}
+        className="min-w-0 flex-1 cursor-pointer p-4 pr-2 transition active:scale-[0.99] touch-manipulation hover:opacity-95"
+      >
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0 flex-1">
           <p className="text-lg font-bold text-neutral-900">{lead.nombre}</p>
-          <p className="mt-0.5 text-sm text-neutral-500">{lead.telefono}</p>
+          {lead.telefono ? (
+            <p className="mt-0.5 text-sm text-neutral-500">{lead.telefono}</p>
+          ) : (
+            <p className="mt-0.5 text-sm italic text-neutral-400">Sin teléfono en encuesta</p>
+          )}
         </div>
         {esArchivo && (
           <span className="shrink-0 rounded-full bg-black px-2.5 py-1 text-xs font-bold uppercase text-white">
@@ -71,6 +91,12 @@ export function LeadCard({
             <span className="text-neutral-400"> · Sup. {lead.supervisorNombre}</span>
           )}
       </p>
+      {mostrarAgendaEntrevista && (
+        <EntrevistaAgendaBadge
+          lead={lead}
+          titulo={reagenda ? undefined : 'Entrevista pendiente'}
+        />
+      )}
       {lead.domicilio && (
         <p className="mt-1 text-xs text-neutral-500">{lead.domicilio}</p>
       )}
@@ -87,23 +113,22 @@ export function LeadCard({
           )}
         </p>
       )}
-      {(esSeguimiento || reagenda) && !esArchivo && (
+      {reagenda && !lead.seguimiento?.fechaReagenda && !esArchivo && (
         <p className="mt-2 rounded-lg bg-white/80 px-2 py-1.5 text-xs font-bold text-brand ring-1 ring-brand/20">
           Próxima entrevista
-          {lead.seguimiento?.fechaReagenda ? (
-            <span className="mt-0.5 block text-sm font-bold normal-case text-neutral-900">
-              {formatFechaReagenda(lead.seguimiento.fechaReagenda)}
-            </span>
-          ) : (
-            <span className="mt-0.5 block font-normal normal-case text-neutral-500">
-              Sin fecha cargada
-            </span>
-          )}
+          <span className="mt-0.5 block font-normal normal-case text-neutral-500">
+            Sin fecha cargada
+          </span>
         </p>
       )}
       {!esArchivo && !reagenda && tieneSeguimiento && (
         <p className="mt-2 text-xs font-bold uppercase text-brand">Seguimiento iniciado</p>
       )}
-    </button>
+      </div>
+
+      <div className="flex shrink-0 flex-col items-center justify-center border-l border-neutral-200/80 bg-neutral-50/50 px-2 py-3">
+        <WhatsAppLeadButton telefono={lead.telefono} nombre={lead.nombre} />
+      </div>
+    </div>
   );
 }

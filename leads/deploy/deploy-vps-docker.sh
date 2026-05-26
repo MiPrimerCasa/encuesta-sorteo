@@ -19,14 +19,9 @@ echo "=== Deploy ${SERVICE_NAME} @ ${TIMESTAMP} ==="
 echo "MONOREPO_ROOT=${MONOREPO_ROOT}"
 echo "LEADS_DIR=${LEADS_DIR}"
 
-ENSURE_ENV="${MONOREPO_ROOT}/deploy/ensure-leads-env.sh"
 if [[ ! -f "${LEADS_DIR}/.env" ]]; then
-  if [[ -x "$ENSURE_ENV" ]]; then
-    MONOREPO_ROOT="$MONOREPO_ROOT" LEADS_DIR="$LEADS_DIR" bash "$ENSURE_ENV"
-  else
-    echo "ERROR: falta ${LEADS_DIR}/.env (copiá desde leads/deploy/.env.vps.example)"
-    exit 1
-  fi
+  echo "ERROR: falta ${LEADS_DIR}/.env (copiá desde leads/deploy/.env.vps.example)"
+  exit 1
 fi
 
 if [[ ! -f "$ROOT_COMPOSE" ]]; then
@@ -50,12 +45,9 @@ set -a
 # shellcheck disable=SC1091
 source "${LEADS_DIR}/.env" 2>/dev/null || true
 set +a
-export LEADS_SMOKE_HOST="${LEADS_SMOKE_HOST:-www.miprimercasafsa-sorteo.com}"
-export BASE_PATH="${BASE_PATH:-/leads}"
+export LEADS_HOST="${LEADS_HOST:-leads.srv955546.hstgr.cloud}"
 
-echo "LEADS_SMOKE_HOST=${LEADS_SMOKE_HOST}"
-echo "BASE_PATH=${BASE_PATH}"
-echo "URL pública: https://${LEADS_SMOKE_HOST}${BASE_PATH}"
+echo "LEADS_HOST=${LEADS_HOST}"
 echo "Building ${SERVICE_NAME} (encuesta-landingqr no se reinicia)..."
 
 docker compose --project-directory "$LEADS_DIR" \
@@ -71,7 +63,7 @@ docker compose --project-directory "$LEADS_DIR" \
 echo "Waiting for health..."
 sleep 5
 
-if curl -sfk -H "Host: ${LEADS_SMOKE_HOST}" "https://127.0.0.1${BASE_PATH}/api/health" | tee /tmp/leads-health.json; then
+if curl -sfk -H "Host: ${LEADS_HOST}" "https://127.0.0.1/api/health" | tee /tmp/leads-health.json; then
   echo ""
   echo "Smoke test OK"
 else

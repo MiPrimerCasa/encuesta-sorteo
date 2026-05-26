@@ -1,5 +1,7 @@
 export type RolUsuario = 'promotor' | 'supervisor';
 export type ListaLead = 'entrevista' | 'contacto';
+/** Dónde quiere la entrevista el cliente (encuesta / SP). */
+export type LugarEntrevista = 'sucursal' | 'domicilio';
 export type CanalContacto = 'llamada' | 'mensaje';
 export type ResultadoEntrevista = 'sin_interes' | 'reagenda' | 'no_compro' | 'compro';
 /** sena/cien = terreno; entrega_33/entrega_55 = plan inversión (33k equivale al cierre del plan) */
@@ -52,6 +54,12 @@ export interface Lead {
   supervisorNombre?: string;
   domicilio?: string;
   quiereEntrevista: boolean;
+  /** Fecha y hora acordadas en la encuesta (ISO local). */
+  horarioEntrevista?: string;
+  /** Oficinas/sucursal o domicilio del cliente. */
+  lugarEntrevista?: LugarEntrevista;
+  /** Dirección si la entrevista es a domicilio. */
+  domicilioEntrevista?: string;
   lista: ListaLead;
   fechaObtencion: string;
   fechaAlta?: string;

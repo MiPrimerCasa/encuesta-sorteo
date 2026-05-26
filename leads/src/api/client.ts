@@ -10,15 +10,6 @@ import type {
 
 const STORAGE_KEY = 'mpc-crm-session';
 
-/** Prefijo API según Vite base (producción: /leads/api). */
-function apiUrl(path: string): string {
-  const base = import.meta.env.BASE_URL.endsWith('/')
-    ? import.meta.env.BASE_URL
-    : `${import.meta.env.BASE_URL}/`;
-  const ruta = path.startsWith('/api') ? path : `/api${path.startsWith('/') ? path : `/${path}`}`;
-  return `${base.replace(/\/$/, '')}${ruta}`;
-}
-
 export function getSession(): { token: string; usuario: UsuarioSesion } | null {
   const raw = sessionStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
@@ -49,7 +40,7 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers['x-usuario-nombre'] = session.usuario.nombre;
   }
 
-  const res = await fetch(apiUrl(path), { ...init, headers });
+  const res = await fetch(path, { ...init, headers });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const msg = typeof data.message === 'string' ? data.message : 'Error en la solicitud';

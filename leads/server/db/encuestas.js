@@ -17,6 +17,18 @@ function pickField(row, ...candidates) {
   return null;
 }
 
+/** Columnas del SP a veces vienen truncadas o con espacios distintos. */
+function pickFieldStartsWith(row, ...prefixes) {
+  if (!row) return null;
+  const keys = Object.keys(row);
+  for (const prefix of prefixes) {
+    const p = prefix.toLowerCase();
+    const key = keys.find((k) => k.toLowerCase().startsWith(p));
+    if (key != null && row[key] != null && row[key] !== '') return row[key];
+  }
+  return null;
+}
+
 export function normalizeNombre(valor) {
   return String(valor ?? '')
     .trim()
@@ -52,6 +64,67 @@ function parseHorarioEntrevista(raw) {
   if (iso) {
     return `${iso[1]}-${iso[2]}-${iso[3]}T${iso[4]}:${iso[5]}:00`;
   }
+  return null;
+}
+
+function normalizeTelefonoValor(raw) {
+  if (raw == null || raw === '') return '';
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return String(Math.round(raw));
+  }
+  if (typeof raw === 'bigint') return raw.toString();
+  return String(raw).trim();
+}
+
+function looksLikeTelefonoCelular(valor) {
+  const digits = String(valor ?? '').replace(/\D/g, '');
+  if (digits.length < 10) return false;
+  return true;
+}
+
+/**
+ * Teléfono WhatsApp desde encuestasMuestraOperador (columna `telefono` de la encuesta).
+ * No usar "Contacto en" (2/3 = lugar de entrevista).
+ */
+export function extractTelefonoEncuesta(row) {
+  if (!row) return '';
+
+  for (const key of Object.keys(row)) {
+    if (key.toLowerCase() === 'telefono') {
+      const t = normalizeTelefonoValor(row[key]);
+      if (looksLikeTelefonoCelular(t)) return t;
+    }
+  }
+
+  const picked =
+    pickField(row, 'telefono', 'Telefono', 'Teléfono', 'Celular', 'WhatsApp', 'whatsapp') ??
+    pickFieldStartsWith(row, 'telefono', 'celular', 'whatsapp');
+  if (picked && looksLikeTelefonoCelular(picked)) {
+    return normalizeTelefonoValor(picked);
+  }
+
+  for (const [key, val] of Object.entries(row)) {
+    if (
+      /contacto en|id$|idoperador|idvendedor|idsupervisor|encuesta|fecha|horario|domicilio|promotor|supervisor|conoce|sabias|queres|asesoramiento|usuario|apellido/i.test(
+        key,
+      )
+    ) {
+      continue;
+    }
+    if (val != null && val !== '' && looksLikeTelefonoCelular(val)) {
+      return normalizeTelefonoValor(val);
+    }
+  }
+
+  return '';
+}
+
+/** SP: Contacto en — 2 = sucursal/oficinas, 3 = domicilio del encuestado. */
+function parseLugarEntrevista(raw) {
+  if (raw == null || raw === '') return null;
+  const texto = String(raw).trim();
+  if (texto === '2' || /sucursal|oficina/i.test(texto)) return 'sucursal';
+  if (texto === '3' || /domicilio/i.test(texto)) return 'domicilio';
   return null;
 }
 
@@ -188,9 +261,26 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
   const quiereAsesoramiento = parseSiNo(
     pickField(row, 'Queres asesoramiento ?', 'Queres asesoramiento', 'Querés asesoramiento ?'),
   );
-  const horarioRaw = pickField(row, 'Horario de entrevista', 'Horario de entrevista ');
+  const horarioRaw =
+    pickField(row, 'Horario de entrevista', 'Horario de entrevista ') ??
+    pickFieldStartsWith(row, 'Horario de entrevista', 'horario de entrevista');
   const horarioIso = parseHorarioEntrevista(horarioRaw);
-  const contacto = pickField(row, 'Contacto en (', 'Contacto en', 'Contacto');
+  const contactoRaw =
+    pickField(
+      row,
+      'Contacto en  (2 = En sucursal , 3 = Domicilio encuestado)',
+      'Contacto en (',
+      'Contacto en',
+    ) ?? pickFieldStartsWith(row, 'Contacto en');
+  const lugarEntrevista = parseLugarEntrevista(contactoRaw);
+  const domicilioEntrevista =
+    pickField(
+      row,
+      'Domicilio de encuesta ',
+      'Domicilio de encuesta',
+      'Domicilio de encuest...',
+    ) ?? pickFieldStartsWith(row, 'Domicilio de encuesta', 'Domicilio de encuest');
+  const telefonoEncuesta = extractTelefonoEncuesta(row);
 
   const fechaBase = horarioIso ? horarioIso.slice(0, 10) : new Date().toISOString().slice(0, 10);
   const lista = horarioIso || quiereAsesoramiento ? 'entrevista' : 'contacto';
@@ -207,12 +297,15 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
   return {
     id: String(usuario ?? `enc-${slugId(nombreLead)}`),
     nombre: String(nombreLead).trim(),
-    telefono: contacto ? String(contacto) : '',
+    telefono: telefonoEncuesta,
     promotorId: slugId(promotorNombre),
     promotorNombre: String(promotorNombre),
     supervisorNombre: supervisorNombre ? String(supervisorNombre) : undefined,
     domicilio: domicilio ? String(domicilio) : undefined,
     quiereEntrevista: quiereAsesoramiento,
+    horarioEntrevista: horarioIso ?? undefined,
+    lugarEntrevista: lugarEntrevista ?? undefined,
+    domicilioEntrevista: domicilioEntrevista ? String(domicilioEntrevista).trim() : undefined,
     lista,
     fechaObtencion: fechaBase,
     fechaAlta: horarioIso ?? `${fechaBase}T09:00:00`,
@@ -233,6 +326,20 @@ export function buildPromotoresFromLeads(leads) {
   return [...map.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
 
+function enrichLeadParaCliente(lead) {
+  let horarioEntrevista = lead.horarioEntrevista;
+  if (
+    !horarioEntrevista &&
+    lead.lista === 'entrevista' &&
+    lead.fechaAlta &&
+    !String(lead.fechaAlta).endsWith('T09:00:00')
+  ) {
+    horarioEntrevista = lead.fechaAlta;
+  }
+  if (horarioEntrevista === lead.horarioEntrevista) return lead;
+  return { ...lead, horarioEntrevista };
+}
+
 export async function listLeadsFromEncuestas(usuario) {
   const rows = await fetchEncuestasMuestraRaw(usuario);
   const ids = rows
@@ -244,7 +351,9 @@ export async function listLeadsFromEncuestas(usuario) {
   );
   const leads = rows.map((row) => {
     const id = String(pickField(row, 'usuario', 'Usuario'));
-    return mapEncuestaRowToLead(row, { [id]: seguimientoById[id] });
+    return enrichLeadParaCliente(
+      mapEncuestaRowToLead(row, { [id]: seguimientoById[id] }),
+    );
   });
   leads.sort((a, b) => (a.fechaAlta ?? '').localeCompare(b.fechaAlta ?? ''));
   return leads;

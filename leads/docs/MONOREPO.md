@@ -32,10 +32,10 @@ encuesta-sorteo/                    # repo github.com/MiPrimerCasa/encuesta-sort
 
 ## VPS (sin cambiar la ruta del clone)
 
-| Servicio | Carpeta | Contenedor | URL pública |
-|----------|---------|------------|-------------|
-| Landing | `/opt/encuesta-landingqr` (raíz) | `encuesta-landingqr` | `https://www.miprimercasafsa-sorteo.com` |
-| CRM | `/opt/encuesta-landingqr/leads` | `seguimiento-leads` | `https://www.miprimercasafsa-sorteo.com/leads` |
+| Servicio | Carpeta | Contenedor | Dominio ejemplo |
+|----------|---------|------------|-----------------|
+| Landing | `/opt/encuesta-landingqr` (raíz) | `encuesta-landingqr` | `www.miprimercasafsa-sorteo.com` |
+| CRM | `/opt/encuesta-landingqr/leads` | `seguimiento-leads` | `leads.srv955546.hstgr.cloud` |
 
 La encuesta **no** se redeploya al publicar solo cambios en `leads/`.
 

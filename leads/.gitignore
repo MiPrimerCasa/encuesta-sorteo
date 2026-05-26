@@ -9,18 +9,15 @@ lerna-debug.log*
 
 node_modules
 dist
-leads/node_modules
-leads/dist
-leads/data/*.db
-leads/data/*.db-*
+data/*.db
+data/*.db-shm
+data/*.db-wal
+data/leads.db
+.env
+src/.env
+.env.local
 dist-ssr
 *.local
-
-# Variables de entorno (credenciales; no subir a Git)
-.env
-.env.*
-!.env.example
-!.env.docker.example
 
 # Editor directories and files
 .vscode/*

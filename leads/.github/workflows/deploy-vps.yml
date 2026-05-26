@@ -1,0 +1,35 @@
+# Repo STANDALONE (sin monorepo): deploy desde la raíz de seguimiento-leads.
+# En monorepo encuesta-sorteo usar: deploy/github-workflow/deploy-leads.yml
+# en .github/workflows/ de la raíz del monorepo.
+
+name: Deploy VPS (Seguimiento Leads — standalone)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-seguimiento-leads-standalone
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy via SSH (standalone /opt/seguimiento-leads)
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            LEADS_DIR="${LEADS_DIR:-/opt/seguimiento-leads}"
+            MONOREPO_ROOT="$LEADS_DIR"
+            cd "$LEADS_DIR"
+            git fetch origin main
+            git reset --hard origin/main
+            chmod +x deploy/deploy-vps-docker.sh
+            MONOREPO_ROOT="$MONOREPO_ROOT" LEADS_DIR="$LEADS_DIR" bash deploy/deploy-vps-docker.sh

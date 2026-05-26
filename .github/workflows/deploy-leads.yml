@@ -1,0 +1,48 @@
+# Deploy CRM leads (carpeta leads/) — no redeploya la landing encuesta.
+
+name: Deploy VPS (Leads CRM)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'leads/**'
+      - '.github/workflows/deploy-leads.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-leads-crm
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://www.miprimercasafsa-sorteo.com/leads
+
+    steps:
+      - name: Deploy leads via SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            MONOREPO_ROOT="${MONOREPO_ROOT:-/opt/encuesta-landingqr}"
+            cd "$MONOREPO_ROOT"
+            git fetch origin main
+            git reset --hard origin/main
+            test -f leads/deploy/deploy-vps-docker.sh
+            chmod +x leads/deploy/deploy-vps-docker.sh
+            MONOREPO_ROOT="$MONOREPO_ROOT" bash leads/deploy/deploy-vps-docker.sh
+
+      - name: Notify Slack (optional)
+        if: success() && secrets.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -sS -X POST -H 'Content-type: application/json' \
+            --data '{"text":"✅ CRM Leads desplegado en https://www.miprimercasafsa-sorteo.com/leads"}' \
+            "$SLACK_WEBHOOK_URL"

@@ -1,0 +1,264 @@
+import sql from 'mssql';
+import {
+  getSqlPoolEncuestas,
+  isSqlServerConfigured,
+  mapOperadorVendedorToRol,
+  parseIdEntero,
+} from './mssql.js';
+import { getSeguimientoExterno, upsertSeguimientoExterno } from './sqlite.js';
+
+function pickField(row, ...candidates) {
+  if (!row) return null;
+  const keys = Object.keys(row);
+  for (const name of candidates) {
+    const key = keys.find((k) => k.toLowerCase() === name.toLowerCase());
+    if (key != null && row[key] != null && row[key] !== '') return row[key];
+  }
+  return null;
+}
+
+export function normalizeNombre(valor) {
+  return String(valor ?? '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function slugId(texto) {
+  return (
+    'p-' +
+    normalizeNombre(texto)
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+  );
+}
+
+function parseSiNo(valor) {
+  return String(valor ?? '')
+    .trim()
+    .toUpperCase()
+    .startsWith('S');
+}
+
+function parseHorarioEntrevista(raw) {
+  if (!raw) return null;
+  const texto = String(raw).trim();
+  const slash = texto.match(/(\d{4})\/(\d{2})\/(\d{2})\s+(\d{2}):(\d{2})/);
+  if (slash) {
+    return `${slash[1]}-${slash[2]}-${slash[3]}T${slash[4]}:${slash[5]}:00`;
+  }
+  const iso = texto.match(/(\d{4})-(\d{2})-(\d{2})[T\s](\d{2}):(\d{2})/);
+  if (iso) {
+    return `${iso[1]}-${iso[2]}-${iso[3]}T${iso[4]}:${iso[5]}:00`;
+  }
+  return null;
+}
+
+function getEncuestasProcedureName() {
+  const raw = process.env.SP_ENCUESTAS || 'encuestasMuestraOperador';
+  return raw.replace(/^\[?dbo\]?\./i, '').replace(/[\[\]]/g, '');
+}
+
+function getEncuestasParamIdVendedor() {
+  return process.env.SP_ENCUESTAS_PARAM_ID || 'idVendedor';
+}
+
+/** idOperador del login → @idVendedor del SP. */
+export function parseIdVendedor(usuario) {
+  const id = Number.parseInt(String(usuario?.id ?? ''), 10);
+  if (!Number.isFinite(id) || id < 1) {
+    throw new Error(`idVendedor inválido: "${usuario?.id}"`);
+  }
+  return id;
+}
+
+/** Serializa una fila SQL para logs / scripts de inspección. */
+export function serializeEncuestaRow(row) {
+  if (!row) return null;
+  return Object.fromEntries(
+    Object.entries(row).map(([k, v]) => [k, v instanceof Date ? v.toISOString() : v]),
+  );
+}
+
+/** exec [dbo].[encuestasMuestraOperador] @idVendedor = idOperador */
+export async function fetchEncuestasMuestraRaw(usuario) {
+  const pool = await getSqlPoolEncuestas();
+  const proc = getEncuestasProcedureName();
+  const paramName = getEncuestasParamIdVendedor();
+  const idVendedor = parseIdVendedor(usuario);
+
+  const request = pool.request();
+  request.input(paramName, sql.Int, idVendedor);
+  const result = await request.execute(proc);
+  return result.recordset ?? result.recordsets?.[0] ?? [];
+}
+
+/**
+ * Rol según encuestasMuestraOperador: idOperador === idVendedor → supervisor.
+ * La DB ya filtra qué filas devuelve con @idVendedor = idOperador.
+ */
+export function resolveRolFromEncuestasRows(rows, idOperador) {
+  if (!rows?.length) return null;
+  const idVendedor = pickField(rows[0], 'idVendedor', 'IdVendedor');
+  const idSupervisor = pickField(rows[0], 'idSupervisor', 'IdSupervisor');
+  const rol = mapOperadorVendedorToRol(idOperador, idVendedor);
+  if (!rol) return null;
+  return {
+    rol,
+    rolOrigen: 'encuestas',
+    idVendedor: idVendedor != null ? String(idVendedor) : undefined,
+    idSupervisor: idSupervisor != null ? String(idSupervisor) : undefined,
+  };
+}
+
+/** Tras login: consulta encuestas y define rol + ids de la primera fila. */
+export async function enrichOperadorRolDesdeEncuestas(operador) {
+  const idOperador = operador.idOperador ?? operador.id;
+  if (!parseIdEntero(idOperador)) return operador;
+
+  try {
+    const rows = await fetchEncuestasMuestraRaw({
+      id: String(idOperador),
+      nombre: operador.nombre,
+      rol: 'supervisor',
+    });
+    const resolved = resolveRolFromEncuestasRows(rows, idOperador);
+    if (!resolved) return operador;
+
+    return {
+      ...operador,
+      rol: resolved.rol,
+      rolOrigen: resolved.rolOrigen,
+      idVendedor: resolved.idVendedor ?? operador.idVendedor,
+      idSupervisor: resolved.idSupervisor ?? operador.idSupervisor,
+    };
+  } catch (error) {
+    console.warn(
+      'Rol desde encuestas no disponible, se usa categoría:',
+      error instanceof Error ? error.message : error,
+    );
+    return operador;
+  }
+}
+
+/** Columnas que podrían servir para comparar supervisor vs vendedor (ids o códigos). */
+export function analyzeEncuestasIdColumns(rows) {
+  if (!rows?.length) return [];
+  const keys = Object.keys(rows[0]);
+  const interesting = keys.filter((k) =>
+    /id|supervisor|vendedor|promotor|operador|usuario|codigo/i.test(k),
+  );
+  return interesting.map((col) => {
+    const valores = [
+      ...new Set(
+        rows
+          .map((r) => r[col])
+          .filter((v) => v != null && String(v).trim() !== '')
+          .map((v) => (v instanceof Date ? v.toISOString() : v)),
+      ),
+    ].slice(0, 8);
+    return { columna: col, ejemplos: valores, distintos: valores.length };
+  });
+}
+
+function buildObservacionesEncuesta(row) {
+  const partes = [];
+  const domicilio = pickField(row, 'Domicilio', 'domicilio');
+  const conoce = pickField(row, 'Conoce MPC', 'Conoce MPC ');
+  const sabias = pickField(
+    row,
+    'Sabias que c...',
+    'Sabias que con MPC podes acceder a la vivienda propia',
+  );
+  const lugar = pickField(row, 'Domicilio de encuest...', 'Domicilio de encuesta');
+  if (domicilio) partes.push(`Domicilio encuesta: ${domicilio}`);
+  if (conoce) partes.push(`Conoce MPC: ${conoce}`);
+  if (sabias) partes.push(`Sabía vivienda propia: ${sabias}`);
+  if (lugar) partes.push(`Lugar encuesta: ${lugar}`);
+  return partes.join(' · ');
+}
+
+export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
+  const usuario = pickField(row, 'usuario', 'Usuario');
+  const promotorNombre = pickField(row, 'Promotor', 'promotor') ?? 'Sin promotor';
+  const supervisorNombre = pickField(row, 'supervisor', 'Supervisor');
+  const nombreLead = pickField(row, 'Apellido y nombres', 'Apellido y nombres ') ?? 'Sin nombre';
+  const domicilio = pickField(row, 'Domicilio', 'domicilio');
+  const quiereAsesoramiento = parseSiNo(
+    pickField(row, 'Queres asesoramiento ?', 'Queres asesoramiento', 'Querés asesoramiento ?'),
+  );
+  const horarioRaw = pickField(row, 'Horario de entrevista', 'Horario de entrevista ');
+  const horarioIso = parseHorarioEntrevista(horarioRaw);
+  const contacto = pickField(row, 'Contacto en (', 'Contacto en', 'Contacto');
+
+  const fechaBase = horarioIso ? horarioIso.slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const lista = horarioIso || quiereAsesoramiento ? 'entrevista' : 'contacto';
+
+  const seguimientoRemoto = seguimientoLocal[usuario] ?? {};
+  const observacionesEncuesta = buildObservacionesEncuesta(row);
+  const seguimiento = {
+    ...seguimientoRemoto,
+    observaciones:
+      [seguimientoRemoto.observaciones, observacionesEncuesta].filter(Boolean).join('\n') ||
+      undefined,
+  };
+
+  return {
+    id: String(usuario ?? `enc-${slugId(nombreLead)}`),
+    nombre: String(nombreLead).trim(),
+    telefono: contacto ? String(contacto) : '',
+    promotorId: slugId(promotorNombre),
+    promotorNombre: String(promotorNombre),
+    supervisorNombre: supervisorNombre ? String(supervisorNombre) : undefined,
+    domicilio: domicilio ? String(domicilio) : undefined,
+    quiereEntrevista: quiereAsesoramiento,
+    lista,
+    fechaObtencion: fechaBase,
+    fechaAlta: horarioIso ?? `${fechaBase}T09:00:00`,
+    seguimiento,
+  };
+}
+
+export function buildPromotoresFromLeads(leads) {
+  const map = new Map();
+  for (const lead of leads) {
+    if (!map.has(lead.promotorId)) {
+      map.set(lead.promotorId, {
+        id: lead.promotorId,
+        nombre: lead.promotorNombre ?? lead.promotorId,
+      });
+    }
+  }
+  return [...map.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
+export async function listLeadsFromEncuestas(usuario) {
+  const rows = await fetchEncuestasMuestraRaw(usuario);
+  const ids = rows
+    .map((r) => pickField(r, 'usuario', 'Usuario'))
+    .filter(Boolean)
+    .map(String);
+  const seguimientoById = Object.fromEntries(
+    ids.map((id) => [id, getSeguimientoExterno(id)]),
+  );
+  const leads = rows.map((row) => {
+    const id = String(pickField(row, 'usuario', 'Usuario'));
+    return mapEncuestaRowToLead(row, { [id]: seguimientoById[id] });
+  });
+  leads.sort((a, b) => (a.fechaAlta ?? '').localeCompare(b.fechaAlta ?? ''));
+  return leads;
+}
+
+/** Leads desde SQL Server (encuestasMuestraOperador filtrado en la DB). */
+export function useEncuestasFromSql() {
+  return isSqlServerConfigured();
+}
+
+export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario, usuarioId) {
+  const rows = await fetchEncuestasMuestraRaw(usuario);
+  const row = rows.find((r) => String(pickField(r, 'usuario', 'Usuario')) === leadId);
+  if (!row) return null;
+  const merged = upsertSeguimientoExterno(leadId, seguimiento, usuarioId);
+  return mapEncuestaRowToLead(row, { [leadId]: merged });
+}

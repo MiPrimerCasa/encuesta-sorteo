@@ -1,0 +1,48 @@
+# Monorepo: mismo dominio que la encuesta, ruta /leads
+#   ./leads/deploy/deploy-vps-docker.sh
+
+services:
+  seguimiento-leads:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_BASE: /leads/
+    image: seguimiento-leads:latest
+    container_name: seguimiento-leads
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      BASE_PATH: /leads
+    volumes:
+      - ./data:/app/data
+    networks:
+      - root_default
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=root_default
+      # www — prioridad alta para no interceptar la landing
+      - traefik.http.routers.leadswww.rule=Host(`www.miprimercasafsa-sorteo.com`) && PathPrefix(`/leads`)
+      - traefik.http.routers.leadswww.entrypoints=web,websecure
+      - traefik.http.routers.leadswww.priority=100
+      - traefik.http.routers.leadswww.tls=true
+      - traefik.http.routers.leadswww.tls.certresolver=myhttpchallenge
+      - traefik.http.routers.leadswww.service=leadssvc
+      - traefik.http.routers.leadswww.middlewares=leadscompress@docker
+      # apex
+      - traefik.http.routers.leadsapex.rule=Host(`miprimercasafsa-sorteo.com`) && PathPrefix(`/leads`)
+      - traefik.http.routers.leadsapex.entrypoints=web,websecure
+      - traefik.http.routers.leadsapex.priority=100
+      - traefik.http.routers.leadsapex.tls=true
+      - traefik.http.routers.leadsapex.tls.certresolver=myhttpchallenge
+      - traefik.http.routers.leadsapex.service=leadssvc
+      - traefik.http.routers.leadsapex.middlewares=leadscompress@docker
+      - traefik.http.middlewares.leadscompress.compress=true
+      - traefik.http.services.leadssvc.loadbalancer.server.port=3001
+
+networks:
+  root_default:
+    external: true

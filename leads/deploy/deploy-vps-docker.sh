@@ -19,9 +19,14 @@ echo "=== Deploy ${SERVICE_NAME} @ ${TIMESTAMP} ==="
 echo "MONOREPO_ROOT=${MONOREPO_ROOT}"
 echo "LEADS_DIR=${LEADS_DIR}"
 
+ENSURE_ENV="${MONOREPO_ROOT}/deploy/ensure-leads-env.sh"
 if [[ ! -f "${LEADS_DIR}/.env" ]]; then
-  echo "ERROR: falta ${LEADS_DIR}/.env (copiá desde leads/deploy/.env.vps.example)"
-  exit 1
+  if [[ -x "$ENSURE_ENV" ]]; then
+    MONOREPO_ROOT="$MONOREPO_ROOT" LEADS_DIR="$LEADS_DIR" bash "$ENSURE_ENV"
+  else
+    echo "ERROR: falta ${LEADS_DIR}/.env (copiá desde leads/deploy/.env.vps.example)"
+    exit 1
+  fi
 fi
 
 if [[ ! -f "$ROOT_COMPOSE" ]]; then

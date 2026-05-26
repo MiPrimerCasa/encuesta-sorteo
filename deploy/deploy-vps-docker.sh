@@ -52,13 +52,16 @@ log "Últimas 30 líneas del contenedor:"
 docker logs --tail 30 encuesta-landingqr 2>&1 | tee -a "$LOG_FILE"
 
 LEADS_DIR="${APP_DIR}/leads"
-LEADS_ENV="${LEADS_DIR}/.env"
 LEADS_DEPLOY="${LEADS_DIR}/deploy/deploy-vps-docker.sh"
-if [[ -f "$LEADS_ENV" && -x "$LEADS_DEPLOY" ]]; then
-  log "Desplegando CRM leads (leads/.env presente)..."
-  MONOREPO_ROOT="$APP_DIR" bash "$LEADS_DEPLOY" 2>&1 | tee -a "$LOG_FILE" || log "WARN: deploy leads falló — revisar leads/.env y logs"
-elif [[ -f "$LEADS_DEPLOY" ]]; then
-  log "WARN: existe leads/ pero falta ${LEADS_ENV} — /leads no mostrará el CRM hasta configurarlo"
+ENSURE_LEADS_ENV="${APP_DIR}/deploy/ensure-leads-env.sh"
+if [[ -x "$ENSURE_LEADS_ENV" ]]; then
+  MONOREPO_ROOT="$APP_DIR" LEADS_DIR="$LEADS_DIR" bash "$ENSURE_LEADS_ENV" 2>&1 | tee -a "$LOG_FILE" || true
+fi
+if [[ -x "$LEADS_DEPLOY" && -f "${LEADS_DIR}/.env" ]]; then
+  log "Desplegando CRM leads..."
+  MONOREPO_ROOT="$APP_DIR" bash "$LEADS_DEPLOY" 2>&1 | tee -a "$LOG_FILE" || log "WARN: deploy leads falló — ver logs/deployments-leads/"
+elif [[ -d "$LEADS_DIR" ]]; then
+  log "WARN: no se pudo desplegar leads (falta ${LEADS_DIR}/.env o falló el build)"
 fi
 
 log "Deploy VPS terminado con éxito"

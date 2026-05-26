@@ -55,6 +55,7 @@ jobs:
           script: |
             set -e
             export DEPLOY_SHA DEPLOY_REF DEPLOY_ACTOR DEPLOY_MESSAGE DEPLOY_RUN_URL
+            chmod +x /opt/encuesta-landingqr/deploy/ensure-leads-env.sh
             bash /opt/encuesta-landingqr/deploy/deploy-vps-docker.sh
 
       - name: Deploy completado

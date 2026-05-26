@@ -34,8 +34,8 @@ jobs:
             cd "$MONOREPO_ROOT"
             git fetch origin main
             git reset --hard origin/main
-            test -f leads/deploy/deploy-vps-docker.sh
-            chmod +x leads/deploy/deploy-vps-docker.sh
+            chmod +x deploy/ensure-leads-env.sh leads/deploy/deploy-vps-docker.sh
+            MONOREPO_ROOT="$MONOREPO_ROOT" bash deploy/ensure-leads-env.sh
             MONOREPO_ROOT="$MONOREPO_ROOT" bash leads/deploy/deploy-vps-docker.sh
 
       - name: Notify Slack (optional)

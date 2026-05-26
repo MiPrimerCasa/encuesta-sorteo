@@ -33,6 +33,9 @@ git fetch origin main
 git reset --hard origin/main
 log "HEAD local: $(git log -1 --oneline)"
 
+chmod +x "${APP_DIR}/deploy/ensure-leads-env.sh" 2>/dev/null || true
+chmod +x "${APP_DIR}/leads/deploy/deploy-vps-docker.sh" 2>/dev/null || true
+
 log "Docker compose build + up"
 docker compose -f "$COMPOSE_BASE" -f "$COMPOSE_APP" up -d --build encuesta 2>&1 | tee -a "$LOG_FILE"
 

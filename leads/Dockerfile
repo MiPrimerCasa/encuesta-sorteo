@@ -3,6 +3,11 @@ FROM node:20-bookworm-slim AS build
 WORKDIR /app
 ARG VITE_BASE=/leads/
 ENV VITE_BASE=$VITE_BASE
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY tsconfig.json vite.config.ts index.html ./

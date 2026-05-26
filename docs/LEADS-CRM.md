@@ -11,7 +11,9 @@ Código en [`leads/`](../leads/) — repo origen: [SISTEMA_SEGUIMIENTO_LEADS](ht
 
 La landing de encuesta sigue en la raíz del dominio; el CRM no comparte contenedor.
 
-## Primer deploy en el VPS
+## Primer deploy en el VPS (obligatorio)
+
+Si abrís `/leads` y ves la **encuesta** en lugar del login del CRM, el contenedor `seguimiento-leads` **no está corriendo** o falta `leads/.env`.
 
 ```bash
 ssh root@72.60.12.48
@@ -25,6 +27,15 @@ nano leads/.env   # DB_*, credenciales STRSYSTEM
 chmod +x leads/deploy/deploy-vps-docker.sh
 ./leads/deploy/deploy-vps-docker.sh
 ```
+
+Verificar:
+
+```bash
+docker ps --filter name=seguimiento-leads
+curl -sfk -H "Host: www.miprimercasafsa-sorteo.com" https://127.0.0.1/leads/api/health
+```
+
+Debe responder `"ok": true`. La página debe titular **Seguimiento de Leads**, no "MiPrimerCasa Sorteo".
 
 ## Desarrollo local
 

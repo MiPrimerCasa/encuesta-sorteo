@@ -51,6 +51,16 @@ fi
 log "Últimas 30 líneas del contenedor:"
 docker logs --tail 30 encuesta-landingqr 2>&1 | tee -a "$LOG_FILE"
 
+LEADS_DIR="${APP_DIR}/leads"
+LEADS_ENV="${LEADS_DIR}/.env"
+LEADS_DEPLOY="${LEADS_DIR}/deploy/deploy-vps-docker.sh"
+if [[ -f "$LEADS_ENV" && -x "$LEADS_DEPLOY" ]]; then
+  log "Desplegando CRM leads (leads/.env presente)..."
+  MONOREPO_ROOT="$APP_DIR" bash "$LEADS_DEPLOY" 2>&1 | tee -a "$LOG_FILE" || log "WARN: deploy leads falló — revisar leads/.env y logs"
+elif [[ -f "$LEADS_DEPLOY" ]]; then
+  log "WARN: existe leads/ pero falta ${LEADS_ENV} — /leads no mostrará el CRM hasta configurarlo"
+fi
+
 log "Deploy VPS terminado con éxito"
 # Mantener solo los últimos 30 logs de deploy
 ls -1t "$LOG_DIR"/*.log 2>/dev/null | tail -n +31 | xargs -r rm -f

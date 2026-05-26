@@ -458,7 +458,8 @@ if (existsSync(distPath)) {
     })
   );
 
-  app.get(/^(?!\/api).*/, (_req, res) => {
+  // /leads lo sirve el contenedor seguimiento-leads (Traefik PathPrefix)
+  app.get(/^(?!\/api)(?!\/leads(?:\/|$)).*/, (_req, res) => {
     res.setHeader("Cache-Control", "no-cache");
     return res.sendFile(path.join(distPath, "index.html"));
   });

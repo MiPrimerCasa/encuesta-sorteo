@@ -229,6 +229,10 @@ api.patch('/leads/:id/seguimiento', async (req, res) => {
 
 app.use(`${BASE}/api`, api);
 
+app.get(BASE, (_req, res) => {
+  res.redirect(301, `${BASE}/`);
+});
+
 if (existsSync(distPath)) {
   app.use(BASE, express.static(distPath));
   const spaPattern = new RegExp(`^${BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:/.*)?$`);

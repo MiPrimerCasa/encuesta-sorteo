@@ -19,14 +19,16 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=root_default
-      - traefik.http.routers.encuestawww.rule=Host(`www.miprimercasafsa-sorteo.com`)
+      - traefik.http.routers.encuestawww.rule=Host(`www.miprimercasafsa-sorteo.com`) && !PathPrefix(`/leads`)
+      - traefik.http.routers.encuestawww.priority=1
       - traefik.http.routers.encuestawww.entrypoints=web,websecure
       - traefik.http.routers.encuestawww.tls=true
       - traefik.http.routers.encuestawww.tls.certresolver=myhttpchallenge
       - traefik.http.routers.encuestawww.service=encuesta
       - traefik.http.middlewares.encuesta-compress.compress=true
       - traefik.http.routers.encuestawww.middlewares=encuesta-compress@docker
-      - traefik.http.routers.encuestaapex.rule=Host(`miprimercasafsa-sorteo.com`)
+      - traefik.http.routers.encuestaapex.rule=Host(`miprimercasafsa-sorteo.com`) && !PathPrefix(`/leads`)
+      - traefik.http.routers.encuestaapex.priority=1
       - traefik.http.routers.encuestaapex.entrypoints=web,websecure
       - traefik.http.routers.encuestaapex.tls=true
       - traefik.http.routers.encuestaapex.tls.certresolver=myhttpchallenge

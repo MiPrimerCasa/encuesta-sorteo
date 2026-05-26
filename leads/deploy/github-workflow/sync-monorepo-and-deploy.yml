@@ -1,7 +1,11 @@
-# PLANTILLA — copiar a SISTEMA_SEGUIMIENTO_LEADS como:
+# Copiar a la RAÍZ del repo SISTEMA_SEGUIMIENTO_LEADS:
 #   .github/workflows/sync-monorepo-and-deploy.yml
-# Ver: deploy/github-workflow/sync-monorepo-and-deploy.yml
-# Docs: docs/FLUJO-FRONTEND-DEPLOY.md
+#
+# Al mergear en main: sincroniza → encuesta-sorteo/leads/ → deploy VPS /leads
+#
+# Secrets en este repo (Settings → Secrets → Actions):
+#   MONOREPO_PUSH_TOKEN  — PAT con write en MiPrimerCasa/encuesta-sorteo
+#   VPS_HOST, VPS_USER, VPS_SSH_KEY — mismos que encuesta-sorteo
 
 name: Sync monorepo y deploy producción
 
@@ -22,23 +26,25 @@ jobs:
       url: https://www.miprimercasafsa-sorteo.com/leads
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout CRM (este repo)
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/checkout@v4
+      - name: Checkout monorepo encuesta-sorteo
+        uses: actions/checkout@v4
         with:
           repository: MiPrimerCasa/encuesta-sorteo
           token: ${{ secrets.MONOREPO_PUSH_TOKEN }}
           path: encuesta-sorteo
           fetch-depth: 0
 
-      - name: Sincronizar a leads/
+      - name: Sincronizar código a leads/
         run: |
           chmod +x scripts/sync-to-monorepo.sh
           bash scripts/sync-to-monorepo.sh . encuesta-sorteo
 
-      - name: Commit y push monorepo
+      - name: Commit y push en monorepo
         id: monorepo_push
         working-directory: encuesta-sorteo
         env:
@@ -50,9 +56,11 @@ jobs:
           git pull --rebase origin main
           git add leads/
           if git diff --staged --quiet; then
+            echo "Sin cambios en leads/ respecto al monorepo."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
-            git commit -m "chore(leads): sync desde SISTEMA_SEGUIMIENTO_LEADS@${SRC_SHA:0:7}
+            SHORT="${SRC_SHA:0:7}"
+            git commit -m "chore(leads): sync desde SISTEMA_SEGUIMIENTO_LEADS@${SHORT}
 
           ${SRC_MSG}"
             git push origin main
@@ -74,3 +82,15 @@ jobs:
             chmod +x deploy/ensure-leads-env.sh leads/deploy/deploy-vps-docker.sh
             MONOREPO_ROOT="$MONOREPO_ROOT" bash deploy/ensure-leads-env.sh || true
             MONOREPO_ROOT="$MONOREPO_ROOT" bash leads/deploy/deploy-vps-docker.sh
+
+      - name: Resumen
+        if: always()
+        run: |
+          echo "## Sync + deploy CRM" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Campo | Valor |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Repo origen | \`${{ github.repository }}\` @ \`${{ github.sha }}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Monorepo | [encuesta-sorteo](https://github.com/MiPrimerCasa/encuesta-sorteo) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Cambios en leads/ | ${{ steps.monorepo_push.outputs.changed }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| URL | https://www.miprimercasafsa-sorteo.com/leads |" >> "$GITHUB_STEP_SUMMARY"

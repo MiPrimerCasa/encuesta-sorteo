@@ -11,6 +11,12 @@ Código en [`leads/`](../leads/) — repo origen: [SISTEMA_SEGUIMIENTO_LEADS](ht
 
 La landing de encuesta sigue en la raíz del dominio; el CRM no comparte contenedor.
 
+## Flujo con el frontend (repo standalone)
+
+El equipo UI trabaja en [SISTEMA_SEGUIMIENTO_LEADS](https://github.com/MiPrimerCasa/SISTEMA_SEGUIMIENTO_LEADS) (ramas → PR → `main`). Al mergear, Actions puede sincronizar a `leads/` y desplegar.
+
+Guía completa: [`leads/docs/FLUJO-FRONTEND-DEPLOY.md`](../leads/docs/FLUJO-FRONTEND-DEPLOY.md)
+
 ## Primer deploy en el VPS (obligatorio)
 
 Si abrís `/leads` y ves la **encuesta** en lugar del login del CRM, el contenedor `seguimiento-leads` **no está corriendo** o falta `leads/.env`.

@@ -229,12 +229,17 @@ api.patch('/leads/:id/seguimiento', async (req, res) => {
 
 app.use(`${BASE}/api`, api);
 
-app.get(BASE, (_req, res) => {
-  res.redirect(301, `${BASE}/`);
+// Solo redirigir sin barra final; con routing no estricto, GET /leads matchea /leads/ y generaba bucle.
+app.get(BASE, (req, res, next) => {
+  const pathOnly = req.originalUrl.split('?')[0];
+  if (pathOnly === BASE) {
+    return res.redirect(301, `${BASE}/`);
+  }
+  next();
 });
 
 if (existsSync(distPath)) {
-  app.use(BASE, express.static(distPath));
+  app.use(BASE, express.static(distPath, { redirect: false }));
   const spaPattern = new RegExp(`^${BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:/.*)?$`);
   app.get(spaPattern, (req, res, next) => {
     if (req.path.startsWith(`${BASE}/api`)) return next();

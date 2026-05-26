@@ -26,17 +26,27 @@ function usuarioDesdeRequest(req) {
   return { id, nombre, rol };
 }
 
+function normalizarBase(ruta) {
+  const limpio = String(ruta || '/leads').trim();
+  if (!limpio || limpio === '/') return '/leads';
+  const conSlash = limpio.startsWith('/') ? limpio : `/${limpio}`;
+  return conSlash.replace(/\/$/, '') || '/leads';
+}
+
 const app = express();
 const PORT = Number(process.env.PORT || process.env.API_PORT || 3001);
+const BASE = normalizarBase(process.env.BASE_PATH || '/leads');
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.resolve(__dirname, '../dist');
+
+const api = express.Router();
 
 app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
 
-app.get('/api/health', async (_req, res) => {
+api.get('/health', async (_req, res) => {
   try {
     res.json(await getHealthInfo());
   } catch (error) {
@@ -47,13 +57,13 @@ app.get('/api/health', async (_req, res) => {
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+api.post('/auth/login', async (req, res) => {
   if (!respondIfNotConfigured(res)) return;
 
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
-      message: 'Credenciales invÃ¡lidas.',
+      message: 'Credenciales inválidas.',
       details: parsed.error.flatten(),
     });
   }
@@ -63,7 +73,7 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     let user = await verifyLoginSqlServer(usuario, password);
     if (!user) {
-      return res.status(401).json({ message: 'Usuario o contraseÃ±a incorrectos.' });
+      return res.status(401).json({ message: 'Usuario o contraseña incorrectos.' });
     }
     user = await enrichOperadorRolDesdeEncuestas(user);
     return res.json({
@@ -83,18 +93,18 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (error) {
     console.error('Error login SQL Server:', error);
     return res.status(503).json({
-      message: 'No se pudo validar el usuario en el servidor de producciÃ³n.',
+      message: 'No se pudo validar el usuario en el servidor de producción.',
       detail: error instanceof Error ? error.message : 'Error desconocido',
     });
   }
 });
 
-app.get('/api/leads', async (req, res) => {
+api.get('/leads', async (req, res) => {
   if (!respondIfNotConfigured(res)) return;
 
   const usuario = usuarioDesdeRequest(req);
   if (!usuario) {
-    return res.status(401).json({ message: 'SesiÃ³n invÃ¡lida. VolvÃ© a iniciar sesiÃ³n.' });
+    return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
   }
 
   try {
@@ -118,16 +128,16 @@ app.get('/api/leads', async (req, res) => {
   }
 });
 
-app.get('/api/promotores', async (req, res) => {
+api.get('/promotores', async (req, res) => {
   if (!respondIfNotConfigured(res)) return;
 
   const usuario = usuarioDesdeRequest(req);
   if (!usuario) {
-    return res.status(401).json({ message: 'SesiÃ³n invÃ¡lida. VolvÃ© a iniciar sesiÃ³n.' });
+    return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
   }
   if (usuario.rol !== 'supervisor') {
     return res.status(403).json({
-      message: 'La vista de promotores solo estÃ¡ disponible para supervisores.',
+      message: 'La vista de promotores solo está disponible para supervisores.',
     });
   }
 
@@ -141,7 +151,7 @@ app.get('/api/promotores', async (req, res) => {
   }
 });
 
-app.get('/api/barrios', (_req, res) => {
+api.get('/barrios', (_req, res) => {
   if (!respondIfNotConfigured(res)) return;
   try {
     getDb();
@@ -154,7 +164,7 @@ app.get('/api/barrios', (_req, res) => {
   }
 });
 
-app.get('/api/productos', (req, res) => {
+api.get('/productos', (req, res) => {
   if (!respondIfNotConfigured(res)) return;
   try {
     getDb();
@@ -172,13 +182,13 @@ app.get('/api/productos', (req, res) => {
   }
 });
 
-app.patch('/api/leads/:id/seguimiento', async (req, res) => {
+api.patch('/leads/:id/seguimiento', async (req, res) => {
   if (!respondIfNotConfigured(res)) return;
 
   const parsed = seguimientoSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({
-      message: 'Datos de seguimiento invÃ¡lidos.',
+      message: 'Datos de seguimiento inválidos.',
       details: parsed.error.flatten(),
     });
   }
@@ -197,7 +207,7 @@ app.patch('/api/leads/:id/seguimiento', async (req, res) => {
 
   const usuario = usuarioDesdeRequest(req);
   if (!usuario) {
-    return res.status(401).json({ message: 'SesiÃ³n invÃ¡lida. VolvÃ© a iniciar sesiÃ³n.' });
+    return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
   }
 
   try {
@@ -223,27 +233,40 @@ app.patch('/api/leads/:id/seguimiento', async (req, res) => {
   }
 });
 
+app.use(`${BASE}/api`, api);
+
+// Solo redirigir sin barra final; con routing no estricto, GET /leads matchea /leads/ y generaba bucle.
+app.get(BASE, (req, res, next) => {
+  const pathOnly = req.originalUrl.split('?')[0];
+  if (pathOnly === BASE) {
+    return res.redirect(301, `${BASE}/`);
+  }
+  next();
+});
+
 if (existsSync(distPath)) {
-  app.use(express.static(distPath));
-  app.get(/^(?!\/api).*/, (_req, res) => {
+  app.use(BASE, express.static(distPath, { redirect: false }));
+  const spaPattern = new RegExp(`^${BASE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:/.*)?$`);
+  app.get(spaPattern, (req, res, next) => {
+    if (req.path.startsWith(`${BASE}/api`)) return next();
     res.sendFile(path.join(distPath, 'index.html'));
   });
 }
 
 app.listen(PORT, () => {
   getDb();
-  console.log(`API Seguimiento Leads en http://localhost:${PORT}`);
+  console.log(`CRM Seguimiento Leads ??? http://localhost:${PORT}${BASE}`);
   if (isSqlServerConfigured()) {
-    console.log('Modo: PRODUCCIÃ“N (sin datos de muestra)');
+    console.log('Modo: PRODUCCI??N (sin datos de muestra)');
     console.log(
-      `  Login â†’ ${process.env.SP_LOGIN || 'operadorAccesoCategoria'} @ ${process.env.DB_NAME}`,
+      `  Login ??? ${process.env.SP_LOGIN || 'operadorAccesoCategoria'} @ ${process.env.DB_NAME}`,
     );
     console.log(
-      `  Leads â†’ ${process.env.SP_ENCUESTAS || 'encuestasMuestraOperador'} @idVendedor @ ${process.env.ENCUESTAS_DB_NAME || process.env.DB_NAME}`,
+      `  Leads ??? ${process.env.SP_ENCUESTAS || 'encuestasMuestraOperador'} @idVendedor @ ${process.env.ENCUESTAS_DB_NAME || process.env.DB_NAME}`,
     );
-    console.log('  WhatsApp â†’ columna telefono de la encuesta (no usar Contacto en 2/3)');
-    console.log('  CachÃ© local: seguimiento de la app en data/app-cache.db');
+    console.log('  WhatsApp ? columna telefono de la encuesta (no usar Contacto en 2/3)');
+    console.log('  Caché local: seguimiento de la app en data/app-cache.db');
   } else {
-    console.error('FALTA .env: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME â€” no hay modo demo.');
+    console.error('FALTA .env: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME ??? no hay modo demo.');
   }
 });

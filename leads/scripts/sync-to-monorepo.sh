@@ -35,7 +35,14 @@ echo "Origen:  ${SOURCE_ROOT}"
 echo "Destino: ${DEST}"
 
 sync_dir src
-sync_dir server
+# server/index.js usa BASE_PATH /leads — no pisar desde standalone
+if [[ -d "${SOURCE_ROOT}/server" ]]; then
+  mkdir -p "${DEST}/server"
+  rsync "${RSYNC_EX[@]}" \
+    --exclude 'index.js' \
+    "${SOURCE_ROOT}/server/" "${DEST}/server/"
+  echo "  synced server/ (sin index.js monorepo)"
+fi
 sync_dir public
 sync_dir scripts
 sync_dir sql

@@ -58,10 +58,17 @@ docker compose --project-directory "$LEADS_DIR" \
   -f "$TRAEFIK_FRAGMENT" \
   build "$SERVICE_NAME"
 
+# Si existe un contenedor viejo con el mismo nombre (a veces queda "huérfano"),
+# `docker compose up` puede fallar por conflicto. Lo limpiamos antes de recrear.
 docker compose --project-directory "$LEADS_DIR" \
   -f "$ROOT_COMPOSE" \
   -f "$TRAEFIK_FRAGMENT" \
-  up -d --no-deps "$SERVICE_NAME"
+  rm -sf "$SERVICE_NAME" || true
+
+docker compose --project-directory "$LEADS_DIR" \
+  -f "$ROOT_COMPOSE" \
+  -f "$TRAEFIK_FRAGMENT" \
+  up -d --no-deps --force-recreate "$SERVICE_NAME"
 
 echo "Waiting for health..."
 HEALTH_OK=0

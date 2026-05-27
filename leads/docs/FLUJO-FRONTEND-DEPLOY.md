@@ -73,8 +73,9 @@ Suele ser el paso **Commit y push en monorepo**. Causas frecuentes:
 | Causa | Solución |
 |-------|----------|
 | `MONOREPO_PUSH_TOKEN` inválido o sin **write** en `encuesta-sorteo` | Crear PAT nuevo (Contents: Read and write) y actualizar el secret |
-| `git pull --rebase` en **detached HEAD** | Corregido en el workflow: `ref: main` + `git checkout -B main origin/main` |
-| Push rechazado (otro commit en `main`) | El workflow hace `pull --rebase` antes del `push` |
+| `git pull --rebase` en **detached HEAD** | Corregido: `ref: main` + `git checkout -B main origin/main` |
+| `cannot pull with rebase: You have unstaged changes` | Corregido: `git add -A leads/` + limpiar working tree antes de `git rebase` |
+| Push rechazado (otro commit en `main`) | `git fetch` + `git rebase origin/main` antes del `push` |
 | Carpeta `leads/` no existía en el monorepo | El script `sync-to-monorepo.sh` ahora la crea si falta |
 
 Si sigue fallando, abrí el log del paso rojo y buscá la línea `fatal:` (ej. `Permission denied`, `rebase failed`).

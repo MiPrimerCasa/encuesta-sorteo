@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { Drawer } from 'vaul';
 import { getProductosPorRol, puedeVenderProducto } from '../../domain/leads';
 import {
   esPlanInversion,
@@ -11,7 +12,6 @@ import {
 } from '../../domain/venta';
 import type {
   Barrio,
-  EstadoPago,
   Lead,
   Producto,
   Referido,
@@ -19,6 +19,7 @@ import type {
   SeguimientoLead,
 } from '../../types';
 import { ButtonGroup, FormSection, RadioOption } from '../ui/ButtonGroup';
+import { DateTimePicker } from '../ui/DateTimePicker';
 
 const emptyReferido = (): Referido => ({ nombre: '', telefono: '' });
 
@@ -69,10 +70,10 @@ function activarReagenda(): Partial<FormState> {
   };
 }
 
-function desactivarReagenda(patch: FormState) {
+function desactivarReagenda(form: FormState): Partial<FormState> {
   return {
     reagendarEntrevista: false,
-    resultadoEntrevista: patch.resultadoEntrevista === 'reagenda' ? null : patch.resultadoEntrevista,
+    resultadoEntrevista: form.resultadoEntrevista === 'reagenda' ? null : form.resultadoEntrevista,
     fechaReagenda: '',
   };
 }
@@ -108,10 +109,7 @@ export function LeadModalForm({
   useEffect(() => {
     if (open && lead) {
       const initial = buildInitialForm(lead);
-      if (
-        initial.idProducto &&
-        !puedeVenderProducto(productos, rol, initial.idProducto)
-      ) {
+      if (initial.idProducto && !puedeVenderProducto(productos, rol, initial.idProducto)) {
         initial.idProducto = '';
       }
       setForm(initial);
@@ -147,8 +145,7 @@ export function LeadModalForm({
     } else {
       patch({
         huboEntrevista: false,
-        resultadoEntrevista:
-          form.reagendarEntrevista ? 'reagenda' : form.resultadoEntrevista,
+        resultadoEntrevista: form.reagendarEntrevista ? 'reagenda' : form.resultadoEntrevista,
       });
     }
   };
@@ -156,12 +153,8 @@ export function LeadModalForm({
   const handleGuardar = (e: FormEvent) => {
     e.preventDefault();
 
-    const esReagenda =
-      form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda';
-
-    if (esReagenda && !form.fechaReagenda) {
-      return;
-    }
+    const esReagenda = form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda';
+    if (esReagenda && !form.fechaReagenda) return;
 
     if (form.resultadoEntrevista === 'compro') {
       if (!form.idProducto) {
@@ -218,10 +211,8 @@ export function LeadModalForm({
   const contactado = Boolean(form.canal);
   const showReagendaBloque = form.reagendarEntrevista;
   const showEntrevistaDetalle = form.huboEntrevista === true && !form.reagendarEntrevista;
-  const showSinEntrevista =
-    form.huboEntrevista === false && !form.reagendarEntrevista;
-  const showReagendaEnNo =
-    showSinEntrevista && form.resultadoEntrevista === 'reagenda';
+  const showSinEntrevista = form.huboEntrevista === false && !form.reagendarEntrevista;
+  const showReagendaEnNo = showSinEntrevista && form.resultadoEntrevista === 'reagenda';
   const showCompro = form.resultadoEntrevista === 'compro';
   const productoEsPij = esPlanInversion(form.idProducto);
   const productoEsTerreno = esTerreno(form.idProducto);
@@ -231,182 +222,191 @@ export function LeadModalForm({
       ? opcionesPagoTerreno()
       : [];
   const muestraRecibo = requiereNumeroRecibo(form.idProducto, form.estadoPago);
-
-  const pillClass = (selected: boolean) =>
-    `min-h-12 w-full rounded-full border-2 px-4 py-3 text-left text-base font-bold transition touch-manipulation ${
-      selected
-        ? 'border-brand bg-brand text-white shadow-md'
-        : 'border-neutral-300 bg-white text-neutral-900'
-    }`;
-
-  const seleccionarPago = (estado: EstadoPago) => {
-    setErrorVenta('');
-    const limpiaRecibo = !requiereNumeroRecibo(form.idProducto, estado);
-    patch({
-      estadoPago: estado,
-      numeroRecibo: limpiaRecibo ? '' : form.numeroRecibo,
-    });
-  };
   const showReferidos = form.brindoReferidos === true;
   const canalLabel = form.canal === 'llamada' ? 'llamada' : form.canal === 'mensaje' ? 'mensaje' : '';
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-lead-title"
+    <Drawer.Root
+      open={open}
+      onOpenChange={(isOpen) => !isOpen && onClose()}
+      shouldScaleBackground
     >
-      <div className="flex max-h-[92vh] w-full max-w-lg flex-col rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
-        <div className="flex items-center justify-between bg-brand px-4 py-4">
-          <div>
-            <h2 id="modal-lead-title" className="text-xl font-bold uppercase text-white">
-              {lead.nombre}
-            </h2>
-            <p className="text-sm text-white/85">{lead.telefono}</p>
+      <Drawer.Portal>
+        <Drawer.Overlay className="fixed inset-0 z-50 bg-zinc-950/50 backdrop-blur-[2px]" />
+
+        <Drawer.Content
+          className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl bg-white outline-none"
+          style={{ maxHeight: 'min(90dvh, 720px)' }}
+          aria-labelledby="sheet-lead-title"
+        >
+          {/* Drag handle */}
+          <div className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-zinc-200" aria-hidden="true" />
+
+          {/* Header sticky */}
+          <div className="flex shrink-0 items-start justify-between border-b border-zinc-100 px-4 pb-4 pt-3">
+            <div>
+              <Drawer.Title
+                id="sheet-lead-title"
+                className="text-[18px] font-semibold tracking-[-0.01em] text-zinc-900"
+              >
+                {lead.nombre}
+              </Drawer.Title>
+              <p className="mt-0.5 text-[13px] tabular-nums text-zinc-500">{lead.telefono}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ touchAction: 'manipulation' }}
+              className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-xl text-zinc-500 transition-colors active:bg-brand-50 active:text-brand-700"
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-xl font-bold text-brand"
-            aria-label="Cerrar"
+
+          {/* Scrollable form */}
+          <form
+            id="lead-form"
+            onSubmit={handleGuardar}
+            className="flex-1 space-y-7 overflow-y-auto overscroll-contain px-4 py-5"
           >
-            ×
-          </button>
-        </div>
-
-        <form onSubmit={handleGuardar} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
-          <FormSection title="1 · Canal de contacto">
-            <ButtonGroup
-              name="canal"
-              options={[
-                { value: 'llamada', label: 'Llamada' },
-                { value: 'mensaje', label: 'Mensaje' },
-              ]}
-              value={form.canal}
-              onChange={handleCanal}
-            />
-          </FormSection>
-
-          {contactado && (
-            <FormSection title="Contactado · Reagendar entrevista">
-              <p className="text-sm text-neutral-600">
-                Cliente contactado por <strong>{canalLabel}</strong>. Si pide otra fecha para la
-                entrevista, registrala acá.
-              </p>
+            {/* 1. Canal */}
+            <FormSection title="Canal de contacto" step={1} totalSteps={4}>
               <ButtonGroup
-                name="reagendar"
-                label="¿Quiere reagendar la entrevista?"
+                name="canal"
                 options={[
-                  { value: true, label: 'Sí, reagendar' },
-                  { value: false, label: 'No' },
+                  { value: 'llamada', label: 'Llamada' },
+                  { value: 'mensaje', label: 'Mensaje' },
                 ]}
-                value={form.reagendarEntrevista}
-                onChange={handleReagendarToggle}
+                value={form.canal}
+                onChange={handleCanal}
               />
-              {showReagendaBloque && (
-                <label className="mt-3 block rounded-xl border-2 border-brand/30 bg-brand-light p-3">
-                  <span className="text-sm font-bold text-brand">Nueva fecha y hora de entrevista</span>
-                  <input
-                    type="datetime-local"
-                    value={form.fechaReagenda}
-                    onChange={(e) => patch({ fechaReagenda: e.target.value })}
-                    className="mt-2 w-full min-h-12 rounded-xl border-2 border-neutral-200 bg-white px-3 text-base focus:border-brand focus:outline-none"
-                    required
-                  />
-                </label>
-              )}
             </FormSection>
-          )}
 
-          <FormSection
-            title="2 · Entrevista"
-            visible={!form.reagendarEntrevista}
-          >
-            <ButtonGroup
-              name="huboEntrevista"
-              label="¿Hubo entrevista?"
-              options={[
-                { value: true, label: 'Sí' },
-                { value: false, label: 'No' },
-              ]}
-              value={form.huboEntrevista}
-              onChange={handleEntrevista}
-            />
-
-            {showSinEntrevista && (
-              <div className="mt-3 space-y-2">
-                <RadioOption
-                  name="sinEntrevista"
-                  value="sin_interes"
-                  label="No muestra interés"
-                  checked={form.resultadoEntrevista === 'sin_interes'}
-                  onChange={() =>
-                    patch({ resultadoEntrevista: 'sin_interes', fechaReagenda: '' })
-                  }
+            {/* Reagendar (solo si fue contactado) */}
+            {contactado && (
+              <FormSection title="Reagendar entrevista">
+                <p className="text-[14px] text-zinc-500">
+                  Cliente contactado por{' '}
+                  <span className="font-medium text-zinc-700">{canalLabel}</span>.
+                  Si pide otra fecha, registrala acá.
+                </p>
+                <ButtonGroup
+                  name="reagendar"
+                  label="¿Quiere reagendar?"
+                  options={[
+                    { value: true, label: 'Sí, reagendar' },
+                    { value: false, label: 'No' },
+                  ]}
+                  value={form.reagendarEntrevista}
+                  onChange={handleReagendarToggle}
                 />
-                <RadioOption
-                  name="sinEntrevista"
-                  value="reagenda"
-                  label="Se reagenda (sin contacto previo registrado)"
-                  checked={form.resultadoEntrevista === 'reagenda'}
-                  onChange={() => patch({ ...activarReagenda(), reagendarEntrevista: true })}
-                />
-                {showReagendaEnNo && (
-                  <label className="block pt-1">
-                    <span className="text-sm font-medium text-neutral-700">Fecha y hora</span>
-                    <input
-                      type="datetime-local"
+                {showReagendaBloque && (
+                  <div className="space-y-1.5 pt-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                      Nueva fecha y hora
+                    </p>
+                    <DateTimePicker
                       value={form.fechaReagenda}
-                      onChange={(e) => patch({ fechaReagenda: e.target.value })}
-                      className="mt-1 w-full min-h-12 rounded-xl border-2 border-neutral-200 px-3 text-base focus:border-brand focus:outline-none"
+                      onChange={(v) => patch({ fechaReagenda: v })}
+                      autoOpen={!form.fechaReagenda}
                       required
                     />
-                  </label>
+                  </div>
                 )}
-              </div>
+              </FormSection>
             )}
 
-            {showEntrevistaDetalle && (
-              <div className="mt-3 space-y-2">
-                <RadioOption
-                  name="conEntrevista"
-                  value="no_compro"
-                  label="No compró"
-                  checked={form.resultadoEntrevista === 'no_compro'}
-                  onChange={() =>
-                    patch({ resultadoEntrevista: 'no_compro', ...resetCamposVenta() })
-                  }
-                />
-                <RadioOption
-                  name="conEntrevista"
-                  value="compro"
-                  label="Compró"
-                  checked={form.resultadoEntrevista === 'compro'}
-                  onChange={() => {
-                    setErrorVenta('');
-                    const defaultProducto = productosDisponibles[0]?.id ?? '';
-                    patch({
-                      resultadoEntrevista: 'compro',
-                      idProducto: form.idProducto || defaultProducto,
-                    });
-                  }}
-                />
-                {showCompro && (
-                  <div className="mt-3 space-y-4 rounded-xl border-2 border-brand/30 bg-brand-light p-3">
-                    <div>
-                      <p className="text-sm font-bold text-brand">¿Qué compró?</p>
-                      <p className="mt-1 text-xs text-neutral-600">
-                        {rol === 'promotor'
-                          ? 'Solo Plan Inversión Joven'
-                          : 'Plan Inversión Joven o Terreno'}
+            {/* 2. Entrevista */}
+            <FormSection
+              title="Entrevista"
+              step={2}
+              totalSteps={4}
+              visible={!form.reagendarEntrevista}
+            >
+              <ButtonGroup
+                name="huboEntrevista"
+                label="¿Hubo entrevista?"
+                options={[
+                  { value: true, label: 'Sí' },
+                  { value: false, label: 'No' },
+                ]}
+                value={form.huboEntrevista}
+                onChange={handleEntrevista}
+              />
+
+              {showSinEntrevista && (
+                <div className="mt-2 space-y-2">
+                  <RadioOption
+                    name="sinEntrevista"
+                    value="sin_interes"
+                    label="No muestra interés"
+                    checked={form.resultadoEntrevista === 'sin_interes'}
+                    onChange={() => patch({ resultadoEntrevista: 'sin_interes', fechaReagenda: '' })}
+                  />
+                  <RadioOption
+                    name="sinEntrevista"
+                    value="reagenda"
+                    label="Se reagenda (sin contacto previo)"
+                    checked={form.resultadoEntrevista === 'reagenda'}
+                    onChange={() => patch({ ...activarReagenda(), reagendarEntrevista: true })}
+                  />
+                  {showReagendaEnNo && (
+                    <div className="space-y-1.5 pt-1">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                        Fecha y hora
                       </p>
-                      <div className="mt-3 flex flex-col gap-2">
-                        {productosDisponibles.length === 0 ? (
-                          <p className="text-sm text-red-600">No hay productos para tu rol.</p>
-                        ) : (
-                          productosDisponibles.map((prod) => {
-                            const seleccionado = form.idProducto === prod.id;
+                      <DateTimePicker
+                        value={form.fechaReagenda}
+                        onChange={(v) => patch({ fechaReagenda: v })}
+                        autoOpen={!form.fechaReagenda}
+                        required
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {showEntrevistaDetalle && (
+                <div className="mt-2 space-y-2">
+                  <RadioOption
+                    name="conEntrevista"
+                    value="no_compro"
+                    label="No compró"
+                    checked={form.resultadoEntrevista === 'no_compro'}
+                    onChange={() =>
+                      patch({ resultadoEntrevista: 'no_compro', ...resetCamposVenta() })
+                    }
+                  />
+                  <RadioOption
+                    name="conEntrevista"
+                    value="compro"
+                    label="Compró"
+                    checked={form.resultadoEntrevista === 'compro'}
+                    onChange={() => {
+                      setErrorVenta('');
+                      patch({
+                        resultadoEntrevista: 'compro',
+                        idProducto: form.idProducto || (productosDisponibles[0]?.id ?? ''),
+                      });
+                    }}
+                  />
+
+                  {showCompro && (
+                    <div className="space-y-5 rounded-xl border border-brand-100 bg-brand-50 p-4">
+                      {/* Producto */}
+                      <div className="space-y-2">
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                            ¿Qué compró?
+                          </p>
+                          <p className="mt-0.5 text-[12px] text-zinc-500">
+                            {rol === 'promotor' ? 'Solo Plan Inversión Joven' : 'Plan Inversión Joven o Terreno'}
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          {productosDisponibles.map((prod) => {
+                            const sel = form.idProducto === prod.id;
                             return (
                               <button
                                 key={prod.id}
@@ -415,181 +415,228 @@ export function LeadModalForm({
                                   setErrorVenta('');
                                   patch(resetCamposAlCambiarProducto(prod.id));
                                 }}
-                                className={`min-h-14 w-full rounded-full border-2 px-4 py-3 text-left text-base font-bold transition touch-manipulation ${
-                                  seleccionado
-                                    ? 'border-brand bg-brand text-white shadow-md'
-                                    : 'border-neutral-300 bg-white text-neutral-900'
+                                style={{ touchAction: 'manipulation' }}
+                                className={`h-12 w-full rounded-lg border px-4 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${
+                                  sel
+                                    ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
+                                    : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
                                 }`}
                               >
                                 {prod.nombre}
                               </button>
                             );
-                          })
-                        )}
+                          })}
+                        </div>
                       </div>
-                    </div>
-                    {productoEsTerreno && (
-                      <div>
-                        <p className="text-sm font-bold text-brand">Barrio</p>
-                        <p className="mt-1 text-xs text-neutral-600">
-                          Seleccioná el barrio del terreno vendido.
-                        </p>
-                        <div className="mt-3 flex flex-col gap-2">
+
+                      {/* Barrio (solo terrenos) */}
+                      {productoEsTerreno && (
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                            Barrio
+                          </p>
                           {barrios.length === 0 ? (
-                            <p className="text-sm text-red-600">No hay barrios cargados.</p>
+                            <p className="text-[13px] text-red-600">No hay barrios cargados.</p>
                           ) : (
-                            barrios.map((barrio) => (
-                              <button
-                                key={barrio.id}
-                                type="button"
-                                onClick={() => {
-                                  setErrorVenta('');
-                                  patch({ idBarrio: barrio.id });
-                                }}
-                                className={pillClass(form.idBarrio === barrio.id)}
-                              >
-                                {barrio.nombre}
-                              </button>
-                            ))
+                            <div className="space-y-2">
+                              {barrios.map((barrio) => {
+                                const sel = form.idBarrio === barrio.id;
+                                return (
+                                  <button
+                                    key={barrio.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setErrorVenta('');
+                                      patch({ idBarrio: barrio.id });
+                                    }}
+                                    style={{ touchAction: 'manipulation' }}
+                                    className={`h-12 w-full rounded-lg border px-4 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${
+                                      sel
+                                        ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
+                                        : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
+                                    }`}
+                                  >
+                                    {barrio.nombre}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           )}
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {form.idProducto && (
-                      <div>
-                        <p className="text-sm font-bold text-brand">Estado del pago</p>
-                        {productoEsPij && (
-                          <p className="mt-1 text-xs text-neutral-600">
-                            La entrega de $33.000 equivale al cierre del plan. Podrá adherirse al
-                            terreno después de 12 meses de pagos.
+                      {/* Estado del pago */}
+                      {form.idProducto && opcionesPago.length > 0 && (
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                            Estado del pago
                           </p>
-                        )}
-                        <div className="mt-3 flex flex-col gap-2">
-                          {opcionesPago.map((op) => (
-                            <button
-                              key={op.value}
-                              type="button"
-                              onClick={() => seleccionarPago(op.value)}
-                              className={pillClass(form.estadoPago === op.value)}
-                            >
-                              {op.label}
-                              {op.hint && form.estadoPago === op.value && (
-                                <span className="mt-1 block text-xs font-normal opacity-90">
-                                  {op.hint}
-                                </span>
-                              )}
-                            </button>
-                          ))}
+                          {productoEsPij && (
+                            <p className="text-[12px] text-zinc-500">
+                              La entrega de $33.000 equivale al cierre del plan.
+                            </p>
+                          )}
+                          <div className="space-y-2">
+                            {opcionesPago.map((op) => {
+                              const sel = form.estadoPago === op.value;
+                              return (
+                                <button
+                                  key={op.value}
+                                  type="button"
+                                  onClick={() => {
+                                    setErrorVenta('');
+                                    const limpiaRecibo = !requiereNumeroRecibo(form.idProducto, op.value);
+                                    patch({
+                                      estadoPago: op.value,
+                                      numeroRecibo: limpiaRecibo ? '' : form.numeroRecibo,
+                                    });
+                                  }}
+                                  style={{ touchAction: 'manipulation' }}
+                                  className={`min-h-[48px] w-full rounded-lg border px-4 py-2 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${
+                                    sel
+                                      ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
+                                      : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
+                                  }`}
+                                >
+                                  {op.label}
+                                  {op.hint && sel && (
+                                    <span className="mt-0.5 block text-[12px] font-normal opacity-90">
+                                      {op.hint}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {muestraRecibo && (
-                      <label className="block rounded-xl border-2 border-brand/30 bg-white p-3">
-                        <span className="text-sm font-bold text-brand">Número de recibo</span>
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={form.numeroRecibo}
-                          onChange={(e) => patch({ numeroRecibo: e.target.value })}
-                          placeholder="Ej. REC-12345"
-                          className="mt-2 w-full min-h-12 rounded-xl border-2 border-neutral-200 px-3 text-base focus:border-brand focus:outline-none"
-                          required
-                        />
-                      </label>
-                    )}
+                      {/* Número de recibo */}
+                      {muestraRecibo && (
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                            Número de recibo
+                          </p>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={form.numeroRecibo}
+                            onChange={(e) => patch({ numeroRecibo: e.target.value })}
+                            placeholder="Ej. REC-12345"
+                            className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                            required
+                          />
+                        </div>
+                      )}
 
-                    {errorVenta && (
-                      <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
-                        {errorVenta}
+                      {errorVenta && (
+                        <p className="rounded-lg bg-red-50 px-3 py-2.5 text-[13px] font-medium text-red-700">
+                          {errorVenta}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </FormSection>
+
+            {form.reagendarEntrevista && (
+              <p className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-[13px] text-brand-700">
+                Al guardar, el lead pasa a{' '}
+                <span className="font-medium">En seguimiento</span> con la nueva fecha.
+              </p>
+            )}
+
+            {/* 3. Referidos */}
+            <FormSection title="Referidos" step={3} totalSteps={4}>
+              <ButtonGroup
+                name="referidos"
+                label="¿Brindó referidos?"
+                options={[
+                  { value: true, label: 'Sí' },
+                  { value: false, label: 'No' },
+                ]}
+                value={form.brindoReferidos}
+                onChange={(v) => patch({ brindoReferidos: v })}
+              />
+
+              {showReferidos && (
+                <div className="space-y-4 pt-1">
+                  {form.referidos.map((ref, idx) => (
+                    <div key={idx} className="space-y-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                        Referido {idx + 1}
                       </p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </FormSection>
-
-          {form.reagendarEntrevista && (
-            <p className="rounded-xl bg-brand-light px-3 py-2 text-sm text-brand">
-              Al guardar, el lead pasa a la sección <strong>Seguimiento</strong> con la nueva fecha.
-              Referidos y observaciones opcionales abajo.
-            </p>
-          )}
-
-          <FormSection title="3 · Referidos">
-            <ButtonGroup
-              name="referidos"
-              label="¿Brindó referidos?"
-              options={[
-                { value: true, label: 'Sí' },
-                { value: false, label: 'No' },
-              ]}
-              value={form.brindoReferidos}
-              onChange={(v: boolean) => patch({ brindoReferidos: v })}
-            />
-            {showReferidos && (
-              <div className="space-y-4 pt-2">
-                {form.referidos.map((ref, idx) => (
-                  <div
-                    key={idx}
-                    className="space-y-2 rounded-xl border-2 border-neutral-200 bg-white p-3"
+                      <input
+                        type="text"
+                        placeholder="Nombre y apellido"
+                        value={ref.nombre}
+                        onChange={(e) => {
+                          const next = [...form.referidos];
+                          next[idx] = { ...next[idx], nombre: e.target.value };
+                          patch({ referidos: next });
+                        }}
+                        autoComplete="name"
+                        className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                      />
+                      <input
+                        type="tel"
+                        placeholder="Teléfono"
+                        value={ref.telefono}
+                        inputMode="tel"
+                        autoComplete="tel"
+                        onChange={(e) => {
+                          const next = [...form.referidos];
+                          next[idx] = { ...next[idx], telefono: e.target.value };
+                          patch({ referidos: next });
+                        }}
+                        className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => patch({ referidos: [...form.referidos, emptyReferido()] })}
+                    style={{ touchAction: 'manipulation' }}
+                    className="h-12 w-full rounded-lg border border-dashed border-zinc-300 text-[14px] font-medium text-zinc-500 transition-colors active:bg-brand-50 active:border-brand-400 active:text-brand-700"
                   >
-                    <p className="text-xs font-bold uppercase text-brand">Referido {idx + 1}</p>
-                    <input
-                      type="text"
-                      placeholder="Nombre y apellido"
-                      value={ref.nombre}
-                      onChange={(e) => {
-                        const next = [...form.referidos];
-                        next[idx] = { ...next[idx], nombre: e.target.value };
-                        patch({ referidos: next });
-                      }}
-                      className="w-full min-h-11 rounded-lg border-2 border-neutral-200 px-3 focus:border-brand"
-                    />
-                    <input
-                      type="tel"
-                      placeholder="Teléfono"
-                      value={ref.telefono}
-                      onChange={(e) => {
-                        const next = [...form.referidos];
-                        next[idx] = { ...next[idx], telefono: e.target.value };
-                        patch({ referidos: next });
-                      }}
-                      className="w-full min-h-11 rounded-lg border-2 border-neutral-200 px-3 focus:border-brand"
-                    />
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => patch({ referidos: [...form.referidos, emptyReferido()] })}
-                  className="w-full min-h-11 rounded-full border-2 border-dashed border-brand py-2 text-sm font-bold uppercase text-brand"
-                >
-                  + Agregar otro referido
-                </button>
-              </div>
-            )}
-          </FormSection>
+                    + Agregar otro referido
+                  </button>
+                </div>
+              )}
+            </FormSection>
 
-          <FormSection title="4 · Observaciones">
-            <textarea
-              value={form.observaciones}
-              onChange={(e) => patch({ observaciones: e.target.value })}
-              rows={4}
-              placeholder="Notas del supervisor..."
-              className="w-full resize-y rounded-xl border-2 border-neutral-200 px-3 py-3 text-base focus:border-brand"
-            />
-          </FormSection>
+            {/* 4. Observaciones */}
+            <FormSection title="Observaciones" step={4} totalSteps={4}>
+              <textarea
+                value={form.observaciones}
+                onChange={(e) => patch({ observaciones: e.target.value })}
+                rows={4}
+                placeholder="Notas del supervisor..."
+                className="w-full resize-y rounded-lg border border-zinc-200 px-3 py-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                style={{ minHeight: '120px' }}
+              />
+            </FormSection>
 
-          <button
-            type="submit"
-            className="sticky bottom-0 w-full min-h-14 rounded-full bg-white text-lg font-bold uppercase text-brand shadow-lg ring-2 ring-brand active:bg-neutral-100"
+            <div className="h-4" aria-hidden="true" />
+          </form>
+
+          {/* Footer sticky con safe area */}
+          <div
+            className="shrink-0 border-t border-zinc-100 px-4 pt-3"
+            style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
           >
-            Guardar y actualizar lead
-          </button>
-        </form>
-      </div>
-    </div>
+            <button
+              type="submit"
+              form="lead-form"
+              style={{ touchAction: 'manipulation' }}
+              className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:bg-brand-800 active:scale-[0.98]"
+            >
+              Guardar y actualizar lead
+            </button>
+          </div>
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
   );
 }

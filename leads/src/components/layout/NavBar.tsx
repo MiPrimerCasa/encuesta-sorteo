@@ -1,10 +1,14 @@
 import { LOGO_MPC_ALT, LOGO_MPC_URL } from '../../brand';
-import type { RolUsuario, UsuarioSesion } from '../../types';
+import { SegmentedControl } from '../ui/SegmentedControl';
+import type { RolUsuario, UsuarioSesion, VistaActiva } from '../../types';
 
-const TABS = [
-  { id: 'leads' as const, label: 'Leads' },
-  { id: 'promotores' as const, label: 'Promotores' },
+const TABS_SUPERVISOR = [
+  { value: 'leads' as const, label: 'Leads' },
+  { value: 'promotores' as const, label: 'Promotores' },
+  { value: 'calendario' as const, label: 'Calendario' },
 ];
+
+const TABS_PROMOTOR = [{ value: 'leads' as const, label: 'Leads' }];
 
 const ROL_LABEL: Record<RolUsuario, string> = {
   promotor: 'Promotor',
@@ -12,73 +16,96 @@ const ROL_LABEL: Record<RolUsuario, string> = {
 };
 
 interface NavBarProps {
-  vistaActiva: 'leads' | 'promotores';
-  onCambiarVista: (id: 'leads' | 'promotores') => void;
+  vistaActiva: VistaActiva;
+  onCambiarVista: (id: VistaActiva) => void;
   usuario: UsuarioSesion;
   onLogout: () => void;
 }
 
 export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBarProps) {
-  const tabs =
-    usuario.rol === 'supervisor' ? TABS : TABS.filter((tab) => tab.id === 'leads');
+  const tabs: Array<{ value: VistaActiva; label: string }> =
+    usuario.rol === 'supervisor' ? TABS_SUPERVISOR : TABS_PROMOTOR;
 
   return (
-    <header className="sticky top-0 z-40 bg-brand shadow-md">
-      <div className="mx-auto max-w-5xl px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <img
-              src={LOGO_MPC_URL}
-              alt={LOGO_MPC_ALT}
-              className="h-12 w-12 shrink-0 rounded-full border-2 border-white bg-white object-contain p-0.5 shadow-sm sm:h-14 sm:w-14"
-            />
-            <div className="min-w-0">
-              <p className="truncate text-[10px] font-bold uppercase tracking-widest text-white/90 sm:text-xs">
-                Mi Primer Casa S.A.
-              </p>
-              <h1 className="truncate text-sm font-bold uppercase text-white sm:text-base">
-                Seguimiento de Leads
-              </h1>
-            </div>
+    <header
+      className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 backdrop-blur-sm"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
+    >
+      {/* Fila 1: marca + usuario */}
+      <div className="flex h-14 items-center justify-between gap-3 px-4 md:mx-auto md:h-16 md:max-w-5xl md:px-6">
+
+        {/* Brand */}
+        <div className="flex min-w-0 items-center gap-2.5">
+          <img
+            src={LOGO_MPC_URL}
+            alt={LOGO_MPC_ALT}
+            className="h-10 w-10 shrink-0 object-contain"
+          />
+          <div className="min-w-0">
+            <p className="hidden text-[10px] font-semibold uppercase tracking-[0.08em] text-zinc-400 sm:block">
+              Mi Primer Casa S.A.
+            </p>
+            <p className="truncate text-[13px] font-semibold text-zinc-900">
+              Mi Primer Casa
+            </p>
           </div>
-          <nav
-            className="flex shrink-0 gap-1 rounded-full bg-black/20 p-1"
-            aria-label="Vistas principales"
-          >
-            {tabs.map((tab) => (
+        </div>
+
+        {/* Desktop: nav */}
+        <div className="hidden items-center gap-4 md:flex">
+          {tabs.length > 1 && (
+            <SegmentedControl
+              options={tabs}
+              value={vistaActiva}
+              onChange={onCambiarVista}
+            />
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Mobile: nombre + rol chip */}
+          <span className="rounded-md bg-zinc-100 px-2.5 py-1.5 text-[12px] font-semibold text-zinc-600 md:hidden">
+            {ROL_LABEL[usuario.rol]}
+          </span>
+
+          {/* Desktop: nombre + logout */}
+          <div className="hidden items-center gap-3 md:flex">
+            <span className="text-[13px] text-zinc-500">{usuario.nombre}</span>
+            <button
+              type="button"
+              onClick={onLogout}
+              style={{ touchAction: 'manipulation' }}
+              className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-zinc-500 transition-colors active:bg-brand-50 active:text-brand-700 hover:text-zinc-700"
+            >
+              Salir
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Fila 2 mobile: underline tabs */}
+      {tabs.length > 1 && (
+        <div className="flex border-t border-zinc-100 md:hidden">
+          {tabs.map((tab) => {
+            const active = vistaActiva === tab.value;
+            return (
               <button
-                key={tab.id}
+                key={tab.value}
                 type="button"
-                onClick={() => onCambiarVista(tab.id)}
-                className={`min-h-11 rounded-full px-3 py-2 text-xs font-bold uppercase transition touch-manipulation sm:px-4 sm:text-sm ${
-                  vistaActiva === tab.id
-                    ? 'bg-white text-brand shadow-sm'
-                    : 'text-white hover:bg-white/15'
+                onClick={() => onCambiarVista(tab.value)}
+                style={{ touchAction: 'manipulation' }}
+                className={`flex-1 py-2.5 text-[14px] font-semibold transition-colors ${
+                  active
+                    ? 'border-b-2 border-brand-600 text-brand-600'
+                    : 'border-b-2 border-transparent text-zinc-400 active:text-zinc-700'
                 }`}
               >
                 {tab.label}
               </button>
-            ))}
-          </nav>
+            );
+          })}
         </div>
-
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <p className="truncate text-xs text-white/90">
-            <span className="font-bold">{usuario.nombre}</span>
-            <span className="text-white/70">
-              {' '}
-              · {ROL_LABEL[usuario.rol]}
-            </span>
-          </p>
-          <button
-            type="button"
-            onClick={onLogout}
-            className="shrink-0 min-h-9 rounded-full bg-black/25 px-3 py-1.5 text-[10px] font-bold uppercase text-white hover:bg-black/40 sm:text-xs"
-          >
-            Salir
-          </button>
-        </div>
-      </div>
+      )}
     </header>
   );
 }

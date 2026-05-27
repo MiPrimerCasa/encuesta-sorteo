@@ -6,64 +6,108 @@ interface PromotoresTableProps {
   metricas: MetricaPromotor[];
 }
 
+function ConversionBar({ value }: { value: number }) {
+  return (
+    <span className="inline-flex items-center justify-end gap-2">
+      <div className="h-1 w-16 overflow-hidden rounded-full bg-zinc-100">
+        <div
+          className="h-full rounded-full bg-brand-600 transition-all"
+          style={{ width: `${Math.min(value, 100)}%` }}
+        />
+      </div>
+      <span className="min-w-[36px] text-right text-[12px] tabular-nums text-zinc-400">
+        {value}%
+      </span>
+    </span>
+  );
+}
+
 export function PromotoresTable({ metricas }: PromotoresTableProps) {
   return (
-    <div className="overflow-hidden rounded-2xl border-2 border-brand/15 bg-white shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white">
+
+      {/* Desktop */}
       <table className="hidden w-full text-left lg:table">
         <thead>
-          <tr className="border-b-2 border-brand/10 bg-brand text-xs font-bold uppercase tracking-wide text-white">
-            <th className="px-4 py-3">Promotor</th>
-            <th className="px-4 py-3 text-center">Total leads</th>
-            <th className="px-4 py-3 text-center">Compró</th>
+          <tr className="border-b border-zinc-200 bg-zinc-50">
+            <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Promotor
+            </th>
+            <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Total leads
+            </th>
+            <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Compró
+            </th>
+            <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Conversión
+            </th>
           </tr>
         </thead>
         <tbody>
-          {metricas.map((p) => (
-            <tr key={p.id} className="border-b border-neutral-100 last:border-0">
-              <td className="px-4 py-4">
-                <span className="font-bold text-neutral-900">{p.nombre}</span>
-              </td>
-              <td className="px-4 py-4 text-center">
-                <span className="inline-flex min-w-[2.5rem] items-center justify-center rounded-full bg-brand-light px-3 py-1 text-lg font-bold text-brand">
+          {metricas.map((p) => {
+            const pct = p.totalLeads > 0 ? Math.round((p.leadsCompro / p.totalLeads) * 100) : 0;
+            return (
+              <tr
+                key={p.id}
+                className="border-b border-zinc-100 last:border-0 transition-colors hover:bg-zinc-50"
+              >
+                <td className="px-5 py-4 text-[14px] font-medium text-zinc-900">{p.nombre}</td>
+                <td className="px-5 py-4 text-right text-[14px] font-semibold tabular-nums text-zinc-900">
                   {p.totalLeads}
-                </span>
-              </td>
-              <td className="px-4 py-4 text-center">
-                <span className="inline-flex min-w-[2.5rem] flex-col items-center gap-0.5">
-                  <span className="rounded-full bg-black px-3 py-1 text-lg font-bold text-white">
-                    {p.leadsCompro}
-                  </span>
-                  {p.totalLeads > 0 && (
-                    <span className="text-xs font-medium text-neutral-500">
-                      {Math.round((p.leadsCompro / p.totalLeads) * 100)}%
-                    </span>
+                </td>
+                <td className="px-5 py-4 text-right text-[14px] font-semibold tabular-nums text-zinc-900">
+                  {p.leadsCompro}
+                </td>
+                <td className="px-5 py-4 text-right">
+                  {p.totalLeads > 0 ? (
+                    <ConversionBar value={pct} />
+                  ) : (
+                    <span className="text-[13px] text-zinc-300">—</span>
                   )}
-                </span>
-              </td>
-            </tr>
-          ))}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
 
-      <div className="space-y-3 p-4 lg:hidden" aria-label="Lista de promotores">
-        {metricas.map((p) => (
-          <div
-            key={p.id}
-            className="flex items-center justify-between rounded-2xl border-2 border-brand/15 bg-brand-light/50 p-4"
-          >
-            <p className="font-bold text-neutral-900">{p.nombre}</p>
-            <div className="flex gap-3 text-center">
-              <div>
-                <p className="text-xs font-bold uppercase text-brand">Leads</p>
-                <p className="text-xl font-bold text-brand">{p.totalLeads}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase text-neutral-600">Compró</p>
-                <p className="text-xl font-bold text-black">{p.leadsCompro}</p>
+      {/* Mobile */}
+      <div className="divide-y divide-zinc-100 lg:hidden">
+        {metricas.map((p) => {
+          const pct = p.totalLeads > 0 ? Math.round((p.leadsCompro / p.totalLeads) * 100) : 0;
+          return (
+            <div key={p.id} className="flex items-center justify-between px-4 py-4">
+              <p className="text-[14px] font-medium text-zinc-900">{p.nombre}</p>
+              <div className="flex items-center gap-5 text-right">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+                    Leads
+                  </p>
+                  <p className="text-[17px] font-semibold tabular-nums text-zinc-900">
+                    {p.totalLeads}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+                    Compró
+                  </p>
+                  <p className="text-[17px] font-semibold tabular-nums text-zinc-900">
+                    {p.leadsCompro}
+                  </p>
+                </div>
+                {p.totalLeads > 0 && (
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">
+                      Conv.
+                    </p>
+                    <p className="text-[17px] font-semibold tabular-nums text-brand-600">{pct}%</p>
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

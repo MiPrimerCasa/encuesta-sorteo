@@ -1,148 +1,55 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
+import { isDemoMode } from '../../api/client';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
-import type { Barrio, Lead, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
-import { CountBadge } from '../ui/CountBadge';
+import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
 import { LeadCard } from './LeadCard';
 import { LeadModalForm } from './LeadModalForm';
+import { NuevoLeadSheet } from './NuevoLeadSheet';
 
 type ListaKey = 'entrevistaPendiente' | 'paraContactar' | 'seguimiento' | 'compraron';
+type VarianteCard = 'activo' | 'seguimiento' | 'compro';
 
-const COLUMNAS_ACTIVAS: Array<{
+const TABS: Array<{
   id: string;
   tituloTab: string;
   tituloLargo: string;
   key: ListaKey;
+  variante: VarianteCard;
+  vacio: string;
 }> = [
   {
     id: 'entrevista',
-    tituloTab: 'Entrevista',
-    tituloLargo: 'Entrevista pendiente',
+    tituloTab: 'Nuevo lead',
+    tituloLargo: 'Nuevo lead — entrevista pendiente',
     key: 'entrevistaPendiente',
+    variante: 'activo',
+    vacio: 'Sin nuevos leads pendientes',
   },
   {
     id: 'contacto',
-    tituloTab: 'Contactar',
-    tituloLargo: 'Para contactar',
+    tituloTab: 'Contactado',
+    tituloLargo: 'Contactado — para seguir',
     key: 'paraContactar',
+    variante: 'activo',
+    vacio: 'Sin leads contactados',
+  },
+  {
+    id: 'seguimiento',
+    tituloTab: 'En seguimiento',
+    tituloLargo: 'En seguimiento — entrevista reagendada',
+    key: 'seguimiento',
+    variante: 'seguimiento',
+    vacio: 'Nadie con entrevista reagendada por ahora',
+  },
+  {
+    id: 'compro',
+    tituloTab: 'Compró',
+    tituloLargo: 'Compró — cerrados',
+    key: 'compraron',
+    variante: 'compro',
+    vacio: 'Aún no hay ventas registradas',
   },
 ];
-
-const SECCION_SEGUIMIENTO = {
-  id: 'seguimiento',
-  tituloTab: 'Seguimiento',
-  tituloLargo: 'Seguimiento — entrevista reagendada',
-  key: 'seguimiento' as const,
-};
-
-const SECCION_COMPRO = {
-  id: 'compro',
-  tituloTab: 'Compraron',
-  tituloLargo: 'Compraron — cerrados',
-  key: 'compraron' as const,
-};
-
-function estiloTabActivo(tabId: string, activo: boolean) {
-  if (!activo) return 'bg-white text-neutral-800 ring-1 ring-neutral-200';
-  if (tabId === 'compro') return 'bg-black text-white ring-2 ring-black';
-  if (tabId === 'seguimiento') return 'bg-brand-dark text-white ring-2 ring-brand-dark';
-  return 'bg-brand text-white ring-2 ring-brand';
-}
-
-const TABS_MOBILE: Array<{
-  id: string;
-  tituloTab: string;
-  key: ListaKey;
-}> = [...COLUMNAS_ACTIVAS, SECCION_SEGUIMIENTO, SECCION_COMPRO];
-
-function ListaLeads({
-  items,
-  onAbrir,
-  variante,
-  vacio,
-  promotores,
-  productos,
-  barrios,
-}: {
-  items: Lead[];
-  onAbrir: (lead: Lead) => void;
-  variante: 'activo' | 'seguimiento' | 'compro';
-  vacio: string;
-  promotores: Promotor[];
-  productos: Producto[];
-  barrios: Barrio[];
-}) {
-  if (items.length === 0) {
-    return (
-      <p className="rounded-2xl border-2 border-dashed border-brand/25 py-8 text-center text-sm text-neutral-400">
-        {vacio}
-      </p>
-    );
-  }
-  return (
-    <div className="space-y-3">
-      {items.map((lead) => (
-        <LeadCard
-          key={lead.id}
-          lead={lead}
-          onClick={onAbrir}
-          variante={variante}
-          promotores={promotores}
-          productos={productos}
-          barrios={barrios}
-        />
-      ))}
-    </div>
-  );
-}
-
-function SeccionColapsable({
-  tabActivo,
-  tabId,
-  abierto,
-  onToggle,
-  titulo,
-  subtituloMobile,
-  contador,
-  headerClass,
-  children,
-}: {
-  tabActivo: string;
-  tabId: string;
-  abierto: boolean;
-  onToggle: () => void;
-  titulo: string;
-  subtituloMobile: string;
-  contador: number;
-  headerClass: string;
-  children: ReactNode;
-}) {
-  const visibleMobile = tabActivo === tabId;
-
-  return (
-    <section
-      className={`mt-6 overflow-hidden rounded-2xl border-2 border-brand/15 bg-white shadow-sm ${
-        visibleMobile ? '' : 'hidden lg:block'
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onToggle}
-        className={`${visibleMobile ? 'hidden' : 'flex'} w-full min-h-12 items-center justify-between gap-2 px-4 py-3 text-left touch-manipulation lg:flex lg:cursor-default lg:pointer-events-none ${headerClass}`}
-        aria-expanded={abierto}
-      >
-        <div>
-          <h2 className="text-base font-bold uppercase text-white">{titulo}</h2>
-          <p className="text-xs text-white/80 lg:hidden">{subtituloMobile}</p>
-        </div>
-        <CountBadge count={contador} size="md" />
-        <span className="text-white lg:hidden" aria-hidden>
-          {abierto ? '▲' : '▼'}
-        </span>
-      </button>
-      {(abierto || visibleMobile) && <div className="space-y-3 bg-neutral-50 p-4">{children}</div>}
-    </section>
-  );
-}
 
 interface LeadsPanelProps {
   leads: Lead[];
@@ -151,6 +58,7 @@ interface LeadsPanelProps {
   productos: Producto[];
   barrios: Barrio[];
   onActualizarLead: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
+  onCrearLead: (data: NuevoLeadData) => void | Promise<void>;
 }
 
 export function LeadsPanel({
@@ -160,6 +68,7 @@ export function LeadsPanel({
   productos,
   barrios,
   onActualizarLead,
+  onCrearLead,
 }: LeadsPanelProps) {
   const { entrevistaPendiente, paraContactar, seguimiento, compraron } = useLeadsFilter(leads);
   const listas: Record<ListaKey, Lead[]> = {
@@ -170,10 +79,9 @@ export function LeadsPanel({
   };
 
   const [tabActivo, setTabActivo] = useState('entrevista');
-  const [seguimientoAbierto, setSeguimientoAbierto] = useState(true);
-  const [comproAbierto, setComproAbierto] = useState(true);
   const [leadSeleccionado, setLeadSeleccionado] = useState<Lead | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [agendarAbierto, setAgendarAbierto] = useState(false);
 
   const abrirLead = (lead: Lead) => {
     setLeadSeleccionado(lead);
@@ -185,111 +93,112 @@ export function LeadsPanel({
     setLeadSeleccionado(null);
   };
 
-  const guardar = async (leadId: string, seguimientoData: SeguimientoLead) => {
-    await onActualizarLead(leadId, seguimientoData);
-  };
+  const tabData = TABS.find((t) => t.id === tabActivo) ?? TABS[0];
+  const itemsActivos = listas[tabData.key];
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-4 pb-8">
-      <p className="mb-4 text-sm font-medium text-neutral-600">
-        <strong>Reagendar</strong> mueve el lead a <strong>Seguimiento</strong>.{' '}
-        <strong>Compró</strong> lo archiva abajo. El panel superior queda solo para trabajo del día.
-      </p>
+    <div className="mx-auto max-w-2xl px-4 py-6 pb-12 sm:px-6">
 
+      {/* Info banner */}
+      <div className="mb-5 flex gap-3 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+        <svg
+          width="15" height="15" viewBox="0 0 15 15" fill="none"
+          className="mt-0.5 shrink-0 text-zinc-400" aria-hidden="true"
+        >
+          <circle cx="7.5" cy="7.5" r="6.5" stroke="currentColor" strokeWidth="1.3" />
+          <path d="M7.5 6.5v4M7.5 4.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        </svg>
+        <p className="text-[13px] text-zinc-500">
+          <span className="font-medium text-zinc-700">Reagendar</span> mueve el lead a{' '}
+          <span className="font-medium text-zinc-700">En seguimiento</span>.{' '}
+          <span className="font-medium text-zinc-700">Compró</span> lo archiva abajo.
+        </p>
+      </div>
+
+      {/* Tab bar — siempre en fila, 4 botones iguales */}
       <nav
-        className="mb-4 grid grid-cols-2 gap-2 rounded-2xl border-2 border-brand/15 bg-neutral-50 p-2 lg:hidden"
+        className="mb-6 flex rounded-xl border border-zinc-200 bg-zinc-50 p-1 gap-1"
         aria-label="Secciones de leads"
+        role="tablist"
       >
-        {TABS_MOBILE.map((tab) => {
+        {TABS.map((tab) => {
           const activo = tabActivo === tab.id;
           const count = listas[tab.key].length;
           return (
             <button
               key={tab.id}
               type="button"
+              role="tab"
+              aria-selected={activo}
               onClick={() => setTabActivo(tab.id)}
-              className={`flex min-h-[3.25rem] w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-bold uppercase shadow-sm transition touch-manipulation ${estiloTabActivo(tab.id, activo)}`}
+              style={{ touchAction: 'manipulation' }}
+              className={`flex flex-1 flex-col items-center gap-0.5 rounded-lg px-1 py-2 text-center transition-all duration-[140ms] ease-out active:scale-[0.97] ${
+                activo
+                  ? 'bg-brand-600 shadow-sm'
+                  : 'hover:bg-zinc-100 active:bg-zinc-200'
+              }`}
             >
-              <span className="leading-tight">{tab.tituloTab}</span>
-              <CountBadge
-                count={count}
-                size="sm"
-                className={activo ? 'ring-2 ring-white' : 'ring-2 ring-brand/15'}
-              />
+              <span
+                className={`text-[12px] font-semibold leading-tight ${
+                  activo ? 'text-white' : 'text-zinc-600'
+                }`}
+              >
+                {tab.tituloTab}
+              </span>
+              <span
+                className={`text-[11px] font-medium tabular-nums leading-none ${
+                  activo ? 'text-white/70' : 'text-zinc-400'
+                }`}
+              >
+                {count}
+              </span>
             </button>
           );
         })}
       </nav>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {COLUMNAS_ACTIVAS.map((col) => {
-          const items = listas[col.key];
-          const esMobileOculta = tabActivo !== col.id;
+      {isDemoMode && (
+        <button
+          type="button"
+          onClick={() => setAgendarAbierto(true)}
+          style={{ touchAction: 'manipulation' }}
+          className="mb-6 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-100 text-[14px] font-semibold text-zinc-600 transition-all duration-[120ms] ease-out active:scale-[0.98] active:bg-zinc-200 hover:bg-zinc-200"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          Agendar cliente (demo)
+        </button>
+      )}
 
-          return (
-            <div
-              key={col.id}
-              className={`space-y-3 ${esMobileOculta ? 'hidden lg:block' : ''}`}
-            >
-              <h2 className="mb-1 hidden items-center gap-3 border-l-4 border-brand pl-3 text-base font-bold uppercase text-neutral-900 lg:flex">
-                {col.tituloLargo}
-                <CountBadge count={items.length} size="lg" />
-              </h2>
-              <ListaLeads
-                items={items}
-                onAbrir={abrirLead}
-                variante="activo"
-                vacio="Sin leads pendientes"
-                promotores={promotores}
-                productos={productos}
-                barrios={barrios}
-              />
-            </div>
-          );
-        })}
+      {/* Título de la sección activa */}
+      <div className="mb-4 flex items-baseline gap-2">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+          {tabData.tituloLargo}
+        </h2>
+        <span className="text-[13px] tabular-nums text-zinc-400">{itemsActivos.length}</span>
       </div>
 
-      <SeccionColapsable
-        tabActivo={tabActivo}
-        tabId="seguimiento"
-        abierto={seguimientoAbierto}
-        onToggle={() => setSeguimientoAbierto((v) => !v)}
-        titulo={SECCION_SEGUIMIENTO.tituloLargo}
-        subtituloMobile={`Tocá para ${seguimientoAbierto ? 'ocultar' : 'ver'}`}
-        contador={seguimiento.length}
-        headerClass="bg-brand-dark"
-      >
-        <ListaLeads
-          items={seguimiento}
-          onAbrir={abrirLead}
-          variante="seguimiento"
-          vacio="Nadie con entrevista reagendada por ahora"
-          promotores={promotores}
-          productos={productos}
-          barrios={barrios}
-        />
-      </SeccionColapsable>
-
-      <SeccionColapsable
-        tabActivo={tabActivo}
-        tabId="compro"
-        abierto={comproAbierto}
-        onToggle={() => setComproAbierto((v) => !v)}
-        titulo={SECCION_COMPRO.tituloLargo}
-        subtituloMobile={`Tocá para ${comproAbierto ? 'ocultar' : 'ver'}`}
-        contador={compraron.length}
-        headerClass="bg-black"
-      >
-        <ListaLeads
-          items={compraron}
-          onAbrir={abrirLead}
-          variante="compro"
-          vacio="Aún no hay ventas registradas"
-          promotores={promotores}
-          productos={productos}
-          barrios={barrios}
-        />
-      </SeccionColapsable>
+      {/* Lista de leads de la sección activa */}
+      {itemsActivos.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-zinc-200 py-10 text-center text-[13px] text-zinc-400">
+          {tabData.vacio}
+        </p>
+      ) : (
+        <div className="space-y-3">
+          {itemsActivos.map((lead) => (
+            <LeadCard
+              key={lead.id}
+              lead={lead}
+              onClick={abrirLead}
+              variante={tabData.variante}
+              promotores={promotores}
+              productos={productos}
+              barrios={barrios}
+            />
+          ))}
+        </div>
+      )}
 
       <LeadModalForm
         lead={leadSeleccionado}
@@ -298,7 +207,15 @@ export function LeadsPanel({
         productos={productos}
         barrios={barrios}
         onClose={cerrarModal}
-        onSave={guardar}
+        onSave={async (leadId, seg) => { await onActualizarLead(leadId, seg); }}
+      />
+
+      <NuevoLeadSheet
+        open={agendarAbierto}
+        rolUsuario={rolUsuario}
+        promotores={promotores}
+        onClose={() => setAgendarAbierto(false)}
+        onSave={onCrearLead}
       />
     </div>
   );

@@ -1,16 +1,151 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400;0,14..32,500;0,14..32,600;0,14..32,700;1,14..32,400&display=swap');
 @import 'tailwindcss';
 
 @theme {
-  --color-brand: #c41e24;
-  --color-brand-dark: #9a171c;
-  --color-brand-light: #fde8e9;
-  --font-sans: 'Segoe UI', system-ui, Roboto, 'Helvetica Neue', sans-serif;
+  /* Escala de marca — bordó */
+  --color-brand:     #9A1620;
+  --color-brand-50:  #FBF2F3;
+  --color-brand-100: #F5DDDF;
+  --color-brand-200: #E9B8BC;
+  --color-brand-500: #B81E2A;
+  --color-brand-600: #9A1620;
+  --color-brand-700: #7A1019;
+  --color-brand-800: #5C0B12;
+  --color-brand-900: #3D070C;
+
+  /* Semánticos */
+  --color-ok:        #15803D;
+  --color-ok-subtle: #F0FDF4;
+
+  /* Tipografía */
+  --font-sans: 'Inter', system-ui, Roboto, 'Helvetica Neue', sans-serif;
 }
+
+/* Eliminar highlight azul iOS — el feedback lo da :active en cada componente */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── react-datepicker — overrides de tema ─────────────────────────────── */
+.react-datepicker-popper { z-index: 9999; }
+
+.mpc-calendar.react-datepicker {
+  font-family: var(--font-sans);
+  border: 1px solid #E4E4E7;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(15, 15, 15, 0.10);
+  overflow: hidden;
+  font-size: 13px;
+}
+
+.mpc-calendar .react-datepicker__header {
+  background: #FAFAFA;
+  border-bottom: 1px solid #E4E4E7;
+  padding: 12px 8px 8px;
+}
+
+.mpc-calendar .react-datepicker__current-month,
+.mpc-calendar .react-datepicker-time__header {
+  color: #18181B;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.mpc-calendar .react-datepicker__navigation {
+  top: 12px;
+}
+.mpc-calendar .react-datepicker__navigation-icon::before {
+  border-color: #71717A;
+  border-width: 2px 2px 0 0;
+  width: 7px;
+  height: 7px;
+}
+.mpc-calendar .react-datepicker__navigation:hover .react-datepicker__navigation-icon::before {
+  border-color: #18181B;
+}
+
+.mpc-calendar .react-datepicker__day-names { margin-top: 4px; }
+.mpc-calendar .react-datepicker__day-name {
+  color: #71717A;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  width: 2.2rem;
+  line-height: 2.2rem;
+}
+
+.mpc-calendar .react-datepicker__day {
+  color: #18181B;
+  border-radius: 6px;
+  width: 2.2rem;
+  line-height: 2.2rem;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+.mpc-calendar .react-datepicker__day:hover:not(.react-datepicker__day--disabled) {
+  background: #FBF2F3;
+  color: #9A1620;
+}
+.mpc-calendar .react-datepicker__day--today {
+  font-weight: 700;
+  color: #9A1620;
+}
+.mpc-calendar .react-datepicker__day--selected,
+.mpc-calendar .react-datepicker__day--keyboard-selected {
+  background: #9A1620;
+  color: #fff;
+  font-weight: 600;
+}
+.mpc-calendar .react-datepicker__day--selected:hover {
+  background: #7A1019;
+  color: #fff;
+}
+.mpc-calendar .react-datepicker__day--today.react-datepicker__day--selected {
+  color: #fff;
+}
+.mpc-calendar .react-datepicker__day--outside-month {
+  color: #A1A1AA;
+}
+.mpc-calendar .react-datepicker__day--disabled {
+  color: #D4D4D8;
+  cursor: not-allowed;
+}
+
+.mpc-calendar .react-datepicker__time-container {
+  border-left: 1px solid #E4E4E7;
+  width: 96px;
+}
+.mpc-calendar .react-datepicker__time-container .react-datepicker__time {
+  background: #fff;
+}
+.mpc-calendar .react-datepicker-time__header {
+  padding: 8px 0;
+}
+.mpc-calendar .react-datepicker__time-list-item {
+  color: #3F3F46;
+  font-size: 13px;
+  height: 36px !important;
+  line-height: 36px !important;
+  padding: 0 12px !important;
+  transition: background 100ms ease-out;
+}
+.mpc-calendar .react-datepicker__time-list-item:hover {
+  background: #FBF2F3 !important;
+  color: #9A1620 !important;
+}
+.mpc-calendar .react-datepicker__time-list-item--selected {
+  background: #9A1620 !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+}
+/* ── fin react-datepicker ─────────────────────────────────────────────── */
 
 body {
   margin: 0;
   min-height: 100svh;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  background-color: #f5f5f5;
+  background-color: #FAFAFA;
+  color: #18181B;
 }

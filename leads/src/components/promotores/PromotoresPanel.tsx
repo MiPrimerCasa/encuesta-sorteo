@@ -12,11 +12,16 @@ export function PromotoresPanel({ leads, promotores }: PromotoresPanelProps) {
   const metricas = usePromotoresMetrics(leads, promotores);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-4 py-4 pb-8">
-      <div className="border-l-4 border-brand pl-3">
-        <h2 className="text-lg font-bold uppercase text-neutral-900">Métricas de origen</h2>
-        <p className="text-sm text-neutral-600">
-          Mi Primer Casa S.A. · Leads por promotor y conversión a compra
+    <div className="mx-auto max-w-5xl space-y-8 px-4 py-6 pb-12 sm:px-6">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+          Mi Primer Casa S.A.
+        </p>
+        <h2 className="mt-1 text-[20px] font-semibold tracking-[-0.01em] text-zinc-900">
+          Métricas de origen
+        </h2>
+        <p className="mt-0.5 text-[13px] text-zinc-500">
+          Leads por promotor y conversión a compra
         </p>
       </div>
 

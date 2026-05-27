@@ -12,7 +12,6 @@ export function telefonoParaWhatsApp(raw?: string | null): string | null {
   return digits;
 }
 
-/** URL oficial para abrir chat (web y app móvil). */
 export function urlWhatsAppChat(
   telefono?: string | null,
   mensaje?: string,

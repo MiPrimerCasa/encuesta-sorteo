@@ -56,13 +56,11 @@ export function labelLugarEntrevista(lugar?: LugarEntrevista | null) {
   return null;
 }
 
-/** Placeholder del mapper cuando la encuesta no trae horario (09:00 del día de alta). */
 function esHorarioPlaceholderSinCita(fechaAlta?: string) {
   if (!fechaAlta) return true;
   return /T09:00:00$/.test(fechaAlta);
 }
 
-/** Horario a mostrar: reagenda local o cita de la encuesta. */
 export function getHorarioEntrevistaLead(lead: Lead): string | null {
   if (leadReagendaEntrevista(lead) && lead.seguimiento?.fechaReagenda) {
     return lead.seguimiento.fechaReagenda;
@@ -78,7 +76,6 @@ export function getLugarEntrevistaLead(lead: Lead): LugarEntrevista | null {
   return lead.lugarEntrevista ?? null;
 }
 
-/** Tarjeta en pestaña Entrevista pendiente (siempre mostrar bloque de cita). */
 export function leadEnEntrevistaPendiente(lead: Lead) {
   return lead.lista === 'entrevista' && !leadReagendaEntrevista(lead) && !leadCompro(lead);
 }

@@ -17,9 +17,12 @@ export function ButtonGroup<T>({ label, options, value, onChange, name }: Button
   return (
     <fieldset className="space-y-2">
       {label && (
-        <legend className="text-sm font-semibold text-neutral-800">{label}</legend>
+        <legend className="text-[14px] font-medium text-zinc-700">{label}</legend>
       )}
-      <div className="flex flex-wrap gap-2">
+      <div
+        className="grid gap-2"
+        style={{ gridTemplateColumns: `repeat(${Math.min(options.length, 2)}, 1fr)` }}
+      >
         {options.map((opt) => {
           const selected = value === opt.value;
           return (
@@ -28,11 +31,13 @@ export function ButtonGroup<T>({ label, options, value, onChange, name }: Button
               type="button"
               name={name}
               onClick={() => onChange(opt.value)}
-              className={`min-h-12 flex-1 min-w-[120px] rounded-full px-4 py-3 text-base font-bold uppercase transition touch-manipulation ${
+              style={{ touchAction: 'manipulation' }}
+              className={`h-[52px] w-full rounded-lg text-[15px] font-semibold transition-all duration-[140ms] ease-out ${
                 selected
-                  ? 'bg-brand text-white shadow-md ring-2 ring-brand/40'
-                  : 'border-2 border-neutral-200 bg-white text-neutral-800 hover:border-brand/40 active:bg-neutral-50'
+                  ? 'border border-brand-700 bg-brand-600 text-white active:bg-brand-700 active:scale-[0.99]'
+                  : 'border border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700 active:scale-[0.99]'
               }`}
+              aria-pressed={selected}
             >
               {opt.label}
             </button>
@@ -53,32 +58,64 @@ interface RadioOptionProps {
 
 export function RadioOption({ label, checked, onChange, name, value }: RadioOptionProps) {
   return (
-    <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border-2 border-neutral-200 bg-white px-4 py-3 has-[:checked]:border-brand has-[:checked]:bg-brand-light">
+    <label
+      className={`flex min-h-[56px] cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-all duration-[140ms] ease-out active:bg-brand-50 active:border-brand-200 ${
+        checked
+          ? 'border-brand-600 bg-brand-50'
+          : 'border-zinc-200 bg-white'
+      }`}
+      style={{ touchAction: 'manipulation' }}
+    >
       <input
         type="radio"
         name={name}
         value={value}
         checked={checked}
         onChange={onChange}
-        className="h-5 w-5 accent-brand"
+        className="sr-only"
       />
-      <span className="text-base text-neutral-800">{label}</span>
+      <span
+        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all duration-[140ms] ${
+          checked ? 'border-brand-600' : 'border-zinc-300'
+        }`}
+        aria-hidden="true"
+      >
+        {checked && <span className="h-2 w-2 rounded-full bg-brand-600" />}
+      </span>
+      <span
+        className={`text-[15px] transition-colors ${
+          checked ? 'font-semibold text-brand-800' : 'font-medium text-zinc-800'
+        }`}
+      >
+        {label}
+      </span>
     </label>
   );
 }
 
 interface FormSectionProps {
   title: string;
+  step?: number;
+  totalSteps?: number;
   children: ReactNode;
   visible?: boolean;
 }
 
-export function FormSection({ title, children, visible = true }: FormSectionProps) {
+export function FormSection({ title, step, totalSteps, children, visible = true }: FormSectionProps) {
   if (!visible) return null;
   return (
-    <section className="space-y-3 rounded-2xl border-2 border-brand/15 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-bold uppercase tracking-wide text-brand">{title}</h3>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+          {title}
+        </h3>
+        {step != null && totalSteps != null && (
+          <span className="text-[11px] tabular-nums text-zinc-400">
+            paso {step} de {totalSteps}
+          </span>
+        )}
+      </div>
       {children}
-    </section>
+    </div>
   );
 }

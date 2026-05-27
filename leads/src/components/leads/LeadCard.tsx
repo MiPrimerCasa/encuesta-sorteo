@@ -8,6 +8,7 @@ import {
 import { etiquetaPagoProducto } from '../../domain/venta';
 import type { Barrio, Lead, Producto, Promotor } from '../../types';
 import { EntrevistaAgendaBadge } from './EntrevistaAgendaBadge';
+import { StatusPill } from '../ui/StatusPill';
 import { WhatsAppLeadButton } from './WhatsAppLeadButton';
 
 interface LeadCardProps {
@@ -45,88 +46,82 @@ export function LeadCard({
   const mostrarAgendaEntrevista =
     !esArchivo &&
     (leadEnEntrevistaPendiente(lead) ||
-      (reagenda && Boolean(lead.seguimiento?.fechaReagenda)));
-
-  const estiloTarjeta = esArchivo
-    ? 'border-black/20 bg-neutral-50'
-    : esSeguimiento
-      ? 'border-brand/40 bg-brand-light'
-      : 'border-neutral-200 bg-white';
+      (reagenda && Boolean(lead.seguimiento?.fechaReagenda)) ||
+      (reagenda && !lead.seguimiento?.fechaReagenda));
 
   return (
-    <div
-      className={`flex w-full overflow-hidden rounded-2xl border-2 text-left shadow-sm ${estiloTarjeta}`}
-    >
-      <div
-        role="button"
-        tabIndex={0}
+    <div className="relative">
+      <button
+        type="button"
         onClick={() => onClick(lead)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onClick(lead);
-          }
-        }}
-        className="min-w-0 flex-1 cursor-pointer p-4 pr-2 transition active:scale-[0.99] touch-manipulation hover:opacity-95"
+        style={{ touchAction: 'manipulation' }}
+        className={`w-full rounded-xl border p-4 pb-14 text-left transition-[background,border-color,transform] duration-[140ms] ease-out active:scale-[0.995] md:p-5 md:pb-14 ${
+          esArchivo
+            ? 'border-zinc-200 bg-zinc-50 active:bg-zinc-100 active:border-zinc-300 [&:not(:active)]:hover:border-zinc-300 [&:not(:active)]:hover:shadow-sm'
+            : esSeguimiento
+              ? 'border-brand-100 bg-brand-50 active:bg-brand-100 active:border-brand-300 [&:not(:active)]:hover:border-brand-200 [&:not(:active)]:hover:shadow-sm'
+              : 'border-zinc-200 bg-white active:bg-brand-50 active:border-brand-200 [&:not(:active)]:hover:border-zinc-300 [&:not(:active)]:hover:shadow-sm'
+        }`}
       >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-lg font-bold text-neutral-900">{lead.nombre}</p>
-          {lead.telefono ? (
-            <p className="mt-0.5 text-sm text-neutral-500">{lead.telefono}</p>
-          ) : (
-            <p className="mt-0.5 text-sm italic text-neutral-400">Sin teléfono en encuesta</p>
-          )}
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-[15px] font-semibold leading-snug text-zinc-900">{lead.nombre}</h3>
+          <div className="shrink-0">
+            {esArchivo && <StatusPill variant="compro" dot>Compró</StatusPill>}
+            {esSeguimiento && !esArchivo && (
+              <StatusPill variant="reagendado" dot>En seguimiento</StatusPill>
+            )}
+            {!esArchivo && !reagenda && tieneSeguimiento && (
+              <StatusPill variant="in-progress" dot>Contactado</StatusPill>
+            )}
+            {!esArchivo && !esSeguimiento && !tieneSeguimiento && !reagenda && (
+              <StatusPill variant="nuevo" dot>Nuevo</StatusPill>
+            )}
+          </div>
         </div>
-        {esArchivo && (
-          <span className="shrink-0 rounded-full bg-black px-2.5 py-1 text-xs font-bold uppercase text-white">
-            Compró
-          </span>
-        )}
-      </div>
-      <p className="mt-2 text-xs text-neutral-500">
-        Promotor: {lead.promotorNombre ?? getPromotorNombre(lead.promotorId, promotores)}
-        {lead.supervisorNombre &&
-          lead.supervisorNombre !== lead.promotorNombre && (
-            <span className="text-neutral-400"> · Sup. {lead.supervisorNombre}</span>
-          )}
-      </p>
-      {mostrarAgendaEntrevista && (
-        <EntrevistaAgendaBadge
-          lead={lead}
-          titulo={reagenda ? undefined : 'Entrevista pendiente'}
-        />
-      )}
-      {lead.domicilio && (
-        <p className="mt-1 text-xs text-neutral-500">{lead.domicilio}</p>
-      )}
-      {esArchivo && productoNombre && (
-        <p className="mt-2 text-sm font-bold text-brand">
-          Compró: {productoNombre}
-          {detallePago && (
-            <span className="font-semibold text-neutral-600"> · {detallePago}</span>
-          )}
-          {lead.seguimiento?.numeroRecibo && (
-            <span className="mt-1 block text-xs font-medium text-neutral-500">
-              Recibo: {lead.seguimiento.numeroRecibo}
-            </span>
-          )}
-        </p>
-      )}
-      {reagenda && !lead.seguimiento?.fechaReagenda && !esArchivo && (
-        <p className="mt-2 rounded-lg bg-white/80 px-2 py-1.5 text-xs font-bold text-brand ring-1 ring-brand/20">
-          Próxima entrevista
-          <span className="mt-0.5 block font-normal normal-case text-neutral-500">
-            Sin fecha cargada
-          </span>
-        </p>
-      )}
-      {!esArchivo && !reagenda && tieneSeguimiento && (
-        <p className="mt-2 text-xs font-bold uppercase text-brand">Seguimiento iniciado</p>
-      )}
-      </div>
 
-      <div className="flex shrink-0 flex-col items-center justify-center border-l border-neutral-200/80 bg-neutral-50/50 px-2 py-3">
+        <dl className="mt-3 space-y-1">
+          <div className="text-[13px]">
+            <dt className="inline text-zinc-400">Tel: </dt>
+            <dd className="inline text-zinc-600">
+              {lead.telefono || (
+                <span className="italic text-zinc-400">Sin teléfono en encuesta</span>
+              )}
+            </dd>
+          </div>
+          <div className="text-[13px]">
+            <dt className="inline text-zinc-400">Promotor: </dt>
+            <dd className="inline text-zinc-600">
+              {lead.promotorNombre ?? getPromotorNombre(lead.promotorId, promotores)}
+              {lead.supervisorNombre && lead.supervisorNombre !== lead.promotorNombre && (
+                <span className="text-zinc-400"> · Sup. {lead.supervisorNombre}</span>
+              )}
+            </dd>
+          </div>
+          {lead.domicilio && (
+            <div className="text-[13px]">
+              <dt className="inline text-zinc-400">Dir: </dt>
+              <dd className="inline text-zinc-600">{lead.domicilio}</dd>
+            </div>
+          )}
+        </dl>
+
+        {mostrarAgendaEntrevista && <EntrevistaAgendaBadge lead={lead} />}
+
+        {esArchivo && productoNombre && (
+          <div className="mt-3 text-[13px]">
+            <span className="text-zinc-400">Producto: </span>
+            <span className="font-medium text-zinc-700">{productoNombre}</span>
+            {detallePago && <span className="ml-1 text-zinc-400">· {detallePago}</span>}
+            {lead.seguimiento?.numeroRecibo && (
+              <span className="ml-1 text-zinc-400">
+                · Recibo: {lead.seguimiento.numeroRecibo}
+              </span>
+            )}
+          </div>
+        )}
+      </button>
+
+      <div className="absolute bottom-3.5 right-4 md:bottom-4 md:right-5">
         <WhatsAppLeadButton telefono={lead.telefono} nombre={lead.nombre} />
       </div>
     </div>

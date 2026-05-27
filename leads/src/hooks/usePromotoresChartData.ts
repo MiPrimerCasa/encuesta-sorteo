@@ -15,16 +15,16 @@ const MESES = [
   'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic',
 ];
 
-/** Paleta contrastada para vista comparativa (todos los promotores) */
+/** Paleta monocroma brand + grises para vista comparativa */
 export const COLORES_PROMOTORES = [
-  '#C41E24',
-  '#1E40AF',
-  '#059669',
-  '#D97706',
-  '#7C3AED',
-  '#0891B2',
-  '#DB2777',
-  '#44403C',
+  '#7A1019',
+  '#B81E2A',
+  '#3F3F46',
+  '#A1A1AA',
+  '#9A1620',
+  '#71717A',
+  '#5C0B12',
+  '#D4D4D8',
 ];
 
 function getISOWeek(date: Date) {
@@ -101,7 +101,7 @@ export function usePromotoresChartData(
         mode: 'trend' as const,
         chartData,
         promotorNombre: promotor?.nombre ?? 'Promotor',
-        color: '#C41E24',
+        color: '#9A1620',
       };
     }
 

@@ -53,6 +53,10 @@ export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBa
             <p className="truncate text-[13px] font-semibold text-zinc-900">
               Mi Primer Casa
             </p>
+            {/* Nombre del usuario — solo mobile, debajo del nombre de empresa */}
+            <p className="truncate text-[11px] text-zinc-400 md:hidden">
+              {usuario.nombre}
+            </p>
           </div>
         </div>
 

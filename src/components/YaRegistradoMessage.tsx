@@ -1,17 +1,21 @@
+import { Check } from "lucide-react";
+
+/** Mismo diseño que SuccessMessage: teléfono ya registrado en la encuesta. */
 function YaRegistradoMessage() {
   return (
     <div
       id="seccion-resultado-encuesta"
-      className="felicidades-card"
+      className="pr-success"
       role="status"
       aria-live="polite"
     >
-      <span className="felicidades-card__icono-wrap" aria-hidden="true">
-        <span className="felicidades-card__icono">✓</span>
-      </span>
-      <h2 className="felicidades-card__titulo">
-        Este número de teléfono ya está participando
-      </h2>
+      <div className="pr-check" aria-hidden="true">
+        <Check size={28} strokeWidth={3} />
+      </div>
+      <p className="pr-success-text">
+        <strong>¡Felicitaciones!</strong>
+        Ya estás participando por el sorteo de las motos.
+      </p>
     </div>
   );
 }

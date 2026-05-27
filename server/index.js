@@ -124,13 +124,22 @@ function extraerMensajeProcedimiento(resultado) {
 function evaluarResultadoSp(resultado) {
   const totalAfectadas = (resultado.rowsAffected || []).reduce((acc, n) => acc + Number(n || 0), 0);
   const primeraFila = obtenerPrimeraFilaResultado(resultado);
-  const codigoResultado =
-    primeraFila && typeof primeraFila === "object" && "codigo" in primeraFila
-      ? Number(primeraFila.codigo)
-      : null;
+  const numeroDeFila = (fila, ...keys) => {
+    if (!fila || typeof fila !== "object") return null;
+    for (const key of keys) {
+      if (key in fila) {
+        const n = Number(fila[key]);
+        if (!Number.isNaN(n)) return n;
+      }
+    }
+    return null;
+  };
+  const codigoResultado = numeroDeFila(primeraFila, "codigo", "Codigo");
+  const gestionCodigo = numeroDeFila(primeraFila, "gestionCodigo", "GestionCodigo");
   const mensajeDb = extraerMensajeProcedimiento(resultado);
   const mensajeNormalizado = aMayusculas(mensajeDb);
   const yaRegistradoPorCodigo = codigoResultado === 0;
+  const yaRegistradoPorGestionCodigo = gestionCodigo === 0;
   const yaRegistradoPorMensaje =
     mensajeNormalizado.includes("YA") &&
     (mensajeNormalizado.includes("REGISTR") ||
@@ -142,7 +151,10 @@ function evaluarResultadoSp(resultado) {
     totalAfectadas,
     mensajeDb,
     yaRegistrado:
-      yaRegistradoPorCodigo || yaRegistradoPorMensaje || yaRegistradoPorSinInsert,
+      yaRegistradoPorCodigo ||
+      yaRegistradoPorGestionCodigo ||
+      yaRegistradoPorMensaje ||
+      yaRegistradoPorSinInsert,
     resultado,
   };
 }

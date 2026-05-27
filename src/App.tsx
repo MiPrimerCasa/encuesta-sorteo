@@ -125,13 +125,9 @@ function App() {
   const [datos, setDatos] = useState<FormData>(modoDemo ? ESTADO_DEMO : ESTADO_INICIAL);
   const [errores, setErrores] = useState<string[]>([]);
   const [enviando, setEnviando] = useState(false);
-  const [enviado, setEnviado] = useState(previewEnviado);
+  const [enviado, setEnviado] = useState(previewEnviado || previewYaRegistrado);
+  const [yaParticipando, setYaParticipando] = useState(previewYaRegistrado);
   const [errorEnvio, setErrorEnvio] = useState("");
-  const [mensajeYaRegistrado, setMensajeYaRegistrado] = useState(
-    previewYaRegistrado
-      ? "Vista previa: participación ya registrada."
-      : ""
-  );
   const [entrevistaConfirmada, setEntrevistaConfirmada] = useState(false);
   const [entrevistaEnviando, setEntrevistaEnviando] = useState(false);
   const [entrevistaError, setEntrevistaError] = useState("");
@@ -173,7 +169,7 @@ function App() {
    * antes del resto del contenido (sorpresa, footer).
    */
   useLayoutEffect(() => {
-    if (!enviado && mensajeYaRegistrado.length === 0) return;
+    if (!enviado) return;
     const el = document.getElementById("seccion-resultado-encuesta");
     if (!el) return;
     const prefersReduced = window.matchMedia(
@@ -186,7 +182,7 @@ function App() {
     requestAnimationFrame(() => {
       requestAnimationFrame(scroll);
     });
-  }, [enviado, mensajeYaRegistrado]);
+  }, [enviado]);
 
   useLayoutEffect(() => {
     if (!entrevistaConfirmada) return;
@@ -324,7 +320,7 @@ function App() {
 
   const handleSubmit = async () => {
     setErrorEnvio("");
-    setMensajeYaRegistrado("");
+    setYaParticipando(false);
     if (!validar()) return;
 
     if (modoDemo) {
@@ -340,10 +336,8 @@ function App() {
       setEnviando(true);
       const resultado = await enviarEncuestaALaApi("no");
       if (resultado.yaRegistrado) {
-        setMensajeYaRegistrado(
-          resultado.message ?? "Este teléfono ya fue registrado en esta encuesta."
-        );
         setParticipacionGuardada(true);
+        setYaParticipando(true);
         setEnviado(true);
         return;
       }
@@ -503,17 +497,12 @@ function App() {
 
       {enviado ? (
         <div className="pr-wrap">
-          <SuccessMessage />
+          {yaParticipando ? <YaRegistradoMessage /> : <SuccessMessage />}
           <SorpresaSection
             telefonoAsesor={supervisorInfo.telefonoSupervisor}
             masInfoBloque={bloqueMasInfo}
           />
         </div>
-      ) : mensajeYaRegistrado ? (
-        <>
-          <YaRegistradoMessage />
-          {bloqueMasInfo}
-        </>
       ) : (
         <>
           <main className="card-principal">
@@ -563,7 +552,7 @@ function App() {
         </>
       )}
 
-      <BranchFooter desbloqueado={enviado || mensajeYaRegistrado.length > 0} />
+      <BranchFooter desbloqueado={enviado} />
     </div>
   );
 }

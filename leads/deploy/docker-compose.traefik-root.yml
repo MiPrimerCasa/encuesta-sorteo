@@ -31,9 +31,7 @@ services:
       - "traefik.http.routers.leadssecure.tls=true"
       - "traefik.http.routers.leadssecure.tls.certresolver=myhttpchallenge"
       - "traefik.http.routers.leadssecure.service=leadssvc"
-      - "traefik.http.routers.leadssecure.middlewares=leadsstrip@docker,leadscompress@docker"
-      # StripPrefix: quita /leads antes de enviar al servidor Node (que sirve desde /)
-      - "traefik.http.middlewares.leadsstrip.stripprefix.prefixes=/leads"
+      - "traefik.http.routers.leadssecure.middlewares=leadscompress@docker"
       - "traefik.http.middlewares.leadscompress.compress=true"
       - "traefik.http.services.leadssvc.loadbalancer.server.port=3001"
 

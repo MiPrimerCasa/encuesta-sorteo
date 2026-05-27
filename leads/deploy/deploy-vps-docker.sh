@@ -90,7 +90,7 @@ APP_PORT="${APP_PORT:-3001}"
 HEALTH_OK=0
 for i in {1..12}; do
   # Hacemos el healthcheck directo desde el contenedor (evita dependencia de Traefik/TLS).
-  if docker exec "$SERVICE_NAME" node -e "fetch('http://127.0.0.1:${APP_PORT}/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+  if docker exec "$SERVICE_NAME" node -e "fetch('http://127.0.0.1:${APP_PORT}/leads/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
     HEALTH_OK=1
     echo ""
     echo "Smoke test OK (directo al contenedor)"

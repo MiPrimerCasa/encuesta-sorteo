@@ -15,6 +15,11 @@ const ROL_LABEL: Record<RolUsuario, string> = {
   supervisor: 'Supervisor',
 };
 
+const ROL_BADGE_CLASS: Record<RolUsuario, string> = {
+  promotor: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200',
+  supervisor: 'bg-blue-100 text-blue-700 ring-1 ring-blue-200',
+};
+
 interface NavBarProps {
   vistaActiva: VistaActiva;
   onCambiarVista: (id: VistaActiva) => void;
@@ -63,14 +68,16 @@ export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBa
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Mobile: nombre + rol chip */}
-          <span className="rounded-md bg-zinc-100 px-2.5 py-1.5 text-[12px] font-semibold text-zinc-600 md:hidden">
+          {/* Rol badge — visible en todos los tamaños */}
+          <span
+            className={`rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${ROL_BADGE_CLASS[usuario.rol]}`}
+          >
             {ROL_LABEL[usuario.rol]}
           </span>
 
           {/* Desktop: nombre + logout */}
           <div className="hidden items-center gap-3 md:flex">
-            <span className="text-[13px] text-zinc-500">{usuario.nombre}</span>
+            <span className="max-w-[140px] truncate text-[13px] text-zinc-500">{usuario.nombre}</span>
             <button
               type="button"
               onClick={onLogout}

@@ -7,7 +7,8 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci \
+  && npm i --no-save @rollup/rollup-linux-x64-gnu
 COPY tsconfig.json vite.config.ts index.html ./
 COPY public ./public
 COPY src ./src

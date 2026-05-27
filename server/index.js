@@ -124,22 +124,23 @@ function extraerMensajeProcedimiento(resultado) {
 function evaluarResultadoSp(resultado) {
   const totalAfectadas = (resultado.rowsAffected || []).reduce((acc, n) => acc + Number(n || 0), 0);
   const filas = [resultado.recordset ?? [], ...(resultado.recordsets ?? [])].flat();
-  const numeroDeFila = (filasArray, ...keys) => {
-    for (const fila of filasArray) {
-      if (!fila || typeof fila !== "object") continue;
-      for (const key of keys) {
-        if (key in fila) {
-          const n = Number(fila[key]);
-          if (!Number.isNaN(n)) return n;
-        }
-      }
-    }
-    return null;
-  };
+  const normalizarClave = (k) => String(k ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+
   // Detecta "ya registrado" aunque el SP devuelva los campos en una fila distinta
-  // a la primera (p. ej. recordsets con múltiples filas).
-  const codigoResultado = numeroDeFila(filas, "codigo", "Codigo");
-  const gestionCodigo = numeroDeFila(filas, "gestionCodigo", "GestionCodigo");
+  // o con nombres de columna variables/case-insensitive.
+  let codigoResultado = null;
+  let gestionCodigo = null;
+  for (const fila of filas) {
+    if (!fila || typeof fila !== "object") continue;
+    for (const [key, value] of Object.entries(fila)) {
+      const n = Number(value);
+      if (Number.isNaN(n)) continue;
+      const keyNorm = normalizarClave(key);
+      if (codigoResultado === null && keyNorm === "codigo") codigoResultado = n;
+      if (gestionCodigo === null && keyNorm.includes("gestioncodigo")) gestionCodigo = n;
+    }
+    if (codigoResultado !== null && gestionCodigo !== null) break;
+  }
   const mensajeDb = extraerMensajeProcedimiento(resultado);
   const mensajeNormalizado = aMayusculas(mensajeDb);
   const yaRegistradoPorCodigo = codigoResultado === 0;
@@ -154,6 +155,8 @@ function evaluarResultadoSp(resultado) {
   return {
     totalAfectadas,
     mensajeDb,
+    codigoResultado,
+    gestionCodigo,
     yaRegistrado:
       yaRegistradoPorCodigo ||
       yaRegistradoPorGestionCodigo ||
@@ -349,13 +352,19 @@ app.post("/api/survey", async (req, res) => {
 
   try {
     const pool = await getPool();
-    const { yaRegistrado, mensajeDb, resultado } = await ejecutarEncuestaCarga(pool, payload);
+    const { yaRegistrado, mensajeDb, resultado, codigoResultado, gestionCodigo } =
+      await ejecutarEncuestaCarga(pool, payload);
 
     if (yaRegistrado) {
       return res.status(409).json({
         message: mensajeDb || "Este teléfono ya fue registrado en el sorteo.",
         code: "ALREADY_REGISTERED",
         procedure: SP_NAME,
+        debug: {
+          mensajeDb,
+          codigoResultado,
+          gestionCodigo,
+        },
         result: {
           rowsAffected: resultado.rowsAffected,
           returnValue: resultado.returnValue,

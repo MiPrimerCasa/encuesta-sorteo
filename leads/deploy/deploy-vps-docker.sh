@@ -58,12 +58,27 @@ docker compose --project-directory "$LEADS_DIR" \
   -f "$TRAEFIK_FRAGMENT" \
   build "$SERVICE_NAME"
 
-# Si existe un contenedor viejo con el mismo nombre (a veces queda "huérfano"),
-# `docker compose up` puede fallar por conflicto. Lo limpiamos antes de recrear.
+# Limpiar contenedor viejo (a veces queda como "Removal in progress" o "Created" huérfano).
+# Sin --rmi para no borrar la imagen recién construida.
 docker compose --project-directory "$LEADS_DIR" \
   -f "$ROOT_COMPOSE" \
   -f "$TRAEFIK_FRAGMENT" \
-  rm -sf "$SERVICE_NAME" || true
+  rm -sf "$SERVICE_NAME" >/dev/null 2>&1 || true
+
+# Garantía extra: si quedó un contenedor con ese nombre por cualquier motivo, forzar remove.
+# Reintentos por si Docker reporta "removal already in progress" (race en stop/remove anterior).
+for attempt in 1 2 3 4 5 6 7 8; do
+  if ! docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
+    break
+  fi
+  echo "Quitando contenedor viejo (intento ${attempt}/8)..."
+  docker rm -f "$SERVICE_NAME" >/dev/null 2>&1 || true
+  sleep 2
+done
+
+if docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
+  echo "WARN: no se pudo quitar el contenedor viejo, intentando up de todos modos."
+fi
 
 docker compose --project-directory "$LEADS_DIR" \
   -f "$ROOT_COMPOSE" \

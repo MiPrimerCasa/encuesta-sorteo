@@ -71,15 +71,17 @@ docker compose --project-directory "$LEADS_DIR" \
   up -d --no-deps --force-recreate "$SERVICE_NAME"
 
 echo "Waiting for health..."
+APP_PORT="${APP_PORT:-3001}"
 HEALTH_OK=0
-for i in {1..10}; do
-  if curl -sfk -H "Host: ${LEADS_HOST}" "https://127.0.0.1/api/health" | tee /tmp/leads-health.json; then
+for i in {1..12}; do
+  # Hacemos el healthcheck directo desde el contenedor (evita dependencia de Traefik/TLS).
+  if docker exec "$SERVICE_NAME" node -e "fetch('http://127.0.0.1:${APP_PORT}/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
     HEALTH_OK=1
     echo ""
-    echo "Smoke test OK"
+    echo "Smoke test OK (directo al contenedor)"
     break
   fi
-  echo "Health not ready yet (${i}/10) — esperando..."
+  echo "Health not ready yet (${i}/12) — esperando..."
   sleep 3
 done
 

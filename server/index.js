@@ -123,19 +123,23 @@ function extraerMensajeProcedimiento(resultado) {
 
 function evaluarResultadoSp(resultado) {
   const totalAfectadas = (resultado.rowsAffected || []).reduce((acc, n) => acc + Number(n || 0), 0);
-  const primeraFila = obtenerPrimeraFilaResultado(resultado);
-  const numeroDeFila = (fila, ...keys) => {
-    if (!fila || typeof fila !== "object") return null;
-    for (const key of keys) {
-      if (key in fila) {
-        const n = Number(fila[key]);
-        if (!Number.isNaN(n)) return n;
+  const filas = [resultado.recordset ?? [], ...(resultado.recordsets ?? [])].flat();
+  const numeroDeFila = (filasArray, ...keys) => {
+    for (const fila of filasArray) {
+      if (!fila || typeof fila !== "object") continue;
+      for (const key of keys) {
+        if (key in fila) {
+          const n = Number(fila[key]);
+          if (!Number.isNaN(n)) return n;
+        }
       }
     }
     return null;
   };
-  const codigoResultado = numeroDeFila(primeraFila, "codigo", "Codigo");
-  const gestionCodigo = numeroDeFila(primeraFila, "gestionCodigo", "GestionCodigo");
+  // Detecta "ya registrado" aunque el SP devuelva los campos en una fila distinta
+  // a la primera (p. ej. recordsets con múltiples filas).
+  const codigoResultado = numeroDeFila(filas, "codigo", "Codigo");
+  const gestionCodigo = numeroDeFila(filas, "gestionCodigo", "GestionCodigo");
   const mensajeDb = extraerMensajeProcedimiento(resultado);
   const mensajeNormalizado = aMayusculas(mensajeDb);
   const yaRegistradoPorCodigo = codigoResultado === 0;

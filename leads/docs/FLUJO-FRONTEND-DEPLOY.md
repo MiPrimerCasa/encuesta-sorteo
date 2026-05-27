@@ -29,19 +29,29 @@ En **SISTEMA_SEGUIMIENTO_LEADS** → **Settings** → **Secrets and variables** 
 
 ### Instalar el workflow en el repo standalone
 
-Copiar estos archivos desde el monorepo (o tras `git pull` en encuesta-sorteo):
+**Estado actual:** en `main` ya están instalados:
 
-```bash
-# En clone de SISTEMA_SEGUIMIENTO_LEADS (raíz del repo)
-cp deploy/github-workflow/sync-monorepo-and-deploy.yml .github/workflows/
-cp scripts/sync-to-monorepo.sh scripts/   # si no existe
-chmod +x scripts/sync-to-monorepo.sh
+- `.github/workflows/sync-monorepo-and-deploy.yml`
+- `scripts/sync-to-monorepo.sh`
+
+Si en tu clone ya tenés esos archivos, **saltá este bloque** y andá a [Configurar secrets](#configurar-secrets-una-sola-vez).
+
+Solo copiá si faltan (desde este repo o desde el monorepo en el VPS):
+
+```powershell
+cd C:\ruta\a\SISTEMA_SEGUIMIENTO_LEADS
+New-Item -ItemType Directory -Force .github\workflows, scripts
+Copy-Item deploy\github-workflow\sync-monorepo-and-deploy.yml .github\workflows\
+Copy-Item scripts\sync-to-monorepo.sh scripts\   # si no existe
 git add .github/workflows/sync-monorepo-and-deploy.yml scripts/sync-to-monorepo.sh
 git commit -m "ci: sync automático al monorepo y deploy VPS"
 git push origin main
 ```
 
-> Las rutas en el monorepo son `leads/deploy/github-workflow/...` y `leads/scripts/...`.
+> Plantilla: `deploy/github-workflow/sync-monorepo-and-deploy.yml`  
+> Activo en GitHub: `.github/workflows/sync-monorepo-and-deploy.yml`
+
+### Configurar secrets (una sola vez)
 
 ### Crear el PAT (`MONOREPO_PUSH_TOKEN`)
 
@@ -55,6 +65,36 @@ git push origin main
 - Scope: `repo` (o al menos acceso al repo de la org)
 
 Guardar el token como secret `MONOREPO_PUSH_TOKEN` en **SISTEMA_SEGUIMIENTO_LEADS** (no en el monorepo).
+
+### Error 128 en Actions (git)
+
+Suele ser el paso **Commit y push en monorepo**. Causas frecuentes:
+
+| Causa | Solución |
+|-------|----------|
+| `MONOREPO_PUSH_TOKEN` inválido o sin **write** en `encuesta-sorteo` | Crear PAT nuevo (Contents: Read and write) y actualizar el secret |
+| `git pull --rebase` en **detached HEAD** | Corregido en el workflow: `ref: main` + `git checkout -B main origin/main` |
+| Push rechazado (otro commit en `main`) | El workflow hace `pull --rebase` antes del `push` |
+| Carpeta `leads/` no existía en el monorepo | El script `sync-to-monorepo.sh` ahora la crea si falta |
+
+Si sigue fallando, abrí el log del paso rojo y buscá la línea `fatal:` (ej. `Permission denied`, `rebase failed`).
+
+### Probar el deploy (manual)
+
+1. GitHub → **MiPrimerCasa/SISTEMA_SEGUIMIENTO_LEADS** → **Actions**
+2. Workflow **「Sync monorepo y deploy producción」**
+3. **Run workflow** → branch `main` → **Run workflow**
+
+Debería: sync a `encuesta-sorteo/leads/` → push al monorepo (si hay diff) → SSH al VPS → `./leads/deploy/deploy-vps-docker.sh`
+
+### Verificar producción
+
+- https://www.miprimercasafsa-sorteo.com/leads
+- Login del CRM y pantalla de leads
+
+### Flujo normal (de ahora en más)
+
+Rama → PR → merge a `main` en **SISTEMA_SEGUIMIENTO_LEADS** → Actions corre solo → producción actualizada.
 
 ## Flujo manual (respaldo)
 

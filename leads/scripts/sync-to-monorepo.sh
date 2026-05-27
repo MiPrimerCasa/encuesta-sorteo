@@ -9,8 +9,8 @@ MONOREPO="$(cd "${2:?monorepo root}" && pwd)"
 DEST="${MONOREPO}/leads"
 
 if [[ ! -d "$DEST" ]]; then
-  echo "ERROR: no existe ${DEST} (¿clonaste encuesta-sorteo?)"
-  exit 1
+  echo "WARN: no existe ${DEST}, se crea (primera vez en el monorepo)"
+  mkdir -p "$DEST"
 fi
 
 RSYNC_EX=( -a

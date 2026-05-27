@@ -73,10 +73,10 @@ Mirá **qué paso está en rojo** en el log:
 | Paso rojo | Causa habitual | Qué hacer |
 |-----------|----------------|-----------|
 | **Commit y push en monorepo** | PAT sin write, rebase con cambios locales | Revisar `MONOREPO_PUSH_TOKEN`; el workflow hace `git reset --hard` + `rebase` + push con token explícito |
-| **Subir leads al VPS** | `dial tcp HOST:22: i/o timeout` | El runner de GitHub **no alcanza** el VPS por SSH. Revisar `VPS_HOST` (IP pública, sin espacios), firewall Hostinger (puerto 22 abierto), fail2ban, y que SSH no sea solo desde tu IP. Opcional: secret `VPS_PORT` si SSH no usa 22 |
-| **Desplegar leads en VPS** | Build Docker, contenedor, healthcheck | Ver log del paso; el script hace deploy por Docker sin `git pull` en el VPS |
+| **Subir leads al VPS** | `dial tcp … i/o timeout` (intermitente) | Reintentar el workflow; secrets `VPS_*` en **este** repo. Si falla SCP pero la encuesta despliega, comparar `VPS_HOST` con el de encuesta-sorteo |
+| **Desplegar leads en VPS** | Docker / healthcheck | Ver log del paso SSH |
 
-Secrets SSH: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` (y opcional `VPS_PORT`).
+Deploy activo: **sync monorepo + SCP + SSH** en este repo (run verde conocida: workflow con timeout 120s). Los secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` van en **SISTEMA_SEGUIMIENTO_LEADS**.
 
 Si sigue fallando, abrí el paso rojo y buscá `fatal:` o `error message:`.
 

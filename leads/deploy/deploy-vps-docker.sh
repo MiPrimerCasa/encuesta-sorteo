@@ -64,14 +64,21 @@ docker compose --project-directory "$LEADS_DIR" \
   up -d --no-deps "$SERVICE_NAME"
 
 echo "Waiting for health..."
-sleep 5
+HEALTH_OK=0
+for i in {1..10}; do
+  if curl -sfk -H "Host: ${LEADS_HOST}" "https://127.0.0.1/api/health" | tee /tmp/leads-health.json; then
+    HEALTH_OK=1
+    echo ""
+    echo "Smoke test OK"
+    break
+  fi
+  echo "Health not ready yet (${i}/10) — esperando..."
+  sleep 3
+done
 
-if curl -sfk -H "Host: ${LEADS_HOST}" "https://127.0.0.1/api/health" | tee /tmp/leads-health.json; then
-  echo ""
-  echo "Smoke test OK"
-else
+if [[ "$HEALTH_OK" -ne 1 ]]; then
   echo "WARN: smoke test falló — docker logs ${SERVICE_NAME}"
-  docker logs --tail 80 "$SERVICE_NAME" || true
+  docker logs --tail 120 "$SERVICE_NAME" || true
   exit 1
 fi
 

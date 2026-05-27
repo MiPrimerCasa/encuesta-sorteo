@@ -116,9 +116,35 @@ fi
 docker ps --filter "name=${SERVICE_NAME}" --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 
 echo "--- Diagnóstico redes ---"
-docker inspect "$SERVICE_NAME" --format '{{range $net, $cfg := .NetworkSettings.Networks}}  red: {{$net}} ip: {{$cfg.IPAddress}}{{"\n"}}{{end}}' 2>/dev/null || echo "no se pudo inspeccionar"
-echo "--- Redes Docker disponibles ---"
-docker network ls --format 'table {{.Name}}\t{{.Driver}}\t{{.Scope}}'
-echo "--- Labels Traefik en contenedor ---"
-docker inspect "$SERVICE_NAME" --format '{{json .Config.Labels}}' 2>/dev/null | python3 -c "import sys,json; [print(f'  {k}={v}') for k,v in json.load(sys.stdin).items() if k.startswith('traefik')]" 2>/dev/null || true
+echo "Redes de ${SERVICE_NAME}:"
+docker inspect "$SERVICE_NAME" --format '{{range $net, $cfg := .NetworkSettings.Networks}}  {{$net}} ip={{$cfg.IPAddress}}{{"\n"}}{{end}}' 2>/dev/null || echo "  (no se pudo inspeccionar)"
+echo "Todas las redes Docker:"
+docker network ls --format '  {{.Name}} driver={{.Driver}}'
+
+# Auto-conectar a la misma red que el contenedor principal de la encuesta.
+# Traefik vigila la red en la que corre la encuesta; si leads no está en esa red, no se descubre.
+ENCUESTA_CONTAINER="${ENCUESTA_CONTAINER:-encuesta-landingqr}"
+if docker inspect "$ENCUESTA_CONTAINER" >/dev/null 2>&1; then
+  ENCUESTA_NETWORKS=$(docker inspect "$ENCUESTA_CONTAINER" \
+    --format '{{range $net, $cfg := .NetworkSettings.Networks}}{{$net}} {{end}}' \
+    | tr ' ' '\n' | grep -v '^$' || true)
+  echo "Redes de ${ENCUESTA_CONTAINER}:"
+  for NET in $ENCUESTA_NETWORKS; do
+    echo "  ${NET}"
+    if ! docker inspect "$SERVICE_NAME" \
+         --format '{{range $net, $cfg := .NetworkSettings.Networks}}{{$net}} {{end}}' \
+         2>/dev/null | grep -qw "$NET"; then
+      echo "  → Conectando ${SERVICE_NAME} a ${NET}..."
+      docker network connect "$NET" "$SERVICE_NAME" 2>/dev/null \
+        && echo "  → OK" || echo "  → ya conectado o error (ignorado)"
+    else
+      echo "  → ${SERVICE_NAME} ya está en ${NET}"
+    fi
+  done
+else
+  echo "Contenedor ${ENCUESTA_CONTAINER} no encontrado — no se puede auto-detectar red."
+fi
+
+echo "Redes finales de ${SERVICE_NAME}:"
+docker inspect "$SERVICE_NAME" --format '{{range $net, $cfg := .NetworkSettings.Networks}}  {{$net}} ip={{$cfg.IPAddress}}{{"\n"}}{{end}}' 2>/dev/null || true
 echo "=== Deploy finished ==="

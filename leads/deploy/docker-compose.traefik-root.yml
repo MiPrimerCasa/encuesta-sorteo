@@ -23,17 +23,19 @@ services:
     networks:
       - root_default
     labels:
-      - traefik.enable=true
-      - traefik.docker.network=root_default
-      # Ruta /leads en el mismo dominio que la encuesta
-      - traefik.http.routers.leadssecure.rule=Host(`${LEADS_DOMAIN:-www.miprimercasafsa-sorteo.com}`) && PathPrefix(`/leads`)
-      - traefik.http.routers.leadssecure.entrypoints=websecure
-      - traefik.http.routers.leadssecure.tls=true
-      - traefik.http.routers.leadssecure.tls.certresolver=myhttpchallenge
-      - traefik.http.routers.leadssecure.service=leadssvc
-      - traefik.http.routers.leadssecure.middlewares=leadscompress@docker
-      - traefik.http.middlewares.leadscompress.compress=true
-      - traefik.http.services.leadssvc.loadbalancer.server.port=3001
+      - "traefik.enable=true"
+      - "traefik.docker.network=root_default"
+      # Router: /leads en el dominio principal
+      - "traefik.http.routers.leadssecure.rule=Host(`www.miprimercasafsa-sorteo.com`) && PathPrefix(`/leads`)"
+      - "traefik.http.routers.leadssecure.entrypoints=websecure"
+      - "traefik.http.routers.leadssecure.tls=true"
+      - "traefik.http.routers.leadssecure.tls.certresolver=myhttpchallenge"
+      - "traefik.http.routers.leadssecure.service=leadssvc"
+      - "traefik.http.routers.leadssecure.middlewares=leadsstrip@docker,leadscompress@docker"
+      # StripPrefix: quita /leads antes de enviar al servidor Node (que sirve desde /)
+      - "traefik.http.middlewares.leadsstrip.stripprefix.prefixes=/leads"
+      - "traefik.http.middlewares.leadscompress.compress=true"
+      - "traefik.http.services.leadssvc.loadbalancer.server.port=3001"
 
 networks:
   root_default:

@@ -114,4 +114,11 @@ if [[ "$HEALTH_OK" -ne 1 ]]; then
 fi
 
 docker ps --filter "name=${SERVICE_NAME}" --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+
+echo "--- Diagnóstico redes ---"
+docker inspect "$SERVICE_NAME" --format '{{range $net, $cfg := .NetworkSettings.Networks}}  red: {{$net}} ip: {{$cfg.IPAddress}}{{"\n"}}{{end}}' 2>/dev/null || echo "no se pudo inspeccionar"
+echo "--- Redes Docker disponibles ---"
+docker network ls --format 'table {{.Name}}\t{{.Driver}}\t{{.Scope}}'
+echo "--- Labels Traefik en contenedor ---"
+docker inspect "$SERVICE_NAME" --format '{{json .Config.Labels}}' 2>/dev/null | python3 -c "import sys,json; [print(f'  {k}={v}') for k,v in json.load(sys.stdin).items() if k.startswith('traefik')]" 2>/dev/null || true
 echo "=== Deploy finished ==="

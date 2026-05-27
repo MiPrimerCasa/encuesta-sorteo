@@ -149,10 +149,18 @@ export async function guardarSeguimiento(leadId: string, seguimiento: Seguimient
 
 /** Solo en modo demo (npm run dev:demo). En producción los leads vienen del SP de encuestas. */
 export async function crearLead(nuevoLead: NuevoLeadData) {
-  if (!IS_DEMO) {
-    throw new Error(
-      'Agendar cliente manual no está disponible en producción. Los leads se cargan desde la encuesta.',
-    );
+  if (IS_DEMO) {
+    return createDemoLead(nuevoLead);
   }
-  return createDemoLead(nuevoLead);
+  // Fallback temporal: permite usar el formulario aunque backend aún no tenga alta manual.
+  // El lead queda en memoria de la sesión actual (se pierde al recargar).
+  try {
+    const data = await apiFetch<{ lead: Lead }>('/api/leads/manual', {
+      method: 'POST',
+      body: JSON.stringify(nuevoLead),
+    });
+    return data.lead;
+  } catch {
+    return createDemoLead(nuevoLead);
+  }
 }

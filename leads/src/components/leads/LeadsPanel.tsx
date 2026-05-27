@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { isDemoMode } from '../../api/client';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
 import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
 import { LeadCard } from './LeadCard';
@@ -159,19 +158,17 @@ export function LeadsPanel({
         })}
       </nav>
 
-      {isDemoMode && (
-        <button
-          type="button"
-          onClick={() => setAgendarAbierto(true)}
-          style={{ touchAction: 'manipulation' }}
-          className="mb-6 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-100 text-[14px] font-semibold text-zinc-600 transition-all duration-[120ms] ease-out active:scale-[0.98] active:bg-zinc-200 hover:bg-zinc-200"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-          </svg>
-          Agendar cliente (demo)
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setAgendarAbierto(true)}
+        style={{ touchAction: 'manipulation' }}
+        className="mb-6 flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-zinc-200 bg-zinc-100 text-[14px] font-semibold text-zinc-600 transition-all duration-[120ms] ease-out active:scale-[0.98] active:bg-zinc-200 hover:bg-zinc-200"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+        Agendar cliente
+      </button>
 
       {/* Título de la sección activa */}
       <div className="mb-4 flex items-baseline gap-2">

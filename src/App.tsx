@@ -80,10 +80,14 @@ function obtenerParametro(params: URLSearchParams, claves: string[]): string {
     if (valor && valor.trim()) return valor.trim();
   }
   const clavesLower = new Set(claves.map((c) => c.toLowerCase()));
-  for (const [key, value] of params.entries()) {
-    if (clavesLower.has(key.toLowerCase()) && value.trim()) return value.trim();
-  }
-  return "";
+  let encontrado = "";
+  params.forEach((value, key) => {
+    if (encontrado) return;
+    if (clavesLower.has(key.toLowerCase()) && value.trim()) {
+      encontrado = value.trim();
+    }
+  });
+  return encontrado;
 }
 
 /** Solo nombre del promotor (sin "Supervisado por …" u otros sufijos del sistema). */

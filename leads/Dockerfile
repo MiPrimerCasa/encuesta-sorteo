@@ -7,8 +7,12 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
+# Workaround del bug de npm con optional deps (rollup + lightningcss)
 RUN npm ci \
-  && npm i --no-save @rollup/rollup-linux-x64-gnu
+  && npm i --no-save \
+       @rollup/rollup-linux-x64-gnu \
+       lightningcss-linux-x64-gnu \
+       @tailwindcss/oxide-linux-x64-gnu
 COPY tsconfig.json vite.config.ts index.html ./
 COPY public ./public
 COPY src ./src

@@ -73,7 +73,7 @@ Mirá **qué paso está en rojo** en el log:
 | Paso rojo | Causa habitual | Qué hacer |
 |-----------|----------------|-----------|
 | **Commit y push en monorepo** | PAT sin write, rebase con cambios locales | Revisar `MONOREPO_PUSH_TOKEN`; el workflow hace `git reset --hard` + `rebase` + push con token explícito |
-| **Deploy leads en VPS** | Cambios locales en `/opt/encuesta-landingqr` o `git pull` con working tree sucio | Corregido: en SSH se hace `checkout` + `reset --hard` + `clean` antes del deploy; el script no vuelve a hacer `pull` si `SKIP_MONOREPO_GIT_PULL=1` |
+| **Desplegar leads en VPS** | `git fetch` en el VPS sin credenciales (repo privado) o working tree sucio | Corregido: Actions sube `leads/` por SCP (`tar` + `scp`) y en el VPS solo corre Docker (sin `git pull`) |
 
 Si sigue fallando, abrí el paso rojo y buscá `fatal:` (ej. `Permission denied`, `not a git repository`, `rebase failed`).
 

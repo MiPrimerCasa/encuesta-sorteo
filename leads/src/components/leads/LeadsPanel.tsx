@@ -54,6 +54,7 @@ const TABS: Array<{
 interface LeadsPanelProps {
   leads: Lead[];
   rolUsuario: RolUsuario;
+  nombreUsuario?: string;
   promotores: Promotor[];
   productos: Producto[];
   barrios: Barrio[];
@@ -64,6 +65,7 @@ interface LeadsPanelProps {
 export function LeadsPanel({
   leads,
   rolUsuario,
+  nombreUsuario,
   promotores,
   productos,
   barrios,
@@ -195,6 +197,7 @@ export function LeadsPanel({
               promotores={promotores}
               productos={productos}
               barrios={barrios}
+              nombreUsuario={nombreUsuario}
             />
           ))}
         </div>

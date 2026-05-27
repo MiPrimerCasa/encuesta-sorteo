@@ -33,7 +33,10 @@ export function abrirChatWhatsApp(
   return true;
 }
 
-export function mensajeWhatsAppLead(nombreLead: string) {
+export function mensajeWhatsAppLead(nombreLead: string, nombreUsuario?: string) {
   const nombre = nombreLead.trim() || 'cliente';
-  return `Hola ${nombre}, te contacto desde Mi Primer Casa.`;
+  if (nombreUsuario?.trim()) {
+    return `Hola ${nombre}! Buenos días, me comunico para confirmar la entrevista, mi nombre es ${nombreUsuario.trim()} asesor comercial de Mi Primer Casa S.A.`;
+  }
+  return `Hola ${nombre}! Buenos días, me comunico para confirmar la entrevista desde Mi Primer Casa S.A.`;
 }

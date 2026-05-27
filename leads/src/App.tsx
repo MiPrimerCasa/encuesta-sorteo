@@ -109,6 +109,7 @@ function AppShell() {
           <LeadsPanel
             leads={leads}
             rolUsuario={usuario.rol}
+            nombreUsuario={usuario.nombre}
             promotores={promotores}
             productos={productos}
             barrios={barrios}

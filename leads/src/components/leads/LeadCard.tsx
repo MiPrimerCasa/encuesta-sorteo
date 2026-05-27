@@ -18,6 +18,7 @@ interface LeadCardProps {
   promotores?: Promotor[];
   productos?: Producto[];
   barrios?: Barrio[];
+  nombreUsuario?: string;
 }
 
 export function LeadCard({
@@ -27,6 +28,7 @@ export function LeadCard({
   promotores = [],
   productos = [],
   barrios = [],
+  nombreUsuario,
 }: LeadCardProps) {
   const compro = leadCompro(lead);
   const reagenda = leadReagendaEntrevista(lead);
@@ -122,7 +124,7 @@ export function LeadCard({
       </button>
 
       <div className="absolute bottom-3.5 right-4 md:bottom-4 md:right-5">
-        <WhatsAppLeadButton telefono={lead.telefono} nombre={lead.nombre} />
+        <WhatsAppLeadButton telefono={lead.telefono} nombre={lead.nombre} nombreUsuario={nombreUsuario} />
       </div>
     </div>
   );

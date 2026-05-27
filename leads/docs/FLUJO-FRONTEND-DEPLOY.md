@@ -68,17 +68,14 @@ Guardar el token como secret `MONOREPO_PUSH_TOKEN` en **SISTEMA_SEGUIMIENTO_LEAD
 
 ### Error 128 en Actions (git)
 
-Suele ser el paso **Commit y push en monorepo**. Causas frecuentes:
+Mirá **qué paso está en rojo** en el log:
 
-| Causa | Solución |
-|-------|----------|
-| `MONOREPO_PUSH_TOKEN` inválido o sin **write** en `encuesta-sorteo` | Crear PAT nuevo (Contents: Read and write) y actualizar el secret |
-| `git pull --rebase` en **detached HEAD** | Corregido: `ref: main` + `git checkout -B main origin/main` |
-| `cannot pull with rebase: You have unstaged changes` | Corregido: `git add -A leads/` + limpiar working tree antes de `git rebase` |
-| Push rechazado (otro commit en `main`) | `git fetch` + `git rebase origin/main` antes del `push` |
-| Carpeta `leads/` no existía en el monorepo | El script `sync-to-monorepo.sh` ahora la crea si falta |
+| Paso rojo | Causa habitual | Qué hacer |
+|-----------|----------------|-----------|
+| **Commit y push en monorepo** | PAT sin write, rebase con cambios locales | Revisar `MONOREPO_PUSH_TOKEN`; el workflow hace `git reset --hard` + `rebase` + push con token explícito |
+| **Deploy leads en VPS** | Cambios locales en `/opt/encuesta-landingqr` o `git pull` con working tree sucio | Corregido: en SSH se hace `checkout` + `reset --hard` + `clean` antes del deploy; el script no vuelve a hacer `pull` si `SKIP_MONOREPO_GIT_PULL=1` |
 
-Si sigue fallando, abrí el log del paso rojo y buscá la línea `fatal:` (ej. `Permission denied`, `rebase failed`).
+Si sigue fallando, abrí el paso rojo y buscá `fatal:` (ej. `Permission denied`, `not a git repository`, `rebase failed`).
 
 ### Probar el deploy (manual)
 

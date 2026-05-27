@@ -53,9 +53,8 @@ if [[ -d "${SOURCE_ROOT}/deploy" ]]; then
   mkdir -p "${DEST}/deploy"
   rsync "${RSYNC_EX[@]}" \
     --exclude 'github-workflow' \
-    --exclude 'docker-compose.traefik-root.yml' \
     "${SOURCE_ROOT}/deploy/" "${DEST}/deploy/"
-  echo "  synced deploy/ (sin github-workflow ni traefik-root monorepo)"
+  echo "  synced deploy/ (sin github-workflow)"
 fi
 
 for f in package.json package-lock.json tsconfig.json vite.config.ts index.html \

@@ -1,4 +1,6 @@
-# Monorepo: mismo dominio que la encuesta, ruta /leads
+# Fragmento Traefik — monorepo encuesta-sorteo
+# Ruta: /leads en el dominio principal (mismo que la encuesta)
+#
 #   ./leads/deploy/deploy-vps-docker.sh
 
 services:
@@ -7,7 +9,7 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        VITE_BASE: /leads/
+        VITE_BASE: ${LEADS_VITE_BASE:-/leads/}
     image: seguimiento-leads:latest
     container_name: seguimiento-leads
     restart: unless-stopped
@@ -16,7 +18,6 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3001"
-      BASE_PATH: /leads
     volumes:
       - ./data:/app/data
     networks:
@@ -24,20 +25,13 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=root_default
-      - traefik.http.routers.leadswww.rule=Host(`www.miprimercasafsa-sorteo.com`) && PathPrefix(`/leads`)
-      - traefik.http.routers.leadswww.entrypoints=web,websecure
-      - traefik.http.routers.leadswww.priority=100
-      - traefik.http.routers.leadswww.tls=true
-      - traefik.http.routers.leadswww.tls.certresolver=myhttpchallenge
-      - traefik.http.routers.leadswww.service=leadssvc
-      - traefik.http.routers.leadswww.middlewares=leadscompress@docker
-      - traefik.http.routers.leadsapex.rule=Host(`miprimercasafsa-sorteo.com`) && PathPrefix(`/leads`)
-      - traefik.http.routers.leadsapex.entrypoints=web,websecure
-      - traefik.http.routers.leadsapex.priority=100
-      - traefik.http.routers.leadsapex.tls=true
-      - traefik.http.routers.leadsapex.tls.certresolver=myhttpchallenge
-      - traefik.http.routers.leadsapex.service=leadssvc
-      - traefik.http.routers.leadsapex.middlewares=leadscompress@docker
+      # Ruta /leads en el mismo dominio que la encuesta
+      - traefik.http.routers.leadssecure.rule=Host(`${LEADS_DOMAIN:-www.miprimercasafsa-sorteo.com}`) && PathPrefix(`/leads`)
+      - traefik.http.routers.leadssecure.entrypoints=websecure
+      - traefik.http.routers.leadssecure.tls=true
+      - traefik.http.routers.leadssecure.tls.certresolver=myhttpchallenge
+      - traefik.http.routers.leadssecure.service=leadssvc
+      - traefik.http.routers.leadssecure.middlewares=leadscompress@docker
       - traefik.http.middlewares.leadscompress.compress=true
       - traefik.http.services.leadssvc.loadbalancer.server.port=3001
 

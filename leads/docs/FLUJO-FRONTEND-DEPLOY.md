@@ -76,7 +76,7 @@ Mirá **qué paso está en rojo** en el log:
 | **Subir leads al VPS** | `dial tcp … i/o timeout` (intermitente) | Reintentar el workflow; secrets `VPS_*` en **este** repo. Si falla SCP pero la encuesta despliega, comparar `VPS_HOST` con el de encuesta-sorteo |
 | **Desplegar leads en VPS** | Docker / healthcheck | Ver log del paso SSH |
 
-Deploy activo: **sync monorepo + SCP + SSH** en este repo (run verde conocida: workflow con timeout 120s). Los secrets `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY` van en **SISTEMA_SEGUIMIENTO_LEADS**.
+Deploy activo: sync monorepo + git pull en VPS via encuesta-sorteo. Ultimo deploy: 2026-05-27 07:44
 
 Si sigue fallando, abrí el paso rojo y buscá `fatal:` o `error message:`.
 

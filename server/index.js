@@ -15,6 +15,12 @@ const SP_INTERVIEW =
   process.env.SP_INTERVIEW_NAME || "dbo.encuestaActualizaEntrevistaSorteo01";
 const ENCUESTA_TABLE = process.env.ENCUESTA_TABLE_NAME || "encuesta";
 
+// Canal de origen (1=QR, 2=Manual, 3=Instagram, 4=Facebook).
+// Mantener en `false` hasta que el SP `dbo.encuestaCargaSorteo01` declare el parámetro;
+// si se manda un parámetro que el SP no define, SQL Server tira error y rompe la carga.
+const SP_INCLUDE_ORIGEN = process.env.SP_INCLUDE_ORIGEN === "true";
+const SP_ORIGEN_PARAM_NAME = process.env.SP_ORIGEN_PARAM_NAME || "origen";
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const distPath = path.resolve(__dirname, "../dist");
@@ -66,6 +72,13 @@ const encuestaSchema = z.object({
   codigoQr: z.string().trim().max(80).optional().default(""),
   mensajeWhatsapp: z.string().trim().max(100).optional().default(""),
   origen: z.string().trim().max(80).optional().default("whatsapp-encuesta-directa"),
+  /** Canal de origen (1=QR, 2=Manual, 3=Instagram, 4=Facebook). null si no vino en la URL. */
+  canalOrigen: z
+    .union([z.number().int().min(1).max(4), z.null()])
+    .optional()
+    .nullable()
+    .default(null),
+  canalOrigenTexto: z.string().trim().max(20).optional().default(""),
   /** Vienen del link de WhatsApp (query string), no de un SP. */
   telefonoSupervisor: z.string().trim().max(50).optional().default(""),
   domicilioSucursal: z.string().trim().max(250).optional().default(""),
@@ -208,6 +221,13 @@ async function ejecutarEncuestaCarga(pool, payload) {
   request.input("campo8Codigo", sql.Int, 8);
   request.input("campo8Valor", sql.NVarChar(200), valorCampo8);
 
+  // Canal de origen: 1=QR | 2=Manual | 3=Instagram | 4=Facebook.
+  // Solo se manda al SP si SP_INCLUDE_ORIGEN=true (evita romper si el SP todavía no
+  // declara el parámetro). Si el SP_ORIGEN_PARAM_NAME es distinto, se setea via env.
+  if (SP_INCLUDE_ORIGEN) {
+    request.input(SP_ORIGEN_PARAM_NAME, sql.Int, payload.canalOrigen ?? null);
+  }
+
   const resultado = await request.execute(SP_NAME);
   return evaluarResultadoSp(resultado);
 }
@@ -349,6 +369,12 @@ app.post("/api/survey", async (req, res) => {
       return res.status(400).json({ message: "Debes indicar la dirección de su domicilio." });
     }
   }
+
+  console.log(
+    `[/api/survey] tel=${payload.telefono} sorteo=${payload.idSorteo} ` +
+      `canalOrigen=${payload.canalOrigen ?? "null"} (${payload.canalOrigenTexto || "-"}) ` +
+      `enviarSp=${SP_INCLUDE_ORIGEN}`
+  );
 
   try {
     const pool = await getPool();

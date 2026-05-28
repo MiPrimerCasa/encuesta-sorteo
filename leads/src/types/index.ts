@@ -1,8 +1,10 @@
 export type RolUsuario = 'promotor' | 'supervisor';
-export type VistaActiva = 'leads' | 'promotores' | 'calendario';
+export type VistaActiva = 'leads' | 'promotores' | 'metricas' | 'calendario';
 export type ListaLead = 'entrevista' | 'contacto';
 /** Dónde quiere la entrevista el cliente (encuesta / SP). */
 export type LugarEntrevista = 'sucursal' | 'domicilio';
+export type OrigenLead = 'encuesta' | 'sorteo' | 'manual' | 'redes';
+export type FuenteLead = 'qr' | 'app' | 'facebook' | 'instagram';
 export type CanalContacto = 'llamada' | 'mensaje';
 export type ResultadoEntrevista = 'sin_interes' | 'reagenda' | 'no_compro' | 'compro';
 /** sena/cien = terreno; entrega_33/entrega_55 = plan inversión */
@@ -15,6 +17,7 @@ export interface NuevoLeadData {
   quiereEntrevista: boolean;
   promotorId: string;
   domicilio?: string;
+  origen: 'sorteo' | 'manual' | 'redes';
 }
 
 export interface Promotor {
@@ -40,6 +43,8 @@ export interface Referido {
 }
 
 export interface SeguimientoLead {
+  fuente?: FuenteLead | null;
+  confirmoEntrevista?: boolean | null;
   canal?: CanalContacto | null;
   huboEntrevista?: boolean | null;
   resultadoEntrevista?: ResultadoEntrevista | null;
@@ -67,6 +72,7 @@ export interface Lead {
   lugarEntrevista?: LugarEntrevista;
   domicilioEntrevista?: string;
   lista: ListaLead;
+  origen?: OrigenLead;
   fechaObtencion: string;
   fechaAlta?: string;
   seguimiento: SeguimientoLead;

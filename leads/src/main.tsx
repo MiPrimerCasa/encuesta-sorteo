@@ -2,7 +2,15 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { LOGO_MPC_URL } from './brand';
 import './index.css';
+import { enableDemoMode } from './api/client';
 import App from './App';
+
+// /demo/supervisor  o  /demo  → supervisor demo
+// /demo/promotor              → promotor demo
+if (window.location.pathname.startsWith('/demo')) {
+  const isPromotor = window.location.pathname === '/demo/promotor';
+  enableDemoMode(isPromotor ? 'promotor' : 'supervisor');
+}
 
 function setFavicon(href: string) {
   let link = document.querySelector<HTMLLinkElement>("link[rel='icon']");

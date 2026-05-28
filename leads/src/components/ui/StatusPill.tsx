@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-type Variant = 'in-progress' | 'reagendado' | 'pending' | 'success' | 'compro' | 'sin-interes' | 'nuevo';
+type Variant = 'in-progress' | 'reagendado' | 'pending' | 'success' | 'compro' | 'no-compro' | 'sin-interes' | 'nuevo' | 'contactado';
 
 const VARIANTS: Record<Variant, string> = {
   'in-progress': 'bg-brand-50 text-brand-700 border border-brand-100',
@@ -8,8 +8,10 @@ const VARIANTS: Record<Variant, string> = {
   'pending':     'bg-zinc-100 text-zinc-600 border border-zinc-200',
   'success':     'bg-ok-subtle text-ok border border-ok-subtle',
   'compro':      'bg-zinc-900 text-white border border-zinc-900',
+  'no-compro':   'bg-zinc-900 text-white border border-red-500',
   'sin-interes': 'bg-zinc-100 text-zinc-400 border border-zinc-200',
   'nuevo':       'bg-ok-subtle text-ok border border-ok-subtle',
+  'contactado':  'bg-amber-50 text-amber-700 border border-amber-200',
 };
 
 const DOT_COLORS: Record<Variant, string> = {
@@ -18,8 +20,10 @@ const DOT_COLORS: Record<Variant, string> = {
   'pending':     'bg-zinc-400',
   'success':     'bg-ok',
   'compro':      'bg-white',
+  'no-compro':   'bg-red-500',
   'sin-interes': 'bg-zinc-400',
   'nuevo':       'bg-ok',
+  'contactado':  'bg-amber-500',
 };
 
 interface StatusPillProps {

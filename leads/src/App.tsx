@@ -12,6 +12,7 @@ import { NavBar } from './components/layout/NavBar';
 import { LeadsPanel } from './components/leads/LeadsPanel';
 import { PromotoresPanel } from './components/promotores/PromotoresPanel';
 import { CalendarioView } from './components/calendario/CalendarioView';
+import { PromotorMetricasPanel } from './components/promotores/PromotorMetricasPanel';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, SeguimientoLead, VistaActiva } from './types';
 
@@ -52,12 +53,6 @@ function AppShell() {
     void cargarDatos();
   }, [cargarDatos]);
 
-  useEffect(() => {
-    if (usuario?.rol === 'promotor' && (vistaActiva === 'promotores' || vistaActiva === 'calendario')) {
-      setVistaActiva('leads');
-    }
-  }, [usuario?.rol, vistaActiva]);
-
   const onActualizarLead = useCallback(
     async (leadId: string, seguimiento: SeguimientoLead) => {
       const updated = await guardarSeguimiento(leadId, seguimiento);
@@ -96,7 +91,7 @@ function AppShell() {
         )}
         {cargando && leads.length === 0 ? (
           <p className="px-4 py-12 text-center text-neutral-600">Cargando datos…</p>
-        ) : vistaActiva === 'calendario' && usuario.rol === 'supervisor' ? (
+        ) : vistaActiva === 'calendario' ? (
           <CalendarioView
             leads={leads}
             promotores={promotores}
@@ -105,6 +100,8 @@ function AppShell() {
           />
         ) : vistaActiva === 'promotores' && usuario.rol === 'supervisor' ? (
           <PromotoresPanel leads={leads} promotores={promotores} />
+        ) : vistaActiva === 'metricas' && usuario.rol === 'promotor' ? (
+          <PromotorMetricasPanel leads={leads} />
         ) : (
           <LeadsPanel
             leads={leads}

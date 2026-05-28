@@ -63,7 +63,7 @@ export function NuevoLeadSheet({
 
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
-  const [lista, setLista] = useState<'entrevista' | 'contacto'>('entrevista');
+  const [origen, setOrigen] = useState<'sorteo' | 'manual' | 'redes'>('sorteo');
   const [promotorId, setPromotorId] = useState('');
   const [domicilio, setDomicilio] = useState('');
   const [saving, setSaving] = useState(false);
@@ -74,7 +74,7 @@ export function NuevoLeadSheet({
     if (!open) return;
     setNombre('');
     setTelefono('');
-    setLista('entrevista');
+    setOrigen('sorteo');
     setDomicilio('');
     setError('');
     setSaving(false);
@@ -97,10 +97,11 @@ export function NuevoLeadSheet({
       await onSave({
         nombre: nombre.trim(),
         telefono: telefono.trim(),
-        lista,
-        quiereEntrevista: lista === 'entrevista',
+        lista: 'entrevista',
+        quiereEntrevista: true,
         promotorId,
         domicilio: domicilio.trim() || undefined,
+        origen,
       });
       onClose();
     } catch (err) {
@@ -144,7 +145,7 @@ export function NuevoLeadSheet({
               type="button"
               onClick={onClose}
               style={{ touchAction: 'manipulation' }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-zinc-100 text-xl text-zinc-500 transition-colors active:bg-brand-50 active:text-brand-700"
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 active:bg-brand-50 active:text-brand-700"
               aria-label="Cerrar"
             >
               ×
@@ -192,17 +193,18 @@ export function NuevoLeadSheet({
               />
             </div>
 
-            {/* Lista / tipo */}
+            {/* Origen del lead */}
             <div className="space-y-1.5">
-              <p className={LABEL_CLASS}>¿Quiere entrevista?</p>
+              <p className={LABEL_CLASS}>¿Cómo ingresó?</p>
               <ToggleGroup
-                name="lista"
+                name="origen"
                 options={[
-                  { value: 'entrevista', label: 'Sí — Nuevo lead' },
-                  { value: 'contacto', label: 'No — Contactado' },
+                  { value: 'sorteo', label: 'Sorteo' },
+                  { value: 'redes', label: 'Redes' },
+                  { value: 'manual', label: 'Manual' },
                 ]}
-                value={lista}
-                onChange={(v) => setLista(v as 'entrevista' | 'contacto')}
+                value={origen}
+                onChange={(v) => setOrigen(v as 'sorteo' | 'manual' | 'redes')}
               />
             </div>
 

@@ -10,18 +10,30 @@ function fifoSort(leads: Lead[]) {
   });
 }
 
-/** Cuatro listas excluyentes con orden FIFO (fecha_alta ASC). */
+function esCerradoNegativo(l: Lead) {
+  return (
+    l.seguimiento?.resultadoEntrevista === 'no_compro' ||
+    l.seguimiento?.resultadoEntrevista === 'sin_interes'
+  );
+}
+
+/** Cinco listas excluyentes con orden FIFO (fecha_alta ASC). */
 export function useLeadsFilter(leads: Lead[]) {
   return useMemo(() => {
-    const compraron = fifoSort(leads.filter((l) => leadCompro(l)));
+    const compraron    = fifoSort(leads.filter(leadCompro));
+    const noCompraron  = fifoSort(leads.filter(esCerradoNegativo));
+    const cerrados     = new Set([...compraron, ...noCompraron].map((l) => l.id));
+
     const seguimiento = fifoSort(
-      leads.filter((l) => !leadCompro(l) && leadReagendaEntrevista(l)),
+      leads.filter((l) => !cerrados.has(l.id) && leadReagendaEntrevista(l)),
     );
-    const activos = leads.filter((l) => !leadCompro(l) && !leadReagendaEntrevista(l));
+    const activos = leads.filter((l) => !cerrados.has(l.id) && !leadReagendaEntrevista(l));
 
-    const entrevistaPendiente = fifoSort(activos.filter((l) => l.lista === 'entrevista'));
-    const paraContactar = fifoSort(activos.filter((l) => l.lista === 'contacto'));
+    const fueContactado = (l: Lead) =>
+      Boolean(l.seguimiento?.canal || l.seguimiento?.huboEntrevista != null);
+    const entrevistaPendiente = fifoSort(activos.filter((l) => !fueContactado(l)));
+    const paraContactar       = fifoSort(activos.filter(fueContactado));
 
-    return { entrevistaPendiente, paraContactar, seguimiento, compraron };
+    return { entrevistaPendiente, paraContactar, seguimiento, compraron, noCompraron };
   }, [leads]);
 }

@@ -8,7 +8,11 @@ const TABS_SUPERVISOR = [
   { value: 'calendario' as const, label: 'Calendario' },
 ];
 
-const TABS_PROMOTOR = [{ value: 'leads' as const, label: 'Leads' }];
+const TABS_PROMOTOR = [
+  { value: 'leads'     as const, label: 'Leads'     },
+  { value: 'metricas'  as const, label: 'Métricas'  },
+  { value: 'calendario' as const, label: 'Calendario' },
+];
 
 const ROL_LABEL: Record<RolUsuario, string> = {
   promotor: 'Promotor',
@@ -105,7 +109,7 @@ export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBa
                 type="button"
                 onClick={() => onCambiarVista(tab.value)}
                 style={{ touchAction: 'manipulation' }}
-                className={`flex-1 py-2.5 text-[14px] font-semibold transition-colors ${
+                className={`flex-1 py-2.5 text-[13px] font-semibold transition-colors xs:text-[14px] ${
                   active
                     ? 'border-b-2 border-brand-600 text-brand-600'
                     : 'border-b-2 border-transparent text-zinc-400 active:text-zinc-700'

@@ -13,13 +13,20 @@ import {
   DEMO_PRODUCTOS,
   DEMO_PROMOTORES,
   DEMO_USUARIO,
+  DEMO_USUARIO_PROMOTOR,
   createDemoLead,
   getDemoLeads,
   updateDemoLead,
 } from './demoData';
 
-const IS_DEMO = import.meta.env.VITE_DEMO === 'true';
+let _isDemoActive = import.meta.env.VITE_DEMO === 'true';
+export function enableDemoMode(rol: 'supervisor' | 'promotor' = 'supervisor') {
+  _isDemoActive = true;
+  _demoUsuario = rol === 'promotor' ? DEMO_USUARIO_PROMOTOR : DEMO_USUARIO;
+}
+
 const STORAGE_KEY = 'mpc-crm-session';
+let _demoUsuario: UsuarioSesion = DEMO_USUARIO;
 
 /** En monorepo (/leads/) Vite usa BASE_URL=/leads/ → /leads/api/... */
 function apiUrl(path: string) {
@@ -29,7 +36,7 @@ function apiUrl(path: string) {
 }
 
 export function getSession(): { token: string; usuario: UsuarioSesion } | null {
-  if (IS_DEMO) return { token: 'demo', usuario: DEMO_USUARIO };
+  if (_isDemoActive) return { token: 'demo', usuario: _demoUsuario };
   const raw = sessionStorage.getItem(STORAGE_KEY);
   if (!raw) return null;
   try {
@@ -40,16 +47,18 @@ export function getSession(): { token: string; usuario: UsuarioSesion } | null {
 }
 
 export function setSession(token: string, usuario: UsuarioSesion) {
-  if (IS_DEMO) return;
+  if (_isDemoActive) return;
   sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ token, usuario }));
 }
 
 export function clearSession() {
-  if (IS_DEMO) return;
+  if (_isDemoActive) return;
   sessionStorage.removeItem(STORAGE_KEY);
 }
 
-export const isDemoMode = IS_DEMO;
+export function isDemoMode() {
+  return _isDemoActive;
+}
 
 async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const session = getSession();
@@ -105,8 +114,9 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export async function login(usuario: string, password: string) {
-  if (IS_DEMO) {
-    return { token: 'demo', usuario: DEMO_USUARIO };
+  if (_isDemoActive) {
+    _demoUsuario = usuario === '__demo_promotor__' ? DEMO_USUARIO_PROMOTOR : DEMO_USUARIO;
+    return { token: 'demo', usuario: _demoUsuario };
   }
   return apiFetch<{ token: string; usuario: UsuarioSesion }>('/api/auth/login', {
     method: 'POST',
@@ -115,31 +125,37 @@ export async function login(usuario: string, password: string) {
 }
 
 export async function fetchLeads() {
-  if (IS_DEMO) return getDemoLeads();
+  if (_isDemoActive) {
+    const all = getDemoLeads();
+    if (_demoUsuario.rol === 'promotor') {
+      return all.filter((l) => l.promotorId === _demoUsuario.id);
+    }
+    return all;
+  }
   const data = await apiFetch<{ leads: Lead[] }>('/api/leads');
   return data.leads;
 }
 
 export async function fetchPromotores() {
-  if (IS_DEMO) return DEMO_PROMOTORES;
+  if (_isDemoActive) return DEMO_PROMOTORES;
   const data = await apiFetch<{ promotores: Promotor[] }>('/api/promotores');
   return data.promotores;
 }
 
 export async function fetchBarrios() {
-  if (IS_DEMO) return DEMO_BARRIOS;
+  if (_isDemoActive) return DEMO_BARRIOS;
   const data = await apiFetch<{ barrios: Barrio[] }>('/api/barrios');
   return data.barrios;
 }
 
 export async function fetchProductos(rol: RolUsuario) {
-  if (IS_DEMO) return DEMO_PRODUCTOS.filter((p) => p.rolesPermitidos.includes(rol));
+  if (_isDemoActive) return DEMO_PRODUCTOS.filter((p) => p.rolesPermitidos.includes(rol));
   const data = await apiFetch<{ productos: Producto[] }>(`/api/productos?rol=${rol}`);
   return data.productos;
 }
 
 export async function guardarSeguimiento(leadId: string, seguimiento: SeguimientoLead) {
-  if (IS_DEMO) return updateDemoLead(leadId, seguimiento);
+  if (_isDemoActive) return updateDemoLead(leadId, seguimiento);
   const data = await apiFetch<{ lead: Lead; message: string }>(`/api/leads/${leadId}/seguimiento`, {
     method: 'PATCH',
     body: JSON.stringify(seguimiento),
@@ -147,15 +163,11 @@ export async function guardarSeguimiento(leadId: string, seguimiento: Seguimient
   return data.lead;
 }
 
-/** Solo en modo demo (npm run dev:demo). En producción los leads vienen del SP de encuestas. */
+/** Alta manual: demo o fallback local si el backend aún no persiste en DB. */
 export async function crearLead(nuevoLead: NuevoLeadData) {
-  if (IS_DEMO) {
-    return createDemoLead(nuevoLead);
-  }
-  // Fallback temporal: permite usar el formulario aunque backend aún no tenga alta manual.
-  // El lead queda en memoria de la sesión actual (se pierde al recargar).
+  if (_isDemoActive) return createDemoLead(nuevoLead);
   try {
-    const data = await apiFetch<{ lead: Lead }>('/api/leads/manual', {
+    const data = await apiFetch<{ lead: Lead }>('/api/leads', {
       method: 'POST',
       body: JSON.stringify(nuevoLead),
     });

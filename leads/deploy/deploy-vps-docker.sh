@@ -59,38 +59,42 @@ docker compose --project-directory "$LEADS_DIR" \
   build "$SERVICE_NAME"
 
 # Limpiar contenedor viejo (stop → rm, con espera si Docker dice "removal in progress").
+# Importante: no usar `docker inspect $SERVICE_NAME` sin --type container: tras el build
+# Docker resuelve el nombre a la imagen seguimiento-leads:latest y el bucle nunca termina.
+container_ids_for_service() {
+  docker ps -aq --filter "name=^/${SERVICE_NAME}$" 2>/dev/null || true
+}
+
 COMPOSE=(docker compose --project-directory "$LEADS_DIR" -f "$ROOT_COMPOSE" -f "$TRAEFIK_FRAGMENT")
 
 "${COMPOSE[@]}" stop "$SERVICE_NAME" >/dev/null 2>&1 || true
 "${COMPOSE[@]}" rm -sf "$SERVICE_NAME" >/dev/null 2>&1 || true
 
 for attempt in $(seq 1 15); do
-  if ! docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
-    echo "Contenedor ${SERVICE_NAME} eliminado."
+  mapfile -t cids < <(container_ids_for_service)
+  if ((${#cids[@]} == 0)); then
+    echo "Contenedor ${SERVICE_NAME} eliminado (o no existía)."
     break
   fi
-  status="$(docker inspect -f '{{.State.Status}}' "$SERVICE_NAME" 2>/dev/null || echo unknown)"
-  echo "Quitando contenedor viejo (intento ${attempt}/15, estado=${status})..."
-  if [[ "$status" == "removing" ]]; then
-    sleep 5
-    continue
-  fi
-  docker stop -t 15 "$SERVICE_NAME" >/dev/null 2>&1 || true
-  sleep 2
-  docker rm -f "$SERVICE_NAME" >/dev/null 2>&1 || true
-  # Por si el nombre quedó atado a otro ID
-  while read -r cid; do
+  for cid in "${cids[@]}"; do
     [[ -z "$cid" ]] && continue
+    status="$(docker inspect --type container -f '{{.State.Status}}' "$cid" 2>/dev/null | tr -d '\r\n' || echo unknown)"
+    echo "Quitando contenedor viejo ${cid} (intento ${attempt}/15, estado=${status})..."
+    if [[ "$status" == "removing" ]]; then
+      sleep 5
+      continue 2
+    fi
     docker stop -t 15 "$cid" >/dev/null 2>&1 || true
+    sleep 2
     docker rm -f "$cid" >/dev/null 2>&1 || true
-  done < <(docker ps -aq --filter "name=^/${SERVICE_NAME}$")
+  done
   sleep 3
 done
 
-if docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
-  echo "ERROR: no se pudo quitar ${SERVICE_NAME}. Estado actual:"
-  docker inspect "$SERVICE_NAME" --format '  status={{.State.Status}} id={{.Id}}' 2>/dev/null || true
-  docker ps -a --filter "name=${SERVICE_NAME}" --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}' || true
+mapfile -t remaining < <(container_ids_for_service)
+if ((${#remaining[@]} > 0)); then
+  echo "ERROR: no se pudo quitar ${SERVICE_NAME}. Contenedores restantes:"
+  docker ps -a --filter "name=^/${SERVICE_NAME}$" --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}' || true
   exit 1
 fi
 

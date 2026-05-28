@@ -58,41 +58,46 @@ docker compose --project-directory "$LEADS_DIR" \
   -f "$TRAEFIK_FRAGMENT" \
   build "$SERVICE_NAME"
 
-# Limpiar contenedor viejo (best-effort). Si Docker queda con un container
-# en estado "removing" o "unknown", NO abortamos: `compose up --force-recreate`
-# se encarga de reemplazarlo. Antes el script hacía `exit 1` y dejaba el
-# servicio caído (404 en Traefik).
+# Limpiar contenedor viejo (stop → rm, con espera si Docker dice "removal in progress").
 COMPOSE=(docker compose --project-directory "$LEADS_DIR" -f "$ROOT_COMPOSE" -f "$TRAEFIK_FRAGMENT")
 
 "${COMPOSE[@]}" stop "$SERVICE_NAME" >/dev/null 2>&1 || true
 "${COMPOSE[@]}" rm -sf "$SERVICE_NAME" >/dev/null 2>&1 || true
-docker rm -f "$SERVICE_NAME" >/dev/null 2>&1 || true
 
-# Hasta 3 intentos cortos; si después queda algo, igual seguimos.
-for attempt in 1 2 3; do
+for attempt in $(seq 1 15); do
   if ! docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
     echo "Contenedor ${SERVICE_NAME} eliminado."
     break
   fi
   status="$(docker inspect -f '{{.State.Status}}' "$SERVICE_NAME" 2>/dev/null || echo unknown)"
-  echo "Quitando contenedor viejo (intento ${attempt}/3, estado=${status})..."
-  docker stop -t 10 "$SERVICE_NAME" >/dev/null 2>&1 || true
+  echo "Quitando contenedor viejo (intento ${attempt}/15, estado=${status})..."
+  if [[ "$status" == "removing" ]]; then
+    sleep 5
+    continue
+  fi
+  docker stop -t 15 "$SERVICE_NAME" >/dev/null 2>&1 || true
+  sleep 2
   docker rm -f "$SERVICE_NAME" >/dev/null 2>&1 || true
+  # Por si el nombre quedó atado a otro ID
+  while read -r cid; do
+    [[ -z "$cid" ]] && continue
+    docker stop -t 15 "$cid" >/dev/null 2>&1 || true
+    docker rm -f "$cid" >/dev/null 2>&1 || true
+  done < <(docker ps -aq --filter "name=^/${SERVICE_NAME}$")
   sleep 3
 done
 
 if docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
-  echo "WARN: no se pudo quitar ${SERVICE_NAME} — compose up --force-recreate intentará reemplazarlo."
+  echo "ERROR: no se pudo quitar ${SERVICE_NAME}. Estado actual:"
   docker inspect "$SERVICE_NAME" --format '  status={{.State.Status}} id={{.Id}}' 2>/dev/null || true
+  docker ps -a --filter "name=${SERVICE_NAME}" --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}' || true
+  exit 1
 fi
 
-# Siempre intentamos levantar la nueva versión.
-"${COMPOSE[@]}" up -d --no-deps --force-recreate "$SERVICE_NAME" || {
-  echo "WARN: primer intento de up falló — reintentando tras 5s con --remove-orphans..."
-  sleep 5
-  docker rm -f "$SERVICE_NAME" >/dev/null 2>&1 || true
-  "${COMPOSE[@]}" up -d --no-deps --force-recreate --remove-orphans "$SERVICE_NAME"
-}
+docker compose --project-directory "$LEADS_DIR" \
+  -f "$ROOT_COMPOSE" \
+  -f "$TRAEFIK_FRAGMENT" \
+  up -d --no-deps --force-recreate "$SERVICE_NAME"
 
 echo "Waiting for health..."
 APP_PORT="${APP_PORT:-3001}"

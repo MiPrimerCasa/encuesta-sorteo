@@ -18,7 +18,7 @@ const ALL = '__all__';
 
 const FUENTES: { key: FuenteLead; label: string; color: string; hex: string }[] = [
   { key: 'qr',        label: 'QR',        color: 'bg-zinc-900',    hex: '#18181B' },
-  { key: 'app',       label: 'App',       color: 'bg-red-500',     hex: '#EF4444' },
+  { key: 'app',       label: 'Manual',    color: 'bg-red-500',     hex: '#EF4444' },
   { key: 'facebook',  label: 'Facebook',  color: 'bg-blue-500',    hex: '#3B82F6' },
   { key: 'instagram', label: 'Instagram', color: 'bg-fuchsia-500', hex: '#D946EF' },
 ];

@@ -13,7 +13,7 @@ import { WhatsAppLeadButton } from './WhatsAppLeadButton';
 
 const FUENTE_LABEL: Record<FuenteLead, string> = {
   qr: 'QR',
-  app: 'App',
+  app: 'Manual',
   facebook: 'Facebook',
   instagram: 'Instagram',
 };
@@ -83,7 +83,7 @@ export function LeadCard({
         <div className="flex items-start justify-between gap-3">
           <h3 className={`text-[15px] font-semibold leading-snug ${esNoCompro ? 'text-white' : 'text-zinc-900'}`}>{lead.nombre}</h3>
           <div className="shrink-0">
-            {esArchivo && <StatusPill variant="compro" dot>Compró</StatusPill>}
+            {esArchivo && <StatusPill variant="compro" dot>Cierre</StatusPill>}
             {esSeguimiento && !esArchivo && (
               <StatusPill variant="reagendado" dot>En seguimiento</StatusPill>
             )}

@@ -82,6 +82,9 @@ EXEC [dbo].[encuestasMuestraOperador] @idVendedor = 132;
 | `Horario de entrevista` | `campo6Valor` (típico) | Fecha/hora cita |
 | `Contacto en  (2 = En sucursal , 3 = Domicilio encuestado)` | `campo7Valor` (típico) | `2` = oficinas, `3` = domicilio |
 | `Domicilio de encuesta ` | `campo8Valor` (típico) | Dirección si a domicilio |
+| `origen` | canal de captación | **Métricas de origen** en CRM → `seguimiento.fuente`: `qr`, `app` (Manual/App), `facebook`, `instagram` |
+
+Valores observados en `origen` (mayo 2026): `QR`, `Facebook`, `Instagram`, `Manual` / `App` (mapeados en `server/db/encuestas.js` → `parseFuente`).
 
 ### Tabla principal: `dbo.encuesta` (estructura de referencia)
 

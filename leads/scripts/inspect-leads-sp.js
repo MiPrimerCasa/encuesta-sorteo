@@ -80,6 +80,20 @@ try {
     console.log(`  ${nombre}: SP=${JSON.stringify(r.telefono)} → app=${mapEncuestaRowToLead(r).telefono || '(vacío)'}`);
   }
 
+  console.log('\n=== Origen (columna SP → seguimiento.fuente para métricas) ===\n');
+  const origenUnicos = [
+    ...new Set(rows.map((r) => String(r.origen ?? '').trim()).filter(Boolean)),
+  ];
+  if (!origenUnicos.length) {
+    console.log('  (sin columna origen o vacía en todas las filas)');
+  } else {
+    for (const raw of origenUnicos) {
+      const sample = rows.find((r) => String(r.origen ?? '').trim() === raw);
+      const fuente = sample ? mapEncuestaRowToLead(sample).seguimiento?.fuente : null;
+      console.log(`  ${JSON.stringify(raw)} → ${fuente ?? '(no mapeado)'}`);
+    }
+  }
+
   console.log('\n=== Primera fila mapeada a Lead (app) ===\n');
   console.log(JSON.stringify(mapEncuestaRowToLead(rows[0]), null, 2));
 

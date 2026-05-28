@@ -50,9 +50,9 @@ const TABS: Array<{
   },
   {
     id: 'compro',
-    tituloTab: 'Compró',
-    tituloTabCorto: 'Compró',
-    tituloLargo: 'Compró — cerrados',
+    tituloTab: 'Cierres',
+    tituloTabCorto: 'Cierres',
+    tituloLargo: 'Cierres',
     key: 'compraron',
     variante: 'compro',
     vacio: 'Aún no hay ventas registradas',
@@ -157,7 +157,7 @@ export function LeadsPanel({
         <p className="text-[13px] text-zinc-500">
           <span className="font-medium text-zinc-700">Reagendar</span> mueve el lead a{' '}
           <span className="font-medium text-zinc-700">En seguimiento</span>.{' '}
-          <span className="font-medium text-zinc-700">Compró</span> lo archiva abajo.
+          <span className="font-medium text-zinc-700">Cierres</span> archiva las ventas abajo.
         </p>
       </div>
 

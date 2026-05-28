@@ -46,13 +46,35 @@ function slugId(texto) {
   );
 }
 
-function parseFuente(raw) {
-  if (!raw) return null;
+/** Columna `origen` del SP encuestasMuestraOperador (QR, Facebook, Manual, Instagram, App…). */
+function extractOrigenRawFromRow(row) {
+  return pickField(
+    row,
+    'origen',
+    'Origen',
+    'fuente',
+    'Fuente',
+    'canal_origen',
+    'Canal origen',
+    'origen_lead',
+    'Origen lead',
+    'medio',
+    'Medio',
+    'Canal',
+    'canal',
+  );
+}
+
+/** Normaliza texto/código del SP → FuenteLead del frontend (métricas + badge en tarjeta). */
+export function parseFuente(raw) {
+  if (raw == null || raw === '') return null;
   const v = String(raw).toLowerCase().trim();
-  if (v.includes('qr')) return 'qr';
-  if (v.includes('app')) return 'app';
-  if (v.includes('face') || v.includes('fb')) return 'facebook';
-  if (v.includes('insta') || v.includes('ig')) return 'instagram';
+  if (v === '1' || v.includes('qr')) return 'qr';
+  if (v.includes('manual') || v.includes('app') || v === 'apps' || v === 'aplicacion' || v === 'aplicación') {
+    return 'app';
+  }
+  if (v.includes('face') || v.includes('fb') || v === 'facebook') return 'facebook';
+  if (v.includes('insta') || v.includes('ig') || v === 'instagram') return 'instagram';
   return null;
 }
 
@@ -291,9 +313,8 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
       'Domicilio de encuest...',
     ) ?? pickFieldStartsWith(row, 'Domicilio de encuesta', 'Domicilio de encuest');
   const telefonoEncuesta = extractTelefonoEncuesta(row);
-  const fuenteDB = parseFuente(
-    pickField(row, 'fuente', 'Fuente', 'canal_origen', 'Canal origen', 'origen_lead', 'Canal', 'canal'),
-  );
+  const origenRaw = extractOrigenRawFromRow(row);
+  const fuenteDB = parseFuente(origenRaw);
 
   const fechaBase = horarioIso ? horarioIso.slice(0, 10) : new Date().toISOString().slice(0, 10);
   const lista = horarioIso || quiereAsesoramiento ? 'entrevista' : 'contacto';
@@ -301,8 +322,9 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
   const seguimientoRemoto = seguimientoLocal[usuario] ?? {};
   const observacionesEncuesta = buildObservacionesEncuesta(row);
   const seguimiento = {
-    fuente: fuenteDB,       // valor de BD como base
-    ...seguimientoRemoto,   // override del usuario si ya editó desde la app
+    ...seguimientoRemoto,
+    // Origen desde encuesta; el caché local solo pisa si el usuario guardó fuente explícita.
+    fuente: seguimientoRemoto.fuente ?? fuenteDB ?? null,
     observaciones:
       [seguimientoRemoto.observaciones, observacionesEncuesta].filter(Boolean).join('\n') ||
       undefined,

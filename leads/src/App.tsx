@@ -65,8 +65,10 @@ function AppShell() {
     try {
       const newLead = await crearLead(data);
       setLeads((prev) => [...prev, newLead]);
+      setError('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo crear el lead');
+      const msg = err instanceof Error ? err.message : 'No se pudo crear el lead';
+      setError(msg);
       throw err;
     }
   }, []);

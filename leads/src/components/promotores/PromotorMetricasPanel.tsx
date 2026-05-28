@@ -38,7 +38,7 @@ export function PromotorMetricasPanel({ leads }: Props) {
         </div>
 
         <div className="min-w-0">
-          <LeadsHistorial leads={leads} promotores={[]} />
+          <LeadsHistorial leads={leads} promotores={[]} modoPromotor />
         </div>
 
       </div>

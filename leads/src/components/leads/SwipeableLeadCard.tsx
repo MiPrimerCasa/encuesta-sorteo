@@ -12,6 +12,7 @@ interface Props {
   productos?: Producto[];
   barrios?: Barrio[];
   nombreUsuario?: string;
+  ocultarPromotor?: boolean;
   onQuickSave: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
 }
 
@@ -23,6 +24,7 @@ export function SwipeableLeadCard({
   productos,
   barrios,
   nombreUsuario,
+  ocultarPromotor,
   onQuickSave,
 }: Props) {
   const [offset, setOffset] = useState(0);
@@ -264,6 +266,7 @@ export function SwipeableLeadCard({
             productos={productos}
             barrios={barrios}
             nombreUsuario={nombreUsuario}
+            ocultarPromotor={ocultarPromotor}
           />
         </div>
       </div>

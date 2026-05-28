@@ -6,17 +6,11 @@ import {
   leadReagendaEntrevista,
 } from '../../domain/leads';
 import { etiquetaPagoProducto } from '../../domain/venta';
-import type { Barrio, FuenteLead, Lead, Producto, Promotor } from '../../types';
+import { FUENTE_LABEL } from '../../domain/fuenteLabels';
+import type { Barrio, Lead, Producto, Promotor } from '../../types';
 import { EntrevistaAgendaBadge } from './EntrevistaAgendaBadge';
 import { StatusPill } from '../ui/StatusPill';
 import { WhatsAppLeadButton } from './WhatsAppLeadButton';
-
-const FUENTE_LABEL: Record<FuenteLead, string> = {
-  qr: 'QR',
-  app: 'Manual',
-  facebook: 'Facebook',
-  instagram: 'Instagram',
-};
 
 interface LeadCardProps {
   lead: Lead;
@@ -26,6 +20,8 @@ interface LeadCardProps {
   productos?: Producto[];
   barrios?: Barrio[];
   nombreUsuario?: string;
+  /** En vista promotor no mostramos la fila Promotor (siempre es el usuario logueado). */
+  ocultarPromotor?: boolean;
 }
 
 export function LeadCard({
@@ -36,6 +32,7 @@ export function LeadCard({
   productos = [],
   barrios = [],
   nombreUsuario,
+  ocultarPromotor = false,
 }: LeadCardProps) {
   const compro = leadCompro(lead);
   const reagenda = leadReagendaEntrevista(lead);
@@ -105,15 +102,17 @@ export function LeadCard({
               )}
             </dd>
           </div>
-          <div className="text-[13px]">
-            <dt className="inline text-zinc-400">Promotor: </dt>
-            <dd className={`inline ${esNoCompro ? 'text-zinc-300' : 'text-zinc-600'}`}>
-              {lead.promotorNombre ?? getPromotorNombre(lead.promotorId, promotores)}
-              {lead.supervisorNombre && lead.supervisorNombre !== lead.promotorNombre && (
-                <span className={esNoCompro ? 'text-zinc-500' : 'text-zinc-400'}> · Sup. {lead.supervisorNombre}</span>
-              )}
-            </dd>
-          </div>
+          {!ocultarPromotor && (
+            <div className="text-[13px]">
+              <dt className="inline text-zinc-400">Promotor: </dt>
+              <dd className={`inline ${esNoCompro ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                {lead.promotorNombre ?? getPromotorNombre(lead.promotorId, promotores)}
+                {lead.supervisorNombre && lead.supervisorNombre !== lead.promotorNombre && (
+                  <span className={esNoCompro ? 'text-zinc-500' : 'text-zinc-400'}> · Sup. {lead.supervisorNombre}</span>
+                )}
+              </dd>
+            </div>
+          )}
           {lead.domicilio && (
             <div className="text-[13px]">
               <dt className="inline text-zinc-400">Dir: </dt>

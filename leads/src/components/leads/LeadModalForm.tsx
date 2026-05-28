@@ -398,7 +398,7 @@ export function LeadModalForm({
                   <RadioOption
                     name="conEntrevista"
                     value="compro"
-                    label="Compró"
+                    label="Cierre"
                     checked={form.resultadoEntrevista === 'compro'}
                     onChange={() => {
                       setErrorVenta('');
@@ -415,7 +415,7 @@ export function LeadModalForm({
                       <div className="space-y-2">
                         <div>
                           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                            ¿Qué compró?
+                            ¿Qué producto cerró?
                           </p>
                           <p className="mt-0.5 text-[12px] text-zinc-500">
                             {rol === 'promotor' ? 'Solo Plan Inversión Joven' : 'Plan Inversión Joven o Terreno'}

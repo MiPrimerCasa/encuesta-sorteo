@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { FUENTE_LABEL } from '../../domain/fuenteLabels';
 import { leadCompro, leadReagendaEntrevista, getPromotorNombre } from '../../domain/leads';
 import type { Lead, Promotor } from '../../types';
 import { StatusPill } from '../ui/StatusPill';
@@ -6,6 +7,8 @@ import { StatusPill } from '../ui/StatusPill';
 interface LeadsHistorialProps {
   leads: Lead[];
   promotores: Promotor[];
+  /** Vista de un solo promotor: sin filtro por equipo ni nombre de promotor en filas. */
+  modoPromotor?: boolean;
 }
 
 type LeadStatus = 'nuevo' | 'contactado' | 'seguimiento' | 'compro';
@@ -35,12 +38,12 @@ const PILL: Record<LeadStatus, { variant: 'nuevo' | 'in-progress' | 'reagendado'
   nuevo:       { variant: 'nuevo',       label: 'Nuevo' },
   contactado:  { variant: 'in-progress', label: 'Contactado' },
   seguimiento: { variant: 'reagendado',  label: 'En seguimiento' },
-  compro:      { variant: 'compro',      label: 'Compró' },
+  compro:      { variant: 'compro',      label: 'Cierre' },
 };
 
 const ALL = '__all__';
 
-export function LeadsHistorial({ leads, promotores }: LeadsHistorialProps) {
+export function LeadsHistorial({ leads, promotores, modoPromotor = false }: LeadsHistorialProps) {
   const [open, setOpen] = useState(false);
   const [filtroPromotor, setFiltroPromotor] = useState(ALL);
 
@@ -95,7 +98,7 @@ export function LeadsHistorial({ leads, promotores }: LeadsHistorialProps) {
       {open && (
         <div className="space-y-3">
           {/* Filtro por promotor — scroll horizontal en mobile */}
-          {promotoresConLeads.length > 1 && (
+          {!modoPromotor && promotoresConLeads.length > 1 && (
             <div
               className="flex gap-2 overflow-x-auto"
               style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' as never, paddingBottom: 2 }}
@@ -157,10 +160,18 @@ export function LeadsHistorial({ leads, promotores }: LeadsHistorialProps) {
                       <p className="truncate text-[14px] font-semibold text-zinc-900">{lead.nombre}</p>
                       <p className="mt-0.5 text-[12px] text-zinc-400">
                         {lead.telefono}
-                        {filtroPromotor === ALL && promotorNombre && (
+                        {!modoPromotor && filtroPromotor === ALL && promotorNombre && (
                           <>
                             <span className="mx-1.5" aria-hidden="true">·</span>
                             {promotorNombre}
+                          </>
+                        )}
+                        {lead.seguimiento?.fuente && (
+                          <>
+                            <span className="mx-1.5" aria-hidden="true">·</span>
+                            <span className="font-medium text-zinc-500">
+                              {FUENTE_LABEL[lead.seguimiento.fuente]}
+                            </span>
                           </>
                         )}
                       </p>

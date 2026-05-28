@@ -62,7 +62,7 @@ export function PromotorResumen({ leads }: Props) {
           {stats.conversion}%
         </p>
         <p className="mt-0.5 text-[11px] text-ok/60">
-          {stats.vendidos} vendido{stats.vendidos !== 1 ? 's' : ''}
+          {stats.vendidos} cierre{stats.vendidos !== 1 ? 's' : ''}
         </p>
       </div>
 

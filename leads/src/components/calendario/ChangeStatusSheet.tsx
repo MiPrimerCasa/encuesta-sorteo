@@ -22,8 +22,8 @@ const OPCIONES: OpcionEstado[] = [
   },
   {
     value: 'compro',
-    label: 'Vendido',
-    hint: 'Operación cerrada. Completá los detalles en el lead.',
+    label: 'Cierre',
+    hint: 'Venta cerrada. Completá los detalles en el lead.',
   },
 ];
 

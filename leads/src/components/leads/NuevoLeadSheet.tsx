@@ -79,7 +79,8 @@ export function NuevoLeadSheet({
     setError('');
     setSaving(false);
     if (rolUsuario === 'promotor' && usuario) {
-      setPromotorId(usuario.id);
+      const pid = String(usuario.idOperador ?? usuario.id ?? '').trim();
+      setPromotorId(pid);
     } else {
       setPromotorId(promotores[0]?.id ?? '');
     }
@@ -89,7 +90,14 @@ export function NuevoLeadSheet({
     e.preventDefault();
     if (!nombre.trim()) { setError('El nombre es obligatorio.'); return; }
     if (!telefono.trim()) { setError('El teléfono es obligatorio.'); return; }
-    if (!promotorId) { setError('Seleccioná un promotor.'); return; }
+    if (!promotorId) {
+      setError(
+        rolUsuario === 'promotor'
+          ? 'No se pudo identificar tu usuario. Volvé a iniciar sesión.'
+          : 'Seleccioná un promotor.',
+      );
+      return;
+    }
 
     setSaving(true);
     setError('');

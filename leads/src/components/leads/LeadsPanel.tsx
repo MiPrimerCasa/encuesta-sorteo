@@ -133,12 +133,13 @@ export function LeadsPanel({
 
   const tabData = TABS.find((t) => t.id === tabActivo) ?? TABS[0];
   const itemsActivos = listas[tabData.key];
+  const esPromotor = rolUsuario === 'promotor';
 
   return (
     <div className="mx-auto max-w-2xl px-3 py-4 pb-12 sm:px-6 sm:py-6">
 
       {/* Promotor: resumen personal + alertas */}
-      {rolUsuario === 'promotor' && (
+      {esPromotor && (
         <>
           <PromotorResumen leads={leads} />
           <AlertasSinContactar leads={entrevistaPendiente} onClickLead={abrirLead} />
@@ -212,7 +213,7 @@ export function LeadsPanel({
                 const variant = estadoLead(lead);
                 const varianteCard =
                   variant === 'compro' ? 'compro' : variant === 'reagendado' ? 'seguimiento' : 'activo';
-                return rolUsuario === 'promotor' && variant !== 'compro' ? (
+                return esPromotor && variant !== 'compro' ? (
                   <SwipeableLeadCard
                     key={lead.id}
                     lead={lead}
@@ -222,6 +223,7 @@ export function LeadsPanel({
                     productos={productos}
                     barrios={barrios}
                     nombreUsuario={nombreUsuario}
+                    ocultarPromotor
                     onQuickSave={onActualizarLead}
                   />
                 ) : (
@@ -234,6 +236,7 @@ export function LeadsPanel({
                     productos={productos}
                     barrios={barrios}
                     nombreUsuario={nombreUsuario}
+                    ocultarPromotor={esPromotor}
                   />
                 );
               })}
@@ -307,7 +310,7 @@ export function LeadsPanel({
           ) : (
             <div className="space-y-3">
               {itemsActivos.map((lead) =>
-                rolUsuario === 'promotor' && tabData.variante !== 'compro' ? (
+                esPromotor && tabData.variante !== 'compro' ? (
                   <SwipeableLeadCard
                     key={lead.id}
                     lead={lead}
@@ -317,6 +320,7 @@ export function LeadsPanel({
                     productos={productos}
                     barrios={barrios}
                     nombreUsuario={nombreUsuario}
+                    ocultarPromotor
                     onQuickSave={onActualizarLead}
                   />
                 ) : (
@@ -329,6 +333,7 @@ export function LeadsPanel({
                     productos={productos}
                     barrios={barrios}
                     nombreUsuario={nombreUsuario}
+                    ocultarPromotor={esPromotor}
                   />
                 ),
               )}
@@ -337,7 +342,7 @@ export function LeadsPanel({
         </>
       )}
 
-      {/* Sub-sección "No compró" — solo dentro del tab Compró */}
+      {/* Sub-sección "No compró" — solo dentro del tab Cierres */}
       {tabActivo === 'compro' && !buscando && noCompraron.length > 0 && (
         <div className="mt-6">
           <div className="mb-4 flex items-baseline gap-2">
@@ -357,6 +362,7 @@ export function LeadsPanel({
                 productos={productos}
                 barrios={barrios}
                 nombreUsuario={nombreUsuario}
+                ocultarPromotor={esPromotor}
               />
             ))}
           </div>

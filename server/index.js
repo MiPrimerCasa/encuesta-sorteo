@@ -381,9 +381,22 @@ app.post("/api/survey", async (req, res) => {
       },
     });
   } catch (error) {
+    const err = error || {};
+    const detalleSql = {
+      message: err.message ?? "Error desconocido",
+      number: err.number ?? null,
+      class: err.class ?? null,
+      state: err.state ?? null,
+      procedure: err.procName ?? null,
+      lineNumber: err.lineNumber ?? null,
+      serverName: err.serverName ?? null,
+    };
+    console.error("[/api/survey] SP error:", JSON.stringify(detalleSql), err);
     return res.status(500).json({
       message: "Error al ejecutar procedimiento en SQL Server.",
-      detail: error instanceof Error ? error.message : "Error desconocido",
+      procedure: SP_NAME,
+      detail: detalleSql.message,
+      sql: detalleSql,
     });
   }
 });

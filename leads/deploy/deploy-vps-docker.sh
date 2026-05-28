@@ -58,26 +58,41 @@ docker compose --project-directory "$LEADS_DIR" \
   -f "$TRAEFIK_FRAGMENT" \
   build "$SERVICE_NAME"
 
-# Limpiar contenedor viejo. Best-effort: si no se puede, igual seguimos:
-# `docker compose up --force-recreate` se encarga de reemplazar lo que quede.
-docker compose --project-directory "$LEADS_DIR" \
-  -f "$ROOT_COMPOSE" \
-  -f "$TRAEFIK_FRAGMENT" \
-  rm -sf "$SERVICE_NAME" >/dev/null 2>&1 || true
+# Limpiar contenedor viejo (best-effort). Si Docker queda con un container
+# en estado "removing" o "unknown", NO abortamos: `compose up --force-recreate`
+# se encarga de reemplazarlo. Antes el script hacía `exit 1` y dejaba el
+# servicio caído (404 en Traefik).
+COMPOSE=(docker compose --project-directory "$LEADS_DIR" -f "$ROOT_COMPOSE" -f "$TRAEFIK_FRAGMENT")
+
+"${COMPOSE[@]}" stop "$SERVICE_NAME" >/dev/null 2>&1 || true
+"${COMPOSE[@]}" rm -sf "$SERVICE_NAME" >/dev/null 2>&1 || true
 docker rm -f "$SERVICE_NAME" >/dev/null 2>&1 || true
-if docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
-  sleep 2
+
+# Hasta 3 intentos cortos; si después queda algo, igual seguimos.
+for attempt in 1 2 3; do
+  if ! docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
+    echo "Contenedor ${SERVICE_NAME} eliminado."
+    break
+  fi
+  status="$(docker inspect -f '{{.State.Status}}' "$SERVICE_NAME" 2>/dev/null || echo unknown)"
+  echo "Quitando contenedor viejo (intento ${attempt}/3, estado=${status})..."
+  docker stop -t 10 "$SERVICE_NAME" >/dev/null 2>&1 || true
   docker rm -f "$SERVICE_NAME" >/dev/null 2>&1 || true
-fi
+  sleep 3
+done
+
 if docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
-  echo "WARN: contenedor viejo no se pudo quitar — compose intentará recrearlo igualmente."
+  echo "WARN: no se pudo quitar ${SERVICE_NAME} — compose up --force-recreate intentará reemplazarlo."
+  docker inspect "$SERVICE_NAME" --format '  status={{.State.Status}} id={{.Id}}' 2>/dev/null || true
 fi
 
-# Siempre intentar levantar (no abortamos si el remove falló).
-docker compose --project-directory "$LEADS_DIR" \
-  -f "$ROOT_COMPOSE" \
-  -f "$TRAEFIK_FRAGMENT" \
-  up -d --no-deps --force-recreate "$SERVICE_NAME"
+# Siempre intentamos levantar la nueva versión.
+"${COMPOSE[@]}" up -d --no-deps --force-recreate "$SERVICE_NAME" || {
+  echo "WARN: primer intento de up falló — reintentando tras 5s con --remove-orphans..."
+  sleep 5
+  docker rm -f "$SERVICE_NAME" >/dev/null 2>&1 || true
+  "${COMPOSE[@]}" up -d --no-deps --force-recreate --remove-orphans "$SERVICE_NAME"
+}
 
 echo "Waiting for health..."
 APP_PORT="${APP_PORT:-3001}"

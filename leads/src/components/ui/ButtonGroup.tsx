@@ -59,10 +59,10 @@ interface RadioOptionProps {
 export function RadioOption({ label, checked, onChange, name, value }: RadioOptionProps) {
   return (
     <label
-      className={`flex min-h-[56px] cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-all duration-[140ms] ease-out active:bg-brand-50 active:border-brand-200 ${
+      className={`flex min-h-[56px] cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-all duration-[140ms] ease-out ${
         checked
-          ? 'border-brand-600 bg-brand-50'
-          : 'border-zinc-200 bg-white'
+          ? 'border-brand-600 bg-brand-50 active:bg-brand-100'
+          : 'border-zinc-200 bg-white active:bg-brand-50 active:border-brand-200'
       }`}
       style={{ touchAction: 'manipulation' }}
     >

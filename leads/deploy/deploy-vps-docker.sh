@@ -58,26 +58,40 @@ docker compose --project-directory "$LEADS_DIR" \
   -f "$TRAEFIK_FRAGMENT" \
   build "$SERVICE_NAME"
 
-# Limpiar contenedor viejo (a veces queda como "Removal in progress" o "Created" huérfano).
-# Sin --rmi para no borrar la imagen recién construida.
-docker compose --project-directory "$LEADS_DIR" \
-  -f "$ROOT_COMPOSE" \
-  -f "$TRAEFIK_FRAGMENT" \
-  rm -sf "$SERVICE_NAME" >/dev/null 2>&1 || true
+# Limpiar contenedor viejo (stop → rm, con espera si Docker dice "removal in progress").
+COMPOSE=(docker compose --project-directory "$LEADS_DIR" -f "$ROOT_COMPOSE" -f "$TRAEFIK_FRAGMENT")
 
-# Garantía extra: si quedó un contenedor con ese nombre por cualquier motivo, forzar remove.
-# Reintentos por si Docker reporta "removal already in progress" (race en stop/remove anterior).
-for attempt in 1 2 3 4 5 6 7 8; do
+"${COMPOSE[@]}" stop "$SERVICE_NAME" >/dev/null 2>&1 || true
+"${COMPOSE[@]}" rm -sf "$SERVICE_NAME" >/dev/null 2>&1 || true
+
+for attempt in $(seq 1 15); do
   if ! docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
+    echo "Contenedor ${SERVICE_NAME} eliminado."
     break
   fi
-  echo "Quitando contenedor viejo (intento ${attempt}/8)..."
-  docker rm -f "$SERVICE_NAME" >/dev/null 2>&1 || true
+  status="$(docker inspect -f '{{.State.Status}}' "$SERVICE_NAME" 2>/dev/null || echo unknown)"
+  echo "Quitando contenedor viejo (intento ${attempt}/15, estado=${status})..."
+  if [[ "$status" == "removing" ]]; then
+    sleep 5
+    continue
+  fi
+  docker stop -t 15 "$SERVICE_NAME" >/dev/null 2>&1 || true
   sleep 2
+  docker rm -f "$SERVICE_NAME" >/dev/null 2>&1 || true
+  # Por si el nombre quedó atado a otro ID
+  while read -r cid; do
+    [[ -z "$cid" ]] && continue
+    docker stop -t 15 "$cid" >/dev/null 2>&1 || true
+    docker rm -f "$cid" >/dev/null 2>&1 || true
+  done < <(docker ps -aq --filter "name=^/${SERVICE_NAME}$")
+  sleep 3
 done
 
 if docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
-  echo "WARN: no se pudo quitar el contenedor viejo, intentando up de todos modos."
+  echo "ERROR: no se pudo quitar ${SERVICE_NAME}. Estado actual:"
+  docker inspect "$SERVICE_NAME" --format '  status={{.State.Status}} id={{.Id}}' 2>/dev/null || true
+  docker ps -a --filter "name=${SERVICE_NAME}" --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}' || true
+  exit 1
 fi
 
 docker compose --project-directory "$LEADS_DIR" \

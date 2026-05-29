@@ -246,5 +246,5 @@ echo "Todas las redes Docker:"
 docker network ls --format '  {{.Name}} driver={{.Driver}}'
 
 echo "Redes finales de ${SERVICE_NAME}:"
-docker inspect "$SERVICE_NAME" --format '{{range $net, $cfg := .NetworkSettings.Networks}}  {{$net}} ip={{$cfg.IPAddress}}{{"\n"}}{{end}}' 2>/dev/null || true
+docker container inspect "$SERVICE_NAME" --format '{{range $net, $cfg := .NetworkSettings.Networks}}  {{$net}} ip={{$cfg.IPAddress}}{{"\n"}}{{end}}' 2>/dev/null || true
 echo "=== Deploy finished ==="

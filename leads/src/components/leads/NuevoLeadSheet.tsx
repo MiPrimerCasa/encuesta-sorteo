@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
 import { useAuth } from '../../context/AuthContext';
-import type { NuevoLeadData, Promotor, RolUsuario } from '../../types';
+import type { LugarEntrevista, NuevoLeadData, Promotor, RolUsuario } from '../../types';
 
 interface NuevoLeadSheetProps {
   open: boolean;
@@ -16,35 +16,35 @@ const INPUT_CLASS =
 
 const LABEL_CLASS = 'text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500';
 
-function ToggleGroup({
-  name,
-  options,
+const SECTION_CLASS = 'space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/80 p-4';
+
+function ToggleSiNo({
   value,
   onChange,
 }: {
-  name: string;
-  options: { value: string; label: string }[];
-  value: string;
-  onChange: (v: string) => void;
+  value: boolean;
+  onChange: (v: boolean) => void;
 }) {
   return (
     <div className="flex gap-2">
-      {options.map((opt) => {
-        const sel = value === opt.value;
+      {[
+        { v: true, label: 'Sí' },
+        { v: false, label: 'No' },
+      ].map(({ v, label }) => {
+        const sel = value === v;
         return (
           <button
-            key={opt.value}
+            key={label}
             type="button"
-            name={name}
-            onClick={() => onChange(opt.value)}
+            onClick={() => onChange(v)}
             style={{ touchAction: 'manipulation' }}
-            className={`h-11 flex-1 rounded-lg border text-[14px] font-medium transition-all duration-[120ms] ease-out active:scale-[0.98] ${
+            className={`h-11 flex-1 rounded-lg border text-[14px] font-semibold transition-all duration-[120ms] active:scale-[0.98] ${
               sel
                 ? 'border-brand-700 bg-brand-600 text-white'
-                : 'border-zinc-200 bg-white text-zinc-700 active:bg-brand-50 active:border-brand-400 active:text-brand-700'
+                : 'border-zinc-200 bg-white text-zinc-700 active:bg-brand-50'
             }`}
           >
-            {opt.label}
+            {label}
           </button>
         );
       })}
@@ -63,19 +63,24 @@ export function NuevoLeadSheet({
 
   const [nombre, setNombre] = useState('');
   const [telefono, setTelefono] = useState('');
-  const [origen, setOrigen] = useState<'sorteo' | 'manual' | 'redes'>('sorteo');
   const [promotorId, setPromotorId] = useState('');
   const [domicilio, setDomicilio] = useState('');
+  const [agendarEntrevista, setAgendarEntrevista] = useState(false);
+  const [horarioEntrevista, setHorarioEntrevista] = useState('');
+  const [lugarEntrevista, setLugarEntrevista] = useState<LugarEntrevista | ''>('');
+  const [domicilioEntrevista, setDomicilioEntrevista] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Pre-seleccionar promotor cuando abre
   useEffect(() => {
     if (!open) return;
     setNombre('');
     setTelefono('');
-    setOrigen('sorteo');
     setDomicilio('');
+    setAgendarEntrevista(false);
+    setHorarioEntrevista('');
+    setLugarEntrevista('');
+    setDomicilioEntrevista('');
     setError('');
     setSaving(false);
     if (rolUsuario === 'promotor' && usuario) {
@@ -88,8 +93,14 @@ export function NuevoLeadSheet({
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!nombre.trim()) { setError('El nombre es obligatorio.'); return; }
-    if (!telefono.trim()) { setError('El teléfono es obligatorio.'); return; }
+    if (!nombre.trim()) {
+      setError('El nombre es obligatorio.');
+      return;
+    }
+    if (!telefono.trim()) {
+      setError('El teléfono es obligatorio.');
+      return;
+    }
     if (!promotorId) {
       setError(
         rolUsuario === 'promotor'
@@ -98,19 +109,43 @@ export function NuevoLeadSheet({
       );
       return;
     }
+    if (agendarEntrevista) {
+      if (!horarioEntrevista.trim()) {
+        setError('Indicá fecha y hora de la entrevista.');
+        return;
+      }
+      if (!lugarEntrevista) {
+        setError('Indicá si la entrevista es en sucursal o a domicilio.');
+        return;
+      }
+      if (lugarEntrevista === 'domicilio' && !domicilioEntrevista.trim() && !domicilio.trim()) {
+        setError('Indicá el domicilio de la entrevista.');
+        return;
+      }
+    }
 
     setSaving(true);
     setError('');
     try {
-      await onSave({
+      const payload: NuevoLeadData = {
         nombre: nombre.trim(),
         telefono: telefono.trim(),
-        lista: 'entrevista',
-        quiereEntrevista: true,
+        lista: agendarEntrevista ? 'entrevista' : 'contacto',
+        quiereEntrevista: agendarEntrevista,
+        agendarEntrevista,
         promotorId,
         domicilio: domicilio.trim() || undefined,
-        origen,
-      });
+        origen: 'manual',
+      };
+      if (agendarEntrevista) {
+        payload.horarioEntrevista = horarioEntrevista;
+        payload.lugarEntrevista = lugarEntrevista as LugarEntrevista;
+        payload.domicilioEntrevista =
+          lugarEntrevista === 'domicilio'
+            ? (domicilioEntrevista.trim() || domicilio.trim())
+            : undefined;
+      }
+      await onSave(payload);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -130,23 +165,21 @@ export function NuevoLeadSheet({
 
         <Drawer.Content
           className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl bg-white outline-none"
-          style={{ maxHeight: 'min(92dvh, 680px)' }}
+          style={{ maxHeight: 'min(94dvh, 760px)' }}
           aria-labelledby="nuevo-lead-title"
         >
-          {/* Drag handle */}
           <div className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-zinc-200" aria-hidden="true" />
 
-          {/* Header */}
           <div className="flex shrink-0 items-start justify-between border-b border-zinc-100 px-4 pb-4 pt-3">
             <div>
               <Drawer.Title
                 id="nuevo-lead-title"
                 className="text-[18px] font-semibold tracking-[-0.01em] text-zinc-900"
               >
-                Agendar cliente
+                Carga manual de lead
               </Drawer.Title>
               <p className="mt-0.5 text-[13px] text-zinc-400">
-                Completá los datos del nuevo lead
+                Datos del cliente; la entrevista es opcional
               </p>
             </div>
             <button
@@ -160,13 +193,11 @@ export function NuevoLeadSheet({
             </button>
           </div>
 
-          {/* Form */}
           <form
             id="nuevo-lead-form"
             onSubmit={handleSubmit}
             className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-5"
           >
-            {/* Nombre */}
             <div className="space-y-1.5">
               <label htmlFor="nl-nombre" className={LABEL_CLASS}>
                 Nombre y apellido <span className="text-brand-600">*</span>
@@ -183,7 +214,6 @@ export function NuevoLeadSheet({
               />
             </div>
 
-            {/* Teléfono */}
             <div className="space-y-1.5">
               <label htmlFor="nl-telefono" className={LABEL_CLASS}>
                 Teléfono <span className="text-brand-600">*</span>
@@ -201,22 +231,95 @@ export function NuevoLeadSheet({
               />
             </div>
 
-            {/* Origen del lead */}
-            <div className="space-y-1.5">
-              <p className={LABEL_CLASS}>¿Cómo ingresó?</p>
-              <ToggleGroup
-                name="origen"
-                options={[
-                  { value: 'sorteo', label: 'Sorteo' },
-                  { value: 'redes', label: 'Redes' },
-                  { value: 'manual', label: 'Manual' },
-                ]}
-                value={origen}
-                onChange={(v) => setOrigen(v as 'sorteo' | 'manual' | 'redes')}
-              />
-            </div>
+            <section className={SECTION_CLASS} aria-labelledby="nl-entrevista-title">
+              <div>
+                <h3 id="nl-entrevista-title" className="text-[13px] font-semibold text-zinc-900">
+                  Entrevista
+                </h3>
+                <p className="mt-0.5 text-[12px] text-zinc-500">
+                  Opcional — si no agendás, el lead queda para contactar después
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <p className={LABEL_CLASS}>¿Agendar entrevista ahora?</p>
+                <ToggleSiNo value={agendarEntrevista} onChange={setAgendarEntrevista} />
+              </div>
 
-            {/* Promotor — solo supervisor */}
+              {agendarEntrevista && (
+                <div className="space-y-4 border-t border-zinc-200/80 pt-4">
+                  <div className="space-y-1.5">
+                    <label htmlFor="nl-horario" className={LABEL_CLASS}>
+                      Fecha y hora <span className="text-brand-600">*</span>
+                    </label>
+                    <input
+                      id="nl-horario"
+                      type="datetime-local"
+                      value={horarioEntrevista}
+                      onChange={(e) => setHorarioEntrevista(e.target.value)}
+                      className={INPUT_CLASS}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <p className={LABEL_CLASS}>
+                      Lugar <span className="text-brand-600">*</span>
+                    </p>
+                    <div className="flex gap-2">
+                      {(
+                        [
+                          { value: 'sucursal' as const, label: 'Sucursal' },
+                          { value: 'domicilio' as const, label: 'A domicilio' },
+                        ] as const
+                      ).map((opt) => {
+                        const sel = lugarEntrevista === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setLugarEntrevista(opt.value)}
+                            style={{ touchAction: 'manipulation' }}
+                            className={`h-11 flex-1 rounded-lg border text-[14px] font-semibold transition-all active:scale-[0.98] ${
+                              sel
+                                ? 'border-brand-700 bg-brand-600 text-white'
+                                : 'border-zinc-200 bg-white text-zinc-700 active:bg-brand-50'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {lugarEntrevista === 'domicilio' && (
+                    <div className="space-y-1.5">
+                      <label htmlFor="nl-dom-entrevista" className={LABEL_CLASS}>
+                        Domicilio de la entrevista <span className="text-brand-600">*</span>
+                      </label>
+                      <input
+                        id="nl-dom-entrevista"
+                        type="text"
+                        value={domicilioEntrevista}
+                        onChange={(e) => setDomicilioEntrevista(e.target.value)}
+                        placeholder={domicilio.trim() || 'Ej. Av. Colón 1234'}
+                        className={INPUT_CLASS}
+                      />
+                      {domicilio.trim() && !domicilioEntrevista.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => setDomicilioEntrevista(domicilio)}
+                          className="text-[12px] font-medium text-brand-600 underline-offset-2 hover:underline"
+                        >
+                          Usar el mismo domicilio del cliente
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+
             {rolUsuario === 'supervisor' && promotores.length > 0 && (
               <div className="space-y-1.5">
                 <label htmlFor="nl-promotor" className={LABEL_CLASS}>
@@ -241,10 +344,9 @@ export function NuevoLeadSheet({
               </div>
             )}
 
-            {/* Domicilio (opcional) */}
             <div className="space-y-1.5">
               <label htmlFor="nl-domicilio" className={LABEL_CLASS}>
-                Domicilio{' '}
+                Domicilio del cliente{' '}
                 <span className="normal-case font-normal text-zinc-400">(opcional)</span>
               </label>
               <input
@@ -264,10 +366,9 @@ export function NuevoLeadSheet({
               </p>
             )}
 
-            <div className="h-4" aria-hidden="true" />
+            <div className="h-2" aria-hidden="true" />
           </form>
 
-          {/* Footer sticky */}
           <div
             className="shrink-0 border-t border-zinc-100 px-4 pt-3"
             style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
@@ -279,7 +380,11 @@ export function NuevoLeadSheet({
               style={{ touchAction: 'manipulation' }}
               className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:bg-brand-800 active:scale-[0.98] disabled:opacity-50"
             >
-              {saving ? 'Guardando…' : 'Agendar cliente'}
+              {saving
+                ? 'Guardando…'
+                : agendarEntrevista
+                  ? 'Guardar y agendar entrevista'
+                  : 'Guardar lead'}
             </button>
           </div>
         </Drawer.Content>

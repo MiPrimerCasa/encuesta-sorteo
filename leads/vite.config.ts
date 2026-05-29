@@ -10,6 +10,15 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     target: 'es2020',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/recharts')) return 'recharts';
+          if (id.includes('node_modules/react-datepicker')) return 'datepicker';
+          if (id.includes('node_modules')) return 'vendor';
+        },
+      },
+    },
   },
   server: {
     proxy: {

@@ -1,3 +1,4 @@
+import { origenIngresoToFuente, origenIngresoToOrigenLead } from '../domain/fuenteLabels';
 import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, SeguimientoLead, UsuarioSesion } from '../types';
 
 // ─── Usuario demo ────────────────────────────────────────────────────────────
@@ -442,6 +443,7 @@ export function updateDemoLead(leadId: string, seguimiento: SeguimientoLead): Le
 export function createDemoLead(data: NuevoLeadData): Lead {
   const now = new Date();
   const promotorNombre = DEMO_PROMOTORES.find((p) => p.id === data.promotorId)?.nombre;
+  const fuente = origenIngresoToFuente(data.origen);
   const newLead: Lead = {
     id: `lead-${Date.now()}`,
     nombre: data.nombre.trim(),
@@ -451,10 +453,16 @@ export function createDemoLead(data: NuevoLeadData): Lead {
     domicilio: data.domicilio?.trim() || undefined,
     quiereEntrevista: data.quiereEntrevista,
     lista: data.lista,
-    origen: data.origen,
+    origen: origenIngresoToOrigenLead(data.origen),
+    horarioEntrevista: data.horarioEntrevista,
+    lugarEntrevista: data.lugarEntrevista,
+    domicilioEntrevista: data.domicilioEntrevista?.trim() || undefined,
     fechaObtencion: now.toISOString().slice(0, 10),
     fechaAlta: now.toISOString(),
-    seguimiento: {},
+    seguimiento: {
+      fuente,
+      observaciones: data.observaciones?.trim() || undefined,
+    },
   };
   demoLeads = [...demoLeads, newLead];
   return { ...newLead };

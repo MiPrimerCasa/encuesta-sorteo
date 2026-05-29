@@ -1,5 +1,19 @@
 import type { Lead, LugarEntrevista, Producto, Promotor, RolUsuario } from '../types';
 
+/** Lista única de promotores a partir de los leads ya cargados (evita 2.º SP en supervisor). */
+export function buildPromotoresFromLeads(leads: Lead[]): Promotor[] {
+  const map = new Map<string, Promotor>();
+  for (const lead of leads) {
+    if (!map.has(lead.promotorId)) {
+      map.set(lead.promotorId, {
+        id: lead.promotorId,
+        nombre: lead.promotorNombre ?? lead.promotorId,
+      });
+    }
+  }
+  return [...map.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+}
+
 export function leadCompro(lead: Lead) {
   return lead.seguimiento?.resultadoEntrevista === 'compro';
 }

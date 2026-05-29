@@ -10,6 +10,16 @@ export type ResultadoEntrevista = 'sin_interes' | 'reagenda' | 'no_compro' | 'co
 /** sena/cien = terreno; entrega_33/entrega_55 = plan inversión */
 export type EstadoPago = 'sena' | 'cien' | 'entrega_33' | 'entrega_55';
 
+/** Canal de ingreso en carga manual (alineado a métricas de origen + casos habituales). */
+export type OrigenIngresoManual =
+  | 'qr'
+  | 'sorteo'
+  | 'facebook'
+  | 'instagram'
+  | 'manual'
+  | 'referido'
+  | 'otro';
+
 export interface NuevoLeadData {
   nombre: string;
   telefono: string;
@@ -17,7 +27,13 @@ export interface NuevoLeadData {
   quiereEntrevista: boolean;
   promotorId: string;
   domicilio?: string;
-  origen: 'sorteo' | 'manual' | 'redes';
+  origen: OrigenIngresoManual;
+  observaciones?: string;
+  /** Si el usuario activa agendar entrevista en el formulario. */
+  agendarEntrevista: boolean;
+  horarioEntrevista?: string;
+  lugarEntrevista?: LugarEntrevista;
+  domicilioEntrevista?: string;
 }
 
 export interface Promotor {

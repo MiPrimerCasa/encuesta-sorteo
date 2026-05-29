@@ -1,20 +1,35 @@
-import { useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import {
   crearLead,
   fetchBarrios,
   fetchLeads,
   fetchProductos,
-  fetchPromotores,
   guardarSeguimiento,
 } from './api/client';
 import { LoginPage } from './components/auth/LoginPage';
 import { NavBar } from './components/layout/NavBar';
-import { LeadsPanel } from './components/leads/LeadsPanel';
-import { PromotoresPanel } from './components/promotores/PromotoresPanel';
-import { CalendarioView } from './components/calendario/CalendarioView';
-import { PromotorMetricasPanel } from './components/promotores/PromotorMetricasPanel';
+import { buildPromotoresFromLeads } from './domain/leads';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, SeguimientoLead, VistaActiva } from './types';
+
+const LeadsPanel = lazy(() =>
+  import('./components/leads/LeadsPanel').then((m) => ({ default: m.LeadsPanel })),
+);
+const PromotoresPanel = lazy(() =>
+  import('./components/promotores/PromotoresPanel').then((m) => ({ default: m.PromotoresPanel })),
+);
+const CalendarioView = lazy(() =>
+  import('./components/calendario/CalendarioView').then((m) => ({ default: m.CalendarioView })),
+);
+const PromotorMetricasPanel = lazy(() =>
+  import('./components/promotores/PromotorMetricasPanel').then((m) => ({
+    default: m.PromotorMetricasPanel,
+  })),
+);
+
+function VistaCargando({ texto = 'Cargando…' }: { texto?: string }) {
+  return <p className="px-4 py-12 text-center text-neutral-600">{texto}</p>;
+}
 
 function AppShell() {
   const { usuario, login, logout } = useAuth();
@@ -32,14 +47,13 @@ function AppShell() {
     setError('');
     try {
       const esSupervisor = usuario.rol === 'supervisor';
-      const [l, p, prod, barr] = await Promise.all([
+      const [l, prod, barr] = await Promise.all([
         fetchLeads(),
-        esSupervisor ? fetchPromotores() : Promise.resolve([]),
         fetchProductos(usuario.rol),
         fetchBarrios(),
       ]);
       setLeads(l);
-      setPromotores(p);
+      setPromotores(esSupervisor ? buildPromotoresFromLeads(l) : []);
       setProductos(prod);
       setBarrios(barr);
     } catch (err) {
@@ -77,6 +91,33 @@ function AppShell() {
     return <LoginPage onLogin={login} />;
   }
 
+  const contenidoPrincipal =
+    cargando && leads.length === 0 ? (
+      <VistaCargando texto="Cargando datos…" />
+    ) : vistaActiva === 'calendario' ? (
+      <CalendarioView
+        leads={leads}
+        promotores={promotores}
+        onActualizarLead={onActualizarLead}
+        onVolver={() => setVistaActiva('leads')}
+      />
+    ) : vistaActiva === 'promotores' && usuario.rol === 'supervisor' ? (
+      <PromotoresPanel leads={leads} promotores={promotores} />
+    ) : vistaActiva === 'metricas' && usuario.rol === 'promotor' ? (
+      <PromotorMetricasPanel leads={leads} />
+    ) : (
+      <LeadsPanel
+        leads={leads}
+        rolUsuario={usuario.rol}
+        nombreUsuario={usuario.nombre}
+        promotores={promotores}
+        productos={productos}
+        barrios={barrios}
+        onActualizarLead={onActualizarLead}
+        onCrearLead={onCrearLead}
+      />
+    );
+
   return (
     <div vaul-drawer-wrapper="" className="min-h-svh bg-zinc-50">
       <NavBar
@@ -91,31 +132,7 @@ function AppShell() {
             {error}
           </p>
         )}
-        {cargando && leads.length === 0 ? (
-          <p className="px-4 py-12 text-center text-neutral-600">Cargando datos…</p>
-        ) : vistaActiva === 'calendario' ? (
-          <CalendarioView
-            leads={leads}
-            promotores={promotores}
-            onActualizarLead={onActualizarLead}
-            onVolver={() => setVistaActiva('leads')}
-          />
-        ) : vistaActiva === 'promotores' && usuario.rol === 'supervisor' ? (
-          <PromotoresPanel leads={leads} promotores={promotores} />
-        ) : vistaActiva === 'metricas' && usuario.rol === 'promotor' ? (
-          <PromotorMetricasPanel leads={leads} />
-        ) : (
-          <LeadsPanel
-            leads={leads}
-            rolUsuario={usuario.rol}
-            nombreUsuario={usuario.nombre}
-            promotores={promotores}
-            productos={productos}
-            barrios={barrios}
-            onActualizarLead={onActualizarLead}
-            onCrearLead={onCrearLead}
-          />
-        )}
+        <Suspense fallback={<VistaCargando />}>{contenidoPrincipal}</Suspense>
       </main>
     </div>
   );

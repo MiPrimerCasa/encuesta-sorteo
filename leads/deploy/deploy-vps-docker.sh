@@ -66,6 +66,87 @@ container_ids_for_service() {
 }
 
 COMPOSE=(docker compose --project-directory "$LEADS_DIR" -f "$ROOT_COMPOSE" -f "$TRAEFIK_FRAGMENT")
+ROLLBACK_TAG="seguimiento-leads:rollback"
+APP_PORT="${APP_PORT:-3001}"
+BASE_PATH="${APP_BASE_PATH:-/leads}"
+BASE_PATH="${BASE_PATH%/}"
+HEALTH_PATH="${BASE_PATH}/api/health/live"
+
+connect_traefik_networks() {
+  local encuesta="${ENCUESTA_CONTAINER:-encuesta-landingqr}"
+  if ! docker inspect "$SERVICE_NAME" >/dev/null 2>&1; then
+    echo "WARN: ${SERVICE_NAME} no existe — omitiendo conexión de redes."
+    return 0
+  fi
+  if ! docker inspect "$encuesta" >/dev/null 2>&1; then
+    echo "Contenedor ${encuesta} no encontrado — no se puede auto-detectar red."
+    return 0
+  fi
+  local encuesta_networks
+  encuesta_networks=$(docker inspect "$encuesta" \
+    --format '{{range $net, $cfg := .NetworkSettings.Networks}}{{$net}} {{end}}' \
+    | tr ' ' '\n' | grep -v '^$' || true)
+  echo "Redes de ${encuesta}:"
+  for net in $encuesta_networks; do
+    echo "  ${net}"
+    if ! docker inspect "$SERVICE_NAME" \
+         --format '{{range $net, $cfg := .NetworkSettings.Networks}}{{$net}} {{end}}' \
+         2>/dev/null | grep -qw "$net"; then
+      echo "  → Conectando ${SERVICE_NAME} a ${net}..."
+      docker network connect "$net" "$SERVICE_NAME" 2>/dev/null \
+        && echo "  → OK" || echo "  → ya conectado o error (ignorado)"
+    else
+      echo "  → ${SERVICE_NAME} ya está en ${net}"
+    fi
+  done
+}
+
+health_probe() {
+  docker exec "$SERVICE_NAME" node -e "
+    const port=${APP_PORT};
+    const paths=['${HEALTH_PATH}','/api/health/live'];
+    (async () => {
+      for (const p of paths) {
+        try {
+          const r = await fetch('http://127.0.0.1:' + port + p);
+          if (r.ok) process.exit(0);
+        } catch {}
+      }
+      process.exit(1);
+    })();
+  " 2>/dev/null
+}
+
+attempt_rollback() {
+  if docker ps --filter "name=^/${SERVICE_NAME}$" --filter "status=running" -q | grep -q .; then
+    return 0
+  fi
+  if ! docker image inspect "$ROLLBACK_TAG" >/dev/null 2>&1; then
+    echo "WARN: no hay imagen ${ROLLBACK_TAG} para rollback."
+    return 1
+  fi
+  echo "ROLLBACK: restaurando ${ROLLBACK_TAG} → latest..."
+  docker tag "$ROLLBACK_TAG" seguimiento-leads:latest
+  "${COMPOSE[@]}" up -d --no-deps --force-recreate "$SERVICE_NAME" || return 1
+  connect_traefik_networks
+  if health_probe; then
+    echo "ROLLBACK OK — servicio restaurado con imagen anterior."
+    return 0
+  fi
+  echo "WARN: rollback levantó contenedor pero health no respondió."
+  return 1
+}
+
+on_deploy_error() {
+  echo "ERROR en deploy — intentando rollback..."
+  attempt_rollback || true
+}
+trap on_deploy_error ERR
+
+if docker ps --filter "name=^/${SERVICE_NAME}$" --filter "status=running" -q | grep -q .; then
+  echo "Guardando imagen de rollback desde contenedor actual..."
+  docker commit "$SERVICE_NAME" "$ROLLBACK_TAG" >/dev/null 2>&1 || true
+fi
 
 "${COMPOSE[@]}" stop "$SERVICE_NAME" >/dev/null 2>&1 || true
 "${COMPOSE[@]}" rm -sf "$SERVICE_NAME" >/dev/null 2>&1 || true
@@ -98,38 +179,40 @@ if ((${#remaining[@]} > 0)); then
   exit 1
 fi
 
-docker compose --project-directory "$LEADS_DIR" \
-  -f "$ROOT_COMPOSE" \
-  -f "$TRAEFIK_FRAGMENT" \
-  up -d --no-deps --force-recreate "$SERVICE_NAME"
+"${COMPOSE[@]}" up -d --no-deps --force-recreate "$SERVICE_NAME"
 
-echo "Waiting for health..."
-APP_PORT="${APP_PORT:-3001}"
+# Traefik solo descubre el CRM si comparte red con la encuesta — siempre conectar antes del health.
+echo "--- Conectar redes Traefik ---"
+connect_traefik_networks
+
+echo "Waiting for health (${HEALTH_PATH} o /api/health/live)..."
 HEALTH_OK=0
-for i in {1..12}; do
-  # Hacemos el healthcheck directo desde el contenedor (evita dependencia de Traefik/TLS).
-  if docker exec "$SERVICE_NAME" node -e "fetch('http://127.0.0.1:${APP_PORT}/leads/api/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"; then
+for i in {1..20}; do
+  if health_probe; then
     HEALTH_OK=1
     echo ""
     echo "Smoke test OK (directo al contenedor)"
     break
   fi
-  echo "Health not ready yet (${i}/12) — esperando..."
+  echo "Health not ready yet (${i}/20) — esperando..."
   sleep 3
 done
 
 if [[ "$HEALTH_OK" -ne 1 ]]; then
   echo "WARN: smoke test falló — docker logs ${SERVICE_NAME}"
   docker logs --tail 120 "$SERVICE_NAME" || true
-  # En algunos VPS el endpoint puede tardar más (red/DB), pero el contenedor queda operativo.
-  # Si el contenedor está corriendo, no frenamos el deploy para evitar falsos negativos.
   if [[ -n "$(docker ps --filter "name=^/${SERVICE_NAME}$" --filter "status=running" --format '{{.Names}}')" ]]; then
     echo "WARN: healthcheck no confirmó a tiempo, pero el contenedor está running. Se continúa."
   else
-    echo "ERROR: el contenedor no quedó corriendo."
-    exit 1
+    echo "ERROR: el contenedor no quedó corriendo — intentando rollback..."
+    attempt_rollback || true
+    if ! docker ps --filter "name=^/${SERVICE_NAME}$" --filter "status=running" -q | grep -q .; then
+      exit 1
+    fi
   fi
 fi
+
+trap - ERR
 
 docker ps --filter "name=${SERVICE_NAME}" --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
 
@@ -138,30 +221,6 @@ echo "Redes de ${SERVICE_NAME}:"
 docker inspect "$SERVICE_NAME" --format '{{range $net, $cfg := .NetworkSettings.Networks}}  {{$net}} ip={{$cfg.IPAddress}}{{"\n"}}{{end}}' 2>/dev/null || echo "  (no se pudo inspeccionar)"
 echo "Todas las redes Docker:"
 docker network ls --format '  {{.Name}} driver={{.Driver}}'
-
-# Auto-conectar a la misma red que el contenedor principal de la encuesta.
-# Traefik vigila la red en la que corre la encuesta; si leads no está en esa red, no se descubre.
-ENCUESTA_CONTAINER="${ENCUESTA_CONTAINER:-encuesta-landingqr}"
-if docker inspect "$ENCUESTA_CONTAINER" >/dev/null 2>&1; then
-  ENCUESTA_NETWORKS=$(docker inspect "$ENCUESTA_CONTAINER" \
-    --format '{{range $net, $cfg := .NetworkSettings.Networks}}{{$net}} {{end}}' \
-    | tr ' ' '\n' | grep -v '^$' || true)
-  echo "Redes de ${ENCUESTA_CONTAINER}:"
-  for NET in $ENCUESTA_NETWORKS; do
-    echo "  ${NET}"
-    if ! docker inspect "$SERVICE_NAME" \
-         --format '{{range $net, $cfg := .NetworkSettings.Networks}}{{$net}} {{end}}' \
-         2>/dev/null | grep -qw "$NET"; then
-      echo "  → Conectando ${SERVICE_NAME} a ${NET}..."
-      docker network connect "$NET" "$SERVICE_NAME" 2>/dev/null \
-        && echo "  → OK" || echo "  → ya conectado o error (ignorado)"
-    else
-      echo "  → ${SERVICE_NAME} ya está en ${NET}"
-    fi
-  done
-else
-  echo "Contenedor ${ENCUESTA_CONTAINER} no encontrado — no se puede auto-detectar red."
-fi
 
 echo "Redes finales de ${SERVICE_NAME}:"
 docker inspect "$SERVICE_NAME" --format '{{range $net, $cfg := .NetworkSettings.Networks}}  {{$net}} ip={{$cfg.IPAddress}}{{"\n"}}{{end}}' 2>/dev/null || true

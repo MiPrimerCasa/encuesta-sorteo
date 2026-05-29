@@ -27,7 +27,8 @@
 }
 
 /* ── react-datepicker — overrides de tema ─────────────────────────────── */
-.react-datepicker-popper { z-index: 9999; }
+.react-datepicker-popper,
+.react-datepicker__portal { z-index: 9999; }
 
 .mpc-calendar.react-datepicker {
   font-family: var(--font-sans);

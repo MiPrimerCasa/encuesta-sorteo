@@ -83,18 +83,26 @@ interface DateTimePickerProps {
   onChange: (v: string) => void;
   required?: boolean;
   autoOpen?: boolean;
+  /** Renderiza el calendario en document.body (recomendado dentro de drawers/modales). */
+  usePortal?: boolean;
 }
 
-export function DateTimePicker({ value, onChange, required, autoOpen }: DateTimePickerProps) {
+export function DateTimePicker({
+  value,
+  onChange,
+  required,
+  autoOpen,
+  usePortal = false,
+}: DateTimePickerProps) {
   const pickerRef = useRef<ReactDatePicker>(null);
 
   useEffect(() => {
     if (!autoOpen) return;
     const t = setTimeout(() => {
       pickerRef.current?.setOpen(true);
-    }, 180);
+    }, 220);
     return () => clearTimeout(t);
-  }, []);
+  }, [autoOpen]);
 
   return (
     <ReactDatePicker
@@ -110,6 +118,7 @@ export function DateTimePicker({ value, onChange, required, autoOpen }: DateTime
       customInput={<TriggerButton />}
       popperPlacement="bottom-start"
       popperProps={{ strategy: 'fixed' }}
+      withPortal={usePortal}
       required={required}
       calendarClassName="mpc-calendar"
       wrapperClassName="w-full"

@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
 import { useAuth } from '../../context/AuthContext';
 import type { LugarEntrevista, NuevoLeadData, Promotor, RolUsuario } from '../../types';
+import { DateTimePicker } from '../ui/DateTimePicker';
 
 interface NuevoLeadSheetProps {
   open: boolean;
@@ -252,16 +253,15 @@ export function NuevoLeadSheet({
               {agendarEntrevista && (
                 <div className="space-y-4 border-t border-zinc-200/80 pt-4">
                   <div className="space-y-1.5">
-                    <label htmlFor="nl-horario" className={LABEL_CLASS}>
+                    <p id="nl-horario-label" className={LABEL_CLASS}>
                       Fecha y hora <span className="text-brand-600">*</span>
-                    </label>
-                    <input
-                      id="nl-horario"
-                      type="datetime-local"
+                    </p>
+                    <DateTimePicker
                       value={horarioEntrevista}
-                      onChange={(e) => setHorarioEntrevista(e.target.value)}
-                      className={INPUT_CLASS}
+                      onChange={setHorarioEntrevista}
+                      autoOpen={agendarEntrevista && !horarioEntrevista}
                       required
+                      usePortal
                     />
                   </div>
 

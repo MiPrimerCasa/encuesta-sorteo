@@ -93,7 +93,7 @@ echo "Building ${SERVICE_NAME} (encuesta-landingqr no se reinicia)..."
 docker compose --project-directory "$LEADS_DIR" \
   -f "$ROOT_COMPOSE" \
   -f "$TRAEFIK_FRAGMENT" \
-  build "$SERVICE_NAME"
+  build --build-arg "CACHEBUST=${TIMESTAMP}" "$SERVICE_NAME"
 
 # Limpiar contenedor viejo (stop → rm, con espera si Docker dice "removal in progress").
 # No usar `docker ps --filter name=^/foo$`: en varios hosts no aplica regex y devuelve vacío
@@ -155,18 +155,41 @@ connect_traefik_networks() {
 
 health_probe() {
   docker exec "$SERVICE_NAME" node -e "
-    const port=${APP_PORT};
-    const paths=['${HEALTH_PATH}','/api/health/live'];
+    const http = require('http');
+    const port = ${APP_PORT};
+    const paths = ['${HEALTH_PATH}', '/api/health/live', '${BASE_PATH}/api/health'];
+    const probe = (p) => new Promise((resolve) => {
+      const req = http.get({ host: '127.0.0.1', port, path: p, timeout: 8000 }, (res) => {
+        res.resume();
+        resolve(res.statusCode >= 200 && res.statusCode < 300);
+      });
+      req.on('error', () => resolve(false));
+      req.on('timeout', () => { req.destroy(); resolve(false); });
+    });
     (async () => {
       for (const p of paths) {
-        try {
-          const r = await fetch('http://127.0.0.1:' + port + p);
-          if (r.ok) process.exit(0);
-        } catch {}
+        if (await probe(p)) process.exit(0);
       }
       process.exit(1);
     })();
-  " 2>/dev/null
+  "
+}
+
+container_ip() {
+  docker container inspect "$SERVICE_NAME" \
+    --format "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" 2>/dev/null \
+    | head -1
+}
+
+direct_smoke() {
+  local ip
+  ip="$(container_ip)"
+  [[ -z "$ip" ]] && return 1
+  local code
+  code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 10 \
+    "http://${ip}:${APP_PORT}${HEALTH_PATH}" 2>/dev/null || echo "000")
+  echo "Directo al contenedor ${ip}:${APP_PORT}${HEALTH_PATH} → HTTP ${code}"
+  [[ "$code" == "200" ]]
 }
 
 attempt_rollback() {
@@ -245,6 +268,9 @@ fi
 echo "--- Conectar redes Traefik ---"
 connect_traefik_networks
 
+echo "Esperando arranque del proceso Node..."
+sleep 5
+
 echo "Waiting for health (${HEALTH_PATH} o /api/health/live)..."
 HEALTH_OK=0
 for i in {1..20}; do
@@ -295,6 +321,12 @@ traefik_smoke() {
   echo "Traefik smoke Host=${host} ${HEALTH_PATH} → HTTP ${code}"
   [[ "$code" == "200" ]]
 }
+
+echo "--- Smoke directo (red Docker) ---"
+if ! direct_smoke; then
+  echo "WARN: el contenedor no respondió por IP — docker logs --tail 40"
+  docker logs --tail 40 "$SERVICE_NAME" 2>/dev/null || true
+fi
 
 echo "--- Smoke Traefik (ruta pública /leads) ---"
 if ! traefik_smoke; then

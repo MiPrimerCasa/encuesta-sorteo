@@ -32,6 +32,8 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
+ARG CACHEBUST=1
+RUN echo "cache bust ${CACHEBUST}"
 COPY server ./server
 COPY --from=build /app/dist ./dist
 

@@ -19,6 +19,7 @@ services:
       NODE_ENV: production
       PORT: "3001"
       APP_BASE_PATH: "/leads"
+      BASE_PATH: "/leads"
     volumes:
       - ./data:/app/data
     networks:
@@ -30,7 +31,7 @@ services:
       # Prioridad > encuesta (Host sin path) para que /leads no caiga en la landing
       - "traefik.http.routers.leadssecure.priority=200"
       - "traefik.http.routers.leadssecure.rule=Host(`${LEADS_TRAEFIK_HOST:-www.miprimercasafsa-sorteo.com}`) && PathPrefix(`/leads`)"
-      - "traefik.http.routers.leadssecure.entrypoints=websecure"
+      - "traefik.http.routers.leadssecure.entrypoints=web,websecure"
       - "traefik.http.routers.leadssecure.tls=true"
       - "traefik.http.routers.leadssecure.tls.certresolver=myhttpchallenge"
       - "traefik.http.routers.leadssecure.service=leadssvc"

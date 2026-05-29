@@ -1,5 +1,6 @@
 import { useAuth } from '../../context/AuthContext';
 import type { Lead } from '../../types';
+import { LinksRedesSection } from '../leads/LinksRedesSection';
 import { PromotorResumen } from '../leads/PromotorResumen';
 import { LeadsHistorial } from './LeadsHistorial';
 import { OrigenLeadsChart } from './OrigenLeadsChart';
@@ -42,6 +43,8 @@ export function PromotorMetricasPanel({ leads }: Props) {
         </div>
 
       </div>
+
+      <LinksRedesSection className="mt-8" />
     </div>
   );
 }

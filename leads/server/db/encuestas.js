@@ -470,6 +470,41 @@ export function buildPromotoresFromLeads(leads, encuestaRows = []) {
   return [...map.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
 
+/**
+ * Supervisor puede cargar como promotor propio: primera opción = él/ella, no un vendedor del equipo.
+ */
+export function prependSupervisorComoPromotor(promotores, usuarioSesion, encuestaRows = []) {
+  if (!usuarioSesion || usuarioSesion.rol !== 'supervisor') return promotores;
+  const id = String(usuarioSesion.idOperador ?? usuarioSesion.id ?? '').trim();
+  if (!id) return promotores;
+
+  const nombre = String(usuarioSesion.nombre ?? 'Supervisor').trim();
+  const codigoCarga =
+    usuarioSesion.codigoCarga?.trim() ||
+    resolveCodigoCargaPorPromotor(encuestaRows, nombre, id) ||
+    undefined;
+
+  const self = {
+    id,
+    nombre,
+    codigoCarga: codigoCarga || undefined,
+    idVendedor: id,
+    direccionSucursal: resolveDireccionOficinasSupervisor(encuestaRows),
+    esPropioSupervisor: true,
+  };
+
+  const normSelf = normalizeNombre(nombre);
+  const rest = promotores.filter(
+    (p) => p.id !== id && normalizeNombre(p.nombre) !== normSelf,
+  );
+  return [self, ...rest];
+}
+
+export function buildPromotoresParaCarga(usuarioSesion, leads, encuestaRows = []) {
+  const base = buildPromotoresFromLeads(leads, encuestaRows);
+  return prependSupervisorComoPromotor(base, usuarioSesion, encuestaRows);
+}
+
 function enrichLeadParaCliente(lead) {
   let horarioEntrevista = lead.horarioEntrevista;
   if (

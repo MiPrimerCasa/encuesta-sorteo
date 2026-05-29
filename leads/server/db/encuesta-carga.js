@@ -162,6 +162,12 @@ export function resolveUsuarioSpCarga(usuarioSesion, context, payload) {
   }
 
   if (usuarioSesion.rol === 'supervisor') {
+    const desdeFilas = codigoDesdeFilasEncuesta(
+      context.rows,
+      usuarioSesion.nombre,
+      usuarioSesion.idOperador ?? usuarioSesion.id,
+    );
+    if (esCodigoUsuarioCargaValido(desdeFilas)) return desdeFilas;
     throw new CodigoPromotorCargaError();
   }
 
@@ -237,7 +243,9 @@ export function buildCargaParamsFromPayload(payload, usuarioSesion, context) {
 
   const promotorNombreFiltro =
     payload.promotorNombre?.trim() ||
-    (usuarioSesion.rol === 'promotor' ? usuarioSesion.nombre : null);
+    (usuarioSesion.rol === 'promotor' || usuarioSesion.rol === 'supervisor'
+      ? usuarioSesion.nombre
+      : null);
 
   let campo8 = null;
   if (agendar && payload.lugarEntrevista === 'domicilio') {

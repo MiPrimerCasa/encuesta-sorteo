@@ -128,7 +128,7 @@ export function LeadCard({
             {detallePago && <span className="ml-1 text-zinc-400">· {detallePago}</span>}
             {lead.seguimiento?.numeroRecibo && (
               <span className="ml-1 text-zinc-400">
-                · Recibo: {lead.seguimiento.numeroRecibo}
+                · Comprobante: {lead.seguimiento.numeroRecibo}
               </span>
             )}
           </div>

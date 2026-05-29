@@ -6,6 +6,7 @@ import { AlertasSinContactar } from './AlertasSinContactar';
 import { LeadCard } from './LeadCard';
 import { LeadModalForm } from './LeadModalForm';
 import { NuevoLeadSheet } from './NuevoLeadSheet';
+import { LinksRedesSection } from './LinksRedesSection';
 import { PromotorResumen } from './PromotorResumen';
 import { SwipeableLeadCard } from './SwipeableLeadCard';
 
@@ -370,6 +371,8 @@ export function LeadsPanel({
           </div>
         </div>
       )}
+
+      <LinksRedesSection className="mt-8" />
 
       <LeadModalForm
         lead={leadSeleccionado}

@@ -108,6 +108,8 @@ export function SwipeableLeadCard({
   };
 
   const canSave = canal !== null || confirmo !== null;
+  /** Promotor en calle: seguimiento completo en el modal, sin canal/confirmó por swipe */
+  const accionesRapidas = !ocultarPromotor;
 
   /* ── Desktop panel state ── */
   const [desktopOpen, setDesktopOpen] = useState(false);
@@ -176,7 +178,7 @@ export function SwipeableLeadCard({
       {/* ── Mobile: slide-to-reveal (touch only) ── */}
       <div className="relative overflow-hidden rounded-xl md:rounded-b-none md:rounded-t-xl">
 
-        {/* Action panel — revealed by swipe on mobile */}
+        {accionesRapidas && (
         <div
           className="absolute inset-y-0 right-0 flex flex-col justify-center gap-2.5 rounded-xl bg-brand-50 px-3 md:hidden"
           style={{ width: REVEAL_WIDTH }}
@@ -247,16 +249,17 @@ export function SwipeableLeadCard({
             </button>
           </div>
         </div>
+        )}
 
-        {/* Card — slides left on touch swipe */}
+        {/* Card — slides left on touch swipe (solo supervisor) */}
         <div
           style={{
-            transform: `translateX(-${offset}px)`,
+            transform: accionesRapidas ? `translateX(-${offset}px)` : undefined,
             transition: isDragging.current ? 'none' : 'transform 220ms ease-out',
           }}
-          onTouchStart={onTouchStart}
-          onTouchMove={onTouchMove}
-          onTouchEnd={onTouchEnd}
+          onTouchStart={accionesRapidas ? onTouchStart : undefined}
+          onTouchMove={accionesRapidas ? onTouchMove : undefined}
+          onTouchEnd={accionesRapidas ? onTouchEnd : undefined}
         >
           <LeadCard
             lead={lead}
@@ -271,7 +274,7 @@ export function SwipeableLeadCard({
         </div>
       </div>
 
-      {/* ── Desktop: inline quick-action bar ── */}
+      {accionesRapidas && (
       <div className="hidden md:block overflow-hidden rounded-b-xl border-x border-b border-zinc-200 bg-zinc-50">
         {desktopOpen ? (
           <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
@@ -299,6 +302,7 @@ export function SwipeableLeadCard({
           </button>
         )}
       </div>
+      )}
     </div>
   );
 }

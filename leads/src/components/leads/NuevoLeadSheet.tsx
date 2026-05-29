@@ -76,6 +76,8 @@ export function NuevoLeadSheet({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const esSupervisor = rolUsuario === 'supervisor';
+
   useEffect(() => {
     if (!open) return;
     setNombre('');
@@ -87,19 +89,16 @@ export function NuevoLeadSheet({
     setDomicilioEntrevista('');
     setError('');
     setSaving(false);
-    if (rolUsuario === 'promotor' && usuario) {
-      const pid = String(usuario.idOperador ?? usuario.id ?? '').trim();
-      setPromotorId(pid);
+    if (usuario) {
+      setPromotorId(String(usuario.idOperador ?? usuario.id ?? '').trim());
     } else {
-      setPromotorId(promotores[0]?.id ?? '');
+      setPromotorId('');
     }
-  }, [open, rolUsuario, usuario, promotores]);
+  }, [open, usuario]);
 
-  const direccionSucursalActiva =
-    (rolUsuario === 'supervisor'
-      ? promotores.find((p) => p.id === promotorId)?.direccionSucursal
-      : undefined) ||
-    direccionOficinas;
+  const direccionSucursalActiva = esSupervisor
+    ? direccionOficinas
+    : promotores.find((p) => p.id === promotorId)?.direccionSucursal || direccionOficinas;
 
   useEffect(() => {
     if (lugarEntrevista === 'sucursal' && direccionSucursalActiva?.trim()) {
@@ -117,12 +116,8 @@ export function NuevoLeadSheet({
       setError('El teléfono es obligatorio.');
       return;
     }
-    if (!promotorId) {
-      setError(
-        rolUsuario === 'promotor'
-          ? 'No se pudo identificar tu usuario. Volvé a iniciar sesión.'
-          : 'Seleccioná un promotor.',
-      );
+    if (!promotorId || !usuario) {
+      setError('No se pudo identificar tu usuario. Volvé a iniciar sesión.');
       return;
     }
     if (agendarEntrevista) {
@@ -140,16 +135,13 @@ export function NuevoLeadSheet({
       }
     }
 
-    const promotorSel = promotores.find((p) => p.id === promotorId);
+    const promotorSel = esSupervisor ? undefined : promotores.find((p) => p.id === promotorId);
     const promotorCodigo =
-      rolUsuario === 'supervisor'
-        ? promotorSel?.codigoCarga?.trim()
-        : usuario?.codigoCarga?.trim() ||
-          promotorSel?.codigoCarga?.trim();
+      usuario.codigoCarga?.trim() || promotorSel?.codigoCarga?.trim();
     if (!promotorCodigo) {
       setError(
-        rolUsuario === 'supervisor'
-          ? 'El promotor seleccionado no tiene código de carga (ej. SORTEO01S21P01). Elegí otro o contactá soporte.'
+        esSupervisor
+          ? 'No se encontró tu código de carga. Volvé a iniciar sesión o contactá soporte.'
           : 'No se encontró tu código de promotor para la carga. Volvé a iniciar sesión.',
       );
       return;
@@ -166,8 +158,7 @@ export function NuevoLeadSheet({
         agendarEntrevista,
         promotorId,
         promotorCodigo,
-        promotorNombre:
-          rolUsuario === 'supervisor' ? promotorSel?.nombre : usuario?.nombre,
+        promotorNombre: usuario.nombre,
         domicilio: domicilio.trim() || undefined,
         origen: 'manual',
       };
@@ -179,8 +170,7 @@ export function NuevoLeadSheet({
             ? (domicilioEntrevista.trim() || domicilio.trim())
             : undefined;
       }
-      const promotorNombre = rolUsuario === 'supervisor' ? promotorSel?.nombre : undefined;
-      await onSave(payload, promotorNombre);
+      await onSave(payload, esSupervisor ? usuario.nombre : undefined);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -370,27 +360,18 @@ export function NuevoLeadSheet({
               )}
             </section>
 
-            {rolUsuario === 'supervisor' && promotores.length > 0 && (
+            {esSupervisor && usuario && (
               <div className="space-y-1.5">
-                <label htmlFor="nl-promotor" className={LABEL_CLASS}>
-                  Promotor <span className="text-brand-600">*</span>
-                </label>
-                <select
-                  id="nl-promotor"
-                  value={promotorId}
-                  onChange={(e) => setPromotorId(e.target.value)}
-                  required
-                  className={`${INPUT_CLASS} cursor-pointer`}
+                <p className={LABEL_CLASS}>Promotor</p>
+                <div
+                  className="flex h-12 items-center rounded-lg border border-zinc-200 bg-zinc-50 px-3 text-[15px] font-medium text-zinc-800"
+                  aria-readonly="true"
                 >
-                  <option value="" disabled>
-                    Seleccioná un promotor…
-                  </option>
-                  {promotores.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.nombre}
-                    </option>
-                  ))}
-                </select>
+                  {usuario.nombre}
+                </div>
+                <p className="text-[12px] leading-relaxed text-zinc-500">
+                  La carga queda a tu nombre; los promotores de tu equipo no verán este lead.
+                </p>
               </div>
             )}
 

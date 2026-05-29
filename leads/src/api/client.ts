@@ -1,6 +1,7 @@
 import type {
   Barrio,
   Lead,
+  LinksRedes,
   NuevoLeadData,
   Producto,
   Promotor,
@@ -16,6 +17,8 @@ import {
   DEMO_USUARIO_PROMOTOR,
   createDemoLead,
   getDemoLeads,
+  getDemoLinksRedes,
+  getDemoPromotoresParaSupervisor,
   updateDemoLead,
 } from './demoData';
 
@@ -154,8 +157,26 @@ export async function fetchLeads(): Promise<{
   };
 }
 
+export async function fetchLinksRedes(): Promise<LinksRedes> {
+  if (_isDemoActive) {
+    const session = getSession();
+    if (!session?.usuario) {
+      throw new Error('Sin sesión de usuario.');
+    }
+    return getDemoLinksRedes(session.usuario);
+  }
+  const data = await apiFetch<{ links: LinksRedes }>('/api/links-redes');
+  return data.links;
+}
+
 export async function fetchPromotores() {
-  if (_isDemoActive) return DEMO_PROMOTORES;
+  if (_isDemoActive) {
+    const session = getSession();
+    if (session?.usuario.rol === 'supervisor') {
+      return getDemoPromotoresParaSupervisor(session.usuario);
+    }
+    return DEMO_PROMOTORES;
+  }
   const data = await apiFetch<{ promotores: Promotor[] }>('/api/promotores');
   return data.promotores;
 }

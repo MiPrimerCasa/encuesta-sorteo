@@ -1,5 +1,15 @@
 import { origenIngresoToFuente, origenIngresoToOrigenLead } from '../domain/fuenteLabels';
-import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, SeguimientoLead, UsuarioSesion } from '../types';
+import type {
+  Barrio,
+  Lead,
+  LinksRedes,
+  NuevoLeadData,
+  Producto,
+  Promotor,
+  SeguimientoLead,
+  UsuarioSesion,
+} from '../types';
+import linksCatalog from '../data/links-redes.json';
 
 // ─── Usuario demo ────────────────────────────────────────────────────────────
 
@@ -7,6 +17,8 @@ export const DEMO_USUARIO: UsuarioSesion = {
   id: 'demo-sup',
   nombre: 'Demo Supervisor',
   rol: 'supervisor',
+  idOperador: 'demo-sup',
+  codigoCarga: 'SORTEO01S21P01',
 };
 
 export const DEMO_USUARIO_PROMOTOR: UsuarioSesion = {
@@ -14,16 +26,63 @@ export const DEMO_USUARIO_PROMOTOR: UsuarioSesion = {
   nombre: 'Martín González',
   rol: 'promotor',
   idVendedor: 'prom-1',
+  idOperador: 'prom-1',
+  codigoCarga: 'SORTEO01S21P01',
 };
 
 // ─── Catálogo ─────────────────────────────────────────────────────────────────
 
 export const DEMO_PROMOTORES: Promotor[] = [
-  { id: 'prom-1', nombre: 'Martín González' },
-  { id: 'prom-2', nombre: 'Ana Rodríguez' },
-  { id: 'prom-3', nombre: 'Carlos López' },
-  { id: 'prom-4', nombre: 'Laura Fernández' },
+  { id: 'prom-1', nombre: 'Martín González', codigoCarga: 'SORTEO01S21P01' },
+  { id: 'prom-2', nombre: 'Ana Rodríguez', codigoCarga: 'SORTEO01S21P02' },
+  { id: 'prom-3', nombre: 'Carlos López', codigoCarga: 'SORTEO01S21P03' },
+  { id: 'prom-4', nombre: 'Laura Fernández', codigoCarga: 'SORTEO01S21P04' },
 ];
+
+/** Combo carga manual: supervisor primero (como promotor propio), luego el equipo. */
+type LinksCatalogJson = {
+  byCodigo: Record<
+    string,
+    { vendedor: string; codigo: string; instagram: string; facebook: string }
+  >;
+};
+
+/** Links de redes del promotor/supervisor demo (mismo catálogo que producción). */
+export function getDemoLinksRedes(usuario: UsuarioSesion): LinksRedes {
+  const codigo = String(usuario.codigoCarga ?? 'SORTEO01S21P01')
+    .trim()
+    .toUpperCase();
+  const entry = (linksCatalog as LinksCatalogJson).byCodigo[codigo];
+  if (!entry) {
+    return {
+      codigo,
+      vendedor: usuario.nombre,
+      instagram: null,
+      facebook: null,
+      mensaje: `No hay links de demo para el código ${codigo}.`,
+    };
+  }
+  return {
+    codigo: entry.codigo,
+    vendedor: entry.vendedor ?? usuario.nombre,
+    instagram: entry.instagram,
+    facebook: entry.facebook,
+    mensaje: null,
+  };
+}
+
+export function getDemoPromotoresParaSupervisor(supervisor: UsuarioSesion): Promotor[] {
+  const id = String(supervisor.idOperador ?? supervisor.id ?? 'demo-sup');
+  return [
+    {
+      id,
+      nombre: supervisor.nombre,
+      codigoCarga: supervisor.codigoCarga ?? 'SORTEO01S21P01',
+      esPropioSupervisor: true,
+    },
+    ...DEMO_PROMOTORES,
+  ];
+}
 
 export const DEMO_PRODUCTOS: Producto[] = [
   {
@@ -442,7 +501,10 @@ export function updateDemoLead(leadId: string, seguimiento: SeguimientoLead): Le
 
 export function createDemoLead(data: NuevoLeadData): Lead {
   const now = new Date();
-  const promotorNombre = DEMO_PROMOTORES.find((p) => p.id === data.promotorId)?.nombre;
+  const promotorNombre =
+    data.promotorNombre?.trim() ||
+    getDemoPromotoresParaSupervisor(DEMO_USUARIO).find((p) => p.id === data.promotorId)?.nombre ||
+    DEMO_PROMOTORES.find((p) => p.id === data.promotorId)?.nombre;
   const fuente = origenIngresoToFuente(data.origen);
   const newLead: Lead = {
     id: `lead-${Date.now()}`,

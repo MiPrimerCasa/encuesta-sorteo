@@ -72,14 +72,6 @@ function activarReagenda(): Partial<FormState> {
   };
 }
 
-function desactivarReagenda(form: FormState): Partial<FormState> {
-  return {
-    reagendarEntrevista: false,
-    resultadoEntrevista: form.resultadoEntrevista === 'reagenda' ? null : form.resultadoEntrevista,
-    fechaReagenda: '',
-  };
-}
-
 interface LeadModalFormProps {
   lead: Lead | null;
   open: boolean;
@@ -125,11 +117,46 @@ export function LeadModalForm({
 
   const handleCanal = (canal: NonNullable<SeguimientoLead['canal']>) => patch({ canal });
 
-  const handleReagendarToggle = (quiere: boolean) => {
-    if (quiere) {
-      patch(activarReagenda());
+  const handleConfirmoEntrevista = (confirmo: boolean) => {
+    if (confirmo) {
+      patch({
+        confirmoEntrevista: true,
+        canal: null,
+        huboEntrevista: null,
+        resultadoEntrevista: null,
+        reagendarEntrevista: false,
+        fechaReagenda: '',
+        ...resetCamposVenta(),
+      });
     } else {
-      patch(desactivarReagenda(form));
+      patch({
+        confirmoEntrevista: false,
+        canal: null,
+        huboEntrevista: null,
+        resultadoEntrevista: null,
+        reagendarEntrevista: false,
+        fechaReagenda: '',
+        ...resetCamposVenta(),
+      });
+    }
+  };
+
+  const handleNoConfirmoMotivo = (reagenda: boolean) => {
+    if (reagenda) {
+      patch({
+        ...activarReagenda(),
+        canal: null,
+      });
+    } else {
+      patch({
+        confirmoEntrevista: false,
+        resultadoEntrevista: 'sin_interes',
+        reagendarEntrevista: false,
+        fechaReagenda: '',
+        huboEntrevista: false,
+        canal: null,
+        ...resetCamposVenta(),
+      });
     }
   };
 
@@ -176,20 +203,43 @@ export function LeadModalForm({
         return;
       }
       if (requiereNumeroRecibo(form.idProducto, form.estadoPago) && !form.numeroRecibo.trim()) {
-        setErrorVenta('Ingresá el número de recibo.');
+        setErrorVenta('Ingresá el número del comprobante.');
         return;
       }
     }
 
     setErrorVenta('');
 
+    const esFlujoCampo = rol === 'promotor';
+    const confirmoNo = !esFlujoCampo && form.confirmoEntrevista === false;
+    const esReagendaNoConfirmo =
+      confirmoNo && (form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda');
+
     const seguimiento: SeguimientoLead = {
       fuente: lead.seguimiento?.fuente,
-      confirmoEntrevista: form.confirmoEntrevista,
-      canal: form.canal,
-      huboEntrevista: esReagenda ? false : form.huboEntrevista,
-      resultadoEntrevista: esReagenda ? 'reagenda' : form.resultadoEntrevista,
-      fechaReagenda: esReagenda ? form.fechaReagenda : null,
+      confirmoEntrevista: esFlujoCampo ? null : form.confirmoEntrevista,
+      canal: esFlujoCampo ? null : form.canal,
+      huboEntrevista: esFlujoCampo
+        ? esReagenda
+          ? false
+          : form.huboEntrevista
+        : confirmoNo
+          ? false
+          : esReagenda
+            ? false
+            : form.huboEntrevista,
+      resultadoEntrevista: esFlujoCampo
+        ? esReagenda
+          ? 'reagenda'
+          : form.resultadoEntrevista
+        : confirmoNo
+          ? esReagendaNoConfirmo
+            ? 'reagenda'
+            : form.resultadoEntrevista
+          : esReagenda
+            ? 'reagenda'
+            : form.resultadoEntrevista,
+      fechaReagenda: esReagenda ? form.fechaReagenda || null : null,
       idProducto: form.resultadoEntrevista === 'compro' ? form.idProducto : null,
       estadoPago: form.resultadoEntrevista === 'compro' ? form.estadoPago : null,
       idBarrio:
@@ -212,12 +262,53 @@ export function LeadModalForm({
     onClose();
   };
 
-  const contactado = Boolean(form.canal);
-  const showReagendaBloque = form.reagendarEntrevista;
-  const showEntrevistaDetalle = form.huboEntrevista === true && !form.reagendarEntrevista;
-  const showSinEntrevista = form.huboEntrevista === false && !form.reagendarEntrevista;
-  const showReagendaEnNo = showSinEntrevista && form.resultadoEntrevista === 'reagenda';
+  const esFlujoCampo = rol === 'promotor';
+  const totalPasos = esFlujoCampo ? 4 : 5;
+  const tituloObservaciones = esFlujoCampo ? 'Observaciones del promotor' : 'Observaciones';
+  const placeholderObservaciones = esFlujoCampo
+    ? 'Notas de la visita, entrevista o cierre…'
+    : 'Notas del supervisor…';
+
+  const confirmoSi = !esFlujoCampo && form.confirmoEntrevista === true;
+  const confirmoNo = !esFlujoCampo && form.confirmoEntrevista === false;
+
+  const showCanalSiConfirmo = confirmoSi;
+  const showHuboEntrevista = esFlujoCampo || (confirmoSi && form.canal != null);
+  const showEntrevistaDetalle = showHuboEntrevista && form.huboEntrevista === true;
+  const showSinEntrevistaResultado = showHuboEntrevista && form.huboEntrevista === false;
+  const showReagendaSinEntrevistaCampo =
+    esFlujoCampo &&
+    showSinEntrevistaResultado &&
+    (form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda');
+
+  const showMotivoNoConfirmo = confirmoNo;
+  const eligioMotivoNoConfirmo =
+    confirmoNo &&
+    (form.resultadoEntrevista === 'sin_interes' ||
+      form.reagendarEntrevista ||
+      form.resultadoEntrevista === 'reagenda');
+  const showReagendaNoConfirmo =
+    confirmoNo && (form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda');
+  const showCanalTrasNoConfirmo = eligioMotivoNoConfirmo;
+
   const showCompro = form.resultadoEntrevista === 'compro';
+
+  const flujoCampoCompleto =
+    esFlujoCampo &&
+    form.huboEntrevista !== null &&
+    (form.huboEntrevista === false
+      ? form.resultadoEntrevista != null
+      : form.resultadoEntrevista != null);
+
+  const showReferidosObs =
+    flujoCampoCompleto ||
+    (confirmoSi &&
+      form.canal != null &&
+      form.huboEntrevista !== null &&
+      (form.huboEntrevista === false
+        ? form.resultadoEntrevista != null
+        : form.huboEntrevista === true && form.resultadoEntrevista != null)) ||
+    (confirmoNo && showCanalTrasNoConfirmo && form.canal != null);
   const productoEsPij = esPlanInversion(form.idProducto);
   const productoEsTerreno = esTerreno(form.idProducto);
   const opcionesPago = productoEsPij
@@ -226,8 +317,7 @@ export function LeadModalForm({
       ? opcionesPagoTerreno()
       : [];
   const muestraRecibo = requiereNumeroRecibo(form.idProducto, form.estadoPago);
-  const showReferidos = form.brindoReferidos === true;
-  const canalLabel = form.canal === 'llamada' ? 'llamada' : form.canal === 'mensaje' ? 'mensaje' : '';
+  const showReferidos = showReferidosObs && form.brindoReferidos === true;
 
   return (
     <Drawer.Root
@@ -274,117 +364,108 @@ export function LeadModalForm({
             onSubmit={handleGuardar}
             className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5"
           >
-            {/* 1. Confirmación entrevista */}
-            <FormSection title="¿Confirmó entrevista?" step={1} totalSteps={5}>
-              <ButtonGroup
-                name="confirmoEntrevista"
-                options={[
-                  { value: true, label: 'Sí' },
-                  { value: false, label: 'No' },
-                ]}
-                value={form.confirmoEntrevista}
-                onChange={(v) => patch({ confirmoEntrevista: v })}
-              />
-            </FormSection>
-
-            {/* 2. Canal */}
-            <FormSection title="Canal de contacto" step={2} totalSteps={5}>
-              <ButtonGroup
-                name="canal"
-                options={[
-                  { value: 'llamada', label: 'Llamada' },
-                  { value: 'mensaje', label: 'Mensaje' },
-                ]}
-                value={form.canal}
-                onChange={handleCanal}
-              />
-            </FormSection>
-
-            {/* Reagendar (solo si fue contactado) */}
-            {contactado && (
-              <FormSection title="Reagendar entrevista">
-                <p className="text-[13px] leading-relaxed text-zinc-500">
-                  Cliente contactado por{' '}
-                  <strong className="font-semibold text-zinc-700">{canalLabel}</strong>.
-                  Si pide otra fecha, registrala acá.
-                </p>
+            {/* Supervisor: confirmación + canal; promotor en calle: arranca en hubo entrevista */}
+            {!esFlujoCampo && (
+              <FormSection title="¿Confirmó entrevista?" step={1} totalSteps={totalPasos}>
                 <ButtonGroup
-                  name="reagendar"
-                  label="¿Quiere reagendar?"
+                  name="confirmoEntrevista"
                   options={[
-                    { value: true, label: 'Sí, reagendar' },
+                    { value: true, label: 'Sí' },
                     { value: false, label: 'No' },
                   ]}
-                  value={form.reagendarEntrevista}
-                  onChange={handleReagendarToggle}
+                  value={form.confirmoEntrevista}
+                  onChange={handleConfirmoEntrevista}
                 />
-                {showReagendaBloque && (
-                  <div className="space-y-1.5 pt-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                      Nueva fecha y hora
-                    </p>
-                    <DateTimePicker
-                      value={form.fechaReagenda}
-                      onChange={(v) => patch({ fechaReagenda: v })}
-                      autoOpen={!form.fechaReagenda}
-                      required
-                    />
-                  </div>
+              </FormSection>
+            )}
+
+            {showCanalSiConfirmo && (
+              <FormSection title="Canal de contacto" step={2} totalSteps={totalPasos}>
+                <ButtonGroup
+                  name="canal"
+                  options={[
+                    { value: 'llamada', label: 'Llamada' },
+                    { value: 'mensaje', label: 'Mensaje' },
+                  ]}
+                  value={form.canal}
+                  onChange={handleCanal}
+                />
+              </FormSection>
+            )}
+
+            {showHuboEntrevista && (
+              <FormSection
+                title={esFlujoCampo ? 'Visita en calle' : 'Entrevista'}
+                step={esFlujoCampo ? 1 : 3}
+                totalSteps={totalPasos}
+              >
+                <ButtonGroup
+                  name="huboEntrevista"
+                  label="¿Hubo entrevista?"
+                  options={[
+                    { value: true, label: 'Sí' },
+                    { value: false, label: 'No' },
+                  ]}
+                  value={form.huboEntrevista}
+                  onChange={handleEntrevista}
+                />
+                {esFlujoCampo && (
+                  <p className="mt-2 text-[12px] leading-relaxed text-zinc-500">
+                    Registrá el resultado de la visita o el cierre de Plan Inversión Joven en el momento.
+                  </p>
                 )}
               </FormSection>
             )}
 
-            {/* 3. Entrevista */}
-            <FormSection
-              title="Entrevista"
-              step={3}
-              totalSteps={5}
-              visible={!form.reagendarEntrevista}
-            >
-              <ButtonGroup
-                name="huboEntrevista"
-                label="¿Hubo entrevista?"
-                options={[
-                  { value: true, label: 'Sí' },
-                  { value: false, label: 'No' },
-                ]}
-                value={form.huboEntrevista}
-                onChange={handleEntrevista}
-              />
+            {showSinEntrevistaResultado && (
+              <FormSection title="Resultado" step={esFlujoCampo ? 2 : undefined} totalSteps={totalPasos}>
+                <RadioOption
+                  name="sinEntrevista"
+                  value="sin_interes"
+                  label="No muestra interés"
+                  checked={form.resultadoEntrevista === 'sin_interes'}
+                  onChange={() =>
+                    patch({
+                      resultadoEntrevista: 'sin_interes',
+                      fechaReagenda: '',
+                      reagendarEntrevista: false,
+                      ...resetCamposVenta(),
+                    })
+                  }
+                />
+                {esFlujoCampo && (
+                  <>
+                    <RadioOption
+                      name="sinEntrevista"
+                      value="reagenda"
+                      label="Quiere reagendar"
+                      checked={form.resultadoEntrevista === 'reagenda'}
+                      onChange={() => patch({ ...activarReagenda(), reagendarEntrevista: true })}
+                    />
+                    {showReagendaSinEntrevistaCampo && (
+                      <div className="space-y-1.5 pt-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                          Nueva fecha y hora de entrevista
+                        </p>
+                        <DateTimePicker
+                          value={form.fechaReagenda}
+                          onChange={(v) => patch({ fechaReagenda: v })}
+                          autoOpen={!form.fechaReagenda}
+                          required
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+              </FormSection>
+            )}
 
-              {showSinEntrevista && (
-                <div className="mt-2 space-y-2">
-                  <RadioOption
-                    name="sinEntrevista"
-                    value="sin_interes"
-                    label="No muestra interés"
-                    checked={form.resultadoEntrevista === 'sin_interes'}
-                    onChange={() => patch({ resultadoEntrevista: 'sin_interes', fechaReagenda: '' })}
-                  />
-                  <RadioOption
-                    name="sinEntrevista"
-                    value="reagenda"
-                    label="Se reagenda (sin contacto previo)"
-                    checked={form.resultadoEntrevista === 'reagenda'}
-                    onChange={() => patch({ ...activarReagenda(), reagendarEntrevista: true })}
-                  />
-                  {showReagendaEnNo && (
-                    <div className="space-y-1.5 pt-1">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                        Fecha y hora
-                      </p>
-                      <DateTimePicker
-                        value={form.fechaReagenda}
-                        onChange={(v) => patch({ fechaReagenda: v })}
-                        autoOpen={!form.fechaReagenda}
-                        required
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {showEntrevistaDetalle && (
+            {showEntrevistaDetalle && (
+              <FormSection
+                title="Resultado de la entrevista"
+                step={esFlujoCampo ? 2 : 4}
+                totalSteps={totalPasos}
+              >
                 <div className="mt-2 space-y-2">
                   <RadioOption
                     name="conEntrevista"
@@ -528,18 +609,17 @@ export function LeadModalForm({
                         </div>
                       )}
 
-                      {/* Número de recibo */}
                       {muestraRecibo && (
                         <div className="space-y-1.5">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                            Número de recibo
+                            Número del comprobante
                           </p>
                           <input
                             type="text"
                             inputMode="numeric"
                             value={form.numeroRecibo}
                             onChange={(e) => patch({ numeroRecibo: e.target.value })}
-                            placeholder="Ej. REC-12345"
+                            placeholder="Ej. 001234"
                             className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
                             required
                           />
@@ -554,18 +634,71 @@ export function LeadModalForm({
                     </div>
                   )}
                 </div>
-              )}
-            </FormSection>
+              </FormSection>
+            )}
 
-            {form.reagendarEntrevista && (
+            {showMotivoNoConfirmo && (
+              <FormSection title="¿Qué pasó?" step={2} totalSteps={totalPasos}>
+                <ButtonGroup
+                  name="motivoNoConfirmo"
+                  label="Seleccioná una opción"
+                  options={[
+                    { value: true, label: 'Quiere reagendar' },
+                    { value: false, label: 'No estaba interesado' },
+                  ]}
+                  value={
+                    form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda'
+                      ? true
+                      : form.resultadoEntrevista === 'sin_interes'
+                        ? false
+                        : null
+                  }
+                  onChange={handleNoConfirmoMotivo}
+                />
+                {showReagendaNoConfirmo && (
+                  <div className="space-y-1.5 pt-1">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                      Nueva fecha y hora de entrevista
+                    </p>
+                    <DateTimePicker
+                      value={form.fechaReagenda}
+                      onChange={(v) => patch({ fechaReagenda: v })}
+                      autoOpen={!form.fechaReagenda}
+                      required
+                    />
+                  </div>
+                )}
+              </FormSection>
+            )}
+
+            {showCanalTrasNoConfirmo && (
+              <FormSection title="Canal de contacto" step={3} totalSteps={totalPasos}>
+                <ButtonGroup
+                  name="canalNoConfirmo"
+                  options={[
+                    { value: 'llamada', label: 'Llamada' },
+                    { value: 'mensaje', label: 'Mensaje' },
+                  ]}
+                  value={form.canal}
+                  onChange={handleCanal}
+                />
+              </FormSection>
+            )}
+
+            {(showReagendaNoConfirmo && form.canal) ||
+            (showReagendaSinEntrevistaCampo && form.fechaReagenda) ? (
               <p className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-[13px] text-brand-700">
                 Al guardar, el lead pasa a{' '}
                 <span className="font-medium">En seguimiento</span> con la nueva fecha.
               </p>
-            )}
+            ) : null}
 
-            {/* 4. Referidos */}
-            <FormSection title="Referidos" step={4} totalSteps={5}>
+            {showReferidosObs && (
+            <FormSection
+              title="Referidos"
+              step={esFlujoCampo ? 3 : 4}
+              totalSteps={totalPasos}
+            >
               <ButtonGroup
                 name="referidos"
                 label="¿Brindó referidos?"
@@ -622,18 +755,24 @@ export function LeadModalForm({
                 </div>
               )}
             </FormSection>
+            )}
 
-            {/* 5. Observaciones */}
-            <FormSection title="Observaciones" step={5} totalSteps={5}>
+            {showReferidosObs && (
+            <FormSection
+              title={tituloObservaciones}
+              step={esFlujoCampo ? 4 : 5}
+              totalSteps={totalPasos}
+            >
               <textarea
                 value={form.observaciones}
                 onChange={(e) => patch({ observaciones: e.target.value })}
                 rows={4}
-                placeholder="Notas del supervisor..."
+                placeholder={placeholderObservaciones}
                 className="w-full resize-y rounded-lg border border-zinc-200 px-3 py-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
                 style={{ minHeight: '120px' }}
               />
             </FormSection>
+            )}
 
             <div className="h-4" aria-hidden="true" />
           </form>

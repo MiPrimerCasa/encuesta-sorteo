@@ -18,6 +18,7 @@ import {
   resolveDireccionOficinasSupervisor,
   updateLeadSeguimientoEncuesta,
 } from './db/encuestas.js';
+import { resolveLinksRedesParaUsuario } from './db/links-redes.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
 import { getDb, listBarrios, listProductos, productoPermitidoParaRol } from './db/sqlite.js';
@@ -141,6 +142,27 @@ function registerApiRoutes(api) {
       console.error('Error al listar leads:', error);
       const err = formatSqlError(error);
       return res.status(500).json(err);
+    }
+  });
+
+  api.get('/links-redes', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+
+    try {
+      const rows = await fetchEncuestasMuestraRaw(usuario);
+      const links = resolveLinksRedesParaUsuario(usuario, rows);
+      return res.json({ links, source: 'links-redes.json' });
+    } catch (error) {
+      console.error('Error al resolver links de redes:', error);
+      return res.status(500).json({
+        message: 'No se pudieron cargar los links de redes.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
     }
   });
 

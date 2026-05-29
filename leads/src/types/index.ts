@@ -48,6 +48,8 @@ export interface Promotor {
   idVendedor?: string | number;
   /** Dirección oficinas del supervisor de ese promotor (SP muestra). */
   direccionSucursal?: string;
+  /** Opción «yo» en carga manual del supervisor (supervisor como promotor propio). */
+  esPropioSupervisor?: boolean;
 }
 
 export interface Producto {
@@ -104,6 +106,14 @@ export interface Lead {
   fechaObtencion: string;
   fechaAlta?: string;
   seguimiento: SeguimientoLead;
+}
+
+export interface LinksRedes {
+  codigo: string | null;
+  vendedor: string | null;
+  instagram: string | null;
+  facebook: string | null;
+  mensaje?: string | null;
 }
 
 export interface UsuarioSesion {

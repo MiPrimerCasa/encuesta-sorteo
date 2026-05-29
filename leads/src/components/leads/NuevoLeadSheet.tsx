@@ -8,6 +8,8 @@ interface NuevoLeadSheetProps {
   open: boolean;
   rolUsuario: RolUsuario;
   promotores: Promotor[];
+  /** Dirección oficinas del supervisor (desde SP muestra / landing). */
+  direccionOficinas?: string;
   onClose: () => void;
   onSave: (data: NuevoLeadData, promotorNombre?: string) => void | Promise<void>;
 }
@@ -57,6 +59,7 @@ export function NuevoLeadSheet({
   open,
   rolUsuario,
   promotores,
+  direccionOficinas,
   onClose,
   onSave,
 }: NuevoLeadSheetProps) {
@@ -92,6 +95,18 @@ export function NuevoLeadSheet({
     }
   }, [open, rolUsuario, usuario, promotores]);
 
+  const direccionSucursalActiva =
+    (rolUsuario === 'supervisor'
+      ? promotores.find((p) => p.id === promotorId)?.direccionSucursal
+      : undefined) ||
+    direccionOficinas;
+
+  useEffect(() => {
+    if (lugarEntrevista === 'sucursal' && direccionSucursalActiva?.trim()) {
+      setDomicilioEntrevista(direccionSucursalActiva.trim());
+    }
+  }, [lugarEntrevista, direccionSucursalActiva, promotorId]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!nombre.trim()) {
@@ -125,6 +140,21 @@ export function NuevoLeadSheet({
       }
     }
 
+    const promotorSel = promotores.find((p) => p.id === promotorId);
+    const promotorCodigo =
+      rolUsuario === 'supervisor'
+        ? promotorSel?.codigoCarga?.trim()
+        : usuario?.codigoCarga?.trim() ||
+          promotorSel?.codigoCarga?.trim();
+    if (!promotorCodigo) {
+      setError(
+        rolUsuario === 'supervisor'
+          ? 'El promotor seleccionado no tiene código de carga (ej. SORTEO01S21P01). Elegí otro o contactá soporte.'
+          : 'No se encontró tu código de promotor para la carga. Volvé a iniciar sesión.',
+      );
+      return;
+    }
+
     setSaving(true);
     setError('');
     try {
@@ -135,6 +165,9 @@ export function NuevoLeadSheet({
         quiereEntrevista: agendarEntrevista,
         agendarEntrevista,
         promotorId,
+        promotorCodigo,
+        promotorNombre:
+          rolUsuario === 'supervisor' ? promotorSel?.nombre : usuario?.nombre,
         domicilio: domicilio.trim() || undefined,
         origen: 'manual',
       };
@@ -146,10 +179,7 @@ export function NuevoLeadSheet({
             ? (domicilioEntrevista.trim() || domicilio.trim())
             : undefined;
       }
-      const promotorNombre =
-        rolUsuario === 'supervisor'
-          ? promotores.find((p) => p.id === promotorId)?.nombre
-          : undefined;
+      const promotorNombre = rolUsuario === 'supervisor' ? promotorSel?.nombre : undefined;
       await onSave(payload, promotorNombre);
       onClose();
     } catch (err) {
@@ -281,7 +311,12 @@ export function NuevoLeadSheet({
                           <button
                             key={opt.value}
                             type="button"
-                            onClick={() => setLugarEntrevista(opt.value)}
+                            onClick={() => {
+                              setLugarEntrevista(opt.value);
+                              if (opt.value === 'sucursal' && direccionSucursalActiva?.trim()) {
+                                setDomicilioEntrevista(direccionSucursalActiva.trim());
+                              }
+                            }}
                             style={{ touchAction: 'manipulation' }}
                             className={`h-11 flex-1 rounded-lg border text-[14px] font-semibold transition-all active:scale-[0.98] ${
                               sel
@@ -295,6 +330,17 @@ export function NuevoLeadSheet({
                       })}
                     </div>
                   </div>
+
+                  {lugarEntrevista === 'sucursal' && (
+                    <div className="space-y-1.5">
+                      <p className={LABEL_CLASS}>Dirección de nuestras oficinas</p>
+                      <p className="rounded-lg border border-zinc-200 bg-white px-3 py-3 text-[14px] text-zinc-800">
+                        {domicilioEntrevista.trim() ||
+                          direccionSucursalActiva?.trim() ||
+                          'No hay dirección de sucursal en el listado. Contactá soporte.'}
+                      </p>
+                    </div>
+                  )}
 
                   {lugarEntrevista === 'domicilio' && (
                     <div className="space-y-1.5">

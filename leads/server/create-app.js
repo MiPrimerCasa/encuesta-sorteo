@@ -5,13 +5,17 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  CargaEncuestaSinPersistirError,
+  CodigoPromotorCargaError,
   ContactoYaRegistradoError,
   crearEncuestaManual,
 } from './db/encuesta-carga.js';
 import {
   buildPromotoresFromLeads,
   enrichOperadorRolDesdeEncuestas,
+  fetchEncuestasMuestraRaw,
   listLeadsFromEncuestas,
+  resolveDireccionOficinasSupervisor,
   updateLeadSeguimientoEncuesta,
 } from './db/encuestas.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
@@ -26,9 +30,16 @@ function usuarioDesdeRequest(req) {
   const nombre = String(req.headers['x-usuario-nombre'] || '').trim();
   const id = String(req.headers['x-usuario-id'] || '').trim();
   const loginId = String(req.headers['x-usuario-login-id'] || '').trim();
+  const codigoCarga = String(req.headers['x-usuario-codigo-carga'] || '').trim();
   if (rol !== 'promotor' && rol !== 'supervisor') return null;
   if (!nombre || !id) return null;
-  return { id, nombre, rol, loginId: loginId || undefined };
+  return {
+    id,
+    nombre,
+    rol,
+    loginId: loginId || undefined,
+    codigoCarga: codigoCarga || undefined,
+  };
 }
 
 /** Prefijo público (Traefik sirve en /leads sin quitar el path). */
@@ -82,6 +93,7 @@ function registerApiRoutes(api) {
           rol: user.rol,
           categoria: user.categoria,
           loginId: user.loginId,
+          codigoCarga: user.codigoCarga,
           idOperador: user.idOperador,
           idSupervisor: user.idSupervisor,
           idVendedor: user.idVendedor,
@@ -117,6 +129,7 @@ function registerApiRoutes(api) {
         meta: {
           telefonoDesde: 'encuesta.telefono (encuestasMuestraOperador)',
           origenDesde: 'encuesta.origen → seguimiento.fuente (métricas de origen)',
+          direccionOficinasSupervisor,
           leadsConTelefono: conTelefono,
           leadsConFuente: conFuente,
           leadsTotal: leads.length,
@@ -143,8 +156,12 @@ function registerApiRoutes(api) {
     }
 
     try {
+      const rows = await fetchEncuestasMuestraRaw(usuario);
       const leads = await listLeadsFromEncuestas(usuario);
-      return res.json({ promotores: buildPromotoresFromLeads(leads), source: 'produccion' });
+      return res.json({
+        promotores: buildPromotoresFromLeads(leads, rows),
+        source: 'produccion',
+      });
     } catch (error) {
       console.error('Error al listar promotores:', error);
       const err = formatSqlError(error);
@@ -199,13 +216,6 @@ function registerApiRoutes(api) {
       return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
     }
 
-    if (usuario.rol === 'promotor' && !usuario.loginId) {
-      return res.status(400).json({
-        message:
-          'No se encontró el código de operador para la carga. Volvé a iniciar sesión.',
-      });
-    }
-
     try {
       getDb();
       const lead = await crearEncuestaManual(parsed.data, usuario, {
@@ -219,10 +229,23 @@ function registerApiRoutes(api) {
         lead,
       });
     } catch (error) {
+      if (error instanceof CodigoPromotorCargaError) {
+        return res.status(400).json({
+          message: error.message,
+          code: error.code,
+        });
+      }
       if (error instanceof ContactoYaRegistradoError) {
         return res.status(409).json({
           message: error.message,
           code: error.code,
+        });
+      }
+      if (error instanceof CargaEncuestaSinPersistirError) {
+        return res.status(error.status).json({
+          message: error.message,
+          code: error.code,
+          detail: error.detail,
         });
       }
       console.error('Error al cargar lead manual:', error);

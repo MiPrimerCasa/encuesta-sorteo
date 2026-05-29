@@ -1,4 +1,5 @@
 import sql from 'mssql';
+import { extraerCodigoPromotorDesdeFilaLogin } from './codigo-promotor.js';
 
 let pool;
 let poolEncuestas;
@@ -126,6 +127,7 @@ export function mapOperadorRow(row) {
     'idOperadorVendedor',
   );
   const loginId = pickField(row, 'operadorCodigo', 'OperadorCodigo');
+  const codigoCarga = extraerCodigoPromotorDesdeFilaLogin(row);
   const nombre =
     pickField(row, 'operadorDescripcion', 'OperadorDescripcion') ??
     loginId ??
@@ -141,6 +143,7 @@ export function mapOperadorRow(row) {
     rolOrigen: 'categoria',
     categoria: categoria ? String(categoria).trim() : undefined,
     loginId: loginId ? String(loginId).trim() : undefined,
+    codigoCarga,
     idOperador: idOperador != null ? String(idOperador) : undefined,
     idSupervisor: idSupervisor != null ? String(idSupervisor) : undefined,
     idVendedor: idVendedor != null ? String(idVendedor) : undefined,

@@ -73,6 +73,9 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (session.usuario.loginId) {
       headers['x-usuario-login-id'] = session.usuario.loginId;
     }
+    if (session.usuario.codigoCarga) {
+      headers['x-usuario-codigo-carga'] = session.usuario.codigoCarga;
+    }
   }
 
   const url = apiUrl(path);
@@ -127,16 +130,28 @@ export async function login(usuario: string, password: string) {
   });
 }
 
-export async function fetchLeads() {
+export async function fetchLeads(): Promise<{
+  leads: Lead[];
+  direccionOficinasSupervisor?: string;
+}> {
   if (_isDemoActive) {
     const all = getDemoLeads();
-    if (_demoUsuario.rol === 'promotor') {
-      return all.filter((l) => l.promotorId === _demoUsuario.id);
-    }
-    return all;
+    const leads =
+      _demoUsuario.rol === 'promotor'
+        ? all.filter((l) => l.promotorId === _demoUsuario.id)
+        : all;
+    const demoDir = leads.find((l) => l.lugarEntrevista === 'sucursal' && l.domicilioEntrevista)
+      ?.domicilioEntrevista;
+    return { leads, direccionOficinasSupervisor: demoDir };
   }
-  const data = await apiFetch<{ leads: Lead[] }>('/api/leads');
-  return data.leads;
+  const data = await apiFetch<{
+    leads: Lead[];
+    meta?: { direccionOficinasSupervisor?: string | null };
+  }>('/api/leads');
+  return {
+    leads: data.leads,
+    direccionOficinasSupervisor: data.meta?.direccionOficinasSupervisor ?? undefined,
+  };
 }
 
 export async function fetchPromotores() {

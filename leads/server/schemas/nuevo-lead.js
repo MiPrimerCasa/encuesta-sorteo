@@ -5,6 +5,9 @@ export const nuevoLeadSchema = z
     nombre: z.string().trim().min(1).max(100),
     telefono: z.string().trim().min(6).max(50),
     promotorId: z.string().trim().min(1).max(80),
+    /** Código SP @usuario (SORTEO01_V1). Obligatorio si el supervisor carga por un promotor. */
+    promotorCodigo: z.string().trim().max(100).optional(),
+    promotorNombre: z.string().trim().max(120).optional(),
     domicilio: z.string().trim().max(200).optional(),
     lista: z.enum(['entrevista', 'contacto']).optional(),
     quiereEntrevista: z.boolean().optional(),

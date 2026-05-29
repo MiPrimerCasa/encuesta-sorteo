@@ -3,7 +3,14 @@ import {
   fetchEncuestasMuestraRaw,
   listLeadsFromEncuestas,
   normalizeNombre,
+  resolveCodigoCargaPorPromotor,
+  resolveDireccionOficinasSupervisor,
 } from './encuestas.js';
+import {
+  esCodigoUsuarioCargaValido,
+  extraerCodigoPromotorDesdeFilaEncuesta,
+  normalizarEncuestaCargaId,
+} from './codigo-promotor.js';
 import { getSqlPoolEncuestas } from './mssql.js';
 
 const MSG_CONTACTO_YA_REGISTRADO = 'Este contacto ya está registrado.';
@@ -14,6 +21,29 @@ export class ContactoYaRegistradoError extends Error {
     this.name = 'ContactoYaRegistradoError';
     this.code = 'CONTACTO_YA_REGISTRADO';
     this.status = 409;
+  }
+}
+
+export class CodigoPromotorCargaError extends Error {
+  constructor() {
+    super(
+      'No se encontró el código de promotor (ej. SORTEO01S21P01) para registrar la encuesta. Volvé a iniciar sesión o elegí otro promotor.',
+    );
+    this.name = 'CodigoPromotorCargaError';
+    this.code = 'CODIGO_PROMOTOR_CARGA';
+    this.status = 400;
+  }
+}
+
+export class CargaEncuestaSinPersistirError extends Error {
+  constructor(detail) {
+    super(
+      'La carga no quedó registrada en la base. Verificá el teléfono y volvé a cargar; si persiste, contactá soporte.',
+    );
+    this.name = 'CargaEncuestaSinPersistirError';
+    this.code = 'CARGA_SIN_PERSISTIR';
+    this.status = 502;
+    this.detail = detail;
   }
 }
 
@@ -42,7 +72,8 @@ function includeOrigenParam() {
 }
 
 function getEncuestaCampaniaId() {
-  return String(process.env.ENCUESTA_CARGA_ID || process.env.ENCUESTA_ID || 'sorteo01').trim();
+  const raw = process.env.ENCUESTA_CARGA_ID || process.env.ENCUESTA_ID || 'sorteo01';
+  return normalizarEncuestaCargaId(raw);
 }
 
 /** Formato SP: AAAA/MM/DD hh:mm */
@@ -71,50 +102,94 @@ function valorIndicaDuplicado(val) {
   return val === 0 || val === '0';
 }
 
-function cargaRetornoIndicaDuplicado(result) {
-  const rows = result?.recordset ?? [];
-  if (!rows.length) return false;
-
-  for (const row of rows) {
-    const codigo = pickField(row, 'codigo', 'Codigo', 'CODIGO');
-    const gestionCodigo = pickField(
-      row,
-      'gestionCodigo',
-      'GestionCodigo',
-      'GESTIONCODIGO',
-      'gestioncodigo',
-    );
-    if (valorIndicaDuplicado(codigo) || valorIndicaDuplicado(gestionCodigo)) {
-      return true;
-    }
+function filaTieneCampoEnCero(row, ...nombres) {
+  const keys = Object.keys(row);
+  for (const name of nombres) {
+    const key = keys.find((k) => k.toLowerCase() === String(name).toLowerCase());
+    if (key == null) continue;
+    const val = row[key];
+    if (val === 0 || val === '0') return true;
   }
   return false;
 }
 
-/**
- * Contexto para encuestaCargaSorteo01 desde sesión + filas del SP de muestra.
- * - Supervisor: @usuario = null
- * - Promotor: @usuario = loginId (codigo operador, ej. SORTEO01_V1)
- */
-export async function resolveCargaEncuestaContext(usuarioSesion) {
-  const rows = await fetchEncuestasMuestraRaw(usuarioSesion);
-  let usuarioCodigo = null;
-  let supervisorNombre = null;
-
-  if (usuarioSesion.rol === 'promotor') {
-    usuarioCodigo =
-      usuarioSesion.loginId?.trim() ||
-      pickField(rows[0], 'usuario', 'Usuario') ||
-      null;
-    supervisorNombre = pickField(rows[0], 'supervisor', 'Supervisor');
+function cargaRetornoIndicaDuplicado(result) {
+  const rows = result?.recordset ?? [];
+  for (const row of rows) {
+    if (filaTieneCampoEnCero(row, 'codigo', 'Codigo', 'CODIGO')) return true;
+    if (filaTieneCampoEnCero(row, 'gestionCodigo', 'GestionCodigo', 'GESTIONCODIGO')) return true;
   }
-
-  return { rows, usuarioCodigo, supervisorNombre };
+  return false;
 }
 
-function bindCampo(request, codigo, valor) {
+function cargaRetornoIndicaExito(result) {
+  const rows = result?.recordset ?? [];
+  if (!rows.length) return true;
+  for (const row of rows) {
+    const codigo = pickField(row, 'codigo', 'Codigo', 'CODIGO');
+    const gestionCodigo = pickField(row, 'gestionCodigo', 'GestionCodigo', 'GESTIONCODIGO');
+    if (codigo != null && Number(codigo) > 0) return true;
+    if (gestionCodigo != null && Number(gestionCodigo) > 0) return true;
+  }
+  return false;
+}
+
+function codigoDesdeFilasEncuesta(rows, nombrePromotor, idVendedor) {
+  return resolveCodigoCargaPorPromotor(rows, nombrePromotor, idVendedor);
+}
+
+/**
+ * @usuario del SP = código promotor (SORTEO01_V1), no el email de login.
+ */
+export function resolveUsuarioSpCarga(usuarioSesion, context, payload) {
+  const explicito = payload.promotorCodigo?.trim();
+  if (esCodigoUsuarioCargaValido(explicito)) return explicito;
+
+  const sesionCodigo = usuarioSesion.codigoCarga?.trim();
+  if (esCodigoUsuarioCargaValido(sesionCodigo)) return sesionCodigo;
+
+  const loginId = usuarioSesion.loginId?.trim();
+  if (esCodigoUsuarioCargaValido(loginId)) return loginId;
+
+  if (usuarioSesion.rol === 'promotor') {
+    const desdeFilas = codigoDesdeFilasEncuesta(
+      context.rows,
+      usuarioSesion.nombre,
+      usuarioSesion.idOperador ?? usuarioSesion.id,
+    );
+    if (esCodigoUsuarioCargaValido(desdeFilas)) return desdeFilas;
+    throw new CodigoPromotorCargaError();
+  }
+
+  if (usuarioSesion.rol === 'supervisor') {
+    throw new CodigoPromotorCargaError();
+  }
+
+  return null;
+}
+
+export async function resolveCargaEncuestaContext(usuarioSesion) {
+  const rows = await fetchEncuestasMuestraRaw(usuarioSesion);
+  const supervisorNombre =
+    usuarioSesion.rol === 'promotor'
+      ? pickField(rows[0], 'supervisor', 'Supervisor')
+      : null;
+
+  return {
+    rows,
+    supervisorNombre,
+    direccionOficinas: resolveDireccionOficinasSupervisor(rows),
+  };
+}
+
+function bindCampo(request, codigo, valor, { vacioComoCadenaVacia = false } = {}) {
   request.input(`campo${codigo}Codigo`, sql.Int, codigo);
-  const v = valor == null || valor === '' ? null : String(valor);
+  let v;
+  if (valor == null || valor === '') {
+    v = vacioComoCadenaVacia ? '' : null;
+  } else {
+    v = String(valor);
+  }
   request.input(`campo${codigo}Valor`, sql.NVarChar(200), v);
 }
 
@@ -135,9 +210,9 @@ export async function execEncuestaCargaSorteo01(params) {
   bindCampo(request, 3, params.campo3Valor);
   bindCampo(request, 4, params.campo4Valor);
   bindCampo(request, 5, 'NO');
-  bindCampo(request, 6, params.campo6Valor);
-  bindCampo(request, 7, params.campo7Valor);
-  bindCampo(request, 8, params.campo8Valor);
+  bindCampo(request, 6, params.campo6Valor, { vacioComoCadenaVacia: true });
+  bindCampo(request, 7, params.campo7Valor, { vacioComoCadenaVacia: true });
+  bindCampo(request, 8, params.campo8Valor, { vacioComoCadenaVacia: true });
 
   if (includeOrigenParam()) {
     request.input('origen', sql.Int, params.origen ?? 2);
@@ -155,25 +230,32 @@ export async function execEncuestaCargaSorteo01(params) {
 
 export function buildCargaParamsFromPayload(payload, usuarioSesion, context) {
   const agendar = Boolean(payload.agendarEntrevista);
-  let usuarioSp = null;
-
-  if (usuarioSesion.rol === 'promotor') {
-    usuarioSp = context.usuarioCodigo;
-  } else if (usuarioSesion.rol === 'supervisor') {
-    usuarioSp = null;
-  }
+  const usuarioSp = resolveUsuarioSpCarga(usuarioSesion, context, payload);
 
   const campo6 = agendar ? formatHorarioEntrevistaSp(payload.horarioEntrevista) : null;
   const campo7 = agendar ? mapLugarEntrevistaSp(payload.lugarEntrevista) : null;
-  const campo8 =
-    agendar && payload.lugarEntrevista === 'domicilio'
-      ? payload.domicilioEntrevista?.trim() || payload.domicilio?.trim() || null
-      : agendar && payload.lugarEntrevista === 'sucursal'
-        ? null
-        : null;
+
+  const promotorNombreFiltro =
+    payload.promotorNombre?.trim() ||
+    (usuarioSesion.rol === 'promotor' ? usuarioSesion.nombre : null);
+
+  let campo8 = null;
+  if (agendar && payload.lugarEntrevista === 'domicilio') {
+    campo8 = payload.domicilioEntrevista?.trim() || payload.domicilio?.trim() || null;
+  } else if (agendar && payload.lugarEntrevista === 'sucursal') {
+    campo8 =
+      payload.domicilioEntrevista?.trim() ||
+      resolveDireccionOficinasSupervisor(context.rows, {
+        promotorNombre: promotorNombreFiltro,
+      }) ||
+      context.direccionOficinas ||
+      null;
+  }
+
+  const telefonoNorm = digitsTelefono(payload.telefono) || payload.telefono.trim();
 
   return {
-    telefono: payload.telefono.trim(),
+    telefono: telefonoNorm,
     encuesta: getEncuestaCampaniaId(),
     usuario: usuarioSp,
     campo1Valor: payload.nombre.trim(),
@@ -201,24 +283,9 @@ export async function crearEncuestaManual(payload, usuarioSesion, opciones = {})
 
   if (lead) return lead;
 
-  return {
-    id: `manual-${Date.now()}`,
-    nombre: payload.nombre.trim(),
-    telefono: payload.telefono.trim(),
-    promotorId: payload.promotorId,
-    promotorNombre: opciones.promotorNombre ?? usuarioSesion.nombre,
-    supervisorNombre:
-      usuarioSesion.rol === 'promotor' ? context.supervisorNombre ?? undefined : undefined,
-    domicilio: payload.domicilio,
-    quiereEntrevista: Boolean(payload.agendarEntrevista),
-    horarioEntrevista: payload.horarioEntrevista,
-    lugarEntrevista: payload.lugarEntrevista,
-    domicilioEntrevista: payload.domicilioEntrevista,
-    lista: payload.agendarEntrevista ? 'entrevista' : 'contacto',
-    fechaObtencion: new Date().toISOString().slice(0, 10),
-    fechaAlta: new Date().toISOString(),
-    seguimiento: { fuente: 'app' },
-  };
+  throw new CargaEncuestaSinPersistirError(
+    'SP ejecutado pero el contacto no aparece en encuestasMuestraOperador (teléfono o permisos).',
+  );
 }
 
 /** Pre-chequeo opcional por teléfono en el listado actual. */

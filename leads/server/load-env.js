@@ -5,15 +5,13 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const isProd = process.env.NODE_ENV === 'production';
-const envFiles = isProd
-  ? ['.env']
-  : ['.env', path.join('src', '.env')];
+const rootEnv = path.join(root, '.env');
+const srcEnv = path.join(root, 'src', '.env');
 
-for (const file of envFiles) {
-  const full = path.join(root, file);
-  if (existsSync(full)) {
-    const isSrcEnv = !isProd && file.replace(/\\/g, '/').includes('src/');
-    dotenv.config({ path: full, override: isSrcEnv });
-  }
+if (existsSync(rootEnv)) {
+  dotenv.config({ path: rootEnv });
+}
+/** Desarrollo local: src/.env siempre pisa (VPS solo usa .env en raíz). */
+if (existsSync(srcEnv)) {
+  dotenv.config({ path: srcEnv, override: true });
 }

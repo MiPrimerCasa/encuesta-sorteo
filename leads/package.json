@@ -7,11 +7,12 @@
     "node": ">=20.19.0"
   },
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -k -n api,web \"npm run dev:api\" \"vite\"",
+    "dev:web": "vite",
     "demo": "vite --mode demo",
-    "dev:api": "node server/index.js",
-    "desarrollo": "vite",
-    "desarrollo:api": "node server/index.js",
+    "dev:api": "node --env-file=src/.env server/index.js",
+    "desarrollo": "npm run dev",
+    "desarrollo:api": "npm run dev:api",
     "build": "tsc && vite build",
     "compilar": "tsc && vite build",
     "preview": "vite preview",
@@ -42,6 +43,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.5.2",
+    "concurrently": "^10.0.0",
     "tailwindcss": "^4.1.8",
     "typescript": "~5.8.3",
     "vite": "^7.0.0"

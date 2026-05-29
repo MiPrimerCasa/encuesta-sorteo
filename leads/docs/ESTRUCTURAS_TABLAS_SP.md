@@ -65,12 +65,12 @@ EXEC [dbo].[encuestasMuestraOperador] @idVendedor = 132;
 
 | Columna del SP | Origen lógico en encuesta | Uso en CRM |
 |----------------|---------------------------|------------|
-| `id` | PK encuesta | ID interno fila |
+| `id` | PK numérico encuesta (ej. `176`) | **`lead.id` en el CRM** |
 | `telefono` | `encuesta.telefono` | WhatsApp, contacto |
 | `encuesta` | código campaña (ej. `sorteo01`) | Agrupación |
 | `fechaAlta` | alta del registro | Orden / fechas |
-| `usuario` | clave lead (ej. `SORTEO01S21P01`) | `lead.id` |
-| `Promotor` | nombre promotor | UI |
+| `usuario` | código promotor / `?codigo=` landing (ej. `SORTEO01S21P01`) | `@usuario` en carga; **no** es PK del contacto |
+| `Promotor` | nombre promotor | UI + combo supervisor |
 | `supervisor` | nombre supervisor | UI |
 | `idVendedor` | int | Rol + filtro SP |
 | `idSupervisor` | int | Rol |

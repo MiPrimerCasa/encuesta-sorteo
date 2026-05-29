@@ -1,4 +1,5 @@
 import sql from 'mssql';
+import { extraerCodigoPromotorDesdeFilaEncuesta } from './codigo-promotor.js';
 import {
   getSqlPoolEncuestas,
   isSqlServerConfigured,
@@ -330,10 +331,19 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
       undefined,
   };
 
+  const pkEncuesta = pickField(row, 'id', 'Id', 'ID');
+  const leadKey =
+    pkEncuesta != null && String(pkEncuesta).trim() !== ''
+      ? String(pkEncuesta)
+      : String(usuario ?? `enc-${slugId(nombreLead)}`);
+
   return {
-    id: String(usuario ?? `enc-${slugId(nombreLead)}`),
+    id: leadKey,
+    encuestaUsuario: usuario ? String(usuario) : undefined,
     nombre: String(nombreLead).trim(),
     telefono: telefonoEncuesta,
+    codigoPromotorCarga: extraerCodigoPromotorDesdeFilaEncuesta(row) ?? undefined,
+    idVendedor: pickField(row, 'idVendedor', 'IdVendedor') ?? undefined,
     promotorId: slugId(promotorNombre),
     promotorNombre: String(promotorNombre),
     supervisorNombre: supervisorNombre ? String(supervisorNombre) : undefined,
@@ -349,13 +359,111 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
   };
 }
 
-export function buildPromotoresFromLeads(leads) {
+/** Índice promotor → código @usuario (desde filas del SP, agrupado por idVendedor + nombre). */
+export function buildCodigoPromotorIndex(encuestaRows = []) {
+  const buckets = new Map();
+  for (const row of encuestaRows) {
+    const nombre = pickField(row, 'Promotor', 'promotor');
+    const codigo = extraerCodigoPromotorDesdeFilaEncuesta(row);
+    const idVendedor = pickField(row, 'idVendedor', 'IdVendedor');
+    if (!nombre || !codigo) continue;
+    const key = `${idVendedor ?? ''}|${normalizeNombre(nombre)}`;
+    const bucket = buckets.get(key) ?? { codigos: new Map(), nombre: String(nombre).trim() };
+    bucket.codigos.set(codigo, (bucket.codigos.get(codigo) ?? 0) + 1);
+    buckets.set(key, bucket);
+  }
+  const index = new Map();
+  for (const [key, { codigos, nombre }] of buckets) {
+    const codigoCarga = [...codigos.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+    if (codigoCarga) index.set(key, { codigoCarga, nombre });
+  }
+  return index;
+}
+
+export function resolveCodigoCargaPorPromotor(encuestaRows, promotorNombre, idVendedor) {
+  const index = buildCodigoPromotorIndex(encuestaRows);
+  const key = `${idVendedor ?? ''}|${normalizeNombre(promotorNombre ?? '')}`;
+  return index.get(key)?.codigoCarga ?? index.get(`|${normalizeNombre(promotorNombre ?? '')}`)?.codigoCarga;
+}
+
+function pickDomicilioEncuestaRow(row) {
+  return (
+    pickField(
+      row,
+      'Domicilio de encuesta ',
+      'Domicilio de encuesta',
+      'supervisorSucursalDireccion',
+      'SupervisorSucursalDireccion',
+    ) ?? pickFieldStartsWith(row, 'Domicilio de encuesta', 'supervisorSucursal')
+  );
+}
+
+function pickContactoEntrevistaRow(row) {
+  return (
+    pickField(
+      row,
+      'Contacto en  (2 = En sucursal , 3 = Domicilio encuestado)',
+      'Contacto en (',
+      'Contacto en',
+    ) ?? pickFieldStartsWith(row, 'Contacto en')
+  );
+}
+
+/** Dirección oficinas del supervisor (columna «Domicilio de encuesta» cuando lugar = sucursal / 2). */
+export function resolveDireccionOficinasSupervisor(encuestaRows, { promotorNombre } = {}) {
+  if (!encuestaRows?.length) {
+    return process.env.SUPERVISOR_SUCURSAL_DIRECCION?.trim() || null;
+  }
+
+  const filas = promotorNombre
+    ? encuestaRows.filter((row) => {
+        const prom = pickField(row, 'Promotor', 'promotor');
+        return prom && normalizeNombre(prom) === normalizeNombre(promotorNombre);
+      })
+    : encuestaRows;
+
+  const buscarEn = filas.length ? filas : encuestaRows;
+
+  for (const row of buscarEn) {
+    const contacto = pickContactoEntrevistaRow(row);
+    const esSucursal =
+      contacto == null ||
+      String(contacto).trim() === '2' ||
+      /sucursal|oficina/i.test(String(contacto));
+    const dir = pickDomicilioEncuestaRow(row);
+    if (dir && esSucursal) return String(dir).trim();
+  }
+
+  for (const row of buscarEn) {
+    const dir = pickDomicilioEncuestaRow(row);
+    if (dir) return String(dir).trim();
+  }
+
+  return process.env.SUPERVISOR_SUCURSAL_DIRECCION?.trim() || null;
+}
+
+export function buildPromotoresFromLeads(leads, encuestaRows = []) {
+  const codigoIndex = buildCodigoPromotorIndex(encuestaRows);
+  const codigoPorNombre = new Map();
+  for (const [, { codigoCarga, nombre }] of codigoIndex) {
+    codigoPorNombre.set(normalizeNombre(nombre), codigoCarga);
+  }
+
   const map = new Map();
   for (const lead of leads) {
     if (!map.has(lead.promotorId)) {
+      const codigoCarga =
+        lead.codigoPromotorCarga ??
+        codigoPorNombre.get(normalizeNombre(lead.promotorNombre ?? '')) ??
+        undefined;
       map.set(lead.promotorId, {
         id: lead.promotorId,
         nombre: lead.promotorNombre ?? lead.promotorId,
+        codigoCarga,
+        idVendedor: lead.idVendedor,
+        direccionSucursal: resolveDireccionOficinasSupervisor(encuestaRows, {
+          promotorNombre: lead.promotorNombre,
+        }),
       });
     }
   }
@@ -379,17 +487,22 @@ function enrichLeadParaCliente(lead) {
 export async function listLeadsFromEncuestas(usuario) {
   const rows = await fetchEncuestasMuestraRaw(usuario);
   const ids = rows
-    .map((r) => pickField(r, 'usuario', 'Usuario'))
+    .map((r) => {
+      const pk = pickField(r, 'id', 'Id', 'ID');
+      return pk != null && String(pk).trim() !== '' ? String(pk) : pickField(r, 'usuario', 'Usuario');
+    })
     .filter(Boolean)
     .map(String);
   const seguimientoById = Object.fromEntries(
     ids.map((id) => [id, getSeguimientoExterno(id)]),
   );
   const leads = rows.map((row) => {
-    const id = String(pickField(row, 'usuario', 'Usuario'));
-    return enrichLeadParaCliente(
-      mapEncuestaRowToLead(row, { [id]: seguimientoById[id] }),
-    );
+    const pk = pickField(row, 'id', 'Id', 'ID');
+    const id =
+      pk != null && String(pk).trim() !== ''
+        ? String(pk)
+        : String(pickField(row, 'usuario', 'Usuario'));
+    return enrichLeadParaCliente(mapEncuestaRowToLead(row, { [id]: seguimientoById[id] }));
   });
   leads.sort((a, b) => (a.fechaAlta ?? '').localeCompare(b.fechaAlta ?? ''));
   return leads;
@@ -402,7 +515,11 @@ export function useEncuestasFromSql() {
 
 export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario, usuarioId) {
   const rows = await fetchEncuestasMuestraRaw(usuario);
-  const row = rows.find((r) => String(pickField(r, 'usuario', 'Usuario')) === leadId);
+  const row = rows.find((r) => {
+    const pk = pickField(r, 'id', 'Id', 'ID');
+    const usuario = pickField(r, 'usuario', 'Usuario');
+    return String(pk ?? '') === leadId || String(usuario ?? '') === leadId;
+  });
   if (!row) return null;
   const merged = upsertSeguimientoExterno(leadId, seguimiento, usuarioId);
   return mapEncuestaRowToLead(row, { [leadId]: merged });

@@ -3,12 +3,12 @@ import {
   crearLead,
   fetchBarrios,
   fetchLeads,
+  fetchPromotores,
   fetchProductos,
   guardarSeguimiento,
 } from './api/client';
 import { LoginPage } from './components/auth/LoginPage';
 import { NavBar } from './components/layout/NavBar';
-import { buildPromotoresFromLeads } from './domain/leads';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, SeguimientoLead, VistaActiva } from './types';
 
@@ -35,6 +35,7 @@ function AppShell() {
   const { usuario, login, logout } = useAuth();
   const [vistaActiva, setVistaActiva] = useState<VistaActiva>('leads');
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [direccionOficinas, setDireccionOficinas] = useState<string | undefined>();
   const [promotores, setPromotores] = useState<Promotor[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [barrios, setBarrios] = useState<Barrio[]>([]);
@@ -47,13 +48,15 @@ function AppShell() {
     setError('');
     try {
       const esSupervisor = usuario.rol === 'supervisor';
-      const [l, prod, barr] = await Promise.all([
+      const [leadsRes, prod, barr, prom] = await Promise.all([
         fetchLeads(),
         fetchProductos(usuario.rol),
         fetchBarrios(),
+        esSupervisor ? fetchPromotores() : Promise.resolve([] as Promotor[]),
       ]);
-      setLeads(l);
-      setPromotores(esSupervisor ? buildPromotoresFromLeads(l) : []);
+      setLeads(leadsRes.leads);
+      setDireccionOficinas(leadsRes.direccionOficinasSupervisor);
+      setPromotores(prom);
       setProductos(prod);
       setBarrios(barr);
     } catch (err) {
@@ -108,6 +111,7 @@ function AppShell() {
     ) : (
       <LeadsPanel
         leads={leads}
+        direccionOficinas={direccionOficinas}
         rolUsuario={usuario.rol}
         nombreUsuario={usuario.nombre}
         promotores={promotores}

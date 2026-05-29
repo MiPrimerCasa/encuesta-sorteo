@@ -68,10 +68,12 @@ interface LeadsPanelProps {
   barrios: Barrio[];
   onActualizarLead: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
   onCrearLead: (data: NuevoLeadData, promotorNombre?: string) => void | Promise<void>;
+  direccionOficinas?: string;
 }
 
 export function LeadsPanel({
   leads,
+  direccionOficinas,
   rolUsuario,
   nombreUsuario,
   promotores,
@@ -383,6 +385,7 @@ export function LeadsPanel({
         open={agendarAbierto}
         rolUsuario={rolUsuario}
         promotores={promotores}
+        direccionOficinas={direccionOficinas}
         onClose={() => setAgendarAbierto(false)}
         onSave={onCrearLead}
       />

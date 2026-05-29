@@ -26,6 +26,10 @@ export interface NuevoLeadData {
   lista: ListaLead;
   quiereEntrevista: boolean;
   promotorId: string;
+  /** Código SP @usuario (ej. SORTEO01S21P01). Supervisor: del promotor elegido. */
+  promotorCodigo?: string;
+  /** Nombre del promotor (supervisor elige en combo; promotor = sesión). */
+  promotorNombre?: string;
   domicilio?: string;
   origen: OrigenIngresoManual;
   observaciones?: string;
@@ -39,6 +43,11 @@ export interface NuevoLeadData {
 export interface Promotor {
   id: string;
   nombre: string;
+  /** Código SP @usuario (ej. SORTEO01S21P01, mismo que ?codigo= en la landing). */
+  codigoCarga?: string;
+  idVendedor?: string | number;
+  /** Dirección oficinas del supervisor de ese promotor (SP muestra). */
+  direccionSucursal?: string;
 }
 
 export interface Producto {
@@ -76,6 +85,9 @@ export interface SeguimientoLead {
 
 export interface Lead {
   id: string;
+  /** Valor columna `usuario` del SP (= código promotor en QR, no PK). */
+  encuestaUsuario?: string;
+  idVendedor?: string | number;
   nombre: string;
   telefono: string;
   promotorId: string;
@@ -100,6 +112,7 @@ export interface UsuarioSesion {
   rol: RolUsuario;
   categoria?: string;
   loginId?: string;
+  codigoCarga?: string;
   idOperador?: string;
   idSupervisor?: string;
   idVendedor?: string;

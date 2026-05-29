@@ -22,7 +22,10 @@ function pickField(row, ...candidates) {
   const keys = Object.keys(row);
   for (const name of candidates) {
     const key = keys.find((k) => k.toLowerCase() === String(name).toLowerCase());
-    if (key != null && row[key] != null && row[key] !== '') return row[key];
+    if (key == null) continue;
+    const val = row[key];
+    if (val === 0 || val === '0') return val;
+    if (val != null && val !== '') return val;
   }
   return null;
 }
@@ -63,19 +66,26 @@ function digitsTelefono(raw) {
   return String(raw ?? '').replace(/\D/g, '');
 }
 
+/** Clave única encuesta: @telefono + @encuesta. El SP devuelve codigo=0 o gestionCodigo=0 si ya existe. */
+function valorIndicaDuplicado(val) {
+  return val === 0 || val === '0';
+}
+
 function cargaRetornoIndicaDuplicado(result) {
-  if (result?.returnValue === 0) return true;
   const rows = result?.recordset ?? [];
   if (!rows.length) return false;
-  const row = rows[0];
-  for (const val of Object.values(row)) {
-    if (val === 0 || val === '0') return true;
-  }
-  const keys = Object.keys(row);
-  for (const k of keys) {
-    if (/resultado|return|codigo|code|ok|exito|éxito/i.test(k)) {
-      const v = row[k];
-      if (v === 0 || v === '0' || String(v).toLowerCase() === 'false') return true;
+
+  for (const row of rows) {
+    const codigo = pickField(row, 'codigo', 'Codigo', 'CODIGO');
+    const gestionCodigo = pickField(
+      row,
+      'gestionCodigo',
+      'GestionCodigo',
+      'GESTIONCODIGO',
+      'gestioncodigo',
+    );
+    if (valorIndicaDuplicado(codigo) || valorIndicaDuplicado(gestionCodigo)) {
+      return true;
     }
   }
   return false;
@@ -134,6 +144,9 @@ export async function execEncuestaCargaSorteo01(params) {
   }
 
   const result = await request.execute(proc);
+  if (process.env.DEBUG_CARGA_ENCUESTA === '1') {
+    console.info('[encuestaCarga] returnValue=%s rows=%s', result.returnValue, JSON.stringify(result.recordset));
+  }
   if (cargaRetornoIndicaDuplicado(result)) {
     throw new ContactoYaRegistradoError();
   }

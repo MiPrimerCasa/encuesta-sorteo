@@ -67,7 +67,7 @@ interface LeadsPanelProps {
   productos: Producto[];
   barrios: Barrio[];
   onActualizarLead: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
-  onCrearLead: (data: NuevoLeadData) => void | Promise<void>;
+  onCrearLead: (data: NuevoLeadData, promotorNombre?: string) => void | Promise<void>;
 }
 
 export function LeadsPanel({

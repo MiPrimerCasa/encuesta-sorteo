@@ -8,7 +8,7 @@ interface NuevoLeadSheetProps {
   rolUsuario: RolUsuario;
   promotores: Promotor[];
   onClose: () => void;
-  onSave: (data: NuevoLeadData) => void | Promise<void>;
+  onSave: (data: NuevoLeadData, promotorNombre?: string) => void | Promise<void>;
 }
 
 const INPUT_CLASS =
@@ -145,7 +145,11 @@ export function NuevoLeadSheet({
             ? (domicilioEntrevista.trim() || domicilio.trim())
             : undefined;
       }
-      await onSave(payload);
+      const promotorNombre =
+        rolUsuario === 'supervisor'
+          ? promotores.find((p) => p.id === promotorId)?.nombre
+          : undefined;
+      await onSave(payload, promotorNombre);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');

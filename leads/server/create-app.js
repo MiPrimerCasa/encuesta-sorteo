@@ -5,11 +5,16 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  ContactoYaRegistradoError,
+  crearEncuestaManual,
+} from './db/encuesta-carga.js';
+import {
   buildPromotoresFromLeads,
   enrichOperadorRolDesdeEncuestas,
   listLeadsFromEncuestas,
   updateLeadSeguimientoEncuesta,
 } from './db/encuestas.js';
+import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
 import { getDb, listBarrios, listProductos, productoPermitidoParaRol } from './db/sqlite.js';
 import { getHealthInfo, respondIfNotConfigured } from './require-production.js';
@@ -20,9 +25,10 @@ function usuarioDesdeRequest(req) {
   const rol = req.headers['x-usuario-rol'];
   const nombre = String(req.headers['x-usuario-nombre'] || '').trim();
   const id = String(req.headers['x-usuario-id'] || '').trim();
+  const loginId = String(req.headers['x-usuario-login-id'] || '').trim();
   if (rol !== 'promotor' && rol !== 'supervisor') return null;
   if (!nombre || !id) return null;
-  return { id, nombre, rol };
+  return { id, nombre, rol, loginId: loginId || undefined };
 }
 
 /** Prefijo público (Traefik sirve en /leads sin quitar el path). */
@@ -172,6 +178,56 @@ function registerApiRoutes(api) {
     } catch (error) {
       return res.status(500).json({
         message: 'Error al listar productos.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
+  api.post('/leads', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const parsed = nuevoLeadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: 'Datos del lead inválidos.',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+
+    if (usuario.rol === 'promotor' && !usuario.loginId) {
+      return res.status(400).json({
+        message:
+          'No se encontró el código de operador para la carga. Volvé a iniciar sesión.',
+      });
+    }
+
+    try {
+      getDb();
+      const lead = await crearEncuestaManual(parsed.data, usuario, {
+        promotorNombre:
+          usuario.rol === 'promotor'
+            ? usuario.nombre
+            : String(req.headers['x-promotor-nombre'] || '').trim() || undefined,
+      });
+      return res.status(201).json({
+        message: 'Lead cargado correctamente.',
+        lead,
+      });
+    } catch (error) {
+      if (error instanceof ContactoYaRegistradoError) {
+        return res.status(409).json({
+          message: error.message,
+          code: error.code,
+        });
+      }
+      console.error('Error al cargar lead manual:', error);
+      return res.status(500).json({
+        message: 'No se pudo cargar el lead.',
         detail: error instanceof Error ? error.message : 'Error desconocido',
       });
     }

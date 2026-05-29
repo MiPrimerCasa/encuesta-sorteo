@@ -75,9 +75,9 @@ function AppShell() {
     [],
   );
 
-  const onCrearLead = useCallback(async (data: NuevoLeadData) => {
+  const onCrearLead = useCallback(async (data: NuevoLeadData, promotorNombre?: string) => {
     try {
-      const newLead = await crearLead(data);
+      const newLead = await crearLead(data, { promotorNombre });
       setLeads((prev) => [...prev, newLead]);
       setError('');
     } catch (err) {

@@ -285,17 +285,11 @@ for i in {1..20}; do
 done
 
 if [[ "$HEALTH_OK" -ne 1 ]]; then
-  echo "WARN: smoke test falló — docker logs ${SERVICE_NAME}"
+  echo "ERROR: health interno falló — docker logs ${SERVICE_NAME}"
   docker logs --tail 120 "$SERVICE_NAME" || true
-  if container_running; then
-    echo "WARN: healthcheck no confirmó a tiempo, pero el contenedor está running. Se continúa."
-  else
-    echo "ERROR: el contenedor no quedó corriendo — intentando rollback..."
-    attempt_rollback || true
-    if ! container_running; then
-      exit 1
-    fi
-  fi
+  echo "Intentando rollback..."
+  attempt_rollback || true
+  exit 1
 fi
 
 trap - ERR
@@ -315,7 +309,7 @@ docker container inspect "$SERVICE_NAME" --format '{{range $net, $cfg := .Networ
 traefik_smoke() {
   local host="${LEADS_TRAEFIK_HOST}"
   local code
-  code=$(curl -sfk -o /dev/null -w '%{http_code}' --max-time 20 \
+  code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 20 \
     -H "Host: ${host}" \
     "https://127.0.0.1${HEALTH_PATH}" 2>/dev/null || echo "000")
   echo "Traefik smoke Host=${host} ${HEALTH_PATH} → HTTP ${code}"
@@ -324,8 +318,10 @@ traefik_smoke() {
 
 echo "--- Smoke directo (red Docker) ---"
 if ! direct_smoke; then
-  echo "WARN: el contenedor no respondió por IP — docker logs --tail 40"
+  echo "ERROR: el contenedor no respondió por IP — docker logs --tail 40"
   docker logs --tail 40 "$SERVICE_NAME" 2>/dev/null || true
+  attempt_rollback || true
+  exit 1
 fi
 
 echo "--- Smoke Traefik (ruta pública /leads) ---"

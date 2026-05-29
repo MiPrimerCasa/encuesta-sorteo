@@ -70,6 +70,9 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers['x-usuario-id'] = session.usuario.id;
     headers['x-usuario-rol'] = session.usuario.rol;
     headers['x-usuario-nombre'] = session.usuario.nombre;
+    if (session.usuario.loginId) {
+      headers['x-usuario-login-id'] = session.usuario.loginId;
+    }
   }
 
   const url = apiUrl(path);
@@ -163,16 +166,17 @@ export async function guardarSeguimiento(leadId: string, seguimiento: Seguimient
   return data.lead;
 }
 
-/** Alta manual: demo o fallback local si el backend aún no persiste en DB. */
-export async function crearLead(nuevoLead: NuevoLeadData) {
+/** Alta manual vía dbo.encuestaCargaSorteo01 (producción) o demo local. */
+export async function crearLead(nuevoLead: NuevoLeadData, opciones?: { promotorNombre?: string }) {
   if (_isDemoActive) return createDemoLead(nuevoLead);
-  try {
-    const data = await apiFetch<{ lead: Lead }>('/api/leads', {
-      method: 'POST',
-      body: JSON.stringify(nuevoLead),
-    });
-    return data.lead;
-  } catch {
-    return createDemoLead(nuevoLead);
+  const headers: Record<string, string> = {};
+  if (opciones?.promotorNombre) {
+    headers['x-promotor-nombre'] = opciones.promotorNombre;
   }
+  const data = await apiFetch<{ lead: Lead; message?: string }>('/api/leads', {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(nuevoLead),
+  });
+  return data.lead;
 }

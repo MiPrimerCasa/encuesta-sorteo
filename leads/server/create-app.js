@@ -119,7 +119,9 @@ function registerApiRoutes(api) {
 
     try {
       getDb();
+      const rowsEncuesta = await fetchEncuestasMuestraRaw(usuario);
       const leads = await listLeadsFromEncuestas(usuario);
+      const direccionOficinasSupervisor = resolveDireccionOficinasSupervisor(rowsEncuesta);
       const conTelefono = leads.filter((l) => l.telefono).length;
       const conFuente = leads.filter((l) => l.seguimiento?.fuente).length;
       return res.json({

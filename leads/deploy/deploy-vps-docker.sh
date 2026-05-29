@@ -49,8 +49,45 @@ set -a
 source "${LEADS_DIR}/.env" 2>/dev/null || true
 set +a
 export LEADS_HOST="${LEADS_HOST:-leads.srv955546.hstgr.cloud}"
+export LEADS_TRAEFIK_HOST="${LEADS_TRAEFIK_HOST:-www.miprimercasafsa-sorteo.com}"
+
+# Red compartida Traefik ↔ encuesta (si el label apunta a otra red, Traefik no registra el router → 404).
+detect_traefik_network() {
+  local traefik="${TRAEFIK_CONTAINER:-root-traefik-1}"
+  local encuesta="${ENCUESTA_CONTAINER:-encuesta-landingqr}"
+  local net
+
+  if docker container inspect "$traefik" >/dev/null 2>&1 \
+     && docker container inspect "$encuesta" >/dev/null 2>&1; then
+    while IFS= read -r net; do
+      [[ -z "$net" ]] && continue
+      if docker container inspect "$encuesta" \
+        --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' \
+        2>/dev/null | grep -qx "$net"; then
+        echo "$net"
+        return 0
+      fi
+    done < <(docker container inspect "$traefik" \
+      --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' 2>/dev/null || true)
+  fi
+
+  if docker container inspect "$encuesta" >/dev/null 2>&1; then
+    net=$(docker container inspect "$encuesta" \
+      --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{"\n"}}{{end}}' \
+      2>/dev/null | head -1)
+    if [[ -n "$net" ]]; then
+      echo "$net"
+      return 0
+    fi
+  fi
+  echo "root_default"
+}
+
+export TRAEFIK_DOCKER_NETWORK="${TRAEFIK_DOCKER_NETWORK:-$(detect_traefik_network)}"
 
 echo "LEADS_HOST=${LEADS_HOST}"
+echo "LEADS_TRAEFIK_HOST=${LEADS_TRAEFIK_HOST}"
+echo "TRAEFIK_DOCKER_NETWORK=${TRAEFIK_DOCKER_NETWORK}"
 echo "Building ${SERVICE_NAME} (encuesta-landingqr no se reinicia)..."
 
 docker compose --project-directory "$LEADS_DIR" \
@@ -247,4 +284,30 @@ docker network ls --format '  {{.Name}} driver={{.Driver}}'
 
 echo "Redes finales de ${SERVICE_NAME}:"
 docker container inspect "$SERVICE_NAME" --format '{{range $net, $cfg := .NetworkSettings.Networks}}  {{$net}} ip={{$cfg.IPAddress}}{{"\n"}}{{end}}' 2>/dev/null || true
+
+# El health interno no prueba Traefik; sin esto el workflow puede quedar verde con 404 público.
+traefik_smoke() {
+  local host="${LEADS_TRAEFIK_HOST}"
+  local code
+  code=$(curl -sfk -o /dev/null -w '%{http_code}' --max-time 20 \
+    -H "Host: ${host}" \
+    "https://127.0.0.1${HEALTH_PATH}" 2>/dev/null || echo "000")
+  echo "Traefik smoke Host=${host} ${HEALTH_PATH} → HTTP ${code}"
+  [[ "$code" == "200" ]]
+}
+
+echo "--- Smoke Traefik (ruta pública /leads) ---"
+if ! traefik_smoke; then
+  echo "WARN: Traefik no enruta /leads. Reiniciando ${TRAEFIK_CONTAINER:-root-traefik-1}..."
+  docker restart "${TRAEFIK_CONTAINER:-root-traefik-1}" >/dev/null 2>&1 || true
+  sleep 10
+  connect_traefik_networks
+  if ! traefik_smoke; then
+    echo "ERROR: sigue sin enrutar /leads. Labels del contenedor:"
+    docker container inspect "$SERVICE_NAME" --format '{{json .Config.Labels}}' 2>/dev/null || true
+    exit 1
+  fi
+fi
+echo "Traefik enruta /leads OK"
+
 echo "=== Deploy finished ==="

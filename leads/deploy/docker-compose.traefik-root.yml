@@ -25,9 +25,11 @@ services:
       - root_default
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=root_default"
-      # Router: /leads en el dominio principal
-      - "traefik.http.routers.leadssecure.rule=Host(`www.miprimercasafsa-sorteo.com`) && PathPrefix(`/leads`)"
+      # Red donde Traefik alcanza el contenedor (la detecta deploy-vps-docker.sh)
+      - "traefik.docker.network=${TRAEFIK_DOCKER_NETWORK:-root_default}"
+      # Prioridad > encuesta (Host sin path) para que /leads no caiga en la landing
+      - "traefik.http.routers.leadssecure.priority=200"
+      - "traefik.http.routers.leadssecure.rule=Host(`${LEADS_TRAEFIK_HOST:-www.miprimercasafsa-sorteo.com}`) && PathPrefix(`/leads`)"
       - "traefik.http.routers.leadssecure.entrypoints=websecure"
       - "traefik.http.routers.leadssecure.tls=true"
       - "traefik.http.routers.leadssecure.tls.certresolver=myhttpchallenge"

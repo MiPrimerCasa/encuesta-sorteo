@@ -19,7 +19,7 @@ Una fila = login OK. Cero filas = usuario o clave incorrectos.
 | Valor exacto en `Categoria` (SP) | Pantalla en la app |
 |----------------------------------|-------------------|
 | **`SUPERVISOR`** | **Supervisor** — Leads + Promotores + Calendario |
-| **`PROMOTOR`** | **Promotor** — Leads + Métricas + Calendario |
+| **`PROMOTOR`** | **Promotor** — Leads + Métricas (sin calendario; visitas en el momento) |
 
 Solo esos dos textos (la app normaliza mayúsculas y espacios). Cualquier otro valor → respaldo por encuestas hasta que el DBA corrija la fila.
 
@@ -80,7 +80,7 @@ Ver: `npm run inspect:leads -- <idOperador>`
 | `rol` en la app | Pestañas | Quién suele ser |
 |-----------------|----------|-----------------|
 | `supervisor` | **Leads** + **Promotores** | Misma persona es supervisor y “vendedor” a nivel id (o categoría no promotor) |
-| `promotor` | **Leads** + **Métricas** + Calendario | `Categoria` = **`PROMOTOR`** (o respaldo por encuestas) |
+| `promotor` | **Leads** + **Métricas** | `Categoria` = **`PROMOTOR`** (o respaldo por encuestas) |
 
 **Promotores** = gráficos y tabla del equipo (métricas de varios promotores).  
 **Leads** = encuestas asignadas a ese operador vía `encuestasMuestraOperador @idVendedor`.

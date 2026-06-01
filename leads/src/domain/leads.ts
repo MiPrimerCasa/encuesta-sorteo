@@ -22,6 +22,19 @@ export function leadReagendaEntrevista(lead: Lead) {
   return lead.seguimiento?.resultadoEntrevista === 'reagenda';
 }
 
+export function esCerradoNegativoLead(lead: Lead) {
+  const r = lead.seguimiento?.resultadoEntrevista;
+  return r === 'no_compro' || r === 'sin_interes';
+}
+
+/** Pestaña de Leads donde corresponde listar el lead. */
+export function tabIdListaLead(lead: Lead): 'entrevista' | 'contacto' | 'seguimiento' | 'compro' {
+  if (leadCompro(lead) || esCerradoNegativoLead(lead)) return 'compro';
+  if (leadReagendaEntrevista(lead)) return 'seguimiento';
+  if (lead.seguimiento?.canal != null || lead.seguimiento?.huboEntrevista != null) return 'contacto';
+  return 'entrevista';
+}
+
 export interface EntrevistaCalendarioFmt {
   diaSemana: string;
   diaNumero: number;

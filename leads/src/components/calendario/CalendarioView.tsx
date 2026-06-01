@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { startOfMonth } from 'date-fns';
 import { Drawer } from 'vaul';
 
-import type { Lead, Promotor, ResultadoEntrevista, SeguimientoLead } from '../../types';
+import type { Lead, Promotor, SeguimientoLead } from '../../types';
 import { getHolidaysAR } from '../../lib/holidays-ar';
 import { isDiaDestacadoCalendario } from '../../lib/holidays-ar';
 import {
@@ -18,7 +18,6 @@ import { buildCalendarEvents, type CalendarEvent } from './calendar-types';
 import { CalendarGrid } from './CalendarGrid';
 import { DayEventsPanel } from './DayEventsPanel';
 import { RescheduleSheet } from './RescheduleSheet';
-import { ChangeStatusSheet } from './ChangeStatusSheet';
 
 function buildWhatsAppUrl(phone: string): string {
   const digits = phone.replace(/\D/g, '');
@@ -32,6 +31,8 @@ interface CalendarioViewProps {
   promotores: Promotor[];
   onActualizarLead: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
   onVolver: () => void;
+  /** Ir a Leads y abrir el formulario de seguimiento del cliente. */
+  onAbrirSeguimientoLead: (leadId: string) => void;
 }
 
 export function CalendarioView({
@@ -39,6 +40,7 @@ export function CalendarioView({
   promotores,
   onActualizarLead,
   onVolver,
+  onAbrirSeguimientoLead,
 }: CalendarioViewProps) {
   const hoy = useMemo(() => new Date(), []);
   const [mesVisible, setMesVisible] = useState(() => startOfMonth(hoy));
@@ -46,8 +48,6 @@ export function CalendarioView({
 
   const [eventoAbierto, setEventoAbierto] = useState<CalendarEvent | null>(null);
   const [reagendaEvento, setReagendaEvento] = useState<CalendarEvent | null>(null);
-  const [statusEvento, setStatusEvento] = useState<CalendarEvent | null>(null);
-
   const panelRef = useRef<HTMLElement>(null);
 
   const holidays = useMemo(
@@ -101,17 +101,6 @@ export function CalendarioView({
       ...event.lead.seguimiento,
       resultadoEntrevista: 'reagenda',
       fechaReagenda: newDate,
-    });
-  };
-
-  const handleCambiarEstado = async (
-    event: CalendarEvent,
-    newStatus: ResultadoEntrevista,
-  ) => {
-    await onActualizarLead(event.leadId, {
-      ...event.lead.seguimiento,
-      resultadoEntrevista: newStatus,
-      fechaReagenda: newStatus === 'reagenda' ? event.lead.seguimiento.fechaReagenda : null,
     });
   };
 
@@ -307,9 +296,9 @@ export function CalendarioView({
                   <button
                     type="button"
                     onClick={() => {
-                      const ev = eventoAbierto;
+                      const leadId = eventoAbierto.leadId;
                       setEventoAbierto(null);
-                      setStatusEvento(ev);
+                      onAbrirSeguimientoLead(leadId);
                     }}
                     style={{ touchAction: 'manipulation' }}
                     className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:bg-brand-800 active:scale-[0.98]"
@@ -331,13 +320,6 @@ export function CalendarioView({
         onSave={handleReagendar}
       />
 
-      {/* Sheet: cambiar estado */}
-      <ChangeStatusSheet
-        event={statusEvento}
-        open={Boolean(statusEvento)}
-        onClose={() => setStatusEvento(null)}
-        onSave={handleCambiarEstado}
-      />
     </div>
   );
 }

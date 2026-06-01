@@ -9,9 +9,8 @@ const TABS_SUPERVISOR = [
 ];
 
 const TABS_PROMOTOR = [
-  { value: 'leads'     as const, label: 'Leads'     },
-  { value: 'metricas'  as const, label: 'Métricas'  },
-  { value: 'calendario' as const, label: 'Calendario' },
+  { value: 'leads' as const, label: 'Leads' },
+  { value: 'metricas' as const, label: 'Métricas' },
 ];
 
 const ROL_LABEL: Record<RolUsuario, string> = {

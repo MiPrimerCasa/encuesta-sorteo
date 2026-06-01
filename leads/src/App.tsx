@@ -34,6 +34,7 @@ function VistaCargando({ texto = 'Cargando…' }: { texto?: string }) {
 function AppShell() {
   const { usuario, login, logout } = useAuth();
   const [vistaActiva, setVistaActiva] = useState<VistaActiva>('leads');
+  const [leadIdSeguimiento, setLeadIdSeguimiento] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [direccionOficinas, setDireccionOficinas] = useState<string | undefined>();
   const [promotores, setPromotores] = useState<Promotor[]>([]);
@@ -70,6 +71,13 @@ function AppShell() {
     void cargarDatos();
   }, [cargarDatos]);
 
+  useEffect(() => {
+    if (!usuario) return;
+    if (usuario.rol === 'promotor' && vistaActiva === 'calendario') {
+      setVistaActiva('leads');
+    }
+  }, [usuario, vistaActiva]);
+
   const onActualizarLead = useCallback(
     async (leadId: string, seguimiento: SeguimientoLead) => {
       const updated = await guardarSeguimiento(leadId, seguimiento);
@@ -77,6 +85,10 @@ function AppShell() {
     },
     [],
   );
+
+  const onLeadSeguimientoConsumido = useCallback(() => {
+    setLeadIdSeguimiento(null);
+  }, []);
 
   const onCrearLead = useCallback(async (data: NuevoLeadData, promotorNombre?: string) => {
     try {
@@ -97,12 +109,16 @@ function AppShell() {
   const contenidoPrincipal =
     cargando && leads.length === 0 ? (
       <VistaCargando texto="Cargando datos…" />
-    ) : vistaActiva === 'calendario' ? (
+    ) : vistaActiva === 'calendario' && usuario.rol === 'supervisor' ? (
       <CalendarioView
         leads={leads}
         promotores={promotores}
         onActualizarLead={onActualizarLead}
         onVolver={() => setVistaActiva('leads')}
+        onAbrirSeguimientoLead={(leadId) => {
+          setLeadIdSeguimiento(leadId);
+          setVistaActiva('leads');
+        }}
       />
     ) : vistaActiva === 'promotores' && usuario.rol === 'supervisor' ? (
       <PromotoresPanel leads={leads} promotores={promotores} />
@@ -119,6 +135,8 @@ function AppShell() {
         barrios={barrios}
         onActualizarLead={onActualizarLead}
         onCrearLead={onCrearLead}
+        leadIdSeguimientoInicial={leadIdSeguimiento}
+        onLeadSeguimientoConsumido={onLeadSeguimientoConsumido}
       />
     );
 

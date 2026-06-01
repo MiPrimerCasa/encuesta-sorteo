@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { leadCompro, leadReagendaEntrevista } from '../../domain/leads';
+import { useEffect, useMemo, useState } from 'react';
+import { leadCompro, leadReagendaEntrevista, tabIdListaLead } from '../../domain/leads';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
 import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
 import { AlertasSinContactar } from './AlertasSinContactar';
@@ -70,6 +70,9 @@ interface LeadsPanelProps {
   onActualizarLead: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
   onCrearLead: (data: NuevoLeadData, promotorNombre?: string) => void | Promise<void>;
   direccionOficinas?: string;
+  /** Desde calendario: abrir seguimiento de este lead al montar. */
+  leadIdSeguimientoInicial?: string | null;
+  onLeadSeguimientoConsumido?: () => void;
 }
 
 export function LeadsPanel({
@@ -82,6 +85,8 @@ export function LeadsPanel({
   barrios,
   onActualizarLead,
   onCrearLead,
+  leadIdSeguimientoInicial,
+  onLeadSeguimientoConsumido,
 }: LeadsPanelProps) {
   const { entrevistaPendiente, paraContactar, seguimiento, compraron, noCompraron } = useLeadsFilter(leads);
   const listas: Record<ListaKey, Lead[]> = {
@@ -128,6 +133,18 @@ export function LeadsPanel({
     setLeadSeleccionado(lead);
     setModalAbierto(true);
   };
+
+  useEffect(() => {
+    if (!leadIdSeguimientoInicial) return;
+    const lead = leads.find((l) => l.id === leadIdSeguimientoInicial);
+    if (lead) {
+      setTabActivo(tabIdListaLead(lead));
+      setBusqueda('');
+      setLeadSeleccionado(lead);
+      setModalAbierto(true);
+    }
+    onLeadSeguimientoConsumido?.();
+  }, [leadIdSeguimientoInicial, leads, onLeadSeguimientoConsumido]);
 
   const cerrarModal = () => {
     setModalAbierto(false);

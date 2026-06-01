@@ -269,7 +269,7 @@ echo "--- Conectar redes Traefik ---"
 connect_traefik_networks
 
 echo "Esperando arranque del proceso Node..."
-sleep 5
+sleep 8
 
 echo "Waiting for health (${HEALTH_PATH} o /api/health/live)..."
 HEALTH_OK=0
@@ -305,15 +305,30 @@ docker network ls --format '  {{.Name}} driver={{.Driver}}'
 echo "Redes finales de ${SERVICE_NAME}:"
 docker container inspect "$SERVICE_NAME" --format '{{range $net, $cfg := .NetworkSettings.Networks}}  {{$net}} ip={{$cfg.IPAddress}}{{"\n"}}{{end}}' 2>/dev/null || true
 
-# El health interno no prueba Traefik; sin esto el workflow puede quedar verde con 404 público.
-traefik_smoke() {
+# El health interno no prueba Traefik; Traefik tarda en registrar routers tras recreate (5s → 404 falso).
+traefik_smoke_once() {
   local host="${LEADS_TRAEFIK_HOST}"
-  local code
-  code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 20 \
-    -H "Host: ${host}" \
-    "https://127.0.0.1${HEALTH_PATH}" 2>/dev/null || echo "000")
-  echo "Traefik smoke Host=${host} ${HEALTH_PATH} → HTTP ${code}"
-  [[ "$code" == "200" ]]
+  local url code
+  for url in "https://127.0.0.1${HEALTH_PATH}" "http://127.0.0.1${HEALTH_PATH}"; do
+    code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 20 \
+      -H "Host: ${host}" \
+      "$url" 2>/dev/null || echo "000")
+    echo "Traefik smoke Host=${host} ${url} → HTTP ${code}"
+    [[ "$code" == "200" ]] && return 0
+  done
+  return 1
+}
+
+traefik_smoke() {
+  local i
+  for i in $(seq 1 18); do
+    if traefik_smoke_once; then
+      return 0
+    fi
+    echo "Traefik aún no enruta /leads (${i}/18) — esperando 5s..."
+    sleep 5
+  done
+  return 1
 }
 
 echo "--- Smoke directo (red Docker) ---"
@@ -324,14 +339,14 @@ if ! direct_smoke; then
   exit 1
 fi
 
-echo "--- Smoke Traefik (ruta pública /leads) ---"
+echo "--- Smoke Traefik (ruta pública /leads, con reintentos) ---"
 if ! traefik_smoke; then
-  echo "WARN: Traefik no enruta /leads. Reiniciando ${TRAEFIK_CONTAINER:-root-traefik-1}..."
+  echo "WARN: Traefik no enrutó tras ~90s. Reiniciando ${TRAEFIK_CONTAINER:-root-traefik-1} y reintentando..."
   docker restart "${TRAEFIK_CONTAINER:-root-traefik-1}" >/dev/null 2>&1 || true
-  sleep 10
+  sleep 12
   connect_traefik_networks
   if ! traefik_smoke; then
-    echo "ERROR: sigue sin enrutar /leads. Labels del contenedor:"
+    echo "ERROR: sigue sin enrutar /leads. El contenedor responde directo; revisá labels Traefik."
     docker container inspect "$SERVICE_NAME" --format '{{json .Config.Labels}}' 2>/dev/null || true
     exit 1
   fi

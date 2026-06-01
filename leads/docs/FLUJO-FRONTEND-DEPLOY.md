@@ -58,7 +58,9 @@ git push origin main
 **Fine-grained (recomendado):**
 
 - Repository access: solo `encuesta-sorteo`
-- Permissions: **Contents** → Read and write
+- Permissions:
+  - **Contents** → Read and write
+  - **Workflows** → Read and write *(obligatorio: el sync sube `.github/workflows/deploy-leads.yml`)*
 
 **Classic:**
 
@@ -72,7 +74,7 @@ Mirá **qué paso está en rojo** en el log:
 
 | Paso rojo | Causa habitual | Qué hacer |
 |-----------|----------------|-----------|
-| **Commit y push en monorepo** | PAT sin write, rebase con cambios locales | Revisar `MONOREPO_PUSH_TOKEN`; el workflow hace `git reset --hard` + `rebase` + push con token explícito |
+| **Commit y push en monorepo** | PAT sin write, sin scope **Workflows**, o rebase | Fine-grained: **Contents** y **Workflows** en write. Error típico: `refusing to allow a Personal Access Token to create or update workflow ... without workflow scope` |
 | **Subir leads al VPS** | `dial tcp … i/o timeout` (intermitente) | Reintentar el workflow; secrets `VPS_*` en **este** repo. Si falla SCP pero la encuesta despliega, comparar `VPS_HOST` con el de encuesta-sorteo |
 | **Desplegar leads en VPS** | Docker / healthcheck | Ver log del paso SSH |
 

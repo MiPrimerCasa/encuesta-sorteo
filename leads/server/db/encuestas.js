@@ -3,6 +3,7 @@ import { extraerCodigoPromotorDesdeFilaEncuesta } from './codigo-promotor.js';
 import {
   getSqlPoolEncuestas,
   isSqlServerConfigured,
+  mapCategoriaToRol,
   mapOperadorVendedorToRol,
   parseIdEntero,
 } from './mssql.js';
@@ -204,24 +205,71 @@ export async function fetchEncuestasMuestraRaw(usuario) {
  * Rol según encuestasMuestraOperador: idOperador === idVendedor → supervisor.
  * La DB ya filtra qué filas devuelve con @idVendedor = idOperador.
  */
-export function resolveRolFromEncuestasRows(rows, idOperador) {
+export function resolveRolFromEncuestasRows(rows, idOperador, categoria) {
   if (!rows?.length) return null;
   const idVendedor = pickField(rows[0], 'idVendedor', 'IdVendedor');
   const idSupervisor = pickField(rows[0], 'idSupervisor', 'IdSupervisor');
-  const rol = mapOperadorVendedorToRol(idOperador, idVendedor);
+  const rolPorIds = mapOperadorVendedorToRol(idOperador, idVendedor);
+  const rolPorCategoria = mapCategoriaToRol(categoria);
+
+  let rol = rolPorIds;
+  let rolOrigen = 'encuestas';
+
+  // Promotor con una sola fila propia: idVendedor suele repetir idOperador → no es supervisor.
+  if (rolPorIds === 'supervisor' && rolPorCategoria === 'promotor') {
+    rol = 'promotor';
+    rolOrigen = 'categoria_encuestas';
+  }
+
   if (!rol) return null;
   return {
     rol,
-    rolOrigen: 'encuestas',
+    rolOrigen,
     idVendedor: idVendedor != null ? String(idVendedor) : undefined,
     idSupervisor: idSupervisor != null ? String(idSupervisor) : undefined,
   };
 }
 
-/** Tras login: consulta encuestas y define rol + ids de la primera fila. */
+/** Si encuestas dice supervisor pero el login es claramente promotor, priorizar promotor. */
+function aplicarRolEncuestasConRespaldoLogin(operador, resolved) {
+  const catRol = mapCategoriaToRol(operador.categoria);
+  const op = parseIdEntero(operador.idOperador ?? operador.id);
+  const sup = parseIdEntero(operador.idSupervisor);
+  const promotorPorLogin =
+    catRol === 'promotor' || (op != null && sup != null && op !== sup);
+
+  if (resolved.rol === 'supervisor' && promotorPorLogin) {
+    return {
+      ...operador,
+      rol: 'promotor',
+      rolOrigen: 'categoria_override',
+      idVendedor: resolved.idVendedor ?? operador.idVendedor,
+      idSupervisor: resolved.idSupervisor ?? operador.idSupervisor,
+    };
+  }
+
+  return {
+    ...operador,
+    rol: resolved.rol,
+    rolOrigen: resolved.rolOrigen,
+    idVendedor: resolved.idVendedor ?? operador.idVendedor,
+    idSupervisor: resolved.idSupervisor ?? operador.idSupervisor,
+  };
+}
+
+/** Tras login: si Categoria del SP es clara, no recalcular rol por encuestas (acuerdo DBA). */
 export async function enrichOperadorRolDesdeEncuestas(operador) {
   const idOperador = operador.idOperador ?? operador.id;
   if (!parseIdEntero(idOperador)) return operador;
+
+  const rolPorCategoria = mapCategoriaToRol(operador.categoria);
+  if (rolPorCategoria) {
+    return {
+      ...operador,
+      rol: rolPorCategoria,
+      rolOrigen: 'categoria',
+    };
+  }
 
   try {
     const rows = await fetchEncuestasMuestraRaw({
@@ -229,16 +277,10 @@ export async function enrichOperadorRolDesdeEncuestas(operador) {
       nombre: operador.nombre,
       rol: 'supervisor',
     });
-    const resolved = resolveRolFromEncuestasRows(rows, idOperador);
+    const resolved = resolveRolFromEncuestasRows(rows, idOperador, operador.categoria);
     if (!resolved) return operador;
 
-    return {
-      ...operador,
-      rol: resolved.rol,
-      rolOrigen: resolved.rolOrigen,
-      idVendedor: resolved.idVendedor ?? operador.idVendedor,
-      idSupervisor: resolved.idSupervisor ?? operador.idSupervisor,
-    };
+    return aplicarRolEncuestasConRespaldoLogin(operador, resolved);
   } catch (error) {
     console.warn(
       'Rol desde encuestas no disponible, se usa categoría:',

@@ -12,7 +12,34 @@ EXEC [dbo].[operadorAccesoCategoria]
 
 Una fila = login OK. Cero filas = usuario o clave incorrectos.
 
-## 2. Columnas que ya conocemos (WhatsApp / captura)
+## 2. Acuerdo con DBA — `Categoria` como fuente del rol
+
+**Objetivo:** que `operadorAccesoCategoria` devuelva en **`Categoria`** el rol real del operador, sin depender de comparar ids en `encuestasMuestraOperador` (evita casos como promotor con `idOperador === idVendedor` en la única fila).
+
+| Valor exacto en `Categoria` (SP) | Pantalla en la app |
+|----------------------------------|-------------------|
+| **`SUPERVISOR`** | **Supervisor** — Leads + Promotores + Calendario |
+| **`PROMOTOR`** | **Promotor** — Leads + Métricas + Calendario |
+
+Solo esos dos textos (la app normaliza mayúsculas y espacios). Cualquier otro valor → respaldo por encuestas hasta que el DBA corrija la fila.
+
+**Recomendaciones para el SP:**
+
+- `Categoria` sin espacios de relleno al final (la app hace `.trim()`, pero conviene limpiar en SQL).
+- Valores **estables** y documentados (misma ortografía en todos los operadores del mismo tipo).
+- Opcional a futuro: columnas `idSupervisor` / `idVendedor` en el mismo SP; hoy la app no las exige si `Categoria` es correcta.
+
+**Verificación después del cambio en SQL:**
+
+```bash
+npm run inspect:login -- email@operador clave
+```
+
+Debe verse `rol final: promotor` (o `supervisor`) con `rolOrigen: categoria` y pestañas acordes.
+
+La regla por encuestas (`idOperador` vs `idVendedor`) queda como **respaldo** si `Categoria` viene vacía o el SP de encuestas falla; cuando `Categoria` viene bien, esa regla no debería cambiar el rol.
+
+## 3. Columnas que ya conocemos (WhatsApp / captura)
 
 | Columna SQL | Ejemplo | Uso en la app |
 |-------------|---------|----------------|
@@ -20,9 +47,9 @@ Una fila = login OK. Cero filas = usuario o clave incorrectos.
 | `operadorCodigo` | `pablo@mail.com` | Email guardado en sesión |
 | `operadorDescripcion` | `STRAUSS PABLO` | Nombre en la barra |
 | `operadorFUM` | fecha | (no se usa hoy) |
-| `Categoria` | `PROMOTOR PLAN JOVEN` | Respaldo de rol si faltan ids |
+| `Categoria` | **`PROMOTOR`** o **`SUPERVISOR`** | Define el rol en la app |
 
-## 3. Regla de pantallas (implementada)
+## 4. Regla de pantallas (respaldo con encuestas)
 
 Tras el login, la app llama `encuestasMuestraOperador` con `@idVendedor = idOperador` y lee **`idVendedor`** de la primera fila:
 
@@ -33,14 +60,15 @@ Tras el login, la app llama `encuestasMuestraOperador` con `@idVendedor = idOper
 
 La **lista de leads** la define la DB en ese SP (no se filtra de nuevo en Node).
 
-Si encuestas falla o no devuelve filas, se usa **Categoria** del login como respaldo.
+Si encuestas falla o no devuelve filas, se usa **ids + Categoria** del login.  
+Si encuestas marca supervisor pero `Categoria` dice PROMOTOR o `idSupervisor ≠ idOperador`, la app mantiene **promotor**.
 
 `rolOrigen` en la respuesta del login:
 
 - `"encuestas"` → regla idOperador vs idVendedor
 - `"categoria"` → respaldo
 
-## 4. Columnas del login (operadorAccesoCategoria)
+## 5. Columnas del login (operadorAccesoCategoria)
 
 ## 5. Columnas útiles en cada lead (encuestas)
 
@@ -52,7 +80,7 @@ Ver: `npm run inspect:leads -- <idOperador>`
 | `rol` en la app | Pestañas | Quién suele ser |
 |-----------------|----------|-----------------|
 | `supervisor` | **Leads** + **Promotores** | Misma persona es supervisor y “vendedor” a nivel id (o categoría no promotor) |
-| `promotor` | **solo Leads** | Tiene un supervisor distinto (otro id) o categoría promotor plan joven |
+| `promotor` | **Leads** + **Métricas** + Calendario | `Categoria` = **`PROMOTOR`** (o respaldo por encuestas) |
 
 **Promotores** = gráficos y tabla del equipo (métricas de varios promotores).  
 **Leads** = encuestas asignadas a ese operador vía `encuestasMuestraOperador @idVendedor`.
@@ -88,7 +116,7 @@ Imprime:
     "idSupervisor": "5",
     "idVendedor": "123",
     "idOperador": "123",
-    "categoria": "PROMOTOR PLAN JOVEN",
+    "categoria": "PROMOTOR",
     "rolOrigen": "ids"
   }
 }
@@ -122,4 +150,4 @@ Muestra columnas del SP, valores de Promotor/supervisor y si hay ids numéricos 
 1. ¿Cómo se llaman en el resultset `idSupervisor` e `idVendedor`?  
 2. ¿`idOperador` es siempre el vendedor logueado?  
 3. Para `encuestasMuestraOperador`, ¿`@idVendedor` debe ser `idVendedor` o `idOperador`?  
-4. ¿Un supervisor con categoría `PROMOTOR PLAN JOVEN` pero ids iguales es supervisor o promotor? (hoy: **ids ganan** si vienen ambos.)
+4. ¿Todos los operadores tienen `Categoria` = **`PROMOTOR`** o **`SUPERVISOR`**? (recomendado; si no, la app usa respaldo por encuestas.)

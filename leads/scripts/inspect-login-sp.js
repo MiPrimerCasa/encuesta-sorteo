@@ -53,6 +53,7 @@ try {
   const enriched = await enrichOperadorRolDesdeEncuestas(mapped);
   const idVendedorFila = rowsEnc[0]?.idVendedor ?? rowsEnc[0]?.IdVendedor;
   const rolVendedor = mapOperadorVendedorToRol(mapped.idOperador, idVendedorFila);
+  const rolEncuesta = resolveRolFromEncuestasRows(rowsEnc, mapped.idOperador, mapped.categoria);
 
   console.log('\n=== Columnas que devolvió SQL ===\n');
   console.log(columnas.join(', '));
@@ -69,11 +70,14 @@ try {
   console.log(`  Filas encuesta         = ${rowsEnc.length}`);
   if (rolVendedor) {
     console.log(
-      `  Comparación: ${mapped.idOperador} ${rolVendedor === 'supervisor' ? '===' : '!=='} ${idVendedorFila}`,
+      `  Comparación ids: ${mapped.idOperador} ${rolVendedor === 'supervisor' ? '===' : '!=='} ${idVendedorFila}`,
     );
-    console.log(`  → rol: ${rolVendedor}`);
+    console.log(`  → solo por ids: ${rolVendedor}`);
   } else {
-    console.log('  → no se pudo comparar (falta idVendedor en filas)');
+    console.log('  → no se pudo comparar ids (falta idVendedor en filas)');
+  }
+  if (rolEncuesta) {
+    console.log(`  → con Categoria (${mapped.categoria}): ${rolEncuesta.rol} (${rolEncuesta.rolOrigen})`);
   }
 
   console.log('\n=== Respaldo por Categoria (si falla encuestas) ===\n');

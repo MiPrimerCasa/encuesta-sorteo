@@ -94,12 +94,36 @@ export function mapOperadorVendedorToRol(idOperador, idVendedor) {
   return op === ven ? 'supervisor' : 'promotor';
 }
 
-/** Respaldo si el SP aún no devuelve idSupervisor / idVendedor. */
+/** Categoria del SP operadorAccesoCategoria (valores acordados con DBA). */
 export function mapCategoriaToRol(categoria) {
   const raw = normalizeCategoria(categoria);
-  if (!raw) return 'supervisor';
-  if (raw === 'PROMOTOR PLAN JOVEN') return 'promotor';
-  return 'supervisor';
+  if (raw === 'PROMOTOR') return 'promotor';
+  if (raw === 'SUPERVISOR') return 'supervisor';
+  return null;
+}
+
+/**
+ * Rol al iniciar sesión: ids del SP operadorAccesoCategoria y luego Categoria.
+ * Evita marcar promotor de prueba como supervisor si Categoria viene vacía o distinta.
+ */
+export function resolveRolDesdeLoginRow({ idOperador, idVendedor, idSupervisor, categoria }) {
+  const porVendedor = mapOperadorVendedorToRol(idOperador, idVendedor);
+  if (porVendedor) {
+    return { rol: porVendedor, rolOrigen: 'login_id_vendedor' };
+  }
+
+  const op = parseIdEntero(idOperador);
+  const sup = parseIdEntero(idSupervisor);
+  if (op != null && sup != null && op !== sup) {
+    return { rol: 'promotor', rolOrigen: 'login_id_supervisor' };
+  }
+
+  const porCat = mapCategoriaToRol(categoria);
+  if (porCat) {
+    return { rol: porCat, rolOrigen: 'categoria' };
+  }
+
+  return { rol: 'supervisor', rolOrigen: 'default' };
 }
 
 /**
@@ -127,21 +151,28 @@ export function mapOperadorRow(row) {
     'IDVendedor',
     'idOperadorVendedor',
   );
-  const loginId = pickField(row, 'operadorCodigo', 'OperadorCodigo');
+  const loginIdRaw = pickField(row, 'operadorCodigo', 'OperadorCodigo');
+  const loginId = loginIdRaw != null ? String(loginIdRaw).trim() : null;
   const codigoCarga = extraerCodigoPromotorDesdeFilaLogin(row);
-  const nombre =
-    pickField(row, 'operadorDescripcion', 'OperadorDescripcion') ??
-    loginId ??
-    String(idOperador ?? 'Operador');
-  const categoria = pickField(row, 'Categoria', 'categoria');
+  const nombreRaw = pickField(row, 'operadorDescripcion', 'OperadorDescripcion');
+  const nombre = (nombreRaw != null ? String(nombreRaw).trim() : null) || loginId || String(idOperador ?? 'Operador');
+  const categoriaRaw = pickField(row, 'Categoria', 'categoria');
+  const categoria = categoriaRaw != null ? String(categoriaRaw).trim() : null;
 
   if (!idOperador && !loginId) return null;
+
+  const { rol, rolOrigen } = resolveRolDesdeLoginRow({
+    idOperador,
+    idVendedor,
+    idSupervisor,
+    categoria,
+  });
 
   return {
     id: String(idOperador ?? loginId),
     nombre: String(nombre).trim(),
-    rol: mapCategoriaToRol(categoria),
-    rolOrigen: 'categoria',
+    rol,
+    rolOrigen,
     categoria: categoria ? String(categoria).trim() : undefined,
     loginId: loginId ? String(loginId).trim() : undefined,
     codigoCarga,

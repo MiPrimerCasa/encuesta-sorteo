@@ -11,6 +11,7 @@ import {
   extraerCodigoPromotorDesdeFilaEncuesta,
   normalizarEncuestaCargaId,
 } from './codigo-promotor.js';
+import { resolveCodigoCargaOperador } from './operadores-catalog.js';
 import { getSqlPoolEncuestas } from './mssql.js';
 
 const MSG_CONTACTO_YA_REGISTRADO = 'Este contacto ya está registrado.';
@@ -148,8 +149,8 @@ export function resolveUsuarioSpCarga(usuarioSesion, context, payload) {
   const sesionCodigo = usuarioSesion.codigoCarga?.trim();
   if (esCodigoUsuarioCargaValido(sesionCodigo)) return sesionCodigo;
 
-  const loginId = usuarioSesion.loginId?.trim();
-  if (esCodigoUsuarioCargaValido(loginId)) return loginId;
+  const desdeCatalogo = resolveCodigoCargaOperador(usuarioSesion, context.rows);
+  if (esCodigoUsuarioCargaValido(desdeCatalogo)) return desdeCatalogo;
 
   if (usuarioSesion.rol === 'promotor') {
     const desdeFilas = codigoDesdeFilasEncuesta(

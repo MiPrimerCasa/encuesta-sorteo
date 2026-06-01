@@ -19,14 +19,14 @@ export function EventListItem({ event, onOpen }: EventListItemProps) {
         className="grid w-full min-h-[72px] grid-cols-[56px_1fr_16px] items-center gap-3 rounded-xl border border-zinc-100 bg-white p-3 text-left transition-all duration-[140ms] ease-out active:scale-[0.995] active:border-brand-200 active:bg-brand-50"
       >
         {/* Hora */}
-        <time className="text-[15px] font-semibold tabular-nums text-zinc-900 leading-tight">
+        <time className="text-[15px] font-semibold tabular-nums text-brand-800 leading-tight">
           {time || 'Todo el día'}
         </time>
 
         {/* Cuerpo */}
         <div className="min-w-0">
           <div className="mb-1 flex items-center gap-2">
-            <span className="flex-1 truncate text-[14px] font-semibold text-zinc-900">
+            <span className="flex-1 truncate text-[14px] font-semibold text-brand-800">
               {event.leadName}
             </span>
             {/* Chip de tipo */}

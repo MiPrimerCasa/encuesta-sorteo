@@ -6,7 +6,7 @@ import {
   isTodayDate,
   isOutsideMonth,
 } from '../../lib/calendar';
-import { isBlockedDay } from '../../lib/holidays-ar';
+import { isDiaDestacadoCalendario } from '../../lib/holidays-ar';
 import type { Holiday } from '../../lib/holidays-ar';
 import type { CalendarEvent } from './calendar-types';
 import { CalendarDay } from './CalendarDay';
@@ -52,7 +52,7 @@ export function CalendarGrid({
         {days.map((day) => {
           const iso = getDateISO(day);
           const outside = isOutsideMonth(day, monthStart);
-          const blocked = isBlockedDay(day, holidays);
+          const diaDestacado = isDiaDestacadoCalendario(day, holidays);
           const today = isTodayDate(day);
           const selected = selectedDate ? isSameDayDate(day, selectedDate) : false;
           const events = eventsByDay.get(iso) ?? [];
@@ -62,7 +62,7 @@ export function CalendarGrid({
               key={iso}
               date={day}
               isOutside={outside}
-              isBlocked={blocked}
+              esFinDeSemanaOFeriado={diaDestacado}
               isToday={today}
               isSelected={selected}
               events={events}

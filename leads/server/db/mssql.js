@@ -1,4 +1,5 @@
 import sql from 'mssql';
+import { enriquecerUsuarioConCodigoCarga } from './operadores-catalog.js';
 import { extraerCodigoPromotorDesdeFilaLogin } from './codigo-promotor.js';
 
 let pool;
@@ -179,7 +180,8 @@ export async function fetchLoginOperadorRaw(loginId, password) {
 /** Solo el usuario mapeado (uso en API). */
 export async function verifyLoginSqlServer(loginId, password) {
   const data = await fetchLoginOperadorRaw(loginId, password);
-  return data?.mapped ?? null;
+  if (!data?.mapped) return null;
+  return enriquecerUsuarioConCodigoCarga(data.mapped);
 }
 
 /** Ping liviano para /api/health en producción. */

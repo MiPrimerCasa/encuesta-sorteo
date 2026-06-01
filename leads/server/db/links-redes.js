@@ -1,60 +1,27 @@
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { esCodigoUsuarioCargaValido } from './codigo-promotor.js';
-import { resolveCodigoCargaPorPromotor } from './encuestas.js';
+import {
+  loadOperadoresCatalog,
+  normalizeCodigoCatalog,
+  resolveCodigoCargaOperador,
+} from './operadores-catalog.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-let catalogCache = null;
-
-function loadCatalog() {
-  if (catalogCache) return catalogCache;
-  const path = join(__dirname, '..', 'data', 'links-redes.json');
-  const raw = readFileSync(path, 'utf8');
-  catalogCache = JSON.parse(raw);
-  return catalogCache;
-}
-
-export function normalizeCodigoLinks(valor) {
-  return String(valor ?? '')
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, '');
-}
+export { normalizeCodigoCatalog as normalizeCodigoLinks };
 
 /**
  * Resuelve links WhatsApp (Instagram / Facebook) por código SORTEO del operador.
  */
 export function resolveLinksRedesPorCodigo(codigoRaw) {
-  const codigo = normalizeCodigoLinks(codigoRaw);
+  const codigo = normalizeCodigoCatalog(codigoRaw);
   if (!codigo) return null;
-  const { byCodigo } = loadCatalog();
+  const { byCodigo } = loadOperadoresCatalog();
   return byCodigo[codigo] ?? null;
 }
 
-/**
- * Código de carga del usuario: sesión → filas encuesta → loginId.
- */
 export function resolveCodigoCargaUsuario(usuarioSesion, encuestaRows = []) {
-  const candidatos = [
-    usuarioSesion?.codigoCarga,
-    usuarioSesion?.loginId,
-  ];
-  for (const c of candidatos) {
-    const t = String(c ?? '').trim();
-    if (esCodigoUsuarioCargaValido(t)) return t;
-  }
-  const desdeFilas = resolveCodigoCargaPorPromotor(
-    encuestaRows,
-    usuarioSesion?.nombre,
-    usuarioSesion?.idOperador ?? usuarioSesion?.id,
-  );
-  if (esCodigoUsuarioCargaValido(desdeFilas)) return desdeFilas;
-  return null;
+  return resolveCodigoCargaOperador(usuarioSesion, encuestaRows);
 }
 
 export function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows = []) {
-  const codigo = resolveCodigoCargaUsuario(usuarioSesion, encuestaRows);
+  const codigo = resolveCodigoCargaOperador(usuarioSesion, encuestaRows);
   if (!codigo) {
     return {
       codigo: null,

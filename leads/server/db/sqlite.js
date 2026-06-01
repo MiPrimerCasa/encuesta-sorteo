@@ -15,7 +15,7 @@ function openDatabase() {
   db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   initSchema();
-  seedCatalogIfEmpty();
+  syncCatalog();
 }
 
 /** SQLite local solo para caché de seguimiento y catálogo de formulario. */
@@ -52,20 +52,31 @@ function initSchema() {
   `);
 }
 
-function seedCatalogIfEmpty() {
-  const n = db.prepare('SELECT COUNT(*) AS c FROM productos').get().c;
-  if (n > 0) return;
-
-  const insProd = db.prepare(
-    'INSERT INTO productos (id, codigo, nombre, roles_json) VALUES (?, ?, ?, ?)',
+/** Mantiene productos y barrios alineados con server/catalog.js (también en DB ya creada). */
+function syncCatalog() {
+  const upsertProd = db.prepare(
+    `INSERT INTO productos (id, codigo, nombre, roles_json) VALUES (?, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       codigo = excluded.codigo,
+       nombre = excluded.nombre,
+       roles_json = excluded.roles_json`,
   );
   for (const pr of productosCatalog) {
-    insProd.run(pr.id, pr.codigo, pr.nombre, JSON.stringify(pr.rolesPermitidos));
+    upsertProd.run(pr.id, pr.codigo, pr.nombre, JSON.stringify(pr.rolesPermitidos));
   }
 
-  const insBarrio = db.prepare('INSERT INTO barrios (id, nombre) VALUES (?, ?)');
+  const upsertBarrio = db.prepare(
+    `INSERT INTO barrios (id, nombre) VALUES (?, ?)
+     ON CONFLICT(id) DO UPDATE SET nombre = excluded.nombre`,
+  );
   for (const b of barriosCatalog) {
-    insBarrio.run(b.id, b.nombre);
+    upsertBarrio.run(b.id, b.nombre);
+  }
+
+  const ids = barriosCatalog.map((b) => b.id);
+  if (ids.length) {
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(`DELETE FROM barrios WHERE id NOT IN (${placeholders})`).run(...ids);
   }
 }
 

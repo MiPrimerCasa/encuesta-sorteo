@@ -12,7 +12,7 @@ type OpcionEstado = {
 const OPCIONES: OpcionEstado[] = [
   {
     value: 'no_compro',
-    label: 'No compró',
+    label: 'NO COMPRO',
     hint: 'Hubo entrevista, pero no cerró la venta.',
   },
   {
@@ -22,7 +22,7 @@ const OPCIONES: OpcionEstado[] = [
   },
   {
     value: 'compro',
-    label: 'Cierre',
+    label: 'SI COMPRO',
     hint: 'Venta cerrada. Completá los detalles en el lead.',
   },
 ];
@@ -73,7 +73,7 @@ export function ChangeStatusSheet({ event, open, onClose, onSave }: ChangeStatus
             <div>
               <Drawer.Title
                 id="changestatus-title"
-                className="text-[18px] font-semibold tracking-[-0.01em] text-zinc-900"
+                className="text-[18px] font-semibold tracking-[-0.01em] text-brand-800"
               >
                 Cambiar estado del lead
               </Drawer.Title>
@@ -119,7 +119,7 @@ export function ChangeStatusSheet({ event, open, onClose, onSave }: ChangeStatus
                       className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
                     />
                     <span className="flex flex-col gap-0.5">
-                      <span className={`text-[14px] font-semibold ${checked ? 'text-brand-800' : 'text-zinc-900'}`}>
+                      <span className={`text-[14px] font-semibold ${checked ? 'text-brand-800' : 'text-zinc-700'}`}>
                         {op.label}
                       </span>
                       <span className="text-[12px] text-zinc-400">{op.hint}</span>

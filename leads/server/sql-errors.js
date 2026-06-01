@@ -27,6 +27,37 @@ export function formatSqlError(error) {
     };
   }
 
+  const executeDenied =
+    /EXECUTE permission was denied/i.test(raw) &&
+    /encuestasMuestraOperador/i.test(raw);
+
+  if (executeDenied) {
+    return {
+      message:
+        `El usuario SQL «${sqlUser}» puede iniciar sesión en la app, pero no tiene permiso para ejecutar ` +
+        `«encuestasMuestraOperador» en la base «${dbConexion}». Pedí al administrador SQL que ejecute el script de permisos (README o sql/grants-mpcsp-leads.sql).`,
+      code: 'PERMISO_EXECUTE_ENCUESTAS',
+      detail: raw,
+      adminSql: [
+        `USE [${dbConexion}];`,
+        `IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = '${sqlUser}')`,
+        `  CREATE USER [${sqlUser}] FOR LOGIN [${sqlUser}];`,
+        `GRANT CONNECT TO [${sqlUser}];`,
+        'GRANT EXECUTE ON dbo.encuestasMuestraOperador TO [' + sqlUser + '];',
+        'GRANT EXECUTE ON dbo.operadorAccesoCategoria TO [' + sqlUser + '];',
+        '-- Si el SP lee tablas directamente:',
+        `-- ALTER ROLE db_datareader ADD MEMBER [${sqlUser}];`,
+        '',
+        '-- El SP suele leer también la base mensajeria (ver README):',
+        'USE mensajeria;',
+        `IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = '${sqlUser}')`,
+        `  CREATE USER [${sqlUser}] FOR LOGIN [${sqlUser}];`,
+        `GRANT CONNECT TO [${sqlUser}];`,
+        `-- ALTER ROLE db_datareader ADD MEMBER [${sqlUser}];`,
+      ].join('\n'),
+    };
+  }
+
   if (
     /not able to access|no puede acceder|permission|permiso|cannot open database/i.test(raw)
   ) {

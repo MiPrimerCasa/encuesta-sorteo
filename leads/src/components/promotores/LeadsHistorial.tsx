@@ -35,7 +35,7 @@ const ROW_CLASS: Record<LeadStatus, string> = {
 };
 
 const PILL: Record<LeadStatus, { variant: 'nuevo' | 'in-progress' | 'reagendado' | 'compro'; label: string }> = {
-  nuevo:       { variant: 'nuevo',       label: 'Nuevo' },
+  nuevo:       { variant: 'nuevo',       label: 'No contactado' },
   contactado:  { variant: 'in-progress', label: 'Contactado' },
   seguimiento: { variant: 'reagendado',  label: 'En seguimiento' },
   compro:      { variant: 'compro',      label: 'Cierre' },

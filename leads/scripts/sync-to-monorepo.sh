@@ -17,7 +17,6 @@ RSYNC_EX=( -a
   --exclude '.git'
   --exclude 'node_modules'
   --exclude 'dist'
-  --exclude 'data'
   --exclude '.env'
   --exclude 'logs'
 )

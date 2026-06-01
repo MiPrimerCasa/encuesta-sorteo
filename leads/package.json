@@ -21,6 +21,8 @@
     "iniciar:api": "node server/index.js",
     "inspect:login": "node scripts/inspect-login-sp.js",
     "inspect:leads": "node scripts/inspect-leads-sp.js",
+    "generate:operadores": "node scripts/generate-operadores-planilla.mjs",
+    "generate:links-redes": "node scripts/generate-operadores-planilla.mjs",
     "deploy:vps": "bash scripts/deploy-vps-remote.sh"
   },
   "dependencies": {

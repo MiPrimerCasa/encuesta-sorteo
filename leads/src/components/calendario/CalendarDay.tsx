@@ -6,7 +6,8 @@ import { isHolidayAR } from '../../lib/holidays-ar';
 interface CalendarDayProps {
   date: Date;
   isOutside: boolean;
-  isBlocked: boolean;
+  /** Feriado, sábado o domingo — solo estilo; no bloquea ventas. */
+  esFinDeSemanaOFeriado: boolean;
   isToday: boolean;
   isSelected: boolean;
   events: CalendarEvent[];
@@ -17,7 +18,7 @@ interface CalendarDayProps {
 export function CalendarDay({
   date,
   isOutside,
-  isBlocked,
+  esFinDeSemanaOFeriado,
   isToday,
   isSelected,
   events,
@@ -36,11 +37,11 @@ export function CalendarDay({
     .filter(Boolean)
     .join(', ');
 
-  const dotColor = isSelected || isBlocked ? 'bg-white' : 'bg-brand-600';
+  const dotColor = isSelected ? 'bg-white' : esFinDeSemanaOFeriado ? 'bg-zinc-400' : 'bg-brand-600';
   const countBg = isSelected
     ? 'bg-white text-brand-700'
-    : isBlocked
-      ? 'bg-white text-zinc-900'
+    : esFinDeSemanaOFeriado
+      ? 'bg-zinc-200 text-zinc-500'
       : 'bg-brand-600 text-white';
 
   const baseClass =
@@ -52,8 +53,8 @@ export function CalendarDay({
   let stateClass = 'text-zinc-800';
   if (isSelected) {
     stateClass = 'bg-brand-600 text-white border border-brand-800';
-  } else if (isBlocked) {
-    stateClass = 'bg-zinc-900 text-white';
+  } else if (esFinDeSemanaOFeriado) {
+    stateClass = 'bg-zinc-100 text-zinc-500 border border-zinc-200';
   } else if (hasEvents) {
     stateClass = 'bg-brand-50 text-brand-800 border border-brand-100';
   }

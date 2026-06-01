@@ -4,8 +4,12 @@ import { getProductosPorRol, puedeVenderProducto } from '../../domain/leads';
 import {
   esPlanInversion,
   esTerreno,
-  opcionesPagoPlanInversion,
-  opcionesPagoTerreno,
+  ID_PRODUCTO_TERRENO,
+  etiquetasResultadoEntrevista,
+  opcionesPagoParaRol,
+  tituloEstadoCompra,
+  etiquetaNumeroDocumentoVenta,
+  mensajeErrorNumeroDocumentoVenta,
   requiereNumeroRecibo,
   resetCamposAlCambiarProducto,
   resetCamposVenta,
@@ -203,7 +207,7 @@ export function LeadModalForm({
         return;
       }
       if (requiereNumeroRecibo(form.idProducto, form.estadoPago) && !form.numeroRecibo.trim()) {
-        setErrorVenta('Ingresá el número del comprobante.');
+        setErrorVenta(mensajeErrorNumeroDocumentoVenta(rol));
         return;
       }
     }
@@ -311,11 +315,8 @@ export function LeadModalForm({
     (confirmoNo && showCanalTrasNoConfirmo && form.canal != null);
   const productoEsPij = esPlanInversion(form.idProducto);
   const productoEsTerreno = esTerreno(form.idProducto);
-  const opcionesPago = productoEsPij
-    ? opcionesPagoPlanInversion()
-    : productoEsTerreno
-      ? opcionesPagoTerreno()
-      : [];
+  const opcionesPago = opcionesPagoParaRol(rol, form.idProducto);
+  const labelsEntrevista = etiquetasResultadoEntrevista(rol);
   const muestraRecibo = requiereNumeroRecibo(form.idProducto, form.estadoPago);
   const showReferidos = showReferidosObs && form.brindoReferidos === true;
 
@@ -470,7 +471,7 @@ export function LeadModalForm({
                   <RadioOption
                     name="conEntrevista"
                     value="no_compro"
-                    label="No compró"
+                    label={labelsEntrevista.noCompro}
                     checked={form.resultadoEntrevista === 'no_compro'}
                     onChange={() =>
                       patch({ resultadoEntrevista: 'no_compro', ...resetCamposVenta() })
@@ -479,13 +480,19 @@ export function LeadModalForm({
                   <RadioOption
                     name="conEntrevista"
                     value="compro"
-                    label="Cierre"
+                    label={labelsEntrevista.compro}
                     checked={form.resultadoEntrevista === 'compro'}
                     onChange={() => {
                       setErrorVenta('');
+                      const defaultProducto =
+                        rol === 'supervisor'
+                          ? productosDisponibles.find((p) => p.id === ID_PRODUCTO_TERRENO)?.id ??
+                            productosDisponibles[0]?.id ??
+                            ''
+                          : productosDisponibles[0]?.id ?? '';
                       patch({
                         resultadoEntrevista: 'compro',
-                        idProducto: form.idProducto || (productosDisponibles[0]?.id ?? ''),
+                        idProducto: form.idProducto || defaultProducto,
                       });
                     }}
                   />
@@ -567,7 +574,7 @@ export function LeadModalForm({
                       {form.idProducto && opcionesPago.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                            Estado del pago
+                            {tituloEstadoCompra(rol)}
                           </p>
                           {productoEsPij && (
                             <p className="text-[12px] text-zinc-500">
@@ -612,7 +619,7 @@ export function LeadModalForm({
                       {muestraRecibo && (
                         <div className="space-y-1.5">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                            Número del comprobante
+                            {etiquetaNumeroDocumentoVenta(rol)}
                           </p>
                           <input
                             type="text"

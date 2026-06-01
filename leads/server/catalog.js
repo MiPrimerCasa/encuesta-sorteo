@@ -16,9 +16,8 @@ export const productosCatalog = [
 ];
 
 export const barriosCatalog = [
-  { id: 'b1', nombre: 'Barrio Los Tilos' },
-  { id: 'b2', nombre: 'Barrio El Mirador' },
-  { id: 'b3', nombre: 'Barrio San Martín' },
-  { id: 'b4', nombre: 'Barrio La Esperanza' },
-  { id: 'b5', nombre: 'Barrio Norte' },
+  { id: 'b1', nombre: 'Cecotto' },
+  { id: 'b2', nombre: 'Los Elfos' },
+  { id: 'b3', nombre: 'Los Bufalos' },
+  { id: 'b4', nombre: 'Palmares' },
 ];

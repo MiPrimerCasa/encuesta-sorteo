@@ -4,7 +4,7 @@ import { Drawer } from 'vaul';
 
 import type { Lead, Promotor, ResultadoEntrevista, SeguimientoLead } from '../../types';
 import { getHolidaysAR } from '../../lib/holidays-ar';
-import { isBlockedDay } from '../../lib/holidays-ar';
+import { isDiaDestacadoCalendario } from '../../lib/holidays-ar';
 import {
   formatLongDate,
   formatMonthYear,
@@ -115,8 +115,8 @@ export function CalendarioView({
     });
   };
 
-  const diaEsBloqueado =
-    diaSeleccionado ? isBlockedDay(diaSeleccionado, holidays) : false;
+  const diaEsFinDeSemanaOFeriado =
+    diaSeleccionado ? isDiaDestacadoCalendario(diaSeleccionado, holidays) : false;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -141,7 +141,7 @@ export function CalendarioView({
             <path d="M13 4l-6 6 6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <h1 className="text-center text-[16px] font-semibold tracking-[-0.01em] text-zinc-900">
+        <h1 className="text-center text-[16px] font-semibold tracking-[-0.01em] text-brand-800">
           Calendario
         </h1>
         <div />
@@ -162,7 +162,7 @@ export function CalendarioView({
         </button>
 
         <h2 className="flex-1 text-center text-[17px] font-semibold tracking-[-0.01em]" aria-live="polite">
-          <span className="capitalize text-zinc-900">{mesLabel}</span>
+          <span className="capitalize text-brand-800">{mesLabel}</span>
           <span className="ml-1.5 font-[500] text-zinc-400">{anioLabel}</span>
         </h2>
 
@@ -197,10 +197,9 @@ export function CalendarioView({
         onSelectDay={handleSelectDay}
       />
 
-      {/* Aviso si el día seleccionado es feriado o domingo */}
-      {diaSeleccionado && diaEsBloqueado && (
-        <p className="mx-4 mb-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-[12px] text-zinc-500">
-          Este día es feriado o domingo.
+      {diaSeleccionado && diaEsFinDeSemanaOFeriado && (
+        <p className="mx-4 mb-2 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-[12px] text-brand-800">
+          Feriado, sábado o domingo. Podés reagendar, cambiar estado y cerrar ventas con normalidad.
         </p>
       )}
 
@@ -231,7 +230,7 @@ export function CalendarioView({
               <div>
                 <Drawer.Title
                   id="evento-title"
-                  className="text-[18px] font-semibold tracking-[-0.01em] text-zinc-900"
+                  className="text-[18px] font-semibold tracking-[-0.01em] text-brand-800"
                 >
                   {eventoAbierto?.leadName}
                 </Drawer.Title>
@@ -273,7 +272,7 @@ export function CalendarioView({
                 <dl className="mb-6 space-y-3 text-[14px]">
                   <div className="flex justify-between">
                     <dt className="text-zinc-400">Cuándo</dt>
-                    <dd className="font-medium text-zinc-900 tabular-nums">
+                    <dd className="font-medium text-zinc-700 tabular-nums">
                       {formatLongDate(new Date(eventoAbierto.date))} · {formatTime(eventoAbierto.date)}
                     </dd>
                   </div>
@@ -287,7 +286,7 @@ export function CalendarioView({
                   </div>
                   <div className="flex justify-between">
                     <dt className="text-zinc-400">Promotor</dt>
-                    <dd className="font-medium text-zinc-900">{eventoAbierto.promotor}</dd>
+                    <dd className="font-medium text-zinc-700">{eventoAbierto.promotor}</dd>
                   </div>
                 </dl>
 

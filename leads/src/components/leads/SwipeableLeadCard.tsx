@@ -1,5 +1,13 @@
 import { useRef, useState } from 'react';
-import type { Barrio, CanalContacto, Lead, Producto, Promotor, SeguimientoLead } from '../../types';
+import type {
+  Barrio,
+  CanalContacto,
+  Lead,
+  Producto,
+  Promotor,
+  RolUsuario,
+  SeguimientoLead,
+} from '../../types';
 import { LeadCard } from './LeadCard';
 
 const REVEAL_WIDTH = 210;
@@ -13,6 +21,7 @@ interface Props {
   barrios?: Barrio[];
   nombreUsuario?: string;
   ocultarPromotor?: boolean;
+  rolUsuario?: RolUsuario;
   onQuickSave: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
 }
 
@@ -25,6 +34,7 @@ export function SwipeableLeadCard({
   barrios,
   nombreUsuario,
   ocultarPromotor,
+  rolUsuario = 'promotor',
   onQuickSave,
 }: Props) {
   const [offset, setOffset] = useState(0);
@@ -270,6 +280,7 @@ export function SwipeableLeadCard({
             barrios={barrios}
             nombreUsuario={nombreUsuario}
             ocultarPromotor={ocultarPromotor}
+            rolUsuario={rolUsuario}
           />
         </div>
       </div>

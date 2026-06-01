@@ -54,7 +54,7 @@ export function RescheduleSheet({ event, open, onClose, onSave }: RescheduleShee
             <div>
               <Drawer.Title
                 id="reschedule-title"
-                className="text-[18px] font-semibold tracking-[-0.01em] text-zinc-900"
+                className="text-[18px] font-semibold tracking-[-0.01em] text-brand-800"
               >
                 Reagendar entrevista
               </Drawer.Title>

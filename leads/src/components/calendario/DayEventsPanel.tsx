@@ -18,7 +18,7 @@ export const DayEventsPanel = forwardRef<HTMLElement, DayEventsPanelProps>(
         aria-label="Eventos del día seleccionado"
       >
         <header className="mb-4 flex flex-wrap items-baseline gap-2.5">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-900">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
             Eventos
           </span>
           {date && (

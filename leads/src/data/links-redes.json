@@ -1,0 +1,395 @@
+{
+  "version": 2,
+  "updatedAt": "2026-05-29",
+  "source": "Planilla operadores (C:/CARRERA_LIC/SEGUIMIENTO_LEADS/data/planilla/operadores-codigos.csv)",
+  "byCodigo": {
+    "SORTEO01ROTATIVO": {
+      "vendedor": "Martin Q",
+      "codigo": "SORTEO01ROTATIVO",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01ROTATIVO&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01ROTATIVO&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S0100": {
+      "vendedor": "Norma M",
+      "codigo": "SORTEO01S0100",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S0100&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S0100&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S01P01": {
+      "vendedor": "PROMOTOR S1P1",
+      "codigo": "SORTEO01S01P01",
+      "rol": "promotor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S01P01&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S01P01&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S01P02": {
+      "vendedor": "PROMOTOR S1P2",
+      "codigo": "SORTEO01S01P02",
+      "rol": "promotor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S01P02&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S01P02&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S0200": {
+      "vendedor": "Adela Alcaraz",
+      "codigo": "SORTEO01S0200",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S0200&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S0200&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S0300": {
+      "vendedor": "Marina L",
+      "codigo": "SORTEO01S0300",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S0300&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S0300&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S03P01": {
+      "vendedor": "PROMOTOR S03P1",
+      "codigo": "SORTEO01S03P01",
+      "rol": "promotor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S03P01&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S03P01&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S03P02": {
+      "vendedor": "PROMOTOR S3P2",
+      "codigo": "SORTEO01S03P02",
+      "rol": "promotor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S03P02&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S03P02&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S0400": {
+      "vendedor": "Federico C",
+      "codigo": "SORTEO01S0400",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S0400&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S0400&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S0500": {
+      "vendedor": "Fatima Farias",
+      "codigo": "SORTEO01S0500",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S0500&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S0500&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S05P01": {
+      "vendedor": "PROMOTOR 05P01",
+      "codigo": "SORTEO01S05P01",
+      "rol": "promotor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S05P01&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S05P01&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S0600": {
+      "vendedor": "Catherine Contreras",
+      "codigo": "SORTEO01S0600",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S0600&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S0600&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S06P01": {
+      "vendedor": "PROMOTOR 06P01",
+      "codigo": "SORTEO01S06P01",
+      "rol": "promotor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S06P01&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S06P01&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S0700": {
+      "vendedor": "Cecilia Fernandez",
+      "codigo": "SORTEO01S0700",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S0700&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S0700&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S07P01": {
+      "vendedor": "PROMOTOR 07P01",
+      "codigo": "SORTEO01S07P01",
+      "rol": "promotor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S07P01&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S07P01&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S0800": {
+      "vendedor": "Tania García",
+      "codigo": "SORTEO01S0800",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S0800&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S0800&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S0900": {
+      "vendedor": "Giselle Roa",
+      "codigo": "SORTEO01S0900",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S0900&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S0900&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S1000": {
+      "vendedor": "Naara Pona",
+      "codigo": "SORTEO01S1000",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S1000&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S1000&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S1100": {
+      "vendedor": "Christian R",
+      "codigo": "SORTEO01S1100",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S1100&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S1100&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S1200": {
+      "vendedor": "Carlos G",
+      "codigo": "SORTEO01S1200",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S1200&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S1200&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S1300": {
+      "vendedor": "Johnatan O",
+      "codigo": "SORTEO01S1300",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S1300&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S1300&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S1400": {
+      "vendedor": "Lucia N",
+      "codigo": "SORTEO01S1400",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S1400&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S1400&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S1500": {
+      "vendedor": "Santiago M",
+      "codigo": "SORTEO01S1500",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S1500&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S1500&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S1600": {
+      "vendedor": "Favio F",
+      "codigo": "SORTEO01S1600",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S1600&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S1600&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S1700": {
+      "vendedor": "Francisco Z",
+      "codigo": "SORTEO01S1700",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S1700&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S1700&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S1800": {
+      "vendedor": "Belen A",
+      "codigo": "SORTEO01S1800",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S1800&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S1800&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S1900": {
+      "vendedor": "Estefania G",
+      "codigo": "SORTEO01S1900",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S1900&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S1900&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S2000": {
+      "vendedor": "Dahiana C",
+      "codigo": "SORTEO01S2000",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S2000&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S2000&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S2100": {
+      "vendedor": "Nildo C",
+      "codigo": "SORTEO01S2100",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S2100&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S2100&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S21P01": {
+      "vendedor": "Leonel C",
+      "codigo": "SORTEO01S21P01",
+      "rol": "promotor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S21P01&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S21P01&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S2200": {
+      "vendedor": "Martiniano S",
+      "codigo": "SORTEO01S2200",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S2200&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S2200&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S2300": {
+      "vendedor": "Patricia A",
+      "codigo": "SORTEO01S2300",
+      "rol": "supervisor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S2300&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S2300&type=phone_number&app_absent=0"
+    }
+  },
+  "byLoginId": {},
+  "byIdOperador": {},
+  "byNombre": {
+    "martin q": {
+      "codigo": "SORTEO01ROTATIVO",
+      "vendedor": "Martin Q",
+      "rol": "supervisor"
+    },
+    "norma m": {
+      "codigo": "SORTEO01S0100",
+      "vendedor": "Norma M",
+      "rol": "supervisor"
+    },
+    "promotor s1p1": {
+      "codigo": "SORTEO01S01P01",
+      "vendedor": "PROMOTOR S1P1",
+      "rol": "promotor"
+    },
+    "promotor s1p2": {
+      "codigo": "SORTEO01S01P02",
+      "vendedor": "PROMOTOR S1P2",
+      "rol": "promotor"
+    },
+    "adela alcaraz": {
+      "codigo": "SORTEO01S0200",
+      "vendedor": "Adela Alcaraz",
+      "rol": "supervisor"
+    },
+    "marina l": {
+      "codigo": "SORTEO01S0300",
+      "vendedor": "Marina L",
+      "rol": "supervisor"
+    },
+    "promotor s03p1": {
+      "codigo": "SORTEO01S03P01",
+      "vendedor": "PROMOTOR S03P1",
+      "rol": "promotor"
+    },
+    "promotor s3p2": {
+      "codigo": "SORTEO01S03P02",
+      "vendedor": "PROMOTOR S3P2",
+      "rol": "promotor"
+    },
+    "federico c": {
+      "codigo": "SORTEO01S0400",
+      "vendedor": "Federico C",
+      "rol": "supervisor"
+    },
+    "fatima farias": {
+      "codigo": "SORTEO01S0500",
+      "vendedor": "Fatima Farias",
+      "rol": "supervisor"
+    },
+    "promotor 05p01": {
+      "codigo": "SORTEO01S05P01",
+      "vendedor": "PROMOTOR 05P01",
+      "rol": "promotor"
+    },
+    "catherine contreras": {
+      "codigo": "SORTEO01S0600",
+      "vendedor": "Catherine Contreras",
+      "rol": "supervisor"
+    },
+    "promotor 06p01": {
+      "codigo": "SORTEO01S06P01",
+      "vendedor": "PROMOTOR 06P01",
+      "rol": "promotor"
+    },
+    "cecilia fernandez": {
+      "codigo": "SORTEO01S0700",
+      "vendedor": "Cecilia Fernandez",
+      "rol": "supervisor"
+    },
+    "promotor 07p01": {
+      "codigo": "SORTEO01S07P01",
+      "vendedor": "PROMOTOR 07P01",
+      "rol": "promotor"
+    },
+    "tania garcia": {
+      "codigo": "SORTEO01S0800",
+      "vendedor": "Tania García",
+      "rol": "supervisor"
+    },
+    "giselle roa": {
+      "codigo": "SORTEO01S0900",
+      "vendedor": "Giselle Roa",
+      "rol": "supervisor"
+    },
+    "naara pona": {
+      "codigo": "SORTEO01S1000",
+      "vendedor": "Naara Pona",
+      "rol": "supervisor"
+    },
+    "christian r": {
+      "codigo": "SORTEO01S1100",
+      "vendedor": "Christian R",
+      "rol": "supervisor"
+    },
+    "carlos g": {
+      "codigo": "SORTEO01S1200",
+      "vendedor": "Carlos G",
+      "rol": "supervisor"
+    },
+    "johnatan o": {
+      "codigo": "SORTEO01S1300",
+      "vendedor": "Johnatan O",
+      "rol": "supervisor"
+    },
+    "lucia n": {
+      "codigo": "SORTEO01S1400",
+      "vendedor": "Lucia N",
+      "rol": "supervisor"
+    },
+    "santiago m": {
+      "codigo": "SORTEO01S1500",
+      "vendedor": "Santiago M",
+      "rol": "supervisor"
+    },
+    "favio f": {
+      "codigo": "SORTEO01S1600",
+      "vendedor": "Favio F",
+      "rol": "supervisor"
+    },
+    "francisco z": {
+      "codigo": "SORTEO01S1700",
+      "vendedor": "Francisco Z",
+      "rol": "supervisor"
+    },
+    "belen a": {
+      "codigo": "SORTEO01S1800",
+      "vendedor": "Belen A",
+      "rol": "supervisor"
+    },
+    "estefania g": {
+      "codigo": "SORTEO01S1900",
+      "vendedor": "Estefania G",
+      "rol": "supervisor"
+    },
+    "dahiana c": {
+      "codigo": "SORTEO01S2000",
+      "vendedor": "Dahiana C",
+      "rol": "supervisor"
+    },
+    "nildo c": {
+      "codigo": "SORTEO01S2100",
+      "vendedor": "Nildo C",
+      "rol": "supervisor"
+    },
+    "leonel c": {
+      "codigo": "SORTEO01S21P01",
+      "vendedor": "Leonel C",
+      "rol": "promotor"
+    },
+    "martiniano s": {
+      "codigo": "SORTEO01S2200",
+      "vendedor": "Martiniano S",
+      "rol": "supervisor"
+    },
+    "patricia a": {
+      "codigo": "SORTEO01S2300",
+      "vendedor": "Patricia A",
+      "rol": "supervisor"
+    }
+  }
+}

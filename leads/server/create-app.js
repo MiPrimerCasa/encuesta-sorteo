@@ -19,6 +19,7 @@ import {
   updateLeadSeguimientoEncuesta,
 } from './db/encuestas.js';
 import { resolveLinksRedesParaUsuario } from './db/links-redes.js';
+import { enriquecerUsuarioConCodigoCarga } from './db/operadores-catalog.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
 import { getDb, listBarrios, listProductos, productoPermitidoParaRol } from './db/sqlite.js';
@@ -40,6 +41,7 @@ function usuarioDesdeRequest(req) {
     rol,
     loginId: loginId || undefined,
     codigoCarga: codigoCarga || undefined,
+    idOperador: id,
   };
 }
 
@@ -154,8 +156,9 @@ function registerApiRoutes(api) {
     }
 
     try {
-      const rows = await fetchEncuestasMuestraRaw(usuario);
-      const links = resolveLinksRedesParaUsuario(usuario, rows);
+      // Catálogo JSON (planilla): no requiere EXECUTE en encuestasMuestraOperador.
+      const usuarioConCodigo = enriquecerUsuarioConCodigoCarga(usuario, []);
+      const links = resolveLinksRedesParaUsuario(usuarioConCodigo, []);
       return res.json({ links, source: 'links-redes.json' });
     } catch (error) {
       console.error('Error al resolver links de redes:', error);

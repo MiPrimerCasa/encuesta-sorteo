@@ -80,6 +80,23 @@ export function isSundayDay(date: Date): boolean {
   return date.getDay() === 0;
 }
 
+export function isSaturdayDay(date: Date): boolean {
+  return date.getDay() === 6;
+}
+
+/**
+ * Referencia visual en el calendario (feriado, sábado o domingo).
+ * No restringe cerrar ventas ni guardar seguimiento: promotores y supervisores operan todos los días.
+ */
+export function isDiaDestacadoCalendario(date: Date, holidays: Holiday[]): boolean {
+  return (
+    isSaturdayDay(date) ||
+    isSundayDay(date) ||
+    isHolidayAR(date, holidays) !== null
+  );
+}
+
+/** @deprecated Usar isDiaDestacadoCalendario — el nombre «blocked» no implica restricción operativa. */
 export function isBlockedDay(date: Date, holidays: Holiday[]): boolean {
-  return isSundayDay(date) || isHolidayAR(date, holidays) !== null;
+  return isDiaDestacadoCalendario(date, holidays);
 }

@@ -49,10 +49,18 @@ type LinksCatalogJson = {
 
 /** Links de redes del promotor/supervisor demo (mismo catálogo que producción). */
 export function getDemoLinksRedes(usuario: UsuarioSesion): LinksRedes {
-  const codigo = String(usuario.codigoCarga ?? 'SORTEO01S21P01')
-    .trim()
-    .toUpperCase();
-  const entry = (linksCatalog as LinksCatalogJson).byCodigo[codigo];
+  const catalog = linksCatalog as LinksCatalogJson & {
+    byNombre?: Record<string, { codigo: string; vendedor?: string }>;
+  };
+
+  let codigo = String(usuario.codigoCarga ?? '').trim().toUpperCase();
+  if (!codigo && usuario.nombre && catalog.byNombre) {
+    const norm = usuario.nombre.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    codigo = catalog.byNombre[norm]?.codigo ?? '';
+  }
+  if (!codigo) codigo = 'SORTEO01S21P01';
+
+  const entry = catalog.byCodigo[codigo];
   if (!entry) {
     return {
       codigo,
@@ -467,7 +475,7 @@ const BASE_LEADS: Lead[] = [
   { id: 'lead-29', nombre: 'Ignacio Bustos',   telefono: '3513 200003', promotorId: 'prom-3', promotorNombre: 'Carlos López',    quiereEntrevista: false, lista: 'contacto',   origen: 'redes',   fechaObtencion: '2026-03-22', seguimiento: { fuente: 'instagram', canal: 'mensaje', huboEntrevista: false } },
   { id: 'lead-30', nombre: 'Daniela Suárez',   telefono: '3515 200004', promotorId: 'prom-4', promotorNombre: 'Laura Fernández', quiereEntrevista: true,  lista: 'entrevista', origen: 'redes',   fechaObtencion: '2026-03-20', seguimiento: { fuente: 'instagram', canal: 'llamada', huboEntrevista: true, resultadoEntrevista: 'compro', idProducto: 'prod-pij', estadoPago: 'sena', brindoReferidos: false } },
   { id: 'lead-31', nombre: 'Ramiro Cáceres',   telefono: '3511 200005', promotorId: 'prom-1', promotorNombre: 'Martín González', quiereEntrevista: false, lista: 'contacto',   origen: 'manual',  fechaObtencion: '2026-03-18', seguimiento: { fuente: 'app',       canal: 'llamada', huboEntrevista: true, resultadoEntrevista: 'sin_interes' } },
-  { id: 'lead-32', nombre: 'Belén Romero',     telefono: '3514 200006', promotorId: 'prom-2', promotorNombre: 'Ana Rodríguez',   quiereEntrevista: true,  lista: 'entrevista', origen: 'redes',   fechaObtencion: '2026-03-15', seguimiento: { fuente: 'facebook',  canal: 'mensaje', huboEntrevista: true, resultadoEntrevista: 'compro', idProducto: 'prod-terreno', estadoPago: 'cien', idBarrio: 'b5', numeroRecibo: '020303', brindoReferidos: false } },
+  { id: 'lead-32', nombre: 'Belén Romero',     telefono: '3514 200006', promotorId: 'prom-2', promotorNombre: 'Ana Rodríguez',   quiereEntrevista: true,  lista: 'entrevista', origen: 'redes',   fechaObtencion: '2026-03-15', seguimiento: { fuente: 'facebook',  canal: 'mensaje', huboEntrevista: true, resultadoEntrevista: 'compro', idProducto: 'prod-terreno', estadoPago: 'cien', idBarrio: 'b4', numeroRecibo: '020303', brindoReferidos: false } },
   { id: 'lead-33', nombre: 'Julián Villalba',  telefono: '3518 200007', promotorId: 'prom-3', promotorNombre: 'Carlos López',    quiereEntrevista: false, lista: 'contacto',   origen: 'sorteo',  fechaObtencion: '2026-03-12', seguimiento: { fuente: 'qr',        canal: 'llamada', huboEntrevista: false } },
   { id: 'lead-34', nombre: 'Sabrina Ponce',    telefono: '3519 200008', promotorId: 'prom-4', promotorNombre: 'Laura Fernández', quiereEntrevista: true,  lista: 'entrevista', origen: 'redes',   fechaObtencion: '2026-03-08', seguimiento: { fuente: 'instagram', canal: 'llamada', huboEntrevista: true, resultadoEntrevista: 'compro', idProducto: 'prod-pij', estadoPago: 'entrega_55', numeroRecibo: '020404', brindoReferidos: true, referidos: [{ nombre: 'Marcos Ponce', telefono: '3512 200077' }] } },
 

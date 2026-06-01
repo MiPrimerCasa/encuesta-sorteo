@@ -18,9 +18,10 @@ export const seguimientoSchema = z
     canal: z.enum(['llamada', 'mensaje']).nullable().optional(),
     huboEntrevista: z.boolean().nullable().optional(),
     resultadoEntrevista: z
-      .enum(['sin_interes', 'reagenda', 'no_compro', 'compro'])
+      .enum(['sin_interes', 'reagenda', 'no_compro', 'compro', 'derivar_terreno'])
       .nullable()
       .optional(),
+    horarioEntrevistaPropuesto: z.string().nullable().optional(),
     fechaReagenda: z.string().nullable().optional(),
     idProducto: z.string().nullable().optional(),
     estadoPago: z.enum(['sena', 'cien', 'entrega_33', 'entrega_55']).nullable().optional(),
@@ -38,6 +39,8 @@ export const seguimientoSchema = z
         path: ['fechaReagenda'],
       });
     }
+
+    if (data.resultadoEntrevista === 'derivar_terreno') return;
 
     if (data.resultadoEntrevista !== 'compro') return;
 

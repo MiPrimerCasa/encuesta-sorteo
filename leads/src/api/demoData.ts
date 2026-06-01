@@ -1,4 +1,5 @@
 import { origenIngresoToFuente, origenIngresoToOrigenLead } from '../domain/fuenteLabels';
+import { applySeguimientoAlLead } from '../domain/leads';
 import type {
   Barrio,
   Lead,
@@ -499,10 +500,7 @@ export function getDemoLeads(): Lead[] {
 export function updateDemoLead(leadId: string, seguimiento: SeguimientoLead): Lead {
   const lead = demoLeads.find((l) => l.id === leadId);
   if (!lead) throw new Error('Lead no encontrado en demo');
-  const updated: Lead = {
-    ...lead,
-    seguimiento: { ...lead.seguimiento, ...seguimiento },
-  };
+  const updated = applySeguimientoAlLead(lead, seguimiento);
   demoLeads = demoLeads.map((l) => (l.id === leadId ? updated : l));
   return { ...updated };
 }

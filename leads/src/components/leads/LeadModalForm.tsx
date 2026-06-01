@@ -41,11 +41,17 @@ interface FormState {
   brindoReferidos: boolean | null;
   referidos: Referido[];
   observaciones: string;
+  /** Promotor — derivar terreno: ¿el cliente propuso fecha? */
+  proponeFechaDerivacion: boolean | null;
+  horarioDerivacion: string;
 }
 
 function buildInitialForm(lead: Lead | null): FormState {
   const s = lead?.seguimiento ?? {};
   const reagenda = s.resultadoEntrevista === 'reagenda';
+  const derivar = s.resultadoEntrevista === 'derivar_terreno';
+  const horarioDeriv =
+    s.horarioEntrevistaPropuesto?.trim() || lead?.horarioEntrevista?.trim() || '';
   let estadoPago = s.estadoPago ?? null;
   if (esPlanInversion(s.idProducto) && estadoPago === 'cien') {
     estadoPago = 'entrega_33';
@@ -64,6 +70,8 @@ function buildInitialForm(lead: Lead | null): FormState {
     brindoReferidos: s.brindoReferidos ?? null,
     referidos: s.referidos?.length ? [...s.referidos] : [emptyReferido()],
     observaciones: s.observaciones ?? '',
+    proponeFechaDerivacion: derivar ? (horarioDeriv ? true : false) : null,
+    horarioDerivacion: horarioDeriv,
   };
 }
 
@@ -170,10 +178,14 @@ export function LeadModalForm({
         huboEntrevista: true,
         reagendarEntrevista: false,
         resultadoEntrevista:
-          form.resultadoEntrevista === 'reagenda' || form.resultadoEntrevista === 'sin_interes'
+          form.resultadoEntrevista === 'reagenda' ||
+          form.resultadoEntrevista === 'sin_interes' ||
+          form.resultadoEntrevista === 'derivar_terreno'
             ? null
             : form.resultadoEntrevista,
         fechaReagenda: '',
+        proponeFechaDerivacion: null,
+        horarioDerivacion: '',
       });
     } else {
       patch({
@@ -188,6 +200,11 @@ export function LeadModalForm({
 
     const esReagenda = form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda';
     if (esReagenda && !form.fechaReagenda) return;
+
+    if (form.resultadoEntrevista === 'derivar_terreno') {
+      if (form.proponeFechaDerivacion === null) return;
+      if (form.proponeFechaDerivacion && !form.horarioDerivacion.trim()) return;
+    }
 
     if (form.resultadoEntrevista === 'compro') {
       if (!form.idProducto) {
@@ -244,6 +261,10 @@ export function LeadModalForm({
             ? 'reagenda'
             : form.resultadoEntrevista,
       fechaReagenda: esReagenda ? form.fechaReagenda || null : null,
+      horarioEntrevistaPropuesto:
+        form.resultadoEntrevista === 'derivar_terreno' && form.proponeFechaDerivacion
+          ? form.horarioDerivacion.trim()
+          : null,
       idProducto: form.resultadoEntrevista === 'compro' ? form.idProducto : null,
       estadoPago: form.resultadoEntrevista === 'compro' ? form.estadoPago : null,
       idBarrio:
@@ -296,13 +317,20 @@ export function LeadModalForm({
   const showCanalTrasNoConfirmo = eligioMotivoNoConfirmo;
 
   const showCompro = form.resultadoEntrevista === 'compro';
+  const showDerivarTerreno =
+    esFlujoCampo && form.resultadoEntrevista === 'derivar_terreno';
+  const showAgendarDerivacion =
+    showDerivarTerreno && form.proponeFechaDerivacion === true;
 
   const flujoCampoCompleto =
     esFlujoCampo &&
     form.huboEntrevista !== null &&
     (form.huboEntrevista === false
       ? form.resultadoEntrevista != null
-      : form.resultadoEntrevista != null);
+      : form.resultadoEntrevista === 'derivar_terreno'
+        ? form.proponeFechaDerivacion !== null &&
+          (form.proponeFechaDerivacion === false || Boolean(form.horarioDerivacion.trim()))
+        : form.resultadoEntrevista != null);
 
   const showReferidosObs =
     flujoCampoCompleto ||
@@ -317,6 +345,10 @@ export function LeadModalForm({
   const productoEsTerreno = esTerreno(form.idProducto);
   const opcionesPago = opcionesPagoParaRol(rol, form.idProducto);
   const labelsEntrevista = etiquetasResultadoEntrevista(rol);
+  const labelDerivarTerreno =
+    'derivarTerreno' in labelsEntrevista
+      ? labelsEntrevista.derivarTerreno
+      : null;
   const muestraRecibo = requiereNumeroRecibo(form.idProducto, form.estadoPago);
   const showReferidos = showReferidosObs && form.brindoReferidos === true;
 
@@ -474,7 +506,12 @@ export function LeadModalForm({
                     label={labelsEntrevista.noCompro}
                     checked={form.resultadoEntrevista === 'no_compro'}
                     onChange={() =>
-                      patch({ resultadoEntrevista: 'no_compro', ...resetCamposVenta() })
+                      patch({
+                        resultadoEntrevista: 'no_compro',
+                        proponeFechaDerivacion: null,
+                        horarioDerivacion: '',
+                        ...resetCamposVenta(),
+                      })
                     }
                   />
                   <RadioOption
@@ -492,10 +529,66 @@ export function LeadModalForm({
                           : productosDisponibles[0]?.id ?? '';
                       patch({
                         resultadoEntrevista: 'compro',
+                        proponeFechaDerivacion: null,
+                        horarioDerivacion: '',
                         idProducto: form.idProducto || defaultProducto,
                       });
                     }}
                   />
+                  {labelDerivarTerreno && (
+                    <RadioOption
+                      name="conEntrevista"
+                      value="derivar_terreno"
+                      label={labelDerivarTerreno}
+                      checked={form.resultadoEntrevista === 'derivar_terreno'}
+                      onChange={() =>
+                        patch({
+                          resultadoEntrevista: 'derivar_terreno',
+                          proponeFechaDerivacion: null,
+                          horarioDerivacion: '',
+                          ...resetCamposVenta(),
+                        })
+                      }
+                    />
+                  )}
+
+                  {showDerivarTerreno && (
+                    <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50 p-4">
+                      <ButtonGroup
+                        name="proponeFechaDerivacion"
+                        label="¿El cliente propuso fecha para la entrevista?"
+                        options={[
+                          { value: true, label: 'Sí' },
+                          { value: false, label: 'No' },
+                        ]}
+                        value={form.proponeFechaDerivacion}
+                        onChange={(v) =>
+                          patch({
+                            proponeFechaDerivacion: v,
+                            horarioDerivacion: v ? form.horarioDerivacion : '',
+                          })
+                        }
+                      />
+                      {showAgendarDerivacion && (
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                            Fecha y hora de entrevista
+                          </p>
+                          <DateTimePicker
+                            value={form.horarioDerivacion}
+                            onChange={(v) => patch({ horarioDerivacion: v })}
+                            autoOpen={!form.horarioDerivacion}
+                            required
+                          />
+                        </div>
+                      )}
+                      {form.proponeFechaDerivacion === false && (
+                        <p className="text-[12px] leading-relaxed text-brand-800">
+                          Sin fecha agendada: el supervisor hará el seguimiento del lead.
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   {showCompro && (
                     <div className="space-y-5 rounded-xl border border-brand-100 bg-brand-50 p-4">

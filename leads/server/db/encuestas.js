@@ -547,18 +547,42 @@ export function buildPromotoresParaCarga(usuarioSesion, leads, encuestaRows = []
   return prependSupervisorComoPromotor(base, usuarioSesion, encuestaRows);
 }
 
+function applyDerivacionTerrenoAlLead(lead, seguimiento) {
+  if (seguimiento?.resultadoEntrevista !== 'derivar_terreno') {
+    return lead;
+  }
+  const horario = seguimiento.horarioEntrevistaPropuesto?.trim();
+  if (horario) {
+    return {
+      ...lead,
+      horarioEntrevista: horario,
+      quiereEntrevista: true,
+      lista: 'entrevista',
+      seguimiento: { ...lead.seguimiento, ...seguimiento, fechaReagenda: null },
+    };
+  }
+  const { horarioEntrevista: _h, ...rest } = lead;
+  return {
+    ...rest,
+    quiereEntrevista: false,
+    lista: 'contacto',
+    seguimiento: { ...lead.seguimiento, ...seguimiento, horarioEntrevistaPropuesto: null },
+  };
+}
+
 function enrichLeadParaCliente(lead) {
-  let horarioEntrevista = lead.horarioEntrevista;
+  let next = lead;
+  let horarioEntrevista = next.horarioEntrevista;
   if (
     !horarioEntrevista &&
-    lead.lista === 'entrevista' &&
-    lead.fechaAlta &&
-    !String(lead.fechaAlta).endsWith('T09:00:00')
+    next.lista === 'entrevista' &&
+    next.fechaAlta &&
+    !String(next.fechaAlta).endsWith('T09:00:00')
   ) {
-    horarioEntrevista = lead.fechaAlta;
+    horarioEntrevista = next.fechaAlta;
+    next = { ...next, horarioEntrevista };
   }
-  if (horarioEntrevista === lead.horarioEntrevista) return lead;
-  return { ...lead, horarioEntrevista };
+  return applyDerivacionTerrenoAlLead(next, next.seguimiento ?? {});
 }
 
 export async function listLeadsFromEncuestas(usuario) {
@@ -599,5 +623,6 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
   });
   if (!row) return null;
   const merged = upsertSeguimientoExterno(leadId, seguimiento, usuarioId);
-  return mapEncuestaRowToLead(row, { [leadId]: merged });
+  const base = mapEncuestaRowToLead(row, { [leadId]: merged });
+  return applyDerivacionTerrenoAlLead(base, merged);
 }

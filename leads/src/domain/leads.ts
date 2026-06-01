@@ -1,4 +1,4 @@
-import type { Lead, LugarEntrevista, Producto, Promotor, RolUsuario } from '../types';
+import type { Lead, LugarEntrevista, Producto, Promotor, RolUsuario, SeguimientoLead } from '../types';
 
 /** Lista única de promotores a partir de los leads ya cargados (evita 2.º SP en supervisor). */
 export function buildPromotoresFromLeads(leads: Lead[]): Promotor[] {
@@ -20,6 +20,37 @@ export function leadCompro(lead: Lead) {
 
 export function leadReagendaEntrevista(lead: Lead) {
   return lead.seguimiento?.resultadoEntrevista === 'reagenda';
+}
+
+export function leadDerivaSupervisorTerreno(lead: Lead) {
+  return lead.seguimiento?.resultadoEntrevista === 'derivar_terreno';
+}
+
+/** Aplica patch de seguimiento y campos de lead (p. ej. derivación a supervisor). */
+export function applySeguimientoAlLead(lead: Lead, patch: SeguimientoLead): Lead {
+  const seguimiento = { ...lead.seguimiento, ...patch };
+  let next: Lead = { ...lead, seguimiento };
+
+  if (seguimiento.resultadoEntrevista !== 'derivar_terreno') {
+    return next;
+  }
+
+  const horario = seguimiento.horarioEntrevistaPropuesto?.trim();
+  if (horario) {
+    return {
+      ...next,
+      horarioEntrevista: horario,
+      quiereEntrevista: true,
+      lista: 'entrevista',
+    };
+  }
+
+  const { horarioEntrevista: _omit, ...sinHorario } = next;
+  return {
+    ...sinHorario,
+    quiereEntrevista: false,
+    lista: 'contacto',
+  };
 }
 
 export function esCerradoNegativoLead(lead: Lead) {

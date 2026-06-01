@@ -6,7 +6,12 @@ export type LugarEntrevista = 'sucursal' | 'domicilio';
 export type OrigenLead = 'encuesta' | 'sorteo' | 'manual' | 'redes';
 export type FuenteLead = 'qr' | 'app' | 'facebook' | 'instagram';
 export type CanalContacto = 'llamada' | 'mensaje';
-export type ResultadoEntrevista = 'sin_interes' | 'reagenda' | 'no_compro' | 'compro';
+export type ResultadoEntrevista =
+  | 'sin_interes'
+  | 'reagenda'
+  | 'no_compro'
+  | 'compro'
+  | 'derivar_terreno';
 /** sena/cien = terreno; entrega_33/entrega_55 = plan inversión */
 export type EstadoPago = 'sena' | 'cien' | 'entrega_33' | 'entrega_55';
 
@@ -75,6 +80,8 @@ export interface SeguimientoLead {
   canal?: CanalContacto | null;
   huboEntrevista?: boolean | null;
   resultadoEntrevista?: ResultadoEntrevista | null;
+  /** Si resultado = derivar_terreno y el cliente propuso fecha (supervisor / calendario). */
+  horarioEntrevistaPropuesto?: string | null;
   fechaReagenda?: string | null;
   idProducto?: string | null;
   estadoPago?: EstadoPago | null;

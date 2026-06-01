@@ -52,8 +52,15 @@ export function opcionesPagoParaRol(
   return [];
 }
 
-export function etiquetasResultadoEntrevista(_rol?: RolUsuario) {
-  return { compro: 'SI COMPRO', noCompro: 'NO COMPRO' };
+export function etiquetasResultadoEntrevista(rol?: RolUsuario) {
+  const base = { compro: 'SI COMPRO', noCompro: 'NO COMPRO' };
+  if (rol === 'promotor') {
+    return {
+      ...base,
+      derivarTerreno: 'Derivar con supervisor — interés terreno',
+    };
+  }
+  return base;
 }
 
 export function etiquetaEstadoPagoVisible(

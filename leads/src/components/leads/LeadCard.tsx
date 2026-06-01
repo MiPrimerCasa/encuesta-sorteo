@@ -2,6 +2,7 @@ import {
   getProductoNombre,
   getPromotorNombre,
   leadCompro,
+  leadDerivaSupervisorTerreno,
   leadEnEntrevistaPendiente,
   leadReagendaEntrevista,
 } from '../../domain/leads';
@@ -38,6 +39,7 @@ export function LeadCard({
 }: LeadCardProps) {
   const compro = leadCompro(lead);
   const reagenda = leadReagendaEntrevista(lead);
+  const derivaTerreno = leadDerivaSupervisorTerreno(lead);
   const productoNombre = getProductoNombre(lead.seguimiento?.idProducto, productos);
   const detallePago = etiquetaPagoProducto(
     lead.seguimiento?.idProducto,
@@ -87,7 +89,10 @@ export function LeadCard({
             {esSeguimiento && !esArchivo && (
               <StatusPill variant="reagendado" dot>En seguimiento</StatusPill>
             )}
-            {esContactado && (
+            {esContactado && derivaTerreno && (
+              <StatusPill variant="pending" dot>Interés terreno</StatusPill>
+            )}
+            {esContactado && !derivaTerreno && (
               <StatusPill variant="contactado" dot>Contactado</StatusPill>
             )}
             {!esArchivo && !esSeguimiento && !tieneSeguimiento && !reagenda && (

@@ -105,7 +105,7 @@ function EntrevistaSelector({
       celdas.push({
         dia: d,
         fecha: toValorFecha(fecha),
-        pasado: fecha <= hoy,
+        pasado: fecha < hoy,
         esDomingo: fecha.getDay() === 0,
       });
     }

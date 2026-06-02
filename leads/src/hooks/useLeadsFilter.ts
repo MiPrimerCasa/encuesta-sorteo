@@ -38,9 +38,10 @@ function esCerradoNegativo(l: Lead) {
  */
 export function useLeadsFilter(leads: Lead[]) {
   return useMemo(() => {
+    // Solo las compras cierran el lead; los negativos pasan a Contactado.
     const compraron = fifoSort(leads.filter(leadCompro));
     const noCompraron = fifoSort(leads.filter(esCerradoNegativo));
-    const cerrados = new Set([...compraron, ...noCompraron].map((l) => l.id));
+    const cerrados = new Set(compraron.map((l) => l.id));
 
     const seguimiento = sortSeguimientoPorFechaReagenda(
       leads.filter((l) => !cerrados.has(l.id) && leadReagendaEntrevista(l)),
@@ -51,9 +52,10 @@ export function useLeadsFilter(leads: Lead[]) {
       activos.filter((l) => perteneceTabInicial(l)),
     );
 
+    // Contactado: contactados pendientes + resultados negativos (no compró / sin interés).
     const paraContactar = fifoSort(
       activos.filter(
-        (l) => fueContactadoLead(l) && !perteneceTabInicial(l),
+        (l) => (fueContactadoLead(l) || esCerradoNegativo(l)) && !perteneceTabInicial(l),
       ),
     );
 

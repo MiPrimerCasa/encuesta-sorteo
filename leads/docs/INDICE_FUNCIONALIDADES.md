@@ -17,6 +17,7 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | Badge de campaña / sorteo en tarjetas | [FUNCIONALIDAD_BADGE_CAMPANIA.md](./FUNCIONALIDAD_BADGE_CAMPANIA.md) | Ambos | `encuestas.js`, `campania.ts`, `LeadCard.tsx` |
 | Duplicado carga manual (teléfono + encuesta) | [FUNCIONALIDAD_DUPLICADO_CARGA_MANUAL.md](./FUNCIONALIDAD_DUPLICADO_CARGA_MANUAL.md) | Ambos | `encuesta-carga.js` |
 | Seguimiento PIJ tras «No compró» + reagenda | [FUNCIONALIDAD_SEGUIMIENTO_PIJ_REAGENDA.md](./FUNCIONALIDAD_SEGUIMIENTO_PIJ_REAGENDA.md) | Promotor (acción), supervisor (solo lectura) | `LeadModalForm.tsx`, `leads.ts`, `LeadCard.tsx` |
+| No compró / sin interés → Contactado (no Cierres) | [FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md](./FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md) | Ambos | `useLeadsFilter.ts`, `leads.ts`, `LeadsPanel.tsx` |
 | Derivar terreno (promotor → supervisor) | [FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md](./FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md) | Promotor, supervisor | `LeadModalForm.tsx`, `prioridad-leads.ts` |
 | Calendario supervisor | [FUNCIONALIDAD_CALENDARIO_SUPERVISOR.md](./FUNCIONALIDAD_CALENDARIO_SUPERVISOR.md) | Supervisor | `CalendarioView.tsx`, `NavBar.tsx` |
 | Multisorteo / participantes | [SORTEOS_Y_PARTICIPANTES.md](./SORTEOS_Y_PARTICIPANTES.md) | Ambos | `encuesta-carga.js`, SP |

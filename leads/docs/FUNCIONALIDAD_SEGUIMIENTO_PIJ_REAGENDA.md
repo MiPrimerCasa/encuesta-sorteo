@@ -11,7 +11,7 @@ Cuando el promotor registró entrevista, eligió **No compró** y **reagendar** 
 
 | Actor | Acción | Persistencia | Pestaña |
 |-------|--------|--------------|---------|
-| Promotor | No compró + **No** reagendar | `resultadoEntrevista: no_compro` | Cierres → No compró |
+| Promotor | No compró + **No** reagendar | `resultadoEntrevista: no_compro` | Contactado (ver [FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md](./FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md)) |
 | Promotor | No compró + **Sí** reagendar + fecha | `resultadoEntrevista: reagenda`, `seguimientoPijPromotor: true`, `fechaReagenda`, `huboEntrevista: true` | En seguimiento |
 | Supervisor | Clic en tarjeta / calendario | — | Bloqueado (solo lectura) |
 

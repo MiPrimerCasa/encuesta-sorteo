@@ -73,7 +73,9 @@ export function esCerradoNegativoLead(lead: Lead) {
 
 /** Pestaña de Leads donde corresponde listar el lead. */
 export function tabIdListaLead(lead: Lead): 'entrevista' | 'contacto' | 'seguimiento' | 'compro' {
-  if (leadCompro(lead) || esCerradoNegativoLead(lead)) return 'compro';
+  if (leadCompro(lead)) return 'compro';
+  // Resultados negativos (no compró / sin interés) → Contactado.
+  if (esCerradoNegativoLead(lead)) return 'contacto';
   if (leadReagendaEntrevista(lead)) return 'seguimiento';
   // Derivados y entrevistas pendientes van a la pestaña inicial (prioridad), no a Contactado.
   if (leadDerivaSupervisorTerreno(lead)) return 'entrevista';

@@ -20,7 +20,7 @@ import { LinksRedesSection } from './LinksRedesSection';
 import { PromotorResumen } from './PromotorResumen';
 import { SwipeableLeadCard } from './SwipeableLeadCard';
 
-type ListaKey = 'entrevistaPendiente' | 'paraContactar' | 'seguimiento' | 'compraron' | 'noCompraron';
+type ListaKey = 'entrevistaPendiente' | 'paraContactar' | 'seguimiento' | 'compraron';
 type VarianteCard = 'activo' | 'seguimiento' | 'compro';
 
 const TABS: Array<{
@@ -103,7 +103,6 @@ export function LeadsPanel({
     paraContactar,
     seguimiento,
     compraron,
-    noCompraron,
     encuestaSinContactar,
   } = useLeadsFilter(leads);
   const listas: Record<ListaKey, Lead[]> = {
@@ -111,7 +110,6 @@ export function LeadsPanel({
     paraContactar,
     seguimiento,
     compraron,
-    noCompraron,
   };
 
   const [tabActivo, setTabActivo] = useState('entrevista');
@@ -331,9 +329,7 @@ export function LeadsPanel({
           >
             {TABS.map((tab) => {
               const activo = tabActivo === tab.id;
-              const count = tab.key === 'compraron'
-                ? listas.compraron.length + listas.noCompraron.length
-                : listas[tab.key].length;
+              const count = listas[tab.key].length;
               return (
                 <button
                   key={tab.id}
@@ -410,34 +406,6 @@ export function LeadsPanel({
             </div>
           )}
         </>
-      )}
-
-      {/* Sub-sección "No compró" — solo dentro del tab Cierres */}
-      {tabActivo === 'compro' && !buscando && noCompraron.length > 0 && (
-        <div className="mt-6">
-          <div className="mb-4 flex items-baseline gap-2">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-              No compró
-            </h2>
-            <span className="text-[13px] tabular-nums text-zinc-400">{noCompraron.length}</span>
-          </div>
-          <div className="space-y-3">
-            {noCompraron.map((lead) => (
-              <LeadCard
-                key={lead.id}
-                lead={lead}
-                onClick={abrirLead}
-                variante="no-compro"
-                promotores={promotores}
-                productos={productos}
-                barrios={barrios}
-                nombreUsuario={nombreUsuario}
-                ocultarPromotor={esPromotor}
-                rolUsuario={rolUsuario}
-              />
-            ))}
-          </div>
-        </div>
       )}
 
       <LinksRedesSection className="mt-8" />

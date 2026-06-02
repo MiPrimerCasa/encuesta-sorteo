@@ -19,9 +19,9 @@ Dentro de cada grupo: **FIFO** por `fechaAlta` (o `fechaObtencion` si falta alta
 
 ## Qué NO va en esta pestaña
 
-- **Contactado** — Ya hubo contacto (`canal` o `huboEntrevista`) y no es derivación ni entrevista pendiente prioritaria.
+- **Contactado** — Ya hubo contacto (`canal` o `huboEntrevista`) y no es derivación ni entrevista pendiente prioritaria. **También** los resultados negativos `no_compro` y `sin_interes`.
 - **En seguimiento** — `resultadoEntrevista = 'reagenda'`.
-- **Cierres** — `compro`, `no_compro`, `sin_interes`.
+- **Cierres** — solo `compro` (compras de PIJ/terreno, incluyendo PIJ de promotores para control de calidad).
 
 Ver también: [SORTEOS_Y_PARTICIPANTES.md](./SORTEOS_Y_PARTICIPANTES.md) (mismo teléfono en sorteo01 y sorteo02).
 

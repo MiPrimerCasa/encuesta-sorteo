@@ -1,10 +1,13 @@
 import {
+  ETIQUETA_SEGUIMIENTO_PIJ,
   getProductoNombre,
   getPromotorNombre,
   leadCompro,
   leadDerivaSupervisorTerreno,
   leadEnEntrevistaPendiente,
   leadReagendaEntrevista,
+  leadSeguimientoPijPromotor,
+  leadSoloLecturaSupervisor,
 } from '../../domain/leads';
 import { etiquetaCortaNumeroDocumentoVenta, etiquetaPagoProducto } from '../../domain/venta';
 import { etiquetaCampania } from '../../domain/campania';
@@ -63,14 +66,16 @@ export function LeadCard({
     !esNoCompro &&
     (leadEnEntrevistaPendiente(lead) || reagenda);
   const etiquetaSorteo = etiquetaCampania(lead.codigoCampania);
+  const seguimientoPij = leadSeguimientoPijPromotor(lead);
+  const soloLectura =
+    rolUsuario === 'supervisor' && leadSoloLecturaSupervisor(lead);
+  const nombrePromotor =
+    lead.promotorNombre ?? getPromotorNombre(lead.promotorId, promotores);
 
-  return (
-    <div className="relative">
-      <button
-        type="button"
-        onClick={() => onClick(lead)}
-        style={{ touchAction: 'manipulation' }}
-        className={`w-full rounded-xl border p-4 pb-14 text-left transition-[background,border-color,transform] duration-[140ms] ease-out active:scale-[0.995] md:p-5 md:pb-14 ${
+  const cardClassName = `w-full rounded-xl border p-4 pb-14 text-left md:p-5 md:pb-14 ${
+    soloLectura
+      ? 'cursor-default border-indigo-200 bg-indigo-50/80'
+      : `transition-[background,border-color,transform] duration-[140ms] ease-out active:scale-[0.995] ${
           esNoCompro
             ? 'border-red-500 bg-zinc-900 active:bg-zinc-800 active:border-red-400 [&:not(:active)]:hover:border-red-400 [&:not(:active)]:hover:shadow-sm'
             : esArchivo
@@ -82,8 +87,11 @@ export function LeadCard({
                 : esNuevo
                   ? 'border-[#99F6E4] bg-[#F0FDFA] active:bg-[#CCFBF1] active:border-[#5EEAD4] [&:not(:active)]:hover:border-[#5EEAD4] [&:not(:active)]:hover:shadow-sm'
                   : 'border-zinc-200 bg-white active:bg-brand-50 active:border-brand-200 [&:not(:active)]:hover:border-zinc-300 [&:not(:active)]:hover:shadow-sm'
-        }`}
-      >
+        }`
+  }`;
+
+  const cardInner = (
+    <>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className={`text-[15px] font-semibold leading-snug ${esNoCompro ? 'text-white' : 'text-zinc-900'}`}>
@@ -99,6 +107,18 @@ export function LeadCard({
               >
                 {etiquetaSorteo}
               </span>
+            )}
+            {seguimientoPij && (
+              <div className="mt-2 space-y-1">
+                <span className="inline-flex items-center rounded-md border border-indigo-300 bg-indigo-100 px-2 py-1 text-[11px] font-semibold leading-snug text-indigo-900">
+                  {ETIQUETA_SEGUIMIENTO_PIJ}
+                </span>
+                {rolUsuario === 'supervisor' && (
+                  <p className="text-[12px] font-medium text-indigo-800/90">
+                    Promotor: {nombrePromotor}
+                  </p>
+                )}
+              </div>
             )}
           </div>
           <div className="shrink-0">
@@ -160,8 +180,33 @@ export function LeadCard({
           </div>
         )}
 
-        {mostrarAgendaEntrevista && <EntrevistaAgendaBadge lead={lead} />}
-      </button>
+        {mostrarAgendaEntrevista && (
+          <EntrevistaAgendaBadge
+            lead={lead}
+            titulo={
+              seguimientoPij ? 'Próximo contacto — Plan Inversión Joven' : undefined
+            }
+          />
+        )}
+    </>
+  );
+
+  return (
+    <div className="relative">
+      {soloLectura ? (
+        <div className={cardClassName} aria-label={`${lead.nombre} — solo lectura`}>
+          {cardInner}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => onClick(lead)}
+          style={{ touchAction: 'manipulation' }}
+          className={cardClassName}
+        >
+          {cardInner}
+        </button>
+      )}
 
       {/* Badge fuente — bottom-left */}
       {lead.seguimiento?.fuente && (

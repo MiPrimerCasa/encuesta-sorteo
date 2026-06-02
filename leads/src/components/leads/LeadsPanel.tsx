@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { leadCompro, leadReagendaEntrevista, tabIdListaLead } from '../../domain/leads';
+import {
+  leadCompro,
+  leadReagendaEntrevista,
+  leadSoloLecturaSupervisor,
+  tabIdListaLead,
+} from '../../domain/leads';
 import {
   ETIQUETA_PRIORIDAD_TAB_INICIAL,
   agruparPorPrioridadTabInicial,
@@ -142,6 +147,7 @@ export function LeadsPanel({
   }
 
   const abrirLead = (lead: Lead) => {
+    if (rolUsuario === 'supervisor' && leadSoloLecturaSupervisor(lead)) return;
     setLeadSeleccionado(lead);
     setModalAbierto(true);
   };
@@ -152,6 +158,10 @@ export function LeadsPanel({
     if (lead) {
       setTabActivo(tabIdListaLead(lead));
       setBusqueda('');
+      if (rolUsuario === 'supervisor' && leadSoloLecturaSupervisor(lead)) {
+        onLeadSeguimientoConsumido?.();
+        return;
+      }
       setLeadSeleccionado(lead);
       setModalAbierto(true);
     }
@@ -439,7 +449,12 @@ export function LeadsPanel({
         productos={productos}
         barrios={barrios}
         onClose={cerrarModal}
-        onSave={async (leadId, seg) => { await onActualizarLead(leadId, seg); }}
+        onSave={async (leadId, seg) => {
+          await onActualizarLead(leadId, seg);
+          if (esPromotor && seg.resultadoEntrevista === 'reagenda') {
+            setTabActivo('seguimiento');
+          }
+        }}
       />
 
       <NuevoLeadSheet

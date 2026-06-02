@@ -34,6 +34,8 @@ interface FormState {
   resultadoEntrevista: SeguimientoLead['resultadoEntrevista'];
   fechaReagenda: string;
   reagendarEntrevista: boolean;
+  /** Promotor: tras «No compró», ¿reagendar para ofrecer PIJ? */
+  reagendaPijTrasNoCompro: boolean | null;
   idProducto: string;
   estadoPago: SeguimientoLead['estadoPago'];
   idBarrio: string;
@@ -49,6 +51,7 @@ interface FormState {
 function buildInitialForm(lead: Lead | null): FormState {
   const s = lead?.seguimiento ?? {};
   const reagenda = s.resultadoEntrevista === 'reagenda';
+  const seguimientoPij = s.seguimientoPijPromotor === true;
   const derivar = s.resultadoEntrevista === 'derivar_terreno';
   const horarioDeriv =
     s.horarioEntrevistaPropuesto?.trim() || lead?.horarioEntrevista?.trim() || '';
@@ -60,9 +63,10 @@ function buildInitialForm(lead: Lead | null): FormState {
     confirmoEntrevista: s.confirmoEntrevista ?? null,
     canal: s.canal ?? null,
     huboEntrevista: s.huboEntrevista ?? null,
-    resultadoEntrevista: s.resultadoEntrevista ?? null,
+    resultadoEntrevista: seguimientoPij ? 'no_compro' : (s.resultadoEntrevista ?? null),
     fechaReagenda: s.fechaReagenda ?? '',
-    reagendarEntrevista: reagenda,
+    reagendarEntrevista: reagenda && !seguimientoPij,
+    reagendaPijTrasNoCompro: seguimientoPij ? true : null,
     idProducto: s.idProducto ?? '',
     estadoPago,
     idBarrio: s.idBarrio ?? '',
@@ -198,7 +202,15 @@ export function LeadModalForm({
   const handleGuardar = (e: FormEvent) => {
     e.preventDefault();
 
-    const esReagenda = form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda';
+    const esFlujoCampoGuardar = rol === 'promotor';
+    const esReagendaPijGuardar =
+      esFlujoCampoGuardar &&
+      form.resultadoEntrevista === 'no_compro' &&
+      form.reagendaPijTrasNoCompro === true;
+    const esReagenda =
+      form.reagendarEntrevista ||
+      form.resultadoEntrevista === 'reagenda' ||
+      esReagendaPijGuardar;
     if (esReagenda && !form.fechaReagenda) return;
 
     if (form.resultadoEntrevista === 'derivar_terreno') {
@@ -235,15 +247,21 @@ export function LeadModalForm({
     const confirmoNo = !esFlujoCampo && form.confirmoEntrevista === false;
     const esReagendaNoConfirmo =
       confirmoNo && (form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda');
+    const esReagendaPij =
+      esFlujoCampo &&
+      form.resultadoEntrevista === 'no_compro' &&
+      form.reagendaPijTrasNoCompro === true;
 
     const seguimiento: SeguimientoLead = {
       fuente: lead.seguimiento?.fuente,
       confirmoEntrevista: esFlujoCampo ? null : form.confirmoEntrevista,
       canal: esFlujoCampo ? null : form.canal,
       huboEntrevista: esFlujoCampo
-        ? esReagenda
-          ? false
-          : form.huboEntrevista
+        ? esReagendaPij
+          ? true
+          : esReagenda
+            ? false
+            : form.huboEntrevista
         : confirmoNo
           ? false
           : esReagenda
@@ -261,6 +279,7 @@ export function LeadModalForm({
             ? 'reagenda'
             : form.resultadoEntrevista,
       fechaReagenda: esReagenda ? form.fechaReagenda || null : null,
+      seguimientoPijPromotor: esReagendaPij,
       horarioEntrevistaPropuesto:
         form.resultadoEntrevista === 'derivar_terreno' && form.proponeFechaDerivacion
           ? form.horarioDerivacion.trim()
@@ -317,6 +336,10 @@ export function LeadModalForm({
   const showCanalTrasNoConfirmo = eligioMotivoNoConfirmo;
 
   const showCompro = form.resultadoEntrevista === 'compro';
+  const showReagendaPijTrasNoCompro =
+    esFlujoCampo && form.resultadoEntrevista === 'no_compro';
+  const showFechaReagendaPij =
+    showReagendaPijTrasNoCompro && form.reagendaPijTrasNoCompro === true;
   const showDerivarTerreno =
     esFlujoCampo && form.resultadoEntrevista === 'derivar_terreno';
   const showAgendarDerivacion =
@@ -330,7 +353,10 @@ export function LeadModalForm({
       : form.resultadoEntrevista === 'derivar_terreno'
         ? form.proponeFechaDerivacion !== null &&
           (form.proponeFechaDerivacion === false || Boolean(form.horarioDerivacion.trim()))
-        : form.resultadoEntrevista != null);
+        : form.resultadoEntrevista === 'no_compro'
+          ? form.reagendaPijTrasNoCompro !== null &&
+            (form.reagendaPijTrasNoCompro === false || Boolean(form.fechaReagenda.trim()))
+          : form.resultadoEntrevista != null);
 
   const showReferidosObs =
     flujoCampoCompleto ||
@@ -508,12 +534,55 @@ export function LeadModalForm({
                     onChange={() =>
                       patch({
                         resultadoEntrevista: 'no_compro',
+                        reagendaPijTrasNoCompro: null,
+                        reagendarEntrevista: false,
+                        fechaReagenda: '',
                         proponeFechaDerivacion: null,
                         horarioDerivacion: '',
                         ...resetCamposVenta(),
                       })
                     }
                   />
+                  {showReagendaPijTrasNoCompro && (
+                    <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50 p-4">
+                      <ButtonGroup
+                        name="reagendaPijTrasNoCompro"
+                        label="¿Reagendar para ofrecer nuevamente el Plan Inversión Joven?"
+                        options={[
+                          { value: true, label: 'Sí, reagendar' },
+                          { value: false, label: 'No, cerrar sin seguimiento' },
+                        ]}
+                        value={form.reagendaPijTrasNoCompro}
+                        onChange={(v) =>
+                          patch({
+                            reagendaPijTrasNoCompro: v,
+                            reagendarEntrevista: v,
+                            fechaReagenda: v ? form.fechaReagenda : '',
+                          })
+                        }
+                      />
+                      {showFechaReagendaPij && (
+                        <div className="space-y-1.5">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                            Nueva fecha y hora de contacto
+                          </p>
+                          <DateTimePicker
+                            value={form.fechaReagenda}
+                            onChange={(v) => patch({ fechaReagenda: v })}
+                            autoOpen={!form.fechaReagenda}
+                            required
+                          />
+                        </div>
+                      )}
+                      {showFechaReagendaPij && (
+                        <p className="text-[12px] leading-relaxed text-brand-800">
+                          Al guardar, el lead sale de Prioridad y queda en{' '}
+                          <span className="font-semibold">En seguimiento</span>, ordenado por esta
+                          fecha.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <RadioOption
                     name="conEntrevista"
                     value="compro"

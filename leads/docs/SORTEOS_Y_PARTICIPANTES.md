@@ -11,7 +11,7 @@ Respuesta corta: **depende de cómo esté modelado en SQL**, no de la prioridad 
 | Concepto | En SQL / SP | En la app |
 |----------|-------------|-----------|
 | **Participación (lead)** | Fila en `dbo.encuesta` con PK numérica `id` | `lead.id` (ej. `176`, `502`) |
-| **Campaña / sorteo** | Columna `encuesta` (ej. `sorteo01`, `sorteo02`) | Hoy no se muestra en UI; existe en el result set |
+| **Campaña / sorteo** | Columna `encuesta` (ej. `sorteo01`, `sorteo02`) | `lead.codigoCampania` + chip en tarjeta — ver [FUNCIONALIDAD_BADGE_CAMPANIA.md](./FUNCIONALIDAD_BADGE_CAMPANIA.md) |
 | **Teléfono del cliente** | `telefono` | Contacto WhatsApp |
 | **Código QR / promotor** | Columna `usuario` (ej. `SORTEO01S21P01`) | `encuestaUsuario` — **no** es el DNI del cliente |
 
@@ -64,6 +64,8 @@ Así un cliente puede estar en sorteo01 y sorteo02 sin conflicto.
 | Sorteo 01 | `sorteo01` |
 | Sorteo 02 | `sorteo02` |
 | Landing `?Encuesta=SORTEO02` | Mapear al mismo texto que guarda el SP |
+
+**Índice general:** [INDICE_FUNCIONALIDADES.md](./INDICE_FUNCIONALIDADES.md)
 
 La app de prioridad **no depende** del nombre del sorteo; solo necesita columnas estables (`id`, teléfono, horario, fecha alta).
 

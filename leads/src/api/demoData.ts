@@ -176,9 +176,10 @@ const BASE_LEADS: Lead[] = [
     seguimiento: {
       fuente: 'instagram',
       canal: 'llamada',
-      huboEntrevista: false,
+      huboEntrevista: true,
       resultadoEntrevista: 'reagenda',
       fechaReagenda: '2026-05-30T10:00',
+      seguimientoPijPromotor: true,
     },
   },
   {

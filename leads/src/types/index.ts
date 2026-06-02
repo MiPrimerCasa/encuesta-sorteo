@@ -83,6 +83,8 @@ export interface SeguimientoLead {
   /** Si resultado = derivar_terreno y el cliente propuso fecha (supervisor / calendario). */
   horarioEntrevistaPropuesto?: string | null;
   fechaReagenda?: string | null;
+  /** Promotor reagendó tras «No compró» para volver a ofrecer PIJ (supervisor solo lectura). */
+  seguimientoPijPromotor?: boolean | null;
   idProducto?: string | null;
   estadoPago?: EstadoPago | null;
   idBarrio?: string | null;

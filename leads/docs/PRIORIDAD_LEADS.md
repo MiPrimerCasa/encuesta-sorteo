@@ -1,7 +1,10 @@
 # Prioridad en la bandeja inicial de Leads
 
-La app **no ordena por número de sorteo ni por campaña**. Cada nuevo sorteo suma filas al mismo SP (`encuestasMuestraOperador`); la prioridad se calcula solo con **campos de negocio** que el DBA ya expone o que la app guarda en seguimiento local.
+**Índice general:** [INDICE_FUNCIONALIDADES.md](./INDICE_FUNCIONALIDADES.md)  
+**Roles:** promotor y supervisor  
+**Estado:** activo
 
+La app **no ordena por número de sorteo ni por campaña**. Cada nuevo sorteo suma filas al mismo SP (`encuestasMuestraOperador`); la prioridad se calcula solo con **campos de negocio** que el DBA ya expone o que la app guarda en seguimiento local.
 ## Pestaña «Prioridad» (antes «No contactados»)
 
 Tres grupos, en este orden:
@@ -38,9 +41,29 @@ Ver también: [SORTEOS_Y_PARTICIPANTES.md](./SORTEOS_Y_PARTICIPANTES.md) (mismo 
 | `horarioEntrevistaPropuesto` | Fecha si el promotor derivó con cita (supervisor + calendario) |
 | `canal`, `huboEntrevista` | Si pasó a «Contactado» |
 | `fechaReagenda` | Pestaña En seguimiento |
+| `seguimientoPijPromotor` | Reagenda del promotor tras «No compró» (PIJ); supervisor solo lectura |
 
-## Código
+## Reagenda PIJ tras «No compró» (promotor)
 
-- Reglas: `src/domain/prioridad-leads.ts`
-- Listas: `src/hooks/useLeadsFilter.ts`
-- UI agrupada: `src/components/leads/LeadsPanel.tsx`
+Si el promotor marca **No compró** y elige **reagendar** para volver a ofrecer Plan Inversión Joven:
+
+- `resultadoEntrevista` = `reagenda`, `seguimientoPijPromotor` = `true`, `fechaReagenda` obligatoria.
+- Sale de **Prioridad** y pasa a **En seguimiento**, ordenado por `fechaReagenda`.
+- El **supervisor** ve la tarjeta en En seguimiento con badge *Seguimiento por plan inversión joven*, texto *Promotor: [nombre]* y **sin poder abrir** el lead (solo lectura). En calendario tampoco puede reagendar ni cambiar estado.
+
+## Dónde está el cambio (mapa de código)
+
+| Capa | Archivo | Qué hace |
+|------|---------|----------|
+| Reglas prioridad 0/1/2 | `src/domain/prioridad-leads.ts` | `prioridadTabInicial`, `perteneceTabInicial`, `ordenarPorPrioridadTabInicial`, etiquetas de grupo |
+| Tab destino al abrir lead | `src/domain/leads.ts` → `tabIdListaLead` | Derivados y entrevista pendiente → pestaña `entrevista` (Prioridad) |
+| Listas excluyentes | `src/hooks/useLeadsFilter.ts` | `entrevistaPendiente`, `paraContactar`, `encuestaSinContactar` (alertas +2 días) |
+| UI pestaña y secciones | `src/components/leads/LeadsPanel.tsx` | Tab «Prioridad», `agruparPorPrioridadTabInicial`, banner informativo |
+| Alertas promotor | `src/components/leads/AlertasSinContactar.tsx` | Solo prioridad 2 (encuesta sin contactar) |
+| Tarjetas | `src/components/leads/LeadCard.tsx` / `SwipeableLeadCard.tsx` | Render por grupo |
+
+## Relacionado
+
+- [FUNCIONALIDAD_SEGUIMIENTO_PIJ_REAGENDA.md](./FUNCIONALIDAD_SEGUIMIENTO_PIJ_REAGENDA.md) — sale de Prioridad al reagendar PIJ
+- [FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md](./FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md) — grupo 0 en Prioridad
+- [SORTEOS_Y_PARTICIPANTES.md](./SORTEOS_Y_PARTICIPANTES.md)

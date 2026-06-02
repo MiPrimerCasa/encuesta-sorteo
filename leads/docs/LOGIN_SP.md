@@ -1,5 +1,7 @@
 # Login: `operadorAccesoCategoria` y pantallas
 
+**Índice general:** [INDICE_FUNCIONALIDADES.md](./INDICE_FUNCIONALIDADES.md)
+
 Guía para alinear con el DBA qué devuelve el SP y qué muestra la app.
 
 ## 1. Qué ejecuta la app

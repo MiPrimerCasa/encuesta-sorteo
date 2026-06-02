@@ -22,6 +22,19 @@ export function leadReagendaEntrevista(lead: Lead) {
   return lead.seguimiento?.resultadoEntrevista === 'reagenda';
 }
 
+export const ETIQUETA_SEGUIMIENTO_PIJ = 'Seguimiento por plan inversión joven';
+
+/** Reagenda activa del promotor tras no comprar PIJ (el supervisor no gestiona). */
+export function leadSeguimientoPijPromotor(lead: Lead) {
+  return (
+    leadReagendaEntrevista(lead) && lead.seguimiento?.seguimientoPijPromotor === true
+  );
+}
+
+export function leadSoloLecturaSupervisor(lead: Lead) {
+  return leadSeguimientoPijPromotor(lead);
+}
+
 export function leadDerivaSupervisorTerreno(lead: Lead) {
   return lead.seguimiento?.resultadoEntrevista === 'derivar_terreno';
 }

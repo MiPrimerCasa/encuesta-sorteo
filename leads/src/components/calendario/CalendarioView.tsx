@@ -14,6 +14,7 @@ import {
   prevMonthDate,
 } from '../../lib/calendar';
 
+import { leadSoloLecturaSupervisor } from '../../domain/leads';
 import { buildCalendarEvents, type CalendarEvent } from './calendar-types';
 import { CalendarGrid } from './CalendarGrid';
 import { DayEventsPanel } from './DayEventsPanel';
@@ -255,8 +256,18 @@ export function CalendarioView({
               </button>
             </div>
 
-            {eventoAbierto && (
+            {eventoAbierto && (() => {
+              const leadEvento = leads.find((l) => l.id === eventoAbierto.leadId);
+              const soloLecturaPij = leadEvento
+                ? leadSoloLecturaSupervisor(leadEvento)
+                : false;
+              return (
               <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5">
+                {soloLecturaPij && (
+                  <p className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-[13px] text-indigo-900">
+                    Seguimiento del promotor por Plan Inversión Joven. Solo lectura en calendario.
+                  </p>
+                )}
                 {/* Metadatos del evento */}
                 <dl className="mb-6 space-y-3 text-[14px]">
                   <div className="flex justify-between">
@@ -280,34 +291,37 @@ export function CalendarioView({
                 </dl>
 
                 {/* Acciones */}
-                <div className="space-y-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const ev = eventoAbierto;
-                      setEventoAbierto(null);
-                      setReagendaEvento(ev);
-                    }}
-                    style={{ touchAction: 'manipulation' }}
-                    className="h-[52px] w-full rounded-xl border border-zinc-200 bg-white text-[15px] font-semibold text-zinc-800 transition-all duration-[120ms] ease-out active:border-brand-200 active:bg-brand-50 active:text-brand-700"
-                  >
-                    Reagendar entrevista
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const leadId = eventoAbierto.leadId;
-                      setEventoAbierto(null);
-                      onAbrirSeguimientoLead(leadId);
-                    }}
-                    style={{ touchAction: 'manipulation' }}
-                    className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:bg-brand-800 active:scale-[0.98]"
-                  >
-                    Cambiar estado del lead
-                  </button>
-                </div>
+                {!soloLecturaPij && (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const ev = eventoAbierto;
+                        setEventoAbierto(null);
+                        setReagendaEvento(ev);
+                      }}
+                      style={{ touchAction: 'manipulation' }}
+                      className="h-[52px] w-full rounded-xl border border-zinc-200 bg-white text-[15px] font-semibold text-zinc-800 transition-all duration-[120ms] ease-out active:border-brand-200 active:bg-brand-50 active:text-brand-700"
+                    >
+                      Reagendar entrevista
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const leadId = eventoAbierto.leadId;
+                        setEventoAbierto(null);
+                        onAbrirSeguimientoLead(leadId);
+                      }}
+                      style={{ touchAction: 'manipulation' }}
+                      className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:bg-brand-800 active:scale-[0.98]"
+                    >
+                      Cambiar estado del lead
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
+              );
+            })()}
           </Drawer.Content>
         </Drawer.Portal>
       </Drawer.Root>

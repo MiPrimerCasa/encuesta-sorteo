@@ -5,6 +5,8 @@ App React mobile-first conectada **solo a la base de producción** (SQL Server S
 **Deploy:** monorepo recomendado con [encuesta-sorteo](https://github.com/MiPrimerCasa/encuesta-sorteo) → carpeta `leads/` — ver [docs/MONOREPO.md](docs/MONOREPO.md).  
 Alternativa repo aparte: [docs/DEPLOY_VPS.md](docs/DEPLOY_VPS.md).
 
+**Documentación por funcionalidad:** [docs/INDICE_FUNCIONALIDADES.md](docs/INDICE_FUNCIONALIDADES.md) (cada cambio lógico tiene su archivo en `docs/`; plantilla en [docs/PLANTILLA_FUNCIONALIDAD.md](docs/PLANTILLA_FUNCIONALIDAD.md)).
+
 ## Fuentes de datos
 
 | Dato | Origen |

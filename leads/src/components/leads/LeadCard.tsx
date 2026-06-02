@@ -7,6 +7,7 @@ import {
   leadReagendaEntrevista,
 } from '../../domain/leads';
 import { etiquetaCortaNumeroDocumentoVenta, etiquetaPagoProducto } from '../../domain/venta';
+import { etiquetaCampania } from '../../domain/campania';
 import { FUENTE_LABEL } from '../../domain/fuenteLabels';
 import type { Barrio, Lead, Producto, Promotor, RolUsuario } from '../../types';
 import { EntrevistaAgendaBadge } from './EntrevistaAgendaBadge';
@@ -61,6 +62,7 @@ export function LeadCard({
     !esArchivo &&
     !esNoCompro &&
     (leadEnEntrevistaPendiente(lead) || reagenda);
+  const etiquetaSorteo = etiquetaCampania(lead.codigoCampania);
 
   return (
     <div className="relative">
@@ -83,7 +85,22 @@ export function LeadCard({
         }`}
       >
         <div className="flex items-start justify-between gap-3">
-          <h3 className={`text-[15px] font-semibold leading-snug ${esNoCompro ? 'text-white' : 'text-zinc-900'}`}>{lead.nombre}</h3>
+          <div className="min-w-0">
+            <h3 className={`text-[15px] font-semibold leading-snug ${esNoCompro ? 'text-white' : 'text-zinc-900'}`}>
+              {lead.nombre}
+            </h3>
+            {etiquetaSorteo && (
+              <span
+                className={`mt-1.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                  esNoCompro
+                    ? 'border-violet-400/40 bg-violet-500/20 text-violet-100'
+                    : 'border-violet-200 bg-violet-50 text-violet-700'
+                }`}
+              >
+                {etiquetaSorteo}
+              </span>
+            )}
+          </div>
           <div className="shrink-0">
             {esArchivo && <StatusPill variant="compro" dot>Cierre</StatusPill>}
             {esSeguimiento && !esArchivo && (

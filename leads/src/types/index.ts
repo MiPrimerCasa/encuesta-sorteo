@@ -112,6 +112,8 @@ export interface Lead {
   origen?: OrigenLead;
   fechaObtencion: string;
   fechaAlta?: string;
+  /** Campaña / sorteo (`encuesta` en SQL: sorteo01, sorteo02, …). */
+  codigoCampania?: string;
   seguimiento: SeguimientoLead;
 }
 

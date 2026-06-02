@@ -62,6 +62,9 @@ export function esCerradoNegativoLead(lead: Lead) {
 export function tabIdListaLead(lead: Lead): 'entrevista' | 'contacto' | 'seguimiento' | 'compro' {
   if (leadCompro(lead) || esCerradoNegativoLead(lead)) return 'compro';
   if (leadReagendaEntrevista(lead)) return 'seguimiento';
+  // Derivados y entrevistas pendientes van a la pestaña inicial (prioridad), no a Contactado.
+  if (leadDerivaSupervisorTerreno(lead)) return 'entrevista';
+  if (leadEnEntrevistaPendiente(lead)) return 'entrevista';
   if (lead.seguimiento?.canal != null || lead.seguimiento?.huboEntrevista != null) return 'contacto';
   return 'entrevista';
 }

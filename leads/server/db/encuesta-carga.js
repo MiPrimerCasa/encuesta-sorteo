@@ -72,7 +72,7 @@ function includeOrigenParam() {
     .toLowerCase() !== 'false';
 }
 
-function getEncuestaCampaniaId() {
+export function getEncuestaCampaniaId() {
   const raw = process.env.ENCUESTA_CARGA_ID || process.env.ENCUESTA_ID || 'sorteo01';
   return normalizarEncuestaCargaId(raw);
 }
@@ -282,12 +282,22 @@ export async function crearEncuestaManual(payload, usuarioSesion, opciones = {})
   const context = await resolveCargaEncuestaContext(usuarioSesion);
   const cargaParams = buildCargaParamsFromPayload(payload, usuarioSesion, context);
 
+  const leadsPrevios = await listLeadsFromEncuestas(usuarioSesion);
+  if (telefonoYaEnCampania(leadsPrevios, payload.telefono, cargaParams.encuesta)) {
+    throw new ContactoYaRegistradoError();
+  }
+
   await execEncuestaCargaSorteo01(cargaParams);
 
   const leads = await listLeadsFromEncuestas(usuarioSesion);
   const telObjetivo = digitsTelefono(payload.telefono);
+  const encCarga = cargaParams.encuesta;
   const lead =
-    leads.find((l) => digitsTelefono(l.telefono) === telObjetivo) ??
+    leads.find(
+      (l) =>
+        digitsTelefono(l.telefono) === telObjetivo &&
+        normalizarEncuestaCargaId(l.codigoCampania || encCarga) === encCarga,
+    ) ??
     leads.find((l) => normalizeNombre(l.nombre) === normalizeNombre(payload.nombre));
 
   if (lead) return lead;
@@ -297,11 +307,23 @@ export async function crearEncuestaManual(payload, usuarioSesion, opciones = {})
   );
 }
 
-/** Pre-chequeo opcional por teléfono en el listado actual. */
-export function telefonoYaEnListado(leads, telefono) {
+/** Duplicado = mismo teléfono en la misma campaña (`encuesta`). */
+export function telefonoYaEnCampania(leads, telefono, encuesta) {
   const d = digitsTelefono(telefono);
-  if (!d) return false;
-  return leads.some((l) => digitsTelefono(l.telefono) === d);
+  const enc = normalizarEncuestaCargaId(encuesta);
+  if (!d || !enc) return false;
+  return leads.some((l) => {
+    if (digitsTelefono(l.telefono) !== d) return false;
+    const encLead = l.codigoCampania
+      ? normalizarEncuestaCargaId(l.codigoCampania)
+      : normalizarEncuestaCargaId('sorteo01');
+    return encLead === enc;
+  });
+}
+
+/** @deprecated Usar telefonoYaEnCampania con getEncuestaCampaniaId(). */
+export function telefonoYaEnListado(leads, telefono) {
+  return telefonoYaEnCampania(leads, telefono, getEncuestaCampaniaId());
 }
 
 export { MSG_CONTACTO_YA_REGISTRADO };

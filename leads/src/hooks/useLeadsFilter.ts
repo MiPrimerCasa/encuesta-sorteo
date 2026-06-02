@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
 import { leadCompro, leadReagendaEntrevista } from '../domain/leads';
+import {
+  fueContactadoLead,
+  ordenarPorPrioridadTabInicial,
+  perteneceTabInicial,
+  prioridadTabInicial,
+} from '../domain/prioridad-leads';
 import type { Lead } from '../types';
 
 function fifoSort(leads: Lead[]) {
@@ -17,23 +23,43 @@ function esCerradoNegativo(l: Lead) {
   );
 }
 
-/** Cinco listas excluyentes con orden FIFO (fecha_alta ASC). */
+/**
+ * Listas excluyentes. La pestaña inicial agrupa por prioridad de negocio
+ * (terreno derivado → entrevista pendiente → encuesta sin contactar), no por sorteo.
+ */
 export function useLeadsFilter(leads: Lead[]) {
   return useMemo(() => {
-    const compraron    = fifoSort(leads.filter(leadCompro));
-    const noCompraron  = fifoSort(leads.filter(esCerradoNegativo));
-    const cerrados     = new Set([...compraron, ...noCompraron].map((l) => l.id));
+    const compraron = fifoSort(leads.filter(leadCompro));
+    const noCompraron = fifoSort(leads.filter(esCerradoNegativo));
+    const cerrados = new Set([...compraron, ...noCompraron].map((l) => l.id));
 
     const seguimiento = fifoSort(
       leads.filter((l) => !cerrados.has(l.id) && leadReagendaEntrevista(l)),
     );
     const activos = leads.filter((l) => !cerrados.has(l.id) && !leadReagendaEntrevista(l));
 
-    const fueContactado = (l: Lead) =>
-      Boolean(l.seguimiento?.canal || l.seguimiento?.huboEntrevista != null);
-    const entrevistaPendiente = fifoSort(activos.filter((l) => !fueContactado(l)));
-    const paraContactar       = fifoSort(activos.filter(fueContactado));
+    const entrevistaPendiente = ordenarPorPrioridadTabInicial(
+      activos.filter((l) => perteneceTabInicial(l)),
+    );
 
-    return { entrevistaPendiente, paraContactar, seguimiento, compraron, noCompraron };
+    const paraContactar = fifoSort(
+      activos.filter(
+        (l) => fueContactadoLead(l) && !perteneceTabInicial(l),
+      ),
+    );
+
+    /** Solo prioridad 2 — encuesta sin agenda ni derivación (alertas +2 días). */
+    const encuestaSinContactar = entrevistaPendiente.filter(
+      (l) => prioridadTabInicial(l) === 2,
+    );
+
+    return {
+      entrevistaPendiente,
+      paraContactar,
+      seguimiento,
+      compraron,
+      noCompraron,
+      encuestaSinContactar,
+    };
   }, [leads]);
 }

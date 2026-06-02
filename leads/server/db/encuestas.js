@@ -1,5 +1,8 @@
 import sql from 'mssql';
-import { extraerCodigoPromotorDesdeFilaEncuesta } from './codigo-promotor.js';
+import {
+  extraerCodigoPromotorDesdeFilaEncuesta,
+  normalizarEncuestaCargaId,
+} from './codigo-promotor.js';
 import {
   getSqlPoolEncuestas,
   isSqlServerConfigured,
@@ -373,6 +376,11 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
       undefined,
   };
 
+  const encuestaRaw = pickField(row, 'encuesta', 'Encuesta', 'ENCUESTA');
+  const codigoCampania = encuestaRaw
+    ? normalizarEncuestaCargaId(encuestaRaw)
+    : undefined;
+
   const pkEncuesta = pickField(row, 'id', 'Id', 'ID');
   const leadKey =
     pkEncuesta != null && String(pkEncuesta).trim() !== ''
@@ -397,6 +405,7 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
     lista,
     fechaObtencion: fechaBase,
     fechaAlta: horarioIso ?? `${fechaBase}T09:00:00`,
+    codigoCampania,
     seguimiento,
   };
 }

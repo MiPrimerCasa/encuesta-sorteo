@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { leadCompro, leadReagendaEntrevista, tabIdListaLead } from '../../domain/leads';
+import {
+  ETIQUETA_PRIORIDAD_TAB_INICIAL,
+  agruparPorPrioridadTabInicial,
+  type PrioridadTabInicial,
+} from '../../domain/prioridad-leads';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
 import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
 import { AlertasSinContactar } from './AlertasSinContactar';
@@ -24,12 +29,12 @@ const TABS: Array<{
 }> = [
   {
     id: 'entrevista',
-    tituloTab: 'No contactados',
-    tituloTabCorto: 'No contact.',
-    tituloLargo: 'No contactados — entrevista pendiente',
+    tituloTab: 'Prioridad',
+    tituloTabCorto: 'Prioridad',
+    tituloLargo: 'Prioridad — terreno, entrevistas y nuevos',
     key: 'entrevistaPendiente',
     variante: 'activo',
-    vacio: 'Sin leads sin contactar',
+    vacio: 'Nada pendiente en esta bandeja',
   },
   {
     id: 'contacto',
@@ -88,7 +93,14 @@ export function LeadsPanel({
   leadIdSeguimientoInicial,
   onLeadSeguimientoConsumido,
 }: LeadsPanelProps) {
-  const { entrevistaPendiente, paraContactar, seguimiento, compraron, noCompraron } = useLeadsFilter(leads);
+  const {
+    entrevistaPendiente,
+    paraContactar,
+    seguimiento,
+    compraron,
+    noCompraron,
+    encuestaSinContactar,
+  } = useLeadsFilter(leads);
   const listas: Record<ListaKey, Lead[]> = {
     entrevistaPendiente,
     paraContactar,
@@ -154,6 +166,39 @@ export function LeadsPanel({
   const tabData = TABS.find((t) => t.id === tabActivo) ?? TABS[0];
   const itemsActivos = listas[tabData.key];
   const esPromotor = rolUsuario === 'promotor';
+  const esTabPrioridad = tabActivo === 'entrevista';
+
+  const renderTarjetaLead = (lead: Lead, variante: VarianteCard) =>
+    esPromotor && variante !== 'compro' ? (
+      <SwipeableLeadCard
+        key={lead.id}
+        lead={lead}
+        onClick={abrirLead}
+        variante={variante}
+        promotores={promotores}
+        productos={productos}
+        barrios={barrios}
+        nombreUsuario={nombreUsuario}
+        ocultarPromotor
+        rolUsuario={rolUsuario}
+        onQuickSave={onActualizarLead}
+      />
+    ) : (
+      <LeadCard
+        key={lead.id}
+        lead={lead}
+        onClick={abrirLead}
+        variante={variante}
+        promotores={promotores}
+        productos={productos}
+        barrios={barrios}
+        nombreUsuario={nombreUsuario}
+        ocultarPromotor={esPromotor}
+        rolUsuario={rolUsuario}
+      />
+    );
+
+  const ORDEN_PRIORIDAD: PrioridadTabInicial[] = [0, 1, 2];
 
   return (
     <div className="mx-auto max-w-2xl px-3 py-4 pb-12 sm:px-6 sm:py-6">
@@ -162,7 +207,7 @@ export function LeadsPanel({
       {esPromotor && (
         <>
           <PromotorResumen leads={leads} />
-          <AlertasSinContactar leads={entrevistaPendiente} onClickLead={abrirLead} />
+          <AlertasSinContactar leads={encuestaSinContactar} onClickLead={abrirLead} />
         </>
       )}
 
@@ -176,9 +221,9 @@ export function LeadsPanel({
           <path d="M7.5 6.5v4M7.5 4.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
         </svg>
         <p className="text-[13px] text-zinc-500">
-          <span className="font-medium text-zinc-700">Reagendar</span> mueve el lead a{' '}
-          <span className="font-medium text-zinc-700">En seguimiento</span>.{' '}
-          <span className="font-medium text-zinc-700">Cierres</span> archiva las ventas abajo.
+          En <span className="font-medium text-zinc-700">Prioridad</span>: primero derivados a terreno, luego
+          entrevistas agendadas, luego encuestas sin contactar (orden cronológico en cada grupo).{' '}
+          <span className="font-medium text-zinc-700">Reagendar</span> va a En seguimiento.
         </p>
       </div>
 
@@ -329,38 +374,29 @@ export function LeadsPanel({
             <p className="rounded-lg border border-dashed border-zinc-200 py-10 text-center text-[13px] text-zinc-400">
               {tabData.vacio}
             </p>
+          ) : esTabPrioridad ? (
+            <div className="space-y-6">
+              {ORDEN_PRIORIDAD.map((prioridad) => {
+                const grupo = agruparPorPrioridadTabInicial(itemsActivos)[prioridad];
+                if (grupo.length === 0) return null;
+                return (
+                  <section key={prioridad}>
+                    <h3 className="mb-3 flex items-baseline gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                      {ETIQUETA_PRIORIDAD_TAB_INICIAL[prioridad]}
+                      <span className="text-[13px] font-medium tabular-nums text-zinc-400">
+                        {grupo.length}
+                      </span>
+                    </h3>
+                    <div className="space-y-3">
+                      {grupo.map((lead) => renderTarjetaLead(lead, tabData.variante))}
+                    </div>
+                  </section>
+                );
+              })}
+            </div>
           ) : (
             <div className="space-y-3">
-              {itemsActivos.map((lead) =>
-                esPromotor && tabData.variante !== 'compro' ? (
-                  <SwipeableLeadCard
-                    key={lead.id}
-                    lead={lead}
-                    onClick={abrirLead}
-                    variante={tabData.variante}
-                    promotores={promotores}
-                    productos={productos}
-                    barrios={barrios}
-                    nombreUsuario={nombreUsuario}
-                    ocultarPromotor
-                    rolUsuario={rolUsuario}
-                    onQuickSave={onActualizarLead}
-                  />
-                ) : (
-                  <LeadCard
-                    key={lead.id}
-                    lead={lead}
-                    onClick={abrirLead}
-                    variante={tabData.variante}
-                    promotores={promotores}
-                    productos={productos}
-                    barrios={barrios}
-                    nombreUsuario={nombreUsuario}
-                    ocultarPromotor={esPromotor}
-                    rolUsuario={rolUsuario}
-                  />
-                ),
-              )}
+              {itemsActivos.map((lead) => renderTarjetaLead(lead, tabData.variante))}
             </div>
           )}
         </>

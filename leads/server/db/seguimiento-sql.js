@@ -2,6 +2,8 @@ import sql from 'mssql';
 import { normalizarEncuestaCargaId } from './codigo-promotor.js';
 import {
   etiquetaEstadoSeguimiento,
+  filaHistorialDesdeEstado,
+  normalizarOperadorHistorial,
   pestanaDesdeSeguimiento,
 } from './seguimiento-historial.js';
 import { getSqlPoolEncuestas, isSqlServerConfigured } from './mssql.js';
@@ -152,6 +154,22 @@ function mapSqlRowToHistorialEntry(row, lead = {}) {
 function encuestaFromLead(lead) {
   if (lead?.codigoCampania) return normalizarEncuestaCargaId(lead.codigoCampania);
   return normalizarEncuestaCargaId(process.env.ENCUESTA_CARGA_ID || 'sorteo01');
+}
+
+function buildEntradaHistorial(leadId, merged, usuario, leadContext, registroId) {
+  const operador = normalizarOperadorHistorial(usuario);
+  const fila = filaHistorialDesdeEstado({
+    leadId,
+    seguimiento: merged,
+    lead: leadContext ?? {},
+    operador,
+  });
+  const idNum = Number(registroId);
+  return {
+    id: Number.isFinite(idNum) && idNum > 0 ? idNum : Date.now(),
+    creadoEn: new Date().toISOString(),
+    ...fila,
+  };
 }
 
 /**
@@ -332,19 +350,37 @@ export async function listHistorialForLead(leadId, lead = {}, opts) {
 }
 
 export async function persistirSeguimientoLead(leadId, patch, usuario, leadContext) {
-  const prev = useSeguimientoSql()
+  let prev = useSeguimientoSql()
     ? await getLatestSeguimientoSql(leadId)
     : getSeguimientoExterno(leadId);
+  if (
+    useSeguimientoSql() &&
+    Object.keys(prev).length === 0 &&
+    leadContext?.seguimiento &&
+    Object.keys(leadContext.seguimiento).length > 0
+  ) {
+    prev = { ...leadContext.seguimiento };
+  }
   const merged = { ...prev, ...patch };
 
   if (JSON.stringify(prev) === JSON.stringify(merged)) {
-    return merged;
+    return { merged, saved: false, entradaHistorial: null };
   }
 
   if (useSeguimientoSql()) {
-    await execRegistrarSeguimientoLead(leadContext, merged, usuario);
-    return merged;
+    const reg = await execRegistrarSeguimientoLead(leadContext, merged, usuario);
+    return {
+      merged,
+      saved: true,
+      registroId: reg.id,
+      entradaHistorial: buildEntradaHistorial(leadId, merged, usuario, leadContext, reg.id),
+    };
   }
 
-  return upsertSeguimientoExterno(leadId, patch, usuario, leadContext);
+  const mergedLocal = upsertSeguimientoExterno(leadId, patch, usuario, leadContext);
+  return {
+    merged: mergedLocal,
+    saved: true,
+    entradaHistorial: buildEntradaHistorial(leadId, mergedLocal, usuario, leadContext, Date.now()),
+  };
 }

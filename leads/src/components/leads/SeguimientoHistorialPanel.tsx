@@ -8,12 +8,14 @@ interface SeguimientoHistorialPanelProps {
   historial: SeguimientoHistorialEntry[];
   cargando?: boolean;
   error?: string | null;
+  aviso?: string | null;
 }
 
 export function SeguimientoHistorialPanel({
   historial,
   cargando = false,
   error = null,
+  aviso = null,
 }: SeguimientoHistorialPanelProps) {
   return (
     <section className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4">
@@ -32,7 +34,11 @@ export function SeguimientoHistorialPanel({
         <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-700">{error}</p>
       )}
 
-      {!cargando && !error && historial.length === 0 && (
+      {aviso && !error && (
+        <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900">{aviso}</p>
+      )}
+
+      {!cargando && !error && historial.length === 0 && !aviso && (
         <p className="mt-4 text-[13px] text-zinc-400">Sin cambios registrados todavía.</p>
       )}
 

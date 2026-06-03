@@ -326,7 +326,7 @@ function registerApiRoutes(api) {
         ...(sinPermiso
           ? {
               aviso:
-                'Sin permiso SELECT en registrarSeguimientoLead: historial no disponible hasta que el DBA aplique GRANT.',
+                'Sin permiso SELECT en SQL: no se puede leer el historial completo. Los guardados de esta sesión se muestran abajo; pedí GRANT SELECT al DBA.',
             }
           : {}),
       });
@@ -368,26 +368,34 @@ function registerApiRoutes(api) {
     }
 
     try {
-      const lead = await updateLeadSeguimientoEncuesta(
+      const result = await updateLeadSeguimientoEncuesta(
         req.params.id,
         data,
         usuario,
         idUsuario ?? null,
       );
-      if (!lead) {
+      if (!result?.lead) {
         return res.status(404).json({ message: 'Lead no encontrado en tus encuestas asignadas.' });
       }
-      const historial = await listHistorialForLead(req.params.id, lead, { limit: 30 });
+      const { lead, saved, entradaHistorial } = result;
+      let historial = await listHistorialForLead(req.params.id, lead, { limit: 30 });
       const { consumeSeguimientoLecturaDegradada } = await import('./db/seguimiento-sql.js');
       const sinPermiso = consumeSeguimientoLecturaDegradada();
+      if (entradaHistorial && saved) {
+        historial = [
+          entradaHistorial,
+          ...historial.filter((h) => h.id !== entradaHistorial.id),
+        ];
+      }
       return res.json({
-        message: 'Seguimiento actualizado.',
+        message: saved ? 'Seguimiento actualizado.' : 'Sin cambios respecto al último guardado.',
         lead,
         historial,
+        entradaHistorial: saved ? entradaHistorial : null,
         ...(sinPermiso
           ? {
               aviso:
-                'Guardado en SQL, pero no se pudo leer historial (falta GRANT SELECT en registrarSeguimientoLead).',
+                'Guardado en SQL. El historial completo requiere GRANT SELECT en registrarSeguimientoLead (se muestran los guardados de esta sesión).',
             }
           : {}),
       });

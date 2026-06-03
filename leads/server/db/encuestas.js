@@ -641,6 +641,12 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     ? await getLatestSeguimientoSql(leadId)
     : getSeguimientoExterno(leadId);
   const base = mapEncuestaRowToLead(row, { [leadId]: prevSeg });
-  const merged = await persistirSeguimientoLead(leadId, seguimiento, usuario, base);
-  return applyDerivacionTerrenoAlLead({ ...base, seguimiento: merged }, merged);
+  const { merged, saved, entradaHistorial } = await persistirSeguimientoLead(
+    leadId,
+    seguimiento,
+    usuario,
+    base,
+  );
+  const lead = applyDerivacionTerrenoAlLead({ ...base, seguimiento: merged }, merged);
+  return { lead, saved, entradaHistorial };
 }

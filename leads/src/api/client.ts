@@ -11,6 +11,10 @@ import type {
   UsuarioSesion,
 } from '../types';
 import {
+  appendHistorialCache,
+  mergeHistorialConCache,
+} from './historial-cache';
+import {
   DEMO_BARRIOS,
   DEMO_PRODUCTOS,
   DEMO_PROMOTORES,
@@ -195,12 +199,20 @@ export async function fetchProductos(rol: RolUsuario) {
   return data.productos;
 }
 
-export async function fetchHistorialSeguimiento(leadId: string) {
-  if (_isDemoActive) return getDemoHistorialSeguimiento(leadId);
-  const data = await apiFetch<{ historial: SeguimientoHistorialEntry[] }>(
+export async function fetchHistorialSeguimiento(leadId: string): Promise<{
+  historial: SeguimientoHistorialEntry[];
+  aviso?: string;
+}> {
+  if (_isDemoActive) {
+    return { historial: getDemoHistorialSeguimiento(leadId) };
+  }
+  const data = await apiFetch<{ historial: SeguimientoHistorialEntry[]; aviso?: string }>(
     `/api/leads/${leadId}/historial`,
   );
-  return data.historial;
+  return {
+    historial: mergeHistorialConCache(leadId, data.historial ?? []),
+    aviso: data.aviso,
+  };
 }
 
 export async function guardarSeguimiento(leadId: string, seguimiento: SeguimientoLead) {
@@ -208,10 +220,21 @@ export async function guardarSeguimiento(leadId: string, seguimiento: Seguimient
     const usuario = getSession()?.usuario;
     return updateDemoLead(leadId, seguimiento, usuario);
   }
-  const data = await apiFetch<{ lead: Lead; message: string }>(`/api/leads/${leadId}/seguimiento`, {
+  const data = await apiFetch<{
+    lead: Lead;
+    message: string;
+    historial?: SeguimientoHistorialEntry[];
+    entradaHistorial?: SeguimientoHistorialEntry | null;
+    aviso?: string;
+  }>(`/api/leads/${leadId}/seguimiento`, {
     method: 'PATCH',
     body: JSON.stringify(seguimiento),
   });
+  if (data.historial?.length) {
+    appendHistorialCache(leadId, data.historial);
+  } else if (data.entradaHistorial) {
+    appendHistorialCache(leadId, [data.entradaHistorial]);
+  }
   return data.lead;
 }
 

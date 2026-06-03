@@ -115,13 +115,16 @@ export function LeadModalForm({
   const [historial, setHistorial] = useState<SeguimientoHistorialEntry[]>([]);
   const [historialCargando, setHistorialCargando] = useState(false);
   const [historialError, setHistorialError] = useState<string | null>(null);
+  const [historialAviso, setHistorialAviso] = useState<string | null>(null);
 
   const cargarHistorial = useCallback(async (leadId: string) => {
     setHistorialCargando(true);
     setHistorialError(null);
+    setHistorialAviso(null);
     try {
-      const filas = await fetchHistorialSeguimiento(leadId);
+      const { historial: filas, aviso } = await fetchHistorialSeguimiento(leadId);
       setHistorial(filas);
+      setHistorialAviso(aviso ?? null);
     } catch (e) {
       setHistorialError(e instanceof Error ? e.message : 'No se pudo cargar el historial.');
       setHistorial([]);
@@ -975,6 +978,7 @@ export function LeadModalForm({
               historial={historial}
               cargando={historialCargando}
               error={historialError}
+              aviso={historialAviso}
             />
           </div>
 

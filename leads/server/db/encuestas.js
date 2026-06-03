@@ -613,8 +613,9 @@ export async function listLeadsFromEncuestas(usuario) {
     })
     .filter(Boolean)
     .map(String);
+  const idOperador = parseInt(String(usuario?.id ?? usuario?.idOperador ?? ''), 10);
   const seguimientoById = useSeguimientoSql()
-    ? await batchLatestSeguimientoSql(ids)
+    ? await batchLatestSeguimientoSql(ids, Number.isFinite(idOperador) ? idOperador : null)
     : Object.fromEntries(ids.map((id) => [id, getSeguimientoExterno(id)]));
   const leads = rows.map((row) => {
     const pk = pickField(row, 'id', 'Id', 'ID');
@@ -641,8 +642,9 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     return String(pk ?? '') === leadId || String(usuario ?? '') === leadId;
   });
   if (!row) return null;
+  const idOperador = parseInt(String(usuario?.id ?? usuario?.idOperador ?? ''), 10);
   const prevSeg = useSeguimientoSql()
-    ? await getLatestSeguimientoSql(leadId)
+    ? await getLatestSeguimientoSql(leadId, Number.isFinite(idOperador) ? idOperador : null)
     : getSeguimientoExterno(leadId);
   const base = mapEncuestaRowToLead(row, { [leadId]: prevSeg });
   const { merged, saved, entradaHistorial } = await persistirSeguimientoLead(

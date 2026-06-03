@@ -30,14 +30,16 @@ export function consumeSeguimientoLecturaDegradada() {
   return v;
 }
 
-function isSeguimientoTableReadDenied(error) {
+function isSeguimientoReadDenied(error) {
   const raw =
     error instanceof Error
       ? `${error.message} ${error.originalError?.message ?? ''}`
       : String(error ?? '');
   return (
     /permission was denied/i.test(raw) &&
-    /registrarSeguimientoLead|SEGUIMIENTO_TABLE/i.test(raw)
+    /registrarSeguimientoLead|SEGUIMIENTO_TABLE|SP_HistorialSeguimientoLead|SP_UltimoSeguimientoOperador/i.test(
+      raw,
+    )
   );
 }
 
@@ -45,15 +47,38 @@ function warnSeguimientoLecturaDegradada(error) {
   if (seguimientoLecturaDegradada) return;
   seguimientoLecturaDegradada = true;
   console.warn(
-    '[seguimiento] Sin permiso SELECT en registrarSeguimientoLead — leads se listan sin estado de seguimiento. ' +
-      'Pedí GRANT SELECT, INSERT + EXECUTE al DBA (sql/grants-mpcsp-leads.sql).',
+    '[seguimiento] Lectura de seguimiento denegada — leads se listan sin estado guardado. ' +
+      'Pedí GRANT EXECUTE en SP_HistorialSeguimientoLead y SP_UltimoSeguimientoOperador (o GRANT SELECT en la tabla).',
     error instanceof Error ? error.message : error,
   );
 }
 
+function normalizeProcedureName(raw) {
+  return String(raw ?? '')
+    .replace(/^\[?dbo\]?\./i, '')
+    .replace(/[\[\]]/g, '');
+}
+
 function getSeguimientoProcedureName() {
-  const raw = process.env.SP_SEGUIMIENTO || 'dbo.SP_RegistrarSeguimientoLead';
-  return raw.replace(/^\[?dbo\]?\./i, '').replace(/[\[\]]/g, '');
+  return normalizeProcedureName(process.env.SP_SEGUIMIENTO || 'dbo.SP_RegistrarSeguimientoLead');
+}
+
+/** null = usar SELECT directo en tabla (fallback). */
+function getHistorialProcedureName() {
+  const raw = process.env.SP_SEGUIMIENTO_HISTORIAL;
+  if (raw === '0' || raw === 'false') return null;
+  if (String(raw ?? '').trim()) return normalizeProcedureName(raw);
+  if (useSeguimientoSql()) return 'SP_HistorialSeguimientoLead';
+  return null;
+}
+
+/** null = usar SELECT directo en tabla (fallback). */
+function getUltimosProcedureName() {
+  const raw = process.env.SP_SEGUIMIENTO_ULTIMOS;
+  if (raw === '0' || raw === 'false') return null;
+  if (String(raw ?? '').trim()) return normalizeProcedureName(raw);
+  if (useSeguimientoSql()) return 'SP_UltimoSeguimientoOperador';
+  return null;
 }
 
 function getSeguimientoTableName() {
@@ -257,13 +282,25 @@ export async function execRegistrarSeguimientoLead(lead, merged, usuario) {
   };
 }
 
-async function queryHistorialRows(leadId, limit = 50) {
-  const pool = await getSqlPoolEncuestas();
-  const table = getSeguimientoTableName();
+async function queryHistorialRows(leadId, limit = 50, idOperador = null) {
   const lim = Math.min(Math.max(limit, 1), 200);
   const leadIdNum = parseInt(String(leadId), 10);
   if (!Number.isFinite(leadIdNum)) return [];
 
+  const proc = getHistorialProcedureName();
+  const pool = await getSqlPoolEncuestas();
+
+  if (proc && idOperador != null) {
+    const result = await pool
+      .request()
+      .input('lead_id', sql.Int, leadIdNum)
+      .input('id_operador', sql.Int, idOperador)
+      .input('lim', sql.Int, lim)
+      .execute(proc);
+    return result.recordset ?? [];
+  }
+
+  const table = getSeguimientoTableName();
   const result = await pool
     .request()
     .input('leadId', sql.Int, leadIdNum)
@@ -277,12 +314,24 @@ async function queryHistorialRows(leadId, limit = 50) {
   return result.recordset ?? [];
 }
 
-export async function getLatestSeguimientoSql(leadId) {
+async function queryUltimosRows(idOperador) {
+  const proc = getUltimosProcedureName();
+  if (!proc || idOperador == null) return null;
+
+  const pool = await getSqlPoolEncuestas();
+  const result = await pool
+    .request()
+    .input('id_operador', sql.Int, idOperador)
+    .execute(proc);
+  return result.recordset ?? [];
+}
+
+export async function getLatestSeguimientoSql(leadId, idOperador = null) {
   try {
-    const rows = await queryHistorialRows(leadId, 1);
+    const rows = await queryHistorialRows(leadId, 1, idOperador);
     return rows.length ? mapSqlRowToSeguimiento(rows[0]) : {};
   } catch (error) {
-    if (isSeguimientoTableReadDenied(error)) {
+    if (isSeguimientoReadDenied(error)) {
       warnSeguimientoLecturaDegradada(error);
       return {};
     }
@@ -290,16 +339,29 @@ export async function getLatestSeguimientoSql(leadId) {
   }
 }
 
-export async function batchLatestSeguimientoSql(leadIds) {
+export async function batchLatestSeguimientoSql(leadIds, idOperador = null) {
   const ids = [...new Set(leadIds.map((id) => parseInt(String(id), 10)).filter(Number.isFinite))];
   if (!ids.length) return {};
 
-  const pool = await getSqlPoolEncuestas();
-  const table = getSeguimientoTableName();
+  const idSet = new Set(ids.map(String));
   const map = {};
-  const chunkSize = 80;
 
   try {
+    const ultimosRows = await queryUltimosRows(idOperador);
+    if (ultimosRows != null) {
+      for (const row of ultimosRows) {
+        const key = String(row.lead_id ?? row.leadId);
+        if (idSet.has(key)) {
+          map[key] = mapSqlRowToSeguimiento(row);
+        }
+      }
+      return map;
+    }
+
+    const pool = await getSqlPoolEncuestas();
+    const table = getSeguimientoTableName();
+    const chunkSize = 80;
+
     for (let i = 0; i < ids.length; i += chunkSize) {
       const chunk = ids.slice(i, i + chunkSize);
       const placeholders = chunk.map((_, idx) => `@id${idx}`).join(', ');
@@ -320,7 +382,7 @@ export async function batchLatestSeguimientoSql(leadIds) {
       }
     }
   } catch (error) {
-    if (isSeguimientoTableReadDenied(error)) {
+    if (isSeguimientoReadDenied(error)) {
       warnSeguimientoLecturaDegradada(error);
       return {};
     }
@@ -329,12 +391,12 @@ export async function batchLatestSeguimientoSql(leadIds) {
   return map;
 }
 
-export async function listHistorialSeguimientoSql(leadId, lead = {}, { limit = 50 } = {}) {
+export async function listHistorialSeguimientoSql(leadId, lead = {}, { limit = 50, idOperador = null } = {}) {
   try {
-    const rows = await queryHistorialRows(leadId, limit);
+    const rows = await queryHistorialRows(leadId, limit, idOperador);
     return rows.map((row) => mapSqlRowToHistorialEntry(row, lead));
   } catch (error) {
-    if (isSeguimientoTableReadDenied(error)) {
+    if (isSeguimientoReadDenied(error)) {
       warnSeguimientoLecturaDegradada(error);
       return [];
     }
@@ -342,7 +404,7 @@ export async function listHistorialSeguimientoSql(leadId, lead = {}, { limit = 5
   }
 }
 
-export async function listHistorialForLead(leadId, lead = {}, opts) {
+export async function listHistorialForLead(leadId, lead = {}, opts = {}) {
   if (useSeguimientoSql()) {
     return listHistorialSeguimientoSql(leadId, lead, opts);
   }
@@ -350,8 +412,9 @@ export async function listHistorialForLead(leadId, lead = {}, opts) {
 }
 
 export async function persistirSeguimientoLead(leadId, patch, usuario, leadContext) {
+  const idOperador = parseOperadorId(usuario);
   let prev = useSeguimientoSql()
-    ? await getLatestSeguimientoSql(leadId)
+    ? await getLatestSeguimientoSql(leadId, idOperador)
     : getSeguimientoExterno(leadId);
   if (
     useSeguimientoSql() &&

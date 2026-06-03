@@ -318,7 +318,10 @@ function registerApiRoutes(api) {
       if (!lead) {
         return res.status(404).json({ message: 'Lead no encontrado en tus encuestas asignadas.' });
       }
-      const historial = await listHistorialForLead(req.params.id, lead);
+      const idOperador = parseInt(String(usuario.id ?? ''), 10);
+      const historial = await listHistorialForLead(req.params.id, lead, {
+        idOperador: Number.isFinite(idOperador) ? idOperador : null,
+      });
       return res.json({ historial });
     } catch (error) {
       console.error('Error al leer historial:', error);
@@ -368,7 +371,11 @@ function registerApiRoutes(api) {
         return res.status(404).json({ message: 'Lead no encontrado en tus encuestas asignadas.' });
       }
       const { lead, saved, entradaHistorial } = result;
-      let historial = await listHistorialForLead(req.params.id, lead, { limit: 30 });
+      const idOperador = parseInt(String(usuario.id ?? ''), 10);
+      let historial = await listHistorialForLead(req.params.id, lead, {
+        limit: 30,
+        idOperador: Number.isFinite(idOperador) ? idOperador : null,
+      });
       if (entradaHistorial && saved) {
         historial = [
           entradaHistorial,

@@ -32,6 +32,12 @@ export async function getHealthInfo() {
     login: process.env.SP_LOGIN || 'dbo.operadorAccesoCategoria',
     leads: process.env.SP_ENCUESTAS || 'encuestasMuestraOperador',
     seguimiento: process.env.SP_SEGUIMIENTO || null,
+    seguimientoHistorial:
+      process.env.SP_SEGUIMIENTO_HISTORIAL ||
+      (useSeguimientoSql() ? 'dbo.SP_HistorialSeguimientoLead' : null),
+    seguimientoUltimos:
+      process.env.SP_SEGUIMIENTO_ULTIMOS ||
+      (useSeguimientoSql() ? 'dbo.SP_UltimoSeguimientoOperador' : null),
     seguimientoTabla: process.env.SEGUIMIENTO_TABLE || 'registrarSeguimientoLead',
     dbLogin: process.env.DB_NAME,
     dbEncuestas: getEncuestasDatabase(),

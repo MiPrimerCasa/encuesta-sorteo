@@ -319,7 +319,17 @@ function registerApiRoutes(api) {
         return res.status(404).json({ message: 'Lead no encontrado en tus encuestas asignadas.' });
       }
       const historial = await listHistorialForLead(req.params.id, lead);
-      return res.json({ historial });
+      const { consumeSeguimientoLecturaDegradada } = await import('./db/seguimiento-sql.js');
+      const sinPermiso = consumeSeguimientoLecturaDegradada();
+      return res.json({
+        historial,
+        ...(sinPermiso
+          ? {
+              aviso:
+                'Sin permiso SELECT en registrarSeguimientoLead: historial no disponible hasta que el DBA aplique GRANT.',
+            }
+          : {}),
+      });
     } catch (error) {
       console.error('Error al leer historial:', error);
       return res.status(500).json({
@@ -368,10 +378,18 @@ function registerApiRoutes(api) {
         return res.status(404).json({ message: 'Lead no encontrado en tus encuestas asignadas.' });
       }
       const historial = await listHistorialForLead(req.params.id, lead, { limit: 30 });
+      const { consumeSeguimientoLecturaDegradada } = await import('./db/seguimiento-sql.js');
+      const sinPermiso = consumeSeguimientoLecturaDegradada();
       return res.json({
         message: 'Seguimiento actualizado.',
         lead,
         historial,
+        ...(sinPermiso
+          ? {
+              aviso:
+                'Guardado en SQL, pero no se pudo leer historial (falta GRANT SELECT en registrarSeguimientoLead).',
+            }
+          : {}),
       });
     } catch (error) {
       if (error instanceof SeguimientoRegistroError) {

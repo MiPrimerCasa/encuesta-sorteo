@@ -312,8 +312,16 @@ export async function batchLatestSeguimientoSql(leadIds) {
 }
 
 export async function listHistorialSeguimientoSql(leadId, lead = {}, { limit = 50 } = {}) {
-  const rows = await queryHistorialRows(leadId, limit);
-  return rows.map((row) => mapSqlRowToHistorialEntry(row, lead));
+  try {
+    const rows = await queryHistorialRows(leadId, limit);
+    return rows.map((row) => mapSqlRowToHistorialEntry(row, lead));
+  } catch (error) {
+    if (isSeguimientoTableReadDenied(error)) {
+      warnSeguimientoLecturaDegradada(error);
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function listHistorialForLead(leadId, lead = {}, opts) {

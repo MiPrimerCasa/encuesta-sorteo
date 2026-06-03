@@ -15,6 +15,8 @@ const ID_TERRENO = 'prod-terreno';
 
 export const seguimientoSchema = z
   .object({
+    confirmoEntrevista: z.boolean().nullable().optional(),
+    fuente: z.enum(['qr', 'app', 'facebook', 'instagram']).nullable().optional(),
     canal: z.enum(['llamada', 'mensaje']).nullable().optional(),
     huboEntrevista: z.boolean().nullable().optional(),
     resultadoEntrevista: z

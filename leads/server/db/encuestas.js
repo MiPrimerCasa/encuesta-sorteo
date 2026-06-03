@@ -10,7 +10,13 @@ import {
   mapOperadorVendedorToRol,
   parseIdEntero,
 } from './mssql.js';
-import { getSeguimientoExterno, upsertSeguimientoExterno } from './sqlite.js';
+import { getSeguimientoExterno } from './sqlite.js';
+import {
+  batchLatestSeguimientoSql,
+  getLatestSeguimientoSql,
+  persistirSeguimientoLead,
+  useSeguimientoSql,
+} from './seguimiento-sql.js';
 
 function pickField(row, ...candidates) {
   if (!row) return null;
@@ -603,9 +609,9 @@ export async function listLeadsFromEncuestas(usuario) {
     })
     .filter(Boolean)
     .map(String);
-  const seguimientoById = Object.fromEntries(
-    ids.map((id) => [id, getSeguimientoExterno(id)]),
-  );
+  const seguimientoById = useSeguimientoSql()
+    ? await batchLatestSeguimientoSql(ids)
+    : Object.fromEntries(ids.map((id) => [id, getSeguimientoExterno(id)]));
   const leads = rows.map((row) => {
     const pk = pickField(row, 'id', 'Id', 'ID');
     const id =
@@ -631,7 +637,10 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     return String(pk ?? '') === leadId || String(usuario ?? '') === leadId;
   });
   if (!row) return null;
-  const merged = upsertSeguimientoExterno(leadId, seguimiento, usuarioId);
-  const base = mapEncuestaRowToLead(row, { [leadId]: merged });
-  return applyDerivacionTerrenoAlLead(base, merged);
+  const prevSeg = useSeguimientoSql()
+    ? await getLatestSeguimientoSql(leadId)
+    : getSeguimientoExterno(leadId);
+  const base = mapEncuestaRowToLead(row, { [leadId]: prevSeg });
+  const merged = await persistirSeguimientoLead(leadId, seguimiento, usuario, base);
+  return applyDerivacionTerrenoAlLead({ ...base, seguimiento: merged }, merged);
 }

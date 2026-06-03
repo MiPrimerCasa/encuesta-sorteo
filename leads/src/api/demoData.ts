@@ -7,9 +7,12 @@ import type {
   NuevoLeadData,
   Producto,
   Promotor,
+  SeguimientoHistorialEntry,
   SeguimientoLead,
   UsuarioSesion,
 } from '../types';
+import { etiquetaEstadoHistorial } from '../domain/seguimiento-historial';
+import { tabIdListaLead } from '../domain/leads';
 import linksCatalog from '../data/links-redes.json';
 
 // ─── Usuario demo ────────────────────────────────────────────────────────────
@@ -493,14 +496,53 @@ const BASE_LEADS: Lead[] = [
 
 // Copia mutable para que guardarSeguimiento actualice en memoria durante la sesión demo
 let demoLeads: Lead[] = BASE_LEADS.map((l) => ({ ...l }));
+const demoHistorialPorLead = new Map<string, SeguimientoHistorialEntry[]>();
+let demoHistorialSeq = 1;
+
+export function getDemoHistorialSeguimiento(leadId: string): SeguimientoHistorialEntry[] {
+  return [...(demoHistorialPorLead.get(leadId) ?? [])].sort((a, b) =>
+    b.creadoEn.localeCompare(a.creadoEn),
+  );
+}
+
+export function appendDemoHistorialSeguimiento(
+  lead: Lead,
+  seguimiento: SeguimientoLead,
+  usuario: UsuarioSesion,
+) {
+  const merged = { ...lead.seguimiento, ...seguimiento };
+  const prev = lead.seguimiento;
+  if (JSON.stringify(prev) === JSON.stringify(merged)) return;
+
+  const entry: SeguimientoHistorialEntry = {
+    id: demoHistorialSeq++,
+    leadId: lead.id,
+    operadorId: usuario.id,
+    operadorRol: usuario.rol,
+    operadorNombre: usuario.nombre,
+    estadoEtiqueta: etiquetaEstadoHistorial(merged, lead),
+    resultadoEntrevista: merged.resultadoEntrevista ?? undefined,
+    pestana: tabIdListaLead({ ...lead, seguimiento: merged }),
+    seguimientoSnapshot: merged,
+    creadoEn: new Date().toISOString(),
+  };
+
+  const lista = demoHistorialPorLead.get(lead.id) ?? [];
+  demoHistorialPorLead.set(lead.id, [entry, ...lista]);
+}
 
 export function getDemoLeads(): Lead[] {
   return demoLeads.map((l) => ({ ...l }));
 }
 
-export function updateDemoLead(leadId: string, seguimiento: SeguimientoLead): Lead {
+export function updateDemoLead(
+  leadId: string,
+  seguimiento: SeguimientoLead,
+  usuario?: UsuarioSesion,
+): Lead {
   const lead = demoLeads.find((l) => l.id === leadId);
   if (!lead) throw new Error('Lead no encontrado en demo');
+  if (usuario) appendDemoHistorialSeguimiento(lead, seguimiento, usuario);
   const updated = applySeguimientoAlLead(lead, seguimiento);
   demoLeads = demoLeads.map((l) => (l.id === leadId ? updated : l));
   return { ...updated };

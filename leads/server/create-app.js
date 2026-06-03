@@ -22,7 +22,17 @@ import { resolveLinksRedesParaUsuario } from './db/links-redes.js';
 import { enriquecerUsuarioConCodigoCarga } from './db/operadores-catalog.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
-import { getDb, listBarrios, listProductos, productoPermitidoParaRol } from './db/sqlite.js';
+import {
+  getDb,
+  listBarrios,
+  listProductos,
+  productoPermitidoParaRol,
+} from './db/sqlite.js';
+import {
+  listHistorialForLead,
+  SeguimientoRegistroError,
+  useSeguimientoSql,
+} from './db/seguimiento-sql.js';
 import { getHealthInfo, respondIfNotConfigured } from './require-production.js';
 import { formatSqlError } from './sql-errors.js';
 import { loginSchema, seguimientoSchema } from './schemas/seguimiento.js';
@@ -283,6 +293,33 @@ function registerApiRoutes(api) {
     }
   });
 
+  api.get('/leads/:id/historial', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+
+    try {
+      if (!useSeguimientoSql()) getDb();
+      const { listLeadsFromEncuestas } = await import('./db/encuestas.js');
+      const leads = await listLeadsFromEncuestas(usuario);
+      const lead = leads.find((l) => l.id === req.params.id);
+      if (!lead) {
+        return res.status(404).json({ message: 'Lead no encontrado en tus encuestas asignadas.' });
+      }
+      const historial = await listHistorialForLead(req.params.id, lead);
+      return res.json({ historial });
+    } catch (error) {
+      console.error('Error al leer historial:', error);
+      return res.status(500).json({
+        message: 'Error al leer historial de seguimiento.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
   api.patch('/leads/:id/seguimiento', async (req, res) => {
     if (!respondIfNotConfigured(res)) return;
 
@@ -321,11 +358,19 @@ function registerApiRoutes(api) {
       if (!lead) {
         return res.status(404).json({ message: 'Lead no encontrado en tus encuestas asignadas.' });
       }
+      const historial = await listHistorialForLead(req.params.id, lead, { limit: 30 });
       return res.json({
         message: 'Seguimiento actualizado.',
         lead,
+        historial,
       });
     } catch (error) {
+      if (error instanceof SeguimientoRegistroError) {
+        return res.status(400).json({
+          message: error.message,
+          code: error.code,
+        });
+      }
       console.error('Error al guardar seguimiento:', error);
       return res.status(500).json({
         message: 'Error al guardar seguimiento.',

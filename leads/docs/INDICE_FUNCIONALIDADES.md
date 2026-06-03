@@ -20,6 +20,9 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | No compró / sin interés → Contactado (no Cierres) | [FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md](./FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md) | Ambos | `useLeadsFilter.ts`, `leads.ts`, `LeadsPanel.tsx` |
 | Derivar terreno (promotor → supervisor) | [FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md](./FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md) | Promotor, supervisor | `LeadModalForm.tsx`, `prioridad-leads.ts` |
 | Calendario supervisor | [FUNCIONALIDAD_CALENDARIO_SUPERVISOR.md](./FUNCIONALIDAD_CALENDARIO_SUPERVISOR.md) | Supervisor | `CalendarioView.tsx`, `NavBar.tsx` |
+| Conexión SP_RegistrarSeguimientoLead | [FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md](./FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md) | Ambos | `seguimiento-sql.js`, `.env SP_SEGUIMIENTO` |
+| Historial de estados al guardar seguimiento | [FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md](./FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md) | Ambos | Tabla `registrarSeguimientoLead` |
+| Modelo SQL seguimiento (análisis parámetros SP) | [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md) | DBA + dev | Propuesta `@lead_id`, `@resultado_entrevista`, etc. |
 | Multisorteo / participantes | [SORTEOS_Y_PARTICIPANTES.md](./SORTEOS_Y_PARTICIPANTES.md) | Ambos | `encuesta-carga.js`, SP |
 | Login y rol desde `Categoria` | [LOGIN_SP.md](./LOGIN_SP.md) | Ambos | `mssql.js`, `encuestas.js` |
 | Deploy y monorepo | [MONOREPO.md](./MONOREPO.md), [DEPLOY_VPS.md](./DEPLOY_VPS.md) | — | `deploy/` |

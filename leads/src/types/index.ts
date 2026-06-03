@@ -74,6 +74,21 @@ export interface Referido {
   telefono: string;
 }
 
+/** Entrada del historial append-only al guardar seguimiento. */
+export interface SeguimientoHistorialEntry {
+  id: number;
+  leadId: string;
+  operadorId?: string;
+  operadorRol?: RolUsuario;
+  operadorNombre: string;
+  /** Resumen legible del estado (resultado + pestaña). */
+  estadoEtiqueta: string;
+  resultadoEntrevista?: ResultadoEntrevista | null;
+  pestana?: 'entrevista' | 'contacto' | 'seguimiento' | 'compro';
+  seguimientoSnapshot: SeguimientoLead;
+  creadoEn: string;
+}
+
 export interface SeguimientoLead {
   fuente?: FuenteLead | null;
   confirmoEntrevista?: boolean | null;

@@ -6,6 +6,7 @@ import type {
   Producto,
   Promotor,
   RolUsuario,
+  SeguimientoHistorialEntry,
   SeguimientoLead,
   UsuarioSesion,
 } from '../types';
@@ -17,6 +18,7 @@ import {
   DEMO_USUARIO_PROMOTOR,
   createDemoLead,
   getDemoLeads,
+  getDemoHistorialSeguimiento,
   getDemoLinksRedes,
   getDemoPromotoresParaSupervisor,
   updateDemoLead,
@@ -193,8 +195,19 @@ export async function fetchProductos(rol: RolUsuario) {
   return data.productos;
 }
 
+export async function fetchHistorialSeguimiento(leadId: string) {
+  if (_isDemoActive) return getDemoHistorialSeguimiento(leadId);
+  const data = await apiFetch<{ historial: SeguimientoHistorialEntry[] }>(
+    `/api/leads/${leadId}/historial`,
+  );
+  return data.historial;
+}
+
 export async function guardarSeguimiento(leadId: string, seguimiento: SeguimientoLead) {
-  if (_isDemoActive) return updateDemoLead(leadId, seguimiento);
+  if (_isDemoActive) {
+    const usuario = getSession()?.usuario;
+    return updateDemoLead(leadId, seguimiento, usuario);
+  }
   const data = await apiFetch<{ lead: Lead; message: string }>(`/api/leads/${leadId}/seguimiento`, {
     method: 'PATCH',
     body: JSON.stringify(seguimiento),

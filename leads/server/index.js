@@ -24,6 +24,9 @@ app.listen(PORT, () => {
     console.log(
       `  Leads → ${process.env.SP_ENCUESTAS || 'encuestasMuestraOperador'} @idVendedor @ ${process.env.ENCUESTAS_DB_NAME || process.env.DB_NAME}`,
     );
+    console.log(
+      `  Seguimiento → ${process.env.SP_SEGUIMIENTO || '(SQLite local)'} @ ${process.env.ENCUESTAS_DB_NAME || process.env.DB_NAME}`,
+    );
     console.log(`  Health rápido → ${base}api/health/live`);
   } else {
     console.error('FALTA .env: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME — no hay modo demo.');

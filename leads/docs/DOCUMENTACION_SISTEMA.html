@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Documentación del Sistema — Seguimiento de Leads</title>
+<style>
+  body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; color: #1a1a1a; line-height: 1.4; }
+  h1 { font-size: 24pt; color: #1a3c6e; border-bottom: 3px solid #1a3c6e; padding-bottom: 6px; }
+  h2 { font-size: 17pt; color: #1a3c6e; margin-top: 24px; border-bottom: 1px solid #c0c0c0; padding-bottom: 3px; }
+  h3 { font-size: 13pt; color: #2a5599; margin-top: 16px; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+  th { background-color: #1a3c6e; color: #ffffff; text-align: left; padding: 6px 8px; border: 1px solid #888; font-size: 10pt; }
+  td { padding: 5px 8px; border: 1px solid #bbb; font-size: 10pt; vertical-align: top; }
+  tr:nth-child(even) td { background-color: #f2f5fa; }
+  code { background-color: #eef0f3; padding: 1px 4px; border-radius: 3px; font-family: Consolas, monospace; font-size: 9.5pt; }
+  pre { background-color: #f5f6f8; border: 1px solid #d0d0d0; border-radius: 4px; padding: 10px; font-family: Consolas, monospace; font-size: 9.5pt; white-space: pre-wrap; }
+  blockquote { border-left: 4px solid #2a5599; margin: 10px 0; padding: 4px 12px; background-color: #f2f5fa; color: #333; }
+  ul, ol { margin: 6px 0; }
+  .subtitle { color: #555; font-style: italic; }
+  .st-ok { color: #0d6b2e; font-weight: 600; }
+  .st-partial { color: #9a6700; font-weight: 600; }
+  .st-pending { color: #b42318; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>Documentación del Sistema — Seguimiento de Leads</h1>
+<p class="subtitle">Mi Primer Casa S.A. — Documento maestro de referencia funcional y técnica del CRM Seguimiento de Leads. Reúne objetivos, requerimientos, actores, funciones, reglas de negocio, arquitectura y despliegue.</p>
+
+<h2>1. Resumen ejecutivo</h2>
+<p><strong>Seguimiento de Leads</strong> es un CRM <em>mobile-first</em> para los operadores comerciales de <strong>Mi Primer Casa S.A.</strong>. Permite gestionar los <em>leads</em> (contactos potenciales) que provienen de <strong>encuestas y sorteos</strong> difundidos mediante una <em>landing</em> con código QR, realizar su seguimiento comercial hasta el cierre (venta o descarte), y ofrecer métricas y calendario al equipo de ventas.</p>
+<p>El sistema se conecta a la base de datos de <strong>producción (SQL Server – STRSYSTEM)</strong> para leer los participantes/encuestas y autenticar usuarios, y mantiene una base de datos local <strong>SQLite</strong> para persistir el seguimiento comercial y los catálogos.</p>
+<ul>
+  <li><strong>Producto comercial principal:</strong> Plan Inversión Joven (PIJ) y venta de Terrenos.</li>
+  <li><strong>Usuarios del sistema:</strong> Promotores y Supervisores.</li>
+  <li><strong>Acceso público:</strong> https://www.miprimercasafsa-sorteo.com/leads</li>
+</ul>
+
+<h2>2. Objetivos del sistema</h2>
+<ol>
+  <li><strong>Centralizar</strong> el seguimiento comercial de los leads provenientes de sorteos/encuestas de Mi Primer Casa.</li>
+  <li><strong>Priorizar</strong> las acciones comerciales de mayor valor (interés en terreno derivado → entrevistas pendientes → nuevos contactos sin atender).</li>
+  <li><strong>Registrar ventas</strong> aplicando reglas según producto y rol del usuario.</li>
+  <li><strong>Dar visibilidad al supervisor</strong> sobre su equipo: rendimiento por promotor, calendario de entrevistas y conversión.</li>
+  <li><strong>Permitir carga manual</strong> de leads alineada con el mismo flujo que la landing del sorteo.</li>
+  <li><strong>Soportar múltiples campañas/sorteos</strong> simultáneos sin cambiar la lógica de priorización.</li>
+</ol>
+
+<h2>3. Actores del sistema</h2>
+<table>
+  <tr><th>Actor</th><th>Descripción</th><th>Acceso</th></tr>
+  <tr><td><strong>Promotor comercial</strong></td><td>Operador de campo que gestiona sus propios leads.</td><td>Vistas: Leads, Métricas</td></tr>
+  <tr><td><strong>Supervisor</strong></td><td>Responsable de un equipo de promotores.</td><td>Vistas: Leads, Promotores, Calendario</td></tr>
+  <tr><td><strong>DBA / Administración</strong></td><td>Gestiona Stored Procedures, campañas activas y la planilla de códigos de promotor.</td><td>Backend / Base de datos</td></tr>
+  <tr><td><strong>Cliente final (participante)</strong></td><td>Persona que completó la encuesta/sorteo. Fuera del CRM (es el origen del lead).</td><td>—</td></tr>
+</table>
+
+<h3>Diferencias por rol</h3>
+<table>
+  <tr><th>Capacidad</th><th>Promotor</th><th>Supervisor</th></tr>
+  <tr><td>Ver sus propios leads</td><td>✔</td><td>✔</td></tr>
+  <tr><td>Ver leads de todo el equipo</td><td>—</td><td>✔</td></tr>
+  <tr><td>Contacto rápido (swipe)</td><td>✔</td><td>—</td></tr>
+  <tr><td>Vender Plan Inversión Joven (PIJ)</td><td>✔</td><td>✔</td></tr>
+  <tr><td>Vender Terreno</td><td>—</td><td>✔</td></tr>
+  <tr><td>Derivar interés de Terreno al supervisor</td><td>✔</td><td>—</td></tr>
+  <tr><td>Calendario de entrevistas</td><td>—</td><td>✔</td></tr>
+  <tr><td>Métricas por promotor (equipo)</td><td>—</td><td>✔</td></tr>
+  <tr><td>Métricas personales</td><td>✔</td><td>—</td></tr>
+  <tr><td>Cargar lead manualmente</td><td>✔ (propio)</td><td>✔ (propio o de promotor)</td></tr>
+</table>
+
+<h2>4. Requerimientos</h2>
+<p class="subtitle"><strong>Última revisión de estado:</strong> junio 2026 (auditoría contra <code>src/</code> y <code>server/</code>).</p>
+
+<h3>Leyenda de estado</h3>
+<table>
+  <tr><th>Estado</th><th>Significado</th></tr>
+  <tr><td class="st-ok">Implementado</td><td>Cubierto en la app/backend en el flujo actual del repo.</td></tr>
+  <tr><td class="st-partial">Parcial</td><td>Existe algo equivalente pero falta el detalle del requerimiento.</td></tr>
+  <tr><td class="st-pending">Pendiente</td><td>No implementado o depende del DBA / infra sin integrar.</td></tr>
+</table>
+
+<h3>4.0 Resumen de cumplimiento</h3>
+<table>
+  <tr><th>Ámbito</th><th>Implementados</th><th>Parciales</th><th>Pendientes</th></tr>
+  <tr><td>Requerimientos funcionales (RF-01 … RF-28)</td><td>20</td><td>7</td><td>1</td></tr>
+  <tr><td>Requerimientos no funcionales (RNF-01 … RNF-08)</td><td>8</td><td>0</td><td>0</td></tr>
+  <tr><td>Entregables DBA (sección 13.8)</td><td>1</td><td>2</td><td>7</td></tr>
+</table>
+
+<h3>4.1 Requerimientos funcionales</h3>
+<table>
+  <tr><th>ID</th><th>Estado</th><th>Requerimiento</th><th>Notas</th></tr>
+  <tr><td>RF-01</td><td class="st-ok">Implementado</td><td>Autenticación SQL Server (SP <code>operadorAccesoCategoria</code>).</td><td><code>create-app.js</code></td></tr>
+  <tr><td>RF-02</td><td class="st-ok">Implementado</td><td>Rol automático promotor/supervisor.</td><td><code>encuestas.js</code></td></tr>
+  <tr><td>RF-03</td><td class="st-ok">Implementado</td><td>Listado de leads (<code>encuestasMuestraOperador</code>).</td><td><code>fetchLeads</code></td></tr>
+  <tr><td>RF-04</td><td class="st-ok">Implementado</td><td>Pestañas Prioridad, Contactado, En seguimiento, Cierres.</td><td><code>LeadsPanel</code></td></tr>
+  <tr><td>RF-05</td><td class="st-ok">Implementado</td><td>Prioridad 0→1→2, FIFO por fecha de alta.</td><td><code>prioridad-leads.ts</code></td></tr>
+  <tr><td>RF-06</td><td class="st-ok">Implementado</td><td>Alerta encuestas sin contactar ≥ 2 días.</td><td><code>AlertasSinContactar</code></td></tr>
+  <tr><td>RF-07</td><td class="st-ok">Implementado</td><td>Seguimiento completo (contacto, entrevista, venta, referidos).</td><td><code>LeadModalForm</code></td></tr>
+  <tr><td>RF-08</td><td class="st-ok">Implementado</td><td>Agendar y reagendar entrevistas.</td><td><code>NuevoLeadSheet</code>, calendario</td></tr>
+  <tr><td>RF-09</td><td class="st-ok">Implementado</td><td>Carga manual de leads.</td><td><code>encuesta-carga.js</code></td></tr>
+  <tr><td>RF-10</td><td class="st-ok">Implementado</td><td>Rechazar duplicado teléfono + campaña.</td><td>API + SP</td></tr>
+  <tr><td>RF-11</td><td class="st-ok">Implementado</td><td>WhatsApp con mensaje prearmado.</td><td><code>WhatsAppLeadButton</code></td></tr>
+  <tr><td>RF-12</td><td class="st-ok">Implementado</td><td>Links Instagram/Facebook por operador.</td><td><code>LinksRedesSection</code></td></tr>
+  <tr><td>RF-13</td><td class="st-ok">Implementado</td><td>Calendario mensual supervisor + feriados AR.</td><td><code>CalendarioView</code></td></tr>
+  <tr><td>RF-14</td><td class="st-ok">Implementado</td><td>Métricas conversión por promotor.</td><td><code>PromotoresTable</code></td></tr>
+  <tr><td>RF-15</td><td class="st-ok">Implementado</td><td>Métricas personales del promotor.</td><td><code>PromotorMetricasPanel</code></td></tr>
+  <tr><td>RF-16</td><td class="st-ok">Implementado</td><td>Reglas de venta PIJ/Terreno por rol.</td><td><code>venta.ts</code>, Zod</td></tr>
+  <tr><td>RF-17</td><td class="st-partial">Parcial</td><td>Múltiples campañas (<code>codigoCampania</code>).</td><td>App OK; tabla <code>campania</code> y SP listado pendientes</td></tr>
+  <tr><td>RF-18</td><td class="st-partial">Parcial</td><td>Captación en calle con QR y verificación del lead.</td><td>Flujo landing + listado; sin pantalla dedicada</td></tr>
+  <tr><td>RF-19</td><td class="st-ok">Implementado</td><td>Seguimiento diferido por el promotor.</td><td><code>LeadModalForm</code></td></tr>
+  <tr><td>RF-20</td><td class="st-partial">Parcial</td><td>Lead sin tratar por promotor → gestión supervisor.</td><td>Queda en Prioridad; sin bandeja explícita</td></tr>
+  <tr><td>RF-21</td><td class="st-partial">Parcial</td><td>PIJ promotor → Cierres QC; sale de bandeja supervisor.</td><td>Va a Cierres; sin subsección QC ni exclusión de Prioridad</td></tr>
+  <tr><td>RF-22</td><td class="st-partial">Parcial</td><td>Supervisor recibe no cerrados por promotor (todas las fuentes).</td><td>Todo el SP; sin filtro UI</td></tr>
+  <tr><td>RF-23</td><td class="st-ok">Implementado</td><td>Máquina de estados Prioridad / Contactado / Seguimiento / Cierre.</td><td>jun. 2026</td></tr>
+  <tr><td>RF-24</td><td class="st-ok">Implementado</td><td>Negativos (<code>sin_interes</code>, <code>no_compro</code>) en Contactado.</td><td>jun. 2026</td></tr>
+  <tr><td>RF-25</td><td class="st-partial">Parcial</td><td>Cierres: ventas supervisor + PIJ promotores para QC.</td><td>Lista <code>compro</code>; sin flujo QC dedicado</td></tr>
+  <tr><td>RF-26</td><td class="st-pending">Pendiente</td><td>Efectividad de entrevistas por promotor.</td><td>Falta métrica entrevistas vs compras/no compras</td></tr>
+  <tr><td>RF-27</td><td class="st-partial">Parcial</td><td>Confirmar reagendas una por una en En seguimiento.</td><td>Modal genérico; sin paso guiado</td></tr>
+  <tr><td>RF-28</td><td class="st-ok">Implementado</td><td>Lógica independiente del sorteo/campaña.</td><td><code>prioridad-leads.ts</code></td></tr>
+</table>
+
+<h3>4.2 Requerimientos no funcionales</h3>
+<table>
+  <tr><th>ID</th><th>Estado</th><th>Requerimiento</th></tr>
+  <tr><td>RNF-01</td><td class="st-ok">Implementado</td><td><strong>Mobile-first</strong></td></tr>
+  <tr><td>RNF-02</td><td class="st-ok">Implementado</td><td>SPA bajo path <code>/leads</code></td></tr>
+  <tr><td>RNF-03</td><td class="st-ok">Implementado</td><td>Sesión en <code>sessionStorage</code></td></tr>
+  <tr><td>RNF-04</td><td class="st-ok">Implementado</td><td>Seguimiento en SQLite + volumen Docker</td></tr>
+  <tr><td>RNF-05</td><td class="st-ok">Implementado</td><td>Solo producción (demo opcional)</td></tr>
+  <tr><td>RNF-06</td><td class="st-ok">Implementado</td><td>Endpoints <code>/health</code></td></tr>
+  <tr><td>RNF-07</td><td class="st-ok">Implementado</td><td>Docker + Traefik VPS</td></tr>
+  <tr><td>RNF-08</td><td class="st-ok">Implementado</td><td>Validación Zod</td></tr>
+</table>
+
+<h2>5. Arquitectura técnica</h2>
+<h3>5.1 Stack tecnológico</h3>
+<table>
+  <tr><th>Capa</th><th>Tecnología</th></tr>
+  <tr><td>Runtime</td><td>Node.js ≥ 20.19</td></tr>
+  <tr><td>Frontend</td><td>React 19, TypeScript 5.8, Vite 7, Tailwind CSS 4</td></tr>
+  <tr><td>Librerías UI</td><td>vaul (drawers), react-datepicker, recharts</td></tr>
+  <tr><td>Backend</td><td>Express 5, compression, cors, Zod</td></tr>
+  <tr><td>BD producción</td><td>SQL Server (STRSYSTEM / mensajeria) vía mssql</td></tr>
+  <tr><td>BD local</td><td>SQLite vía better-sqlite3</td></tr>
+  <tr><td>Fechas</td><td>date-fns 4</td></tr>
+  <tr><td>Dev</td><td>concurrently (API + Vite en paralelo)</td></tr>
+</table>
+<blockquote>Nota: la navegación no usa React Router; se controla por estado <code>VistaActiva</code> en <code>App.tsx</code>.</blockquote>
+
+<h3>5.2 Estructura de directorios</h3>
+<pre>SEGUIMIENTO_LEADS/
+├── src/                    # Frontend React + TypeScript
+│   ├── api/                # Cliente HTTP y modo demo
+│   ├── components/         # UI por dominio (auth, leads, calendario, promotores, layout, ui)
+│   ├── context/            # AuthContext
+│   ├── domain/             # Lógica de negocio pura
+│   ├── hooks/              # Filtrado de leads y métricas
+│   ├── lib/                # Calendario, feriados AR
+│   ├── types/              # Tipos TypeScript centrales
+│   └── App.tsx             # Shell principal
+├── server/                 # API Express
+│   ├── db/                 # SQL Server, SQLite, encuestas, carga, catálogos
+│   ├── schemas/            # Validación Zod
+│   ├── catalog.js          # Productos y barrios
+│   └── create-app.js       # Rutas API + SPA estática
+├── deploy/                 # Docker, Traefik, scripts VPS, workflows
+├── docs/                   # Documentación
+├── sql/migrations/         # Borrador tablas CRM (futuro)
+└── Dockerfile</pre>
+
+<h3>5.3 Modelo de datos principal (Lead)</h3>
+<table>
+  <tr><th>Entidad</th><th>Campos clave</th></tr>
+  <tr><td><strong>Lead</strong></td><td><code>id</code>, <code>encuestaUsuario</code>, <code>telefono</code>, <code>nombre</code>, <code>domicilio</code>, <code>promotorNombre</code>, <code>promotorId</code>, <code>fechaAlta</code>, <code>lista</code> (entrevista|contacto), <code>codigoCampania</code>, <code>horarioEntrevista</code>, <code>lugarEntrevista</code>, <code>seguimiento</code></td></tr>
+  <tr><td><strong>SeguimientoLead</strong></td><td><code>fuente</code>, <code>canal</code>, <code>huboEntrevista</code>, <code>resultadoEntrevista</code>, <code>horarioEntrevistaPropuesto</code>, <code>fechaReagenda</code>, <code>idProducto</code>, <code>estadoPago</code>, <code>idBarrio</code>, <code>numeroRecibo</code>, <code>referidos</code>, <code>observaciones</code></td></tr>
+  <tr><td><strong>NuevoLeadData</strong></td><td>Campos de carga manual + datos para agendar entrevista</td></tr>
+  <tr><td><strong>UsuarioSesion</strong></td><td><code>id</code>, <code>nombre</code>, <code>rol</code>, <code>categoria</code>, <code>codigoCarga</code>, <code>idOperador</code>, <code>idSupervisor</code>, <code>idVendedor</code>, <code>rolOrigen</code></td></tr>
+</table>
+
+<h2>6. Funcionalidades detalladas</h2>
+<h3>6.1 Autenticación y roles</h3>
+<ul>
+  <li>Login con email/clave validado contra el SP <code>operadorAccesoCategoria</code> (SQL Server).</li>
+  <li>El rol se determina así:
+    <ul>
+      <li><code>idOperador === idVendedor</code> → <strong>supervisor</strong></li>
+      <li><code>idOperador !== idVendedor</code> → <strong>promotor</strong></li>
+      <li>Respaldo: columna <code>Categoria</code> (PROMOTOR / SUPERVISOR).</li>
+    </ul>
+  </li>
+  <li><strong>Modo demo:</strong> activable con <code>VITE_DEMO=true</code> o por URL (<code>/demo/supervisor</code>, <code>/demo/promotor</code>) usando datos ficticios.</li>
+</ul>
+
+<h3>6.2 Gestión de leads — ciclo de vida</h3>
+<pre>Encuesta/sorteo (SQL) → Listado SP → Tarjeta en CRM
+        ↓
+Prioridad (sin contactar / entrevista pendiente / terreno derivado)
+        ↓
+Contacto (canal: llamada / mensaje)
+        ↓
+Entrevista (confirmada / realizada)
+        ↓
+Resultado: compró | no compró | sin interés | reagenda | derivar terreno
+        ↓
+Cierre (venta con producto + pago + recibo) o archivo negativo</pre>
+<p><strong>Pestañas de la vista Leads (LeadsPanel):</strong></p>
+<ol>
+  <li><strong>Prioridad</strong> — leads agrupados por prioridad (0 → 1 → 2).</li>
+  <li><strong>Contactado</strong> — ya hubo contacto, no son prioridad ni reagenda.</li>
+  <li><strong>En seguimiento</strong> — <code>resultadoEntrevista = reagenda</code>.</li>
+  <li><strong>Cierres</strong> — compraron + subsección «No compró».</li>
+</ol>
+<p><strong>Modal de seguimiento (LeadModalForm):</strong> drawer que recorre confirmación de entrevista → canal de contacto → ¿hubo entrevista? → resultado (según rol) → venta (producto, pago, barrio, recibo, referidos).</p>
+
+<h3>6.3 Priorización de leads (bandeja inicial / no contactados)</h3>
+<blockquote>Detalle completo en <code>docs/PRIORIDAD_LEADS.md</code>. La prioridad es <strong>independiente del sorteo/campaña</strong>: cada sorteo nuevo solo agrega más filas, no cambia la lógica.</blockquote>
+<p>La pestaña <strong>Prioridad</strong> ordena los leads no contactados <strong>cronológicamente y por orden de importancia</strong>. Se muestran primero los de mayor valor comercial:</p>
+<table>
+  <tr><th>Orden</th><th>Grupo</th><th>Condición</th><th>Por qué primero</th></tr>
+  <tr><td>0</td><td>Interés en terreno — derivado por el promotor</td><td><code>resultadoEntrevista = derivar_terreno</code></td><td>Cliente con interés caliente detectado en calle; máxima prioridad de contacto del supervisor.</td></tr>
+  <tr><td>1</td><td>Entrevista pendiente</td><td><code>lista = entrevista</code>, sin cierre/reagenda, horario válido</td><td>Ya hay una cita comprometida que no se puede perder.</td></tr>
+  <tr><td>2</td><td>Encuesta sin contactar</td><td>Hizo la encuesta pero sin entrevista ni derivación; sin <code>canal</code> ni <code>huboEntrevista</code></td><td>Oportunidad fría a la espera del primer contacto.</td></tr>
+</table>
+<p>Dentro de cada grupo el orden es <strong>FIFO por <code>fechaAlta</code></strong> (más antiguo primero), para no dejar envejecer ninguna oportunidad.</p>
+<p><strong>Excluidos de Prioridad:</strong> contactados, reagendas (van a En seguimiento) y cierres. <strong>Alerta:</strong> banner para encuestas de prioridad 2 con ≥ 2 días sin contacto.</p>
+
+<h3>6.10 Flujo operativo de captación (promotor en calle con QR)</h3>
+<p>El promotor sale a la calle con el código QR y opera el lead de punta a punta:</p>
+<ol>
+  <li>El promotor <strong>asiste al cliente</strong> para completar la encuesta mediante el QR.</li>
+  <li>La encuesta genera un <strong>lead</strong> (una fila en <code>encuesta</code>, con su <code>id</code> y <code>codigoCampania</code>).</li>
+  <li>El promotor <strong>verifica en el sistema</strong> que el lead de ese cliente quedó cargado.</li>
+  <li>Si detecta <strong>interés en el momento</strong>, inicia el seguimiento: lo registra en el sistema, o lo gestiona de forma manual y luego completa la información de ese lead.</li>
+  <li>Si el promotor <strong>no realiza la entrevista</strong> y marca «no hubo entrevista», o directamente <strong>no carga la información</strong> del lead, el lead queda <strong>disponible para que el supervisor lo gestione</strong>.</li>
+  <li>Si el promotor <strong>vende un Plan Inversión Joven</strong> y completa todos los pasos, el lead pasa a <strong>Cierres</strong> y le aparece al supervisor en el control de calidad de promotores; <strong>deja de figurar</strong> en la bandeja de gestión directa del supervisor.</li>
+</ol>
+<p><strong>Leads que llegan a la bandeja del supervisor:</strong> todas las encuestas que el promotor <strong>no cerró con venta de PIJ</strong>, sin importar la fuente de captación: QR, Instagram, Facebook o WhatsApp manual.</p>
+
+<h3>6.11 Máquina de estados y transiciones (pestañas)</h3>
+<p>El estado de un lead se deriva de su seguimiento. Define en qué pestaña aparece:</p>
+<table>
+  <tr><th>Pestaña / estado</th><th>Condición de entrada</th><th>Aplica a</th></tr>
+  <tr><td><strong>Prioridad</strong> (no contactado)</td><td>Sin contacto ni cierre. Ordenado: derivar_terreno (0) → entrevista pendiente (1) → encuesta sin contactar (2).</td><td>Promotor y supervisor</td></tr>
+  <tr><td><strong>Contactado</strong></td><td>«¿Hubo entrevista?» = <strong>No</strong> + «No muestra interés» (<code>sin_interes</code>) &nbsp;•&nbsp; o «¿Hubo entrevista?» = <strong>Sí</strong> (por llamada o mensaje) + «No compró» (<code>no_compro</code>).</td><td>Resultados negativos de promotor o supervisor (incluye leads que el promotor cargó con esa info).</td></tr>
+  <tr><td><strong>En seguimiento</strong></td><td>La entrevista se <strong>reagenda</strong> (<code>resultadoEntrevista = reagenda</code>, con <code>fechaReagenda</code>). Permite confirmar las entrevistas una por una.</td><td>Promotor y supervisor</td></tr>
+  <tr><td><strong>Cierre</strong></td><td>El lead <strong>compró</strong> (<code>resultadoEntrevista = compro</code>) Terreno o PIJ.</td><td>Ventas del supervisor (PIJ y Terreno) + ventas de PIJ de promotores (control de calidad).</td></tr>
+</table>
+<blockquote><strong>Estado de implementación:</strong> implementado. Los resultados negativos (<code>no_compro</code>, <code>sin_interes</code>) se muestran en la pestaña <strong>Contactado</strong>; la pestaña <strong>Cierres</strong> solo lista compras (<code>compro</code>). Ver <code>tabIdListaLead</code> en <code>src/domain/leads.ts</code> y <code>src/hooks/useLeadsFilter.ts</code>.</blockquote>
+<p><strong>Diagrama de flujo del lead:</strong></p>
+<pre>Encuesta/sorteo → Lead en bandeja (PRIORIDAD)
+   │
+   ├─ Derivar terreno (promotor) ───────────► PRIORIDAD (orden 0) ──► gestiona supervisor
+   │
+   ├─ ¿Hubo entrevista? = No + No interés ──► CONTACTADO (sin_interes)
+   │
+   ├─ ¿Hubo entrevista? = Sí + No compró ───► CONTACTADO (no_compro)
+   │
+   ├─ Reagenda entrevista ──────────────────► EN SEGUIMIENTO (confirmar 1 x 1)
+   │
+   └─ Compró (PIJ / Terreno) ───────────────► CIERRE (control de calidad supervisor)</pre>
+
+<h3>6.12 Cierres y control de calidad</h3>
+<p>La pestaña <strong>Cierres</strong> reúne todas las ventas para que el supervisor contacte al cliente y haga control de calidad:</p>
+<ul>
+  <li>Ventas del <strong>supervisor</strong>: Plan Inversión Joven y Terreno.</li>
+  <li>Ventas de <strong>PIJ de los promotores</strong>: una vez que el promotor completa todos los pasos, el lead se mueve a Cierres y <strong>sale de la bandeja directa</strong> del supervisor.</li>
+</ul>
+<p>Objetivo: el supervisor puede verificar cada venta cerrada (recibo/comprobante, producto, estado de pago) y contactar al cliente para asegurar la calidad de la operación.</p>
+
+<h3>6.13 Efectividad de entrevistas por promotor (métrica)</h3>
+<p>El supervisor debe poder ver la <strong>efectividad de entrevistas de cada promotor</strong>: cuántas entrevistas realizó y en cuántas se concretó una compra. Indicadores sugeridos por promotor (y por campaña):</p>
+<table>
+  <tr><th>Indicador</th><th>Cálculo</th></tr>
+  <tr><td>Entrevistas realizadas</td><td>Leads con <code>huboEntrevista = true</code></td></tr>
+  <tr><td>Compras</td><td>Leads con <code>resultadoEntrevista = compro</code></td></tr>
+  <tr><td>No compró</td><td>Leads con <code>resultadoEntrevista = no_compro</code></td></tr>
+  <tr><td>Sin interés / sin entrevista</td><td>Leads con <code>resultadoEntrevista = sin_interes</code></td></tr>
+  <tr><td>Tasa de conversión de entrevistas</td><td>Compras / Entrevistas realizadas</td></tr>
+</table>
+
+<h3>6.4 Encuestas, sorteos y participantes</h3>
+<blockquote>Detalle completo en <code>docs/SORTEOS_Y_PARTICIPANTES.md</code>.</blockquote>
+<ul>
+  <li><strong>Una participación = una fila <code>encuesta</code> = un <code>lead.id</code>.</strong></li>
+  <li><strong>Campaña</strong> = columna <code>encuesta</code> (sorteo01, sorteo02, …).</li>
+  <li><strong>Duplicado de carga:</strong> mismo teléfono + misma campaña → rechazado.</li>
+  <li><strong>Mismo teléfono en otra campaña</strong> → permitido (nueva participación).</li>
+  <li>El seguimiento se guarda <strong>por <code>lead.id</code></strong> (no se mezcla entre sorteos).</li>
+  <li>Para lanzar un nuevo sorteo se configura <code>ENCUESTA_CARGA_ID=sorteo02</code>.</li>
+</ul>
+
+<h3>6.5 Carga manual de leads</h3>
+<ul>
+  <li>Se realiza vía el SP de carga (<code>encuestaCargaSorteo01</code> por defecto, configurable).</li>
+  <li>Valida duplicado por teléfono + campaña.</li>
+  <li>El supervisor puede elegir a qué promotor asignar el lead.</li>
+  <li>Errores controlados: <code>ContactoYaRegistradoError</code> (409), <code>CodigoPromotorCargaError</code> (400), <code>CargaEncuestaSinPersistirError</code> (502).</li>
+</ul>
+
+<h3>6.6 Calendario / eventos (solo supervisor)</h3>
+<ul>
+  <li>Construye eventos desde leads con entrevista pendiente o reagenda (excluye comprados).</li>
+  <li>Vista mensual navegable con feriados de Argentina.</li>
+  <li>Acciones desde el calendario: WhatsApp, reagendar, abrir el seguimiento en la vista Leads.</li>
+</ul>
+
+<h3>6.7 Ventas y productos</h3>
+<table>
+  <tr><th>Producto</th><th>Rol</th><th>Estados de pago válidos</th></tr>
+  <tr><td><strong>Plan Inversión Joven (PIJ)</strong></td><td>promotor + supervisor</td><td>seña, entrega $33k, entrega $55k</td></tr>
+  <tr><td><strong>Terreno</strong></td><td>solo supervisor</td><td>seña, 100% (+ barrio obligatorio)</td></tr>
+</table>
+<ul>
+  <li><strong>Barrios disponibles:</strong> Cecotto, Los Elfos, Los Búfalos, Palmares.</li>
+  <li>Se exige número de recibo/comprobante en ventas con entrega o terreno.</li>
+</ul>
+
+<h3>6.8 Links de redes (captación)</h3>
+<ul>
+  <li>Por cada código de operador (SORTEO) hay enlaces preconfigurados de Instagram/Facebook.</li>
+  <li>Permite compartir nativo (<code>navigator.share</code>) o abrir la URL.</li>
+  <li>Visible en LeadsPanel y PromotorMetricasPanel.</li>
+</ul>
+
+<h3>6.9 Métricas</h3>
+<ul>
+  <li><strong>Supervisor (PromotoresPanel):</strong> tabla de conversión, gráfico de leads por promotor/tiempo, distribución por origen y historial.</li>
+  <li><strong>Promotor (PromotorMetricasPanel):</strong> resumen personal, gráfico de origen, historial propio y links de redes.</li>
+</ul>
+
+<h2>7. API del backend</h2>
+<p>Endpoints montados en <code>/api</code> y <code>{APP_BASE_PATH}/api</code> (por defecto <code>/leads/api</code>).</p>
+<table>
+  <tr><th>Método</th><th>Ruta</th><th>Auth</th><th>Descripción</th></tr>
+  <tr><td>GET</td><td>/health/live</td><td>No</td><td>Liveness { ok: true }</td></tr>
+  <tr><td>GET</td><td>/health</td><td>No</td><td>Estado SQL y SPs configurados</td></tr>
+  <tr><td>POST</td><td>/auth/login</td><td>No</td><td>Login SQL Server</td></tr>
+  <tr><td>GET</td><td>/leads</td><td>Headers sesión</td><td>Lista encuestas + seguimiento local</td></tr>
+  <tr><td>POST</td><td>/leads</td><td>Headers sesión</td><td>Carga manual de encuesta</td></tr>
+  <tr><td>PATCH</td><td>/leads/:id/seguimiento</td><td>Headers sesión</td><td>Guarda seguimiento en SQLite</td></tr>
+  <tr><td>GET</td><td>/promotores</td><td>Supervisor</td><td>Promotores derivados de encuestas</td></tr>
+  <tr><td>GET</td><td>/barrios</td><td>SQL configurado</td><td>Catálogo de barrios</td></tr>
+  <tr><td>GET</td><td>/productos?rol=</td><td>SQL configurado</td><td>Catálogo de productos filtrado por rol</td></tr>
+  <tr><td>GET</td><td>/links-redes</td><td>Headers sesión</td><td>Links IG/FB por código de operador</td></tr>
+</table>
+<p><strong>Headers de sesión:</strong> <code>x-usuario-id</code>, <code>x-usuario-rol</code>, <code>x-usuario-nombre</code> (y opcionalmente <code>x-usuario-login-id</code>, <code>x-usuario-codigo-carga</code>, <code>x-promotor-nombre</code>).</p>
+
+<h2>8. Bases de datos</h2>
+<h3>8.1 SQL Server (producción) — vía Stored Procedures</h3>
+<table>
+  <tr><th>Stored Procedure</th><th>Uso</th></tr>
+  <tr><td><code>operadorAccesoCategoria</code></td><td>Login (@LoginID, @PasID)</td></tr>
+  <tr><td><code>encuestasMuestraOperador</code></td><td>Listado de leads (@idVendedor)</td></tr>
+  <tr><td><code>encuestaCargaSorteo01</code> (configurable)</td><td>Alta manual de lead</td></tr>
+</table>
+
+<h3>8.2 SQLite local (data/app-cache.db)</h3>
+<table>
+  <tr><th>Tabla</th><th>Propósito</th></tr>
+  <tr><td><code>lead_seguimiento_externo</code></td><td>JSON de seguimiento por lead_id</td></tr>
+  <tr><td><code>seguimiento_eventos</code></td><td>Auditoría de cambios</td></tr>
+  <tr><td><code>productos</code></td><td>Catálogo sincronizado desde catalog.js</td></tr>
+  <tr><td><code>barrios</code></td><td>Catálogo sincronizado</td></tr>
+</table>
+
+<h2>9. Despliegue e infraestructura</h2>
+<ul>
+  <li><strong>Contenedor:</strong> seguimiento-leads (Node 20, puerto interno 3001).</li>
+  <li><strong>Proxy:</strong> Traefik en VPS Hostinger.</li>
+  <li><strong>Ruta pública:</strong> https://www.miprimercasafsa-sorteo.com/leads (PathPrefix /leads).</li>
+  <li><strong>Volumen:</strong> ./data → persistencia de SQLite.</li>
+  <li><strong>CI/CD:</strong> push a main en leads/** → deploy por SSH + verificación de salud.</li>
+</ul>
+<h3>Variables de entorno críticas</h3>
+<pre>APP_BASE_PATH=/leads
+SP_LOGIN, SP_ENCUESTAS, SP_CARGA_ENCUESTA
+ENCUESTA_CARGA_ID=sorteo01
+DB_HOST, DB_NAME, ENCUESTAS_DB_NAME, DB_USER, DB_PASSWORD
+LEADS_HOST, LEADS_TRAEFIK_HOST</pre>
+
+<h2>10. Integraciones externas</h2>
+<ul>
+  <li><strong>SQL Server STRSYSTEM</strong> (+ lectura de mensajeria según SP).</li>
+  <li><strong>Landing encuesta-sorteo</strong> (misma tabla encuesta, mismos SPs de carga/listado).</li>
+  <li><strong>WhatsApp</strong> (enlaces wa.me).</li>
+  <li><strong>Redes sociales</strong> (links compartibles por operador).</li>
+</ul>
+
+<h2>11. Limitaciones actuales conocidas</h2>
+<ul>
+  <li>El seguimiento se guarda en <strong>SQLite local</strong> del contenedor (aún no en SQL Server CRM).</li>
+  <li>El SP <code>SP_RegistrarSeguimientoLead</code> está planeado pero <strong>no integrado</strong> (ver <code>sql/migrations/001_lead_seguimiento_crm.sql</code>).</li>
+  <li>El listado muestra lo que devuelve el SP, sin deduplicar por teléfono a nivel global.</li>
+  <li>El modo producción <strong>requiere</strong> un .env con configuración de SQL; no hay demo del lado del servidor.</li>
+</ul>
+
+<h2>12. Documentación complementaria</h2>
+<table>
+  <tr><th>Archivo</th><th>Contenido</th></tr>
+  <tr><td><code>docs/PRIORIDAD_LEADS.md</code></td><td>Reglas de la pestaña Prioridad y checklist para nuevo sorteo</td></tr>
+  <tr><td><code>docs/SORTEOS_Y_PARTICIPANTES.md</code></td><td>Modelo de participación multicampaña y duplicados</td></tr>
+  <tr><td><code>docs/ESTRUCTURAS_TABLAS_SP.md</code></td><td>Columnas de los SP y mapeo encuesta → CRM</td></tr>
+  <tr><td><code>docs/LOGIN_SP.md</code></td><td>Detalle del login operadorAccesoCategoria</td></tr>
+  <tr><td><code>docs/MONOREPO.md</code></td><td>Integración en encuesta-sorteo/leads/</td></tr>
+  <tr><td><code>docs/DEPLOY_VPS.md</code></td><td>Infraestructura, Traefik, primer deploy</td></tr>
+  <tr><td><code>docs/FLUJO-FRONTEND-DEPLOY.md</code></td><td>Flujo de build/deploy del frontend</td></tr>
+  <tr><td><code>README.md</code></td><td>Quick start y resumen de la API</td></tr>
+</table>
+
+<h2>13. Anexo — Parámetros y procedimientos para el DBA</h2>
+<p>Especificación para que el DBA cree y mantenga la capa de datos del CRM. <strong>Principio rector: todo debe ser abstracto respecto del sorteo/campaña.</strong> El día de mañana se lanzarán más sorteos y la misma persona podrá volver a participar; el sistema debe seguir funcionando <strong>sin cambios de código</strong>, solo configurando la campaña activa.</p>
+
+<h3>13.1 Principio de abstracción multi-sorteo</h3>
+<ul>
+  <li><strong>Nada hardcodeado:</strong> ningún procedimiento debe contener el texto <code>sorteo01</code> fijo. La campaña se pasa siempre como parámetro <code>@encuesta</code> (o se resuelve desde una tabla de campaña activa).</li>
+  <li><strong>Una participación = una fila</strong> en <code>encuesta</code>, identificada por <code>id</code> (PK) y <code>encuesta</code> (campaña). Misma persona en sorteo01 y sorteo02 = dos leads independientes con su propio seguimiento.</li>
+  <li><strong>Unicidad por campaña:</strong> evitar <code>UNIQUE</code> global por teléfono. Usar <code>UNIQUE (telefono_normalizado, encuesta)</code> para permitir reparticipación en nuevos sorteos.</li>
+  <li><strong>Estado y métricas calculados sobre columnas estables</strong> (no sobre el nombre del sorteo): teléfono, fecha de alta, horario de entrevista, resultado de entrevista, producto.</li>
+</ul>
+
+<h3>13.2 Tabla de campañas (abstracción del sorteo)</h3>
+<p><strong>Justificación:</strong> permite lanzar nuevos sorteos y marcar cuál está activo sin tocar la app. La app consulta la campaña activa en lugar de tener el código fijo en el deploy.</p>
+<pre>CREATE TABLE dbo.campania (
+  id_campania   INT IDENTITY(1,1) PRIMARY KEY,
+  codigo        NVARCHAR(64)  NOT NULL UNIQUE,  -- sorteo01, sorteo02, ...
+  nombre        NVARCHAR(120) NOT NULL,         -- "Sorteo 01"
+  activa        BIT           NOT NULL DEFAULT 0,
+  fecha_inicio  DATETIME2     NULL,
+  fecha_fin     DATETIME2     NULL
+);
+-- Solo una campaña activa a la vez (regla de negocio a aplicar por el DBA).</pre>
+
+<h3>13.3 Persistencia del seguimiento — <code>SP_RegistrarSeguimientoLead</code></h3>
+<p><strong>Estado actual:</strong> hoy la app guarda el seguimiento en SQLite local (<code>lead_seguimiento_externo</code>). El objetivo es persistirlo en SQL Server vía este SP, sobre la tabla <code>lead_seguimiento_crm</code> (ya propuesta en <code>sql/migrations/001_lead_seguimiento_crm.sql</code>).</p>
+<p><strong>Justificación:</strong> centraliza el seguimiento en la base corporativa, habilita reportes/cierres/métricas server-side y sobrevive a recreaciones del contenedor.</p>
+<p><strong>Parámetros que la app enviará</strong> (todos opcionales salvo los de identificación):</p>
+<table>
+  <tr><th>Parámetro</th><th>Tipo</th><th>Justificación / uso</th></tr>
+  <tr><td><code>@lead_id</code></td><td>INT</td><td>PK de la fila de <code>encuesta</code> (= <code>lead.id</code>). Identifica la participación exacta.</td></tr>
+  <tr><td><code>@telefono</code></td><td>NVARCHAR(32)</td><td>Refuerza identidad y permite armar <code>lead_key</code>.</td></tr>
+  <tr><td><code>@encuesta</code></td><td>NVARCHAR(64)</td><td>Campaña del lead. Clave de la abstracción multi-sorteo.</td></tr>
+  <tr><td><code>@canal</code></td><td>NVARCHAR(16)</td><td><code>llamada</code> | <code>mensaje</code> | NULL. Cómo se contactó.</td></tr>
+  <tr><td><code>@hubo_entrevista</code></td><td>BIT</td><td>Sí/No/NULL. Determina la rama de la máquina de estados.</td></tr>
+  <tr><td><code>@resultado_entrevista</code></td><td>NVARCHAR(16)</td><td><code>sin_interes</code> | <code>reagenda</code> | <code>no_compro</code> | <code>compro</code> | <code>derivar_terreno</code>. Define la pestaña/estado.</td></tr>
+  <tr><td><code>@horario_entrevista_propuesto</code></td><td>NVARCHAR(32)</td><td>Fecha/hora cuando el promotor deriva terreno con cita.</td></tr>
+  <tr><td><code>@fecha_reagenda</code></td><td>NVARCHAR(32)</td><td>Obligatoria si <code>@resultado_entrevista = reagenda</code>. Mueve a En seguimiento.</td></tr>
+  <tr><td><code>@seguimiento_pij_promotor</code></td><td>BIT</td><td>Reagenda del promotor tras «No compró» PIJ; el supervisor la ve solo lectura.</td></tr>
+  <tr><td><code>@id_producto</code></td><td>NVARCHAR(32)</td><td><code>prod-pij</code> | <code>prod-terreno</code>. Obligatorio si compró.</td></tr>
+  <tr><td><code>@estado_pago</code></td><td>NVARCHAR(16)</td><td><code>sena</code> | <code>cien</code> | <code>entrega_33</code> | <code>entrega_55</code>. Validado según producto.</td></tr>
+  <tr><td><code>@id_barrio</code></td><td>NVARCHAR(32)</td><td>Obligatorio en venta de Terreno.</td></tr>
+  <tr><td><code>@numero_recibo</code></td><td>NVARCHAR(80)</td><td>Recibo (supervisor) o comprobante (promotor) de la venta.</td></tr>
+  <tr><td><code>@brindo_referidos</code></td><td>BIT</td><td>Si el cliente dejó referidos.</td></tr>
+  <tr><td><code>@referidos_json</code></td><td>NVARCHAR(MAX)</td><td>Lista de referidos <code>[{nombre, telefono}]</code>.</td></tr>
+  <tr><td><code>@observaciones</code></td><td>NVARCHAR(500)</td><td>Notas libres del operador.</td></tr>
+  <tr><td><code>@operador_id</code></td><td>INT</td><td>Quién registró el seguimiento (auditoría).</td></tr>
+  <tr><td><code>@operador_rol</code></td><td>NVARCHAR(16)</td><td><code>promotor</code> | <code>supervisor</code>. Necesario para cierres y control de calidad.</td></tr>
+  <tr><td><code>@operador_nombre</code></td><td>NVARCHAR(200)</td><td>Nombre del operador (auditoría / UI).</td></tr>
+  <tr><td><code>@seguimiento_json</code></td><td>NVARCHAR(MAX)</td><td>JSON completo del modal (a prueba de futuro: campos nuevos no rompen el contrato).</td></tr>
+</table>
+<p><strong>Firma propuesta:</strong></p>
+<pre>CREATE OR ALTER PROCEDURE dbo.SP_RegistrarSeguimientoLead
+  @lead_id INT,
+  @telefono NVARCHAR(32) = NULL,
+  @encuesta NVARCHAR(64) = NULL,
+  @canal NVARCHAR(16) = NULL,
+  @hubo_entrevista BIT = NULL,
+  @resultado_entrevista NVARCHAR(16) = NULL,
+  @horario_entrevista_propuesto NVARCHAR(32) = NULL,
+  @fecha_reagenda NVARCHAR(32) = NULL,
+  @seguimiento_pij_promotor BIT = NULL,
+  @id_producto NVARCHAR(32) = NULL,
+  @estado_pago NVARCHAR(16) = NULL,
+  @id_barrio NVARCHAR(32) = NULL,
+  @numero_recibo NVARCHAR(80) = NULL,
+  @brindo_referidos BIT = NULL,
+  @referidos_json NVARCHAR(MAX) = NULL,
+  @observaciones NVARCHAR(500) = NULL,
+  @operador_id INT = NULL,
+  @operador_rol NVARCHAR(16) = NULL,
+  @operador_nombre NVARCHAR(200) = NULL,
+  @seguimiento_json NVARCHAR(MAX) = NULL
+AS
+BEGIN
+  SET NOCOUNT ON;
+  -- UPSERT por lead_key = CONCAT(@telefono, '|', @encuesta) o por @lead_id.
+  -- Calcular columna 'estado' derivada (nuevo/contactado/en_seguimiento/cerrado_compro/derivado_terreno).
+  -- Guardar columnas clave (resultado, producto, estado_pago, operador_rol, fecha_cierre) + seguimiento_json.
+END;</pre>
+
+<h3>13.4 Listado de leads parametrizado por campaña — <code>encuestasMuestraOperador</code></h3>
+<p><strong>Justificación:</strong> el listado debe poder filtrar por campaña activa y, además, devolver ya el seguimiento (estado actual) para que la app arme las pestañas en una sola llamada.</p>
+<table>
+  <tr><th>Parámetro</th><th>Tipo</th><th>Uso</th></tr>
+  <tr><td><code>@idVendedor</code></td><td>INT</td><td>Operador logueado (= <code>idOperador</code> del login). Filtra sus leads.</td></tr>
+  <tr><td><code>@encuesta</code></td><td>NVARCHAR(64) = NULL</td><td>Campaña a listar. <code>NULL</code> = campaña activa o todas, según política acordada.</td></tr>
+  <tr><td><code>@solo_campania_activa</code></td><td>BIT = 1</td><td>Si está en 1, devuelve solo la campaña marcada como activa en <code>dbo.campania</code>.</td></tr>
+</table>
+<p>Debe hacer <code>LEFT JOIN</code> con <code>lead_seguimiento_crm</code> para devolver, junto a cada encuesta, su <code>estado</code>, <code>resultado_entrevista</code>, <code>operador_rol</code> y <code>seguimiento_json</code>. Políticas posibles a acordar (documentar cuál se elige): <strong>A</strong> todas las participaciones visibles, <strong>B</strong> solo campaña activa, <strong>C</strong> última participación por teléfono. Recomendado: A o B.</p>
+
+<h3>13.5 Carga de leads parametrizada — <code>SP_CargarEncuesta</code></h3>
+<p><strong>Justificación:</strong> un único SP parametrizado por campaña es más mantenible que un SP por sorteo (<code>encuestaCargaSorteo01</code>, <code>...02</code>, etc.).</p>
+<table>
+  <tr><th>Parámetro</th><th>Uso</th></tr>
+  <tr><td><code>@telefono</code></td><td>Teléfono del cliente. Parte de la clave de duplicado.</td></tr>
+  <tr><td><code>@encuesta</code></td><td>Campaña. Parte de la clave de duplicado. <strong>No hardcodear.</strong></td></tr>
+  <tr><td><code>@usuario</code></td><td>Código del promotor / QR (ej. <code>SORTEO01S21P01</code>). Asigna el lead al promotor.</td></tr>
+  <tr><td><code>@campo1</code> … <code>@campo8</code></td><td>Respuestas de la encuesta (nombre, domicilio, asesoramiento, horario, modalidad, domicilio entrevista).</td></tr>
+  <tr><td><code>@origen</code></td><td>Fuente de captación: <code>QR</code>, <code>Facebook</code>, <code>Instagram</code>, <code>Manual</code>/<code>App</code>.</td></tr>
+</table>
+<p><strong>Regla de duplicado:</strong> rechazar solo si existe <strong>mismo <code>@telefono</code> + mismo <code>@encuesta</code></strong> (devolver código de duplicado). Mismo teléfono en otra campaña = participación nueva válida.</p>
+
+<h3>13.6 Cierres y control de calidad del supervisor — <code>SP_LeadsCierresSupervisor</code></h3>
+<p><strong>Justificación:</strong> el supervisor necesita ver, en un solo lugar, todas las ventas cerradas (propias de PIJ y Terreno, y las de PIJ de sus promotores) para hacer control de calidad.</p>
+<table>
+  <tr><th>Parámetro</th><th>Uso</th></tr>
+  <tr><td><code>@id_supervisor</code></td><td>Supervisor logueado. Filtra su equipo.</td></tr>
+  <tr><td><code>@encuesta</code> = NULL</td><td>Campaña (NULL = todas / activa).</td></tr>
+</table>
+<p>Devuelve los leads con <code>resultado_entrevista = compro</code>, con columnas: <code>producto</code>, <code>estado_pago</code>, <code>numero_recibo</code>, <code>operador_rol</code> (promotor/supervisor), <code>operador_nombre</code>, teléfono y datos del cliente. Estos leads dejan de aparecer en la bandeja de gestión directa del supervisor.</p>
+
+<h3>13.7 Efectividad de entrevistas por promotor — <code>SP_EfectividadEntrevistasPromotor</code></h3>
+<p><strong>Justificación:</strong> alimenta la métrica de la sección 6.13 sin que la app tenga que traer todos los leads y calcular en el cliente.</p>
+<table>
+  <tr><th>Parámetro</th><th>Uso</th></tr>
+  <tr><td><code>@id_supervisor</code></td><td>Equipo a analizar.</td></tr>
+  <tr><td><code>@encuesta</code> = NULL</td><td>Campaña (NULL = todas / activa). Permite comparar entre sorteos.</td></tr>
+  <tr><td><code>@desde</code>, <code>@hasta</code></td><td>Rango de fechas opcional (por período).</td></tr>
+</table>
+<p>Devuelve, por promotor: <code>entrevistas_realizadas</code> (<code>hubo_entrevista = 1</code>), <code>compras</code> (<code>compro</code>), <code>no_compras</code> (<code>no_compro</code>), <code>sin_interes</code>, y <code>tasa_conversion</code> = compras / entrevistas realizadas.</p>
+
+<h3>13.8 Resumen — qué entregar al DBA</h3>
+<table>
+  <tr><th>#</th><th>Estado</th><th>Entregable / parámetro</th><th>Detalle</th><th>RF</th></tr>
+  <tr><td>1</td><td class="st-pending">Pendiente</td><td>Tabla <code>dbo.campania</code></td><td>Abstracción de sorteos + campaña activa.</td><td>RF-17, RF-28</td></tr>
+  <tr><td>2</td><td class="st-pending">Pendiente</td><td>Tablas <code>lead_seguimiento_crm</code> y <code>lead_nota_crm</code></td><td>Borrador en migración; ejecutar en SQL.</td><td>RNF-04</td></tr>
+  <tr><td>3</td><td class="st-pending">Pendiente</td><td>SP <code>SP_RegistrarSeguimientoLead</code></td><td>20 parámetros §13.3; hoy SQLite.</td><td>RNF-04</td></tr>
+  <tr><td>4</td><td class="st-pending">Pendiente</td><td>SP <code>encuestasMuestraOperador</code> (ampliado)</td><td>+ campaña activa y JOIN seguimiento.</td><td>RF-03, RF-22</td></tr>
+  <tr><td>5</td><td class="st-partial">Parcial</td><td>SP <code>SP_CargarEncuesta</code> parametrizado</td><td>Existe carga por <code>ENCUESTA_CARGA_ID</code>.</td><td>RF-09</td></tr>
+  <tr><td>6</td><td class="st-pending">Pendiente</td><td>SP <code>SP_LeadsCierresSupervisor</code></td><td>Cierres QC en servidor.</td><td>RF-21, RF-25</td></tr>
+  <tr><td>7</td><td class="st-pending">Pendiente</td><td>SP <code>SP_EfectividadEntrevistasPromotor</code></td><td>Métrica entrevistas por promotor.</td><td>RF-26</td></tr>
+  <tr><td>8</td><td class="st-pending">Pendiente</td><td>Índice UNIQUE (teléfono, encuesta)</td><td>Reparticipación en nuevos sorteos.</td><td>RF-10</td></tr>
+  <tr><td>9</td><td class="st-partial">Parcial</td><td>Permisos SQL <code>MPCSP</code></td><td>Login/listado OK; faltan SP/tablas CRM.</td><td>RF-01</td></tr>
+  <tr><td>10</td><td class="st-ok">Implementado</td><td><code>ENCUESTA_CARGA_ID</code> en deploy</td><td><code>encuesta-carga.js</code></td><td>RF-17</td></tr>
+</table>
+<blockquote>Consultas para que el DBA obtenga el DDL real (definición de SP y tablas que tocan) están en <code>docs/ESTRUCTURAS_TABLAS_SP.md</code> (sección 5: <code>sp_helptext</code>, <code>sys.sql_expression_dependencies</code>, <code>sp_help</code>).</blockquote>
+
+<p class="subtitle">Documento generado a partir del análisis integral del repositorio. Mantener actualizado ante cambios funcionales relevantes. Cada vez que se agregan requerimientos se actualiza esta documentación y el anexo del DBA (sección 13).</p>
+
+</body>
+</html>

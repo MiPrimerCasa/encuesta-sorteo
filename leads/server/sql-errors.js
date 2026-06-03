@@ -58,6 +58,25 @@ export function formatSqlError(error) {
     };
   }
 
+  const seguimientoSelectDenied =
+    /SELECT permission was denied/i.test(raw) &&
+    /registrarSeguimientoLead/i.test(raw);
+
+  if (seguimientoSelectDenied) {
+    return {
+      message:
+        `El usuario SQL «${sqlUser}» no puede leer la tabla «registrarSeguimientoLead» en «${dbConexion}». ` +
+        'Los leads del sorteo deberían listarse igual; guardar seguimiento e historial requieren permisos del DBA.',
+      code: 'PERMISO_SELECT_SEGUIMIENTO',
+      detail: raw,
+      adminSql: [
+        `USE [${dbConexion}];`,
+        `GRANT EXECUTE ON dbo.SP_RegistrarSeguimientoLead TO [${sqlUser}];`,
+        `GRANT SELECT, INSERT ON dbo.registrarSeguimientoLead TO [${sqlUser}];`,
+      ].join('\n'),
+    };
+  }
+
   if (
     /not able to access|no puede acceder|permission|permiso|cannot open database/i.test(raw)
   ) {

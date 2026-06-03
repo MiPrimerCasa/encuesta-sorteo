@@ -13,6 +13,9 @@ GO
 GRANT CONNECT TO [MPCSP];
 GRANT EXECUTE ON dbo.operadorAccesoCategoria TO [MPCSP];
 GRANT EXECUTE ON dbo.encuestasMuestraOperador TO [MPCSP];
+-- Seguimiento CRM (SP + lectura/escritura historial en tabla)
+GRANT EXECUTE ON dbo.SP_RegistrarSeguimientoLead TO [MPCSP];
+GRANT SELECT, INSERT ON dbo.registrarSeguimientoLead TO [MPCSP];
 -- Si tras EXECUTE falla por SELECT en tablas internas del SP:
 -- ALTER ROLE db_datareader ADD MEMBER [MPCSP];
 GO

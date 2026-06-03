@@ -137,6 +137,8 @@ function registerApiRoutes(api) {
       const direccionOficinasSupervisor = resolveDireccionOficinasSupervisor(rowsEncuesta);
       const conTelefono = leads.filter((l) => l.telefono).length;
       const conFuente = leads.filter((l) => l.seguimiento?.fuente).length;
+      const { consumeSeguimientoLecturaDegradada } = await import('./db/seguimiento-sql.js');
+      const seguimientoSinPermisoLectura = consumeSeguimientoLecturaDegradada();
       return res.json({
         leads,
         source: 'produccion',
@@ -148,6 +150,13 @@ function registerApiRoutes(api) {
           leadsConTelefono: conTelefono,
           leadsConFuente: conFuente,
           leadsTotal: leads.length,
+          ...(seguimientoSinPermisoLectura
+            ? {
+                seguimientoSinPermisoLectura: true,
+                avisoSeguimiento:
+                  'Falta permiso SELECT en registrarSeguimientoLead: los leads se muestran sin estado de seguimiento guardado.',
+              }
+            : {}),
         },
       });
     } catch (error) {

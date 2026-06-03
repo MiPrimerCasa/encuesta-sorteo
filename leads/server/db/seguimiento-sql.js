@@ -19,6 +19,36 @@ export function useSeguimientoSql() {
   return isSqlServerConfigured() && Boolean(String(process.env.SP_SEGUIMIENTO ?? '').trim());
 }
 
+/** True si el último listado/leads usó seguimiento vacío por permiso SELECT denegado. */
+let seguimientoLecturaDegradada = false;
+
+export function consumeSeguimientoLecturaDegradada() {
+  const v = seguimientoLecturaDegradada;
+  seguimientoLecturaDegradada = false;
+  return v;
+}
+
+function isSeguimientoTableReadDenied(error) {
+  const raw =
+    error instanceof Error
+      ? `${error.message} ${error.originalError?.message ?? ''}`
+      : String(error ?? '');
+  return (
+    /permission was denied/i.test(raw) &&
+    /registrarSeguimientoLead|SEGUIMIENTO_TABLE/i.test(raw)
+  );
+}
+
+function warnSeguimientoLecturaDegradada(error) {
+  if (seguimientoLecturaDegradada) return;
+  seguimientoLecturaDegradada = true;
+  console.warn(
+    '[seguimiento] Sin permiso SELECT en registrarSeguimientoLead — leads se listan sin estado de seguimiento. ' +
+      'Pedí GRANT SELECT, INSERT + EXECUTE al DBA (sql/grants-mpcsp-leads.sql).',
+    error instanceof Error ? error.message : error,
+  );
+}
+
 function getSeguimientoProcedureName() {
   const raw = process.env.SP_SEGUIMIENTO || 'dbo.SP_RegistrarSeguimientoLead';
   return raw.replace(/^\[?dbo\]?\./i, '').replace(/[\[\]]/g, '');
@@ -230,8 +260,16 @@ async function queryHistorialRows(leadId, limit = 50) {
 }
 
 export async function getLatestSeguimientoSql(leadId) {
-  const rows = await queryHistorialRows(leadId, 1);
-  return rows.length ? mapSqlRowToSeguimiento(rows[0]) : {};
+  try {
+    const rows = await queryHistorialRows(leadId, 1);
+    return rows.length ? mapSqlRowToSeguimiento(rows[0]) : {};
+  } catch (error) {
+    if (isSeguimientoTableReadDenied(error)) {
+      warnSeguimientoLecturaDegradada(error);
+      return {};
+    }
+    throw error;
+  }
 }
 
 export async function batchLatestSeguimientoSql(leadIds) {
@@ -243,24 +281,32 @@ export async function batchLatestSeguimientoSql(leadIds) {
   const map = {};
   const chunkSize = 80;
 
-  for (let i = 0; i < ids.length; i += chunkSize) {
-    const chunk = ids.slice(i, i + chunkSize);
-    const placeholders = chunk.map((_, idx) => `@id${idx}`).join(', ');
-    const request = pool.request();
-    chunk.forEach((id, idx) => {
-      request.input(`id${idx}`, sql.Int, id);
-    });
-    const result = await request.query(
-      `WITH ranked AS (
-         SELECT *, ROW_NUMBER() OVER (PARTITION BY lead_id ORDER BY id DESC) AS rn
-         FROM dbo.[${table}]
-         WHERE lead_id IN (${placeholders})
-       )
-       SELECT * FROM ranked WHERE rn = 1`,
-    );
-    for (const row of result.recordset ?? []) {
-      map[String(row.lead_id)] = mapSqlRowToSeguimiento(row);
+  try {
+    for (let i = 0; i < ids.length; i += chunkSize) {
+      const chunk = ids.slice(i, i + chunkSize);
+      const placeholders = chunk.map((_, idx) => `@id${idx}`).join(', ');
+      const request = pool.request();
+      chunk.forEach((id, idx) => {
+        request.input(`id${idx}`, sql.Int, id);
+      });
+      const result = await request.query(
+        `WITH ranked AS (
+           SELECT *, ROW_NUMBER() OVER (PARTITION BY lead_id ORDER BY id DESC) AS rn
+           FROM dbo.[${table}]
+           WHERE lead_id IN (${placeholders})
+         )
+         SELECT * FROM ranked WHERE rn = 1`,
+      );
+      for (const row of result.recordset ?? []) {
+        map[String(row.lead_id)] = mapSqlRowToSeguimiento(row);
+      }
     }
+  } catch (error) {
+    if (isSeguimientoTableReadDenied(error)) {
+      warnSeguimientoLecturaDegradada(error);
+      return {};
+    }
+    throw error;
   }
   return map;
 }

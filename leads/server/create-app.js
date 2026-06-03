@@ -319,17 +319,7 @@ function registerApiRoutes(api) {
         return res.status(404).json({ message: 'Lead no encontrado en tus encuestas asignadas.' });
       }
       const historial = await listHistorialForLead(req.params.id, lead);
-      const { consumeSeguimientoLecturaDegradada } = await import('./db/seguimiento-sql.js');
-      const sinPermiso = consumeSeguimientoLecturaDegradada();
-      return res.json({
-        historial,
-        ...(sinPermiso
-          ? {
-              aviso:
-                'Sin permiso SELECT en SQL: no se puede leer el historial completo. Los guardados de esta sesión se muestran abajo; pedí GRANT SELECT al DBA.',
-            }
-          : {}),
-      });
+      return res.json({ historial });
     } catch (error) {
       console.error('Error al leer historial:', error);
       return res.status(500).json({
@@ -379,8 +369,6 @@ function registerApiRoutes(api) {
       }
       const { lead, saved, entradaHistorial } = result;
       let historial = await listHistorialForLead(req.params.id, lead, { limit: 30 });
-      const { consumeSeguimientoLecturaDegradada } = await import('./db/seguimiento-sql.js');
-      const sinPermiso = consumeSeguimientoLecturaDegradada();
       if (entradaHistorial && saved) {
         historial = [
           entradaHistorial,
@@ -392,12 +380,6 @@ function registerApiRoutes(api) {
         lead,
         historial,
         entradaHistorial: saved ? entradaHistorial : null,
-        ...(sinPermiso
-          ? {
-              aviso:
-                'Sin permiso SELECT en SQL: al recargar no se verá el seguimiento guardado hasta que el DBA aplique GRANT SELECT en registrarSeguimientoLead.',
-            }
-          : {}),
       });
     } catch (error) {
       if (error instanceof SeguimientoRegistroError) {

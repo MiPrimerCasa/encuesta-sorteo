@@ -6,6 +6,7 @@ import type {
   Producto,
   Promotor,
   RolUsuario,
+  SeguimientoHistorialEntry,
   SeguimientoLead,
 } from '../../types';
 import { LeadCard } from './LeadCard';
@@ -23,6 +24,7 @@ interface Props {
   ocultarPromotor?: boolean;
   rolUsuario?: RolUsuario;
   onQuickSave: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
+  historial?: SeguimientoHistorialEntry[];
 }
 
 export function SwipeableLeadCard({
@@ -36,6 +38,7 @@ export function SwipeableLeadCard({
   ocultarPromotor,
   rolUsuario = 'promotor',
   onQuickSave,
+  historial = [],
 }: Props) {
   const [offset, setOffset] = useState(0);
   const [revealed, setRevealed] = useState(false);
@@ -281,6 +284,7 @@ export function SwipeableLeadCard({
             nombreUsuario={nombreUsuario}
             ocultarPromotor={ocultarPromotor}
             rolUsuario={rolUsuario}
+            historial={historial}
           />
         </div>
       </div>

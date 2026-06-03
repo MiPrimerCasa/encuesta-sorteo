@@ -12,8 +12,9 @@ import {
 import { etiquetaCortaNumeroDocumentoVenta, etiquetaPagoProducto } from '../../domain/venta';
 import { etiquetaCampania } from '../../domain/campania';
 import { FUENTE_LABEL } from '../../domain/fuenteLabels';
-import type { Barrio, Lead, Producto, Promotor, RolUsuario } from '../../types';
+import type { Barrio, Lead, Producto, Promotor, RolUsuario, SeguimientoHistorialEntry } from '../../types';
 import { EntrevistaAgendaBadge } from './EntrevistaAgendaBadge';
+import { LeadHistorialInline } from './LeadHistorialInline';
 import { StatusPill } from '../ui/StatusPill';
 import { WhatsAppLeadButton } from './WhatsAppLeadButton';
 
@@ -28,6 +29,7 @@ interface LeadCardProps {
   /** En vista promotor no mostramos la fila Promotor (siempre es el usuario logueado). */
   ocultarPromotor?: boolean;
   rolUsuario?: RolUsuario;
+  historial?: SeguimientoHistorialEntry[];
 }
 
 export function LeadCard({
@@ -40,6 +42,7 @@ export function LeadCard({
   nombreUsuario,
   ocultarPromotor = false,
   rolUsuario = 'supervisor',
+  historial = [],
 }: LeadCardProps) {
   const compro = leadCompro(lead);
   const reagenda = leadReagendaEntrevista(lead);
@@ -72,7 +75,9 @@ export function LeadCard({
   const nombrePromotor =
     lead.promotorNombre ?? getPromotorNombre(lead.promotorId, promotores);
 
-  const cardClassName = `w-full rounded-xl border p-4 pb-14 text-left md:p-5 md:pb-14 ${
+  const cardClassName = `w-full rounded-xl border p-4 text-left md:p-5 ${
+    historial.length > 0 ? 'pb-16 md:pb-16' : 'pb-14 md:pb-14'
+  } ${
     soloLectura
       ? 'cursor-default border-indigo-200 bg-indigo-50/80'
       : `transition-[background,border-color,transform] duration-[140ms] ease-out active:scale-[0.995] ${
@@ -188,6 +193,8 @@ export function LeadCard({
             }
           />
         )}
+
+        <LeadHistorialInline historial={historial} esNoCompro={esNoCompro} />
     </>
   );
 

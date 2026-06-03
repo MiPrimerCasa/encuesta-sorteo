@@ -195,20 +195,16 @@ export async function fetchProductos(rol: RolUsuario) {
   return data.productos;
 }
 
-export async function fetchHistorialSeguimiento(leadId: string): Promise<{
-  historial: SeguimientoHistorialEntry[];
-  aviso?: string;
-}> {
+export async function fetchHistorialSeguimiento(
+  leadId: string,
+): Promise<SeguimientoHistorialEntry[]> {
   if (_isDemoActive) {
-    return { historial: getDemoHistorialSeguimiento(leadId) };
+    return getDemoHistorialSeguimiento(leadId);
   }
-  const data = await apiFetch<{ historial: SeguimientoHistorialEntry[]; aviso?: string }>(
+  const data = await apiFetch<{ historial: SeguimientoHistorialEntry[] }>(
     `/api/leads/${leadId}/historial`,
   );
-  return {
-    historial: data.historial ?? [],
-    aviso: data.aviso,
-  };
+  return data.historial ?? [];
 }
 
 export async function guardarSeguimiento(leadId: string, seguimiento: SeguimientoLead) {

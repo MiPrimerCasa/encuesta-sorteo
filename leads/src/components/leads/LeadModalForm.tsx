@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
-import { fetchHistorialSeguimiento } from '../../api/client';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
 import { getProductosPorRol, puedeVenderProducto } from '../../domain/leads';
 import {
@@ -25,8 +24,6 @@ import type {
 } from '../../types';
 import { ButtonGroup, FormSection, RadioOption } from '../ui/ButtonGroup';
 import { DateTimePicker } from '../ui/DateTimePicker';
-import { SeguimientoHistorialPanel } from './SeguimientoHistorialPanel';
-import type { SeguimientoHistorialEntry } from '../../types';
 
 const emptyReferido = (): Referido => ({ nombre: '', telefono: '' });
 
@@ -112,26 +109,6 @@ export function LeadModalForm({
 }: LeadModalFormProps) {
   const [form, setForm] = useState<FormState>(() => buildInitialForm(lead));
   const [errorVenta, setErrorVenta] = useState('');
-  const [historial, setHistorial] = useState<SeguimientoHistorialEntry[]>([]);
-  const [historialCargando, setHistorialCargando] = useState(false);
-  const [historialError, setHistorialError] = useState<string | null>(null);
-  const [historialAviso, setHistorialAviso] = useState<string | null>(null);
-
-  const cargarHistorial = useCallback(async (leadId: string) => {
-    setHistorialCargando(true);
-    setHistorialError(null);
-    setHistorialAviso(null);
-    try {
-      const { historial: filas, aviso } = await fetchHistorialSeguimiento(leadId);
-      setHistorial(filas);
-      setHistorialAviso(aviso ?? null);
-    } catch (e) {
-      setHistorialError(e instanceof Error ? e.message : 'No se pudo cargar el historial.');
-      setHistorial([]);
-    } finally {
-      setHistorialCargando(false);
-    }
-  }, []);
 
   const rol: RolUsuario = rolUsuario === 'promotor' ? 'promotor' : 'supervisor';
   const productosDisponibles = useMemo(
@@ -147,9 +124,8 @@ export function LeadModalForm({
       }
       setForm(initial);
       setErrorVenta('');
-      void cargarHistorial(lead.id);
     }
-  }, [open, lead, rol, productos, cargarHistorial]);
+  }, [open, lead, rol, productos]);
 
   if (!open || !lead) return null;
 
@@ -328,7 +304,6 @@ export function LeadModalForm({
     };
     void (async () => {
       await onSave(lead.id, seguimiento);
-      await cargarHistorial(lead.id);
       onClose();
     })();
   };
@@ -972,15 +947,6 @@ export function LeadModalForm({
 
             <div className="h-4" aria-hidden="true" />
           </form>
-
-          <div className="shrink-0 border-t border-zinc-100 px-4 py-4">
-            <SeguimientoHistorialPanel
-              historial={historial}
-              cargando={historialCargando}
-              error={historialError}
-              aviso={historialAviso}
-            />
-          </div>
 
           {/* Footer sticky con safe area */}
           <div

@@ -10,6 +10,7 @@ import {
   agruparPorPrioridadTabInicial,
   type PrioridadTabInicial,
 } from '../../domain/prioridad-leads';
+import { useHistorialLeads } from '../../hooks/useHistorialLeads';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
 import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
 import { AlertasSinContactar } from './AlertasSinContactar';
@@ -123,6 +124,9 @@ export function LeadsPanel({
     [entrevistaPendiente, paraContactar, seguimiento, compraron],
   );
 
+  const leadIds = useMemo(() => todosLosLeads.map((l) => l.id), [todosLosLeads]);
+  const { historialPorLead, refrescarHistorial } = useHistorialLeads(leadIds);
+
   const resultadosBusqueda = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     if (!q) return [];
@@ -176,6 +180,11 @@ export function LeadsPanel({
   const esPromotor = rolUsuario === 'promotor';
   const esTabPrioridad = tabActivo === 'entrevista';
 
+  const guardarSeguimientoLead = async (leadId: string, seg: SeguimientoLead) => {
+    await onActualizarLead(leadId, seg);
+    await refrescarHistorial(leadId);
+  };
+
   const renderTarjetaLead = (lead: Lead, variante: VarianteCard) =>
     esPromotor && variante !== 'compro' ? (
       <SwipeableLeadCard
@@ -189,7 +198,8 @@ export function LeadsPanel({
         nombreUsuario={nombreUsuario}
         ocultarPromotor
         rolUsuario={rolUsuario}
-        onQuickSave={onActualizarLead}
+        onQuickSave={guardarSeguimientoLead}
+        historial={historialPorLead[lead.id] ?? []}
       />
     ) : (
       <LeadCard
@@ -203,6 +213,7 @@ export function LeadsPanel({
         nombreUsuario={nombreUsuario}
         ocultarPromotor={esPromotor}
         rolUsuario={rolUsuario}
+        historial={historialPorLead[lead.id] ?? []}
       />
     );
 
@@ -298,7 +309,8 @@ export function LeadsPanel({
                     nombreUsuario={nombreUsuario}
                     ocultarPromotor
                     rolUsuario={rolUsuario}
-                    onQuickSave={onActualizarLead}
+                    onQuickSave={guardarSeguimientoLead}
+                    historial={historialPorLead[lead.id] ?? []}
                   />
                 ) : (
                   <LeadCard
@@ -312,6 +324,7 @@ export function LeadsPanel({
                     nombreUsuario={nombreUsuario}
                     ocultarPromotor={esPromotor}
                     rolUsuario={rolUsuario}
+                    historial={historialPorLead[lead.id] ?? []}
                   />
                 );
               })}
@@ -418,7 +431,7 @@ export function LeadsPanel({
         barrios={barrios}
         onClose={cerrarModal}
         onSave={async (leadId, seg) => {
-          await onActualizarLead(leadId, seg);
+          await guardarSeguimientoLead(leadId, seg);
           if (esPromotor && seg.resultadoEntrevista === 'reagenda') {
             setTabActivo('seguimiento');
           }

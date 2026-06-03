@@ -7,13 +7,7 @@ import {
   pestanaDesdeSeguimiento,
 } from './seguimiento-historial.js';
 import { getSqlPoolEncuestas, isSqlServerConfigured } from './mssql.js';
-import {
-  batchSeguimientoExterno,
-  getSeguimientoExterno,
-  listSeguimientoHistorial,
-  upsertSeguimientoExterno,
-  writeSeguimientoExternoMerged,
-} from './sqlite.js';
+import { getSeguimientoExterno, listSeguimientoHistorial, upsertSeguimientoExterno } from './sqlite.js';
 
 export class SeguimientoRegistroError extends Error {
   constructor(message, code = 'SEGUIMIENTO_SQL') {
@@ -283,40 +277,22 @@ async function queryHistorialRows(leadId, limit = 50) {
   return result.recordset ?? [];
 }
 
-function mergeSeguimientoConEspejoLocal(map, leadIds) {
-  for (const id of leadIds) {
-    const key = String(id);
-    if (map[key] && Object.keys(map[key]).length > 0) continue;
-    const local = getSeguimientoExterno(key);
-    if (local && Object.keys(local).length > 0) {
-      map[key] = local;
-    }
-  }
-  return map;
-}
-
-function seguimientoLocalFallback(leadId) {
-  return getSeguimientoExterno(String(leadId));
-}
-
 export async function getLatestSeguimientoSql(leadId) {
   try {
     const rows = await queryHistorialRows(leadId, 1);
-    if (rows.length) return mapSqlRowToSeguimiento(rows[0]);
+    return rows.length ? mapSqlRowToSeguimiento(rows[0]) : {};
   } catch (error) {
     if (isSeguimientoTableReadDenied(error)) {
       warnSeguimientoLecturaDegradada(error);
-    } else {
-      throw error;
+      return {};
     }
+    throw error;
   }
-  return seguimientoLocalFallback(leadId);
 }
 
 export async function batchLatestSeguimientoSql(leadIds) {
   const ids = [...new Set(leadIds.map((id) => parseInt(String(id), 10)).filter(Number.isFinite))];
-  const stringIds = [...new Set(leadIds.map((id) => String(id)))];
-  if (!ids.length) return batchSeguimientoExterno(stringIds);
+  if (!ids.length) return {};
 
   const pool = await getSqlPoolEncuestas();
   const table = getSeguimientoTableName();
@@ -346,27 +322,24 @@ export async function batchLatestSeguimientoSql(leadIds) {
   } catch (error) {
     if (isSeguimientoTableReadDenied(error)) {
       warnSeguimientoLecturaDegradada(error);
-      return batchSeguimientoExterno(stringIds);
+      return {};
     }
     throw error;
   }
-  return mergeSeguimientoConEspejoLocal(map, stringIds);
+  return map;
 }
 
 export async function listHistorialSeguimientoSql(leadId, lead = {}, { limit = 50 } = {}) {
   try {
     const rows = await queryHistorialRows(leadId, limit);
-    if (rows.length) {
-      return rows.map((row) => mapSqlRowToHistorialEntry(row, lead));
-    }
+    return rows.map((row) => mapSqlRowToHistorialEntry(row, lead));
   } catch (error) {
     if (isSeguimientoTableReadDenied(error)) {
       warnSeguimientoLecturaDegradada(error);
-    } else {
-      throw error;
+      return [];
     }
+    throw error;
   }
-  return listSeguimientoHistorial(leadId, { limit });
 }
 
 export async function listHistorialForLead(leadId, lead = {}, opts) {
@@ -396,7 +369,6 @@ export async function persistirSeguimientoLead(leadId, patch, usuario, leadConte
 
   if (useSeguimientoSql()) {
     const reg = await execRegistrarSeguimientoLead(leadContext, merged, usuario);
-    writeSeguimientoExternoMerged(leadId, merged, usuario, leadContext);
     return {
       merged,
       saved: true,

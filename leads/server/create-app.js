@@ -395,7 +395,7 @@ function registerApiRoutes(api) {
         ...(sinPermiso
           ? {
               aviso:
-                'Guardado en SQL. El historial completo requiere GRANT SELECT en registrarSeguimientoLead (se muestran los guardados de esta sesión).',
+                'Sin permiso SELECT en SQL: al recargar no se verá el seguimiento guardado hasta que el DBA aplique GRANT SELECT en registrarSeguimientoLead.',
             }
           : {}),
       });

@@ -11,10 +11,6 @@ import type {
   UsuarioSesion,
 } from '../types';
 import {
-  appendHistorialCache,
-  mergeHistorialConCache,
-} from './historial-cache';
-import {
   DEMO_BARRIOS,
   DEMO_PRODUCTOS,
   DEMO_PROMOTORES,
@@ -210,7 +206,7 @@ export async function fetchHistorialSeguimiento(leadId: string): Promise<{
     `/api/leads/${leadId}/historial`,
   );
   return {
-    historial: mergeHistorialConCache(leadId, data.historial ?? []),
+    historial: data.historial ?? [],
     aviso: data.aviso,
   };
 }
@@ -230,11 +226,6 @@ export async function guardarSeguimiento(leadId: string, seguimiento: Seguimient
     method: 'PATCH',
     body: JSON.stringify(seguimiento),
   });
-  if (data.historial?.length) {
-    appendHistorialCache(leadId, data.historial);
-  } else if (data.entradaHistorial) {
-    appendHistorialCache(leadId, [data.entradaHistorial]);
-  }
   return data.lead;
 }
 

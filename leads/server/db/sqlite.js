@@ -225,43 +225,6 @@ export function upsertSeguimientoExterno(leadId, seguimiento, usuario, leadConte
   return merged;
 }
 
-/** Espejo local del seguimiento SQL (lectura cuando MPCSP no tiene SELECT en STRSYSTEM). */
-export function writeSeguimientoExternoMerged(leadId, merged, usuario, leadContext) {
-  const prev = getSeguimientoExterno(leadId);
-  if (JSON.stringify(prev) === JSON.stringify(merged)) {
-    return merged;
-  }
-  const usuarioId =
-    typeof usuario === 'string' || usuario == null ? usuario : String(usuario.id ?? '');
-  appendSeguimientoHistorial(leadId, merged, {
-    usuario: typeof usuario === 'object' && usuario ? usuario : null,
-    usuarioId,
-    lead: leadContext,
-  });
-  getDb()
-    .prepare(
-      `INSERT INTO lead_seguimiento_externo (lead_id, seguimiento_json, actualizado_en)
-       VALUES (?, ?, datetime('now'))
-       ON CONFLICT(lead_id) DO UPDATE SET
-         seguimiento_json = excluded.seguimiento_json,
-         actualizado_en = datetime('now')`,
-    )
-    .run(String(leadId), JSON.stringify(merged));
-  return merged;
-}
-
-export function batchSeguimientoExterno(leadIds) {
-  const map = {};
-  for (const id of leadIds) {
-    const key = String(id);
-    const seg = getSeguimientoExterno(key);
-    if (seg && Object.keys(seg).length > 0) {
-      map[key] = seg;
-    }
-  }
-  return map;
-}
-
 export function listBarrios() {
   return getDb().prepare('SELECT id, nombre FROM barrios ORDER BY nombre').all();
 }

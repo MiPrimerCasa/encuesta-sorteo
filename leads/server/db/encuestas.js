@@ -371,7 +371,17 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
   const fechaBase = horarioIso ? horarioIso.slice(0, 10) : new Date().toISOString().slice(0, 10);
   const lista = horarioIso || quiereAsesoramiento ? 'entrevista' : 'contacto';
 
-  const seguimientoRemoto = seguimientoLocal[usuario] ?? {};
+  const pkEncuesta = pickField(row, 'id', 'Id', 'ID');
+  const leadKey =
+    pkEncuesta != null && String(pkEncuesta).trim() !== ''
+      ? String(pkEncuesta)
+      : String(usuario ?? `enc-${slugId(nombreLead)}`);
+  const usuarioKey = usuario ? String(usuario) : '';
+  /** Clave por id numérico del lead (206), no por usuario encuesta (SORTEO01S21P02). */
+  const seguimientoRemoto =
+    seguimientoLocal[leadKey] ??
+    (usuarioKey ? seguimientoLocal[usuarioKey] : undefined) ??
+    {};
   const observacionesEncuesta = buildObservacionesEncuesta(row);
   const seguimiento = {
     ...seguimientoRemoto,
@@ -386,12 +396,6 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
   const codigoCampania = encuestaRaw
     ? normalizarEncuestaCargaId(encuestaRaw)
     : undefined;
-
-  const pkEncuesta = pickField(row, 'id', 'Id', 'ID');
-  const leadKey =
-    pkEncuesta != null && String(pkEncuesta).trim() !== ''
-      ? String(pkEncuesta)
-      : String(usuario ?? `enc-${slugId(nombreLead)}`);
 
   return {
     id: leadKey,

@@ -1,5 +1,6 @@
 import {
   ETIQUETA_CIERRE_SUPERVISOR,
+  ETIQUETA_REFERIDO,
   ETIQUETA_SEGUIMIENTO_PIJ,
   getProductoNombre,
   getPromotorNombre,
@@ -124,6 +125,26 @@ export function LeadCard({
                 }`}
               >
                 {etiquetaSorteo}
+              </span>
+            )}
+            {lead.esReferido && (
+              <span
+                className={`ml-1.5 mt-1.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                  esNoCompro
+                    ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-100'
+                    : 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                }`}
+                title={
+                  lead.leadReferidoDeId
+                    ? `Referido del lead #${lead.leadReferidoDeId}${
+                        lead.nivelReferido && lead.nivelReferido > 1
+                          ? ` (nivel ${lead.nivelReferido})`
+                          : ''
+                      }`
+                    : ETIQUETA_REFERIDO
+                }
+              >
+                {ETIQUETA_REFERIDO}
               </span>
             )}
             {seguimientoPij && (

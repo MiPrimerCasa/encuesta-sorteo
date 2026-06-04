@@ -24,6 +24,7 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | Historial de estados al guardar seguimiento | [FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md](./FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md) | Ambos | Tabla `registrarSeguimientoLead` |
 | Modelo SQL seguimiento (análisis parámetros SP) | [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md) | DBA + dev | Propuesta `@lead_id`, `@resultado_entrevista`, etc. |
 | Multisorteo / participantes | [SORTEOS_Y_PARTICIPANTES.md](./SORTEOS_Y_PARTICIPANTES.md) | Ambos | `encuesta-carga.js`, SP |
+| Referidos → encuesta + árbol + visibilidad | [FUNCIONALIDAD_REFERIDOS_ENCUESTA.md](./FUNCIONALIDAD_REFERIDOS_ENCUESTA.md) | Promotor, supervisor, DBA | `lead_referido`, `referidos-carga.js`, `LeadCard.tsx` |
 | Login y rol desde `Categoria` | [LOGIN_SP.md](./LOGIN_SP.md) | Ambos | `mssql.js`, `encuestas.js` |
 | Deploy y monorepo | [MONOREPO.md](./MONOREPO.md), [DEPLOY_VPS.md](./DEPLOY_VPS.md) | — | `deploy/` |
 

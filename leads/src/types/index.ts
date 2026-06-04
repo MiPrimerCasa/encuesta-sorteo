@@ -1,5 +1,5 @@
-export type RolUsuario = 'promotor' | 'supervisor';
-export type VistaActiva = 'leads' | 'promotores' | 'metricas' | 'calendario';
+export type RolUsuario = 'promotor' | 'supervisor' | 'superadmin';
+export type VistaActiva = 'leads' | 'promotores' | 'metricas' | 'calendario' | 'admin';
 export type ListaLead = 'entrevista' | 'contacto';
 /** Dónde quiere la entrevista el cliente (encuesta / SP). */
 export type LugarEntrevista = 'sucursal' | 'domicilio';
@@ -74,6 +74,23 @@ export interface Referido {
   telefono: string;
 }
 
+export type ReferidoProcesadoEstado = 'creado' | 'duplicado' | 'error';
+
+export interface ReferidoProcesado {
+  nombre: string;
+  telefono: string;
+  leadId?: string;
+  estado: ReferidoProcesadoEstado;
+  mensaje?: string;
+}
+
+export interface GuardarSeguimientoResult {
+  lead: Lead;
+  referidosCreados?: ReferidoProcesado[];
+  nuevosLeads?: Lead[];
+  message?: string;
+}
+
 /** Entrada del historial append-only al guardar seguimiento. */
 export interface SeguimientoHistorialEntry {
   id: number;
@@ -106,6 +123,8 @@ export interface SeguimientoLead {
   numeroRecibo?: string | null;
   brindoReferidos?: boolean | null;
   referidos?: Referido[];
+  /** Referidos ya procesados en carga automática (teléfono → lead creado o duplicado). */
+  referidosGenerados?: ReferidoProcesado[];
   observaciones?: string;
   /** Rol del operador que registró este estado (última fila SQL). */
   operadorRol?: RolUsuario | null;
@@ -136,8 +155,22 @@ export interface Lead {
   codigoCampania?: string;
   /** Valor columna `origen` de encuesta (ej. `2`, Manual, App). */
   origenEncuesta?: string;
+  /** Lead referido (tabla lead_referido o columna del SP listado). */
+  esReferido?: boolean;
+  /** id encuesta del lead que brindó este referido. */
+  leadReferidoDeId?: string;
+  /** Raíz del árbol de referidos (cliente original). */
+  leadReferidoRaizId?: string;
+  /** Profundidad en cadena de referidos (1 = directo). */
+  nivelReferido?: number;
+  /** Rol de quien cargó el referido (visibilidad promotor/supervisor). */
+  referidoCargadoPorRol?: RolUsuario;
   /** Código @usuario del promotor en el SP (SORTEO01S21P01). */
   codigoPromotorCarga?: string;
+  /** Respuesta encuesta «Conoce MPC» (S/N). */
+  conoceMpc?: boolean | null;
+  /** Respuesta encuesta sobre Plan Inversión Joven / vivienda propia (S/N). */
+  sabiaPlanInversionJoven?: boolean | null;
   seguimiento: SeguimientoLead;
 }
 
@@ -181,5 +214,162 @@ export interface UsuarioSesion {
   idOperador?: string;
   idSupervisor?: string;
   idVendedor?: string;
-  rolOrigen?: 'encuestas' | 'categoria';
+  rolOrigen?: 'encuestas' | 'categoria' | 'env_superadmin';
+}
+
+export interface PromotorMetricasAdmin {
+  promotorId: string;
+  promotorNombre: string;
+  codigoCarga?: string;
+  leadsTotal: number;
+  leadsSemana: number;
+  entrevistasSemana: number;
+  entrevistasHoy: number;
+  cierresSemana: number;
+  cierresHoy: number;
+  ventasTerrenoSemana: number;
+  ventasTerrenoHoy: number;
+  ventasPijSemana: number;
+  ventasPijHoy: number;
+}
+
+export interface SupervisorMetricasAdmin {
+  supervisorId: string;
+  supervisorNombre: string;
+  promotores: PromotorMetricasAdmin[];
+  totales: Omit<PromotorMetricasAdmin, 'promotorId' | 'promotorNombre' | 'codigoCarga'>;
+}
+
+export interface RankingAdminEntry {
+  promotorId: string;
+  promotorNombre: string;
+  supervisorNombre?: string;
+  valor: number;
+}
+
+export type AdminChartEventTipo = 'lead' | 'entrevista' | 'cierre' | 'terreno' | 'pij';
+
+export interface AdminChartEvent {
+  fecha: string;
+  tipo: AdminChartEventTipo;
+  supervisorNombre?: string;
+}
+
+export interface AdminConocimientoConteo {
+  si: number;
+  no: number;
+  sinResponder: number;
+}
+
+export interface AdminConocimientoLeads {
+  total: number;
+  conoceMpc: AdminConocimientoConteo;
+  sabiaPlanInversionJoven: AdminConocimientoConteo;
+}
+
+export interface AdminEmbudoGlobal {
+  leads: number;
+  conEntrevista: number;
+  conCierre: number;
+  tasaEntrevistaPct: number | null;
+  tasaCierreEntrevistaPct: number | null;
+  tasaCierreLeadPct: number | null;
+}
+
+export interface AdminEmbudoPromotor {
+  promotorId: string;
+  promotorNombre: string;
+  supervisorNombre: string;
+  leads: number;
+  entrevistas: number;
+  cierres: number;
+  tasaEntrevistaPct: number | null;
+  tasaCierrePct: number | null;
+  tasaCierreEntrevistaPct: number | null;
+}
+
+export interface AdminResultadosEntrevista {
+  compro: number;
+  no_compro: number;
+  reagenda: number;
+  sin_interes: number;
+  derivar_terreno: number;
+  pendiente: number;
+}
+
+export interface AdminCanalMetrica {
+  fuente: FuenteLead | 'otros';
+  label: string;
+  leads: number;
+  cierres: number;
+  tasaCierrePct: number | null;
+}
+
+export interface AdminBacklog {
+  sinGestion7: number;
+  sinGestion14: number;
+  sinGestion30: number;
+}
+
+export interface AdminTiempoRespuesta {
+  promedioDias: number | null;
+  medianaDias: number | null;
+  muestras: number;
+}
+
+export interface AdminConocimientoCierre {
+  segmento: string;
+  leads: number;
+  cierres: number;
+  tasaCierrePct: number | null;
+}
+
+export interface AdminPijRecuperacion {
+  totalSeguimiento: number;
+  conCierre: number;
+  tasaRecuperacionPct: number | null;
+}
+
+export interface AdminReferidosMetrica {
+  cierresConReferidos: number;
+  totalReferidos: number;
+}
+
+export interface AdminProductividad {
+  embudoGlobal: AdminEmbudoGlobal;
+  embudoPromotores: AdminEmbudoPromotor[];
+  resultadosEntrevista: AdminResultadosEntrevista;
+  canales: AdminCanalMetrica[];
+  backlog: AdminBacklog;
+  tiempoPrimeraEntrevista: AdminTiempoRespuesta;
+  conocimientoVsCierre: AdminConocimientoCierre[];
+  pijRecuperacion: AdminPijRecuperacion;
+  referidos: AdminReferidosMetrica;
+}
+
+export interface AdminDashboardData {
+  generadoEn: string;
+  semanaDesde: string;
+  semanaHasta: string;
+  hoy: string;
+  supervisores: SupervisorMetricasAdmin[];
+  resumenHoy: {
+    entrevistas: number;
+    cierres: number;
+    ventasTerreno: number;
+    ventasPij: number;
+  };
+  rankings: {
+    entrevistasSemana: RankingAdminEntry[];
+    cierresSemana: RankingAdminEntry[];
+    leadsSemana: RankingAdminEntry[];
+    ventasTerrenoSemana: RankingAdminEntry[];
+    ventasPijSemana: RankingAdminEntry[];
+  };
+  eventos?: AdminChartEvent[];
+  conocimientoLeads?: AdminConocimientoLeads;
+  productividad?: AdminProductividad;
+  aviso?: string;
+  totalLeads?: number;
+  totalSupervisores?: number;
 }

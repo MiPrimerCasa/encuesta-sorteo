@@ -32,6 +32,17 @@ export const seguimientoSchema = z
     numeroRecibo: z.string().trim().max(80).nullable().optional(),
     brindoReferidos: z.boolean().nullable().optional(),
     referidos: z.array(referidoSchema).optional(),
+    referidosGenerados: z
+      .array(
+        z.object({
+          nombre: z.string(),
+          telefono: z.string(),
+          leadId: z.string().optional(),
+          estado: z.enum(['creado', 'duplicado', 'error']),
+          mensaje: z.string().optional(),
+        }),
+      )
+      .optional(),
     observaciones: z.string().max(500).optional(),
   })
   .superRefine((data, ctx) => {

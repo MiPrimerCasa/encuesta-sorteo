@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { startOfMonth } from 'date-fns';
 import { Drawer } from 'vaul';
 
-import type { Lead, Promotor, RolUsuario, SeguimientoLead } from '../../types';
+import type { GuardarSeguimientoResult, Lead, Promotor, RolUsuario, SeguimientoLead } from '../../types';
 import { getHolidaysAR } from '../../lib/holidays-ar';
 import { isDiaDestacadoCalendario } from '../../lib/holidays-ar';
 import {
@@ -31,7 +31,10 @@ interface CalendarioViewProps {
   leads: Lead[];
   promotores: Promotor[];
   rolUsuario: RolUsuario;
-  onActualizarLead: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
+  onActualizarLead: (
+    leadId: string,
+    seguimiento: SeguimientoLead,
+  ) => void | Promise<void | GuardarSeguimientoResult>;
   onVolver: () => void;
   /** Ir a Leads y abrir el formulario de seguimiento del cliente. */
   onAbrirSeguimientoLead: (leadId: string) => void;

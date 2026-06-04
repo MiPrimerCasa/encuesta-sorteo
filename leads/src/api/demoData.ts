@@ -1,5 +1,9 @@
 import { origenIngresoToFuente, origenIngresoToOrigenLead } from '../domain/fuenteLabels';
 import { applySeguimientoAlLead } from '../domain/leads';
+import {
+  mergeReferidosGenerados,
+  referidosPendientesDeCarga,
+} from '../domain/referidos-carga';
 import type {
   Barrio,
   Lead,
@@ -7,10 +11,12 @@ import type {
   NuevoLeadData,
   Producto,
   Promotor,
+  ReferidoProcesado,
   SeguimientoHistorialEntry,
   SeguimientoLead,
   UsuarioSesion,
 } from '../types';
+import { buildAdminDashboardFromLeads } from '../domain/admin-metrics';
 import { etiquetaEstadoHistorial } from '../domain/seguimiento-historial';
 import { tabIdListaLead } from '../domain/leads';
 import linksCatalog from '../data/links-redes.json';
@@ -32,6 +38,13 @@ export const DEMO_USUARIO_PROMOTOR: UsuarioSesion = {
   idVendedor: 'prom-1',
   idOperador: 'prom-1',
   codigoCarga: 'SORTEO01S21P01',
+};
+
+export const DEMO_USUARIO_SUPERADMIN: UsuarioSesion = {
+  id: 'demo-admin',
+  nombre: 'Admin Demo',
+  rol: 'superadmin',
+  loginId: 'admin@demo.local',
 };
 
 // ─── Catálogo ─────────────────────────────────────────────────────────────────
@@ -588,4 +601,141 @@ export function createDemoLead(data: NuevoLeadData): Lead {
   };
   demoLeads = [...demoLeads, newLead];
   return { ...newLead };
+}
+
+function telefonoEnDemoLeads(telefono: string, excluirId?: string) {
+  const d = String(telefono).replace(/\D/g, '');
+  return demoLeads.some(
+    (l) => l.id !== excluirId && String(l.telefono).replace(/\D/g, '') === d,
+  );
+}
+
+/** Demo: alta automática de referidos como leads (misma lógica que producción). */
+export function processDemoReferidos(leadPadre: Lead, seguimiento: SeguimientoLead) {
+  const vacio = {
+    referidosGenerados: seguimiento.referidosGenerados ?? [],
+    resultados: [] as ReferidoProcesado[],
+    nuevosLeads: [] as Lead[],
+  };
+  if (seguimiento.brindoReferidos !== true) return vacio;
+
+  const pendientes = referidosPendientesDeCarga(
+    seguimiento.referidos ?? [],
+    seguimiento.referidosGenerados,
+    leadPadre.telefono,
+  );
+  if (!pendientes.length) return vacio;
+
+  const resultados: ReferidoProcesado[] = [];
+  const nuevosLeads: Lead[] = [];
+  const generadosNuevos: ReferidoProcesado[] = [];
+
+  for (const ref of pendientes) {
+    if (telefonoEnDemoLeads(ref.telefono)) {
+      const existente = demoLeads.find(
+        (l) => String(l.telefono).replace(/\D/g, '') === ref.telefono,
+      );
+      const item: ReferidoProcesado = {
+        nombre: ref.nombre,
+        telefono: ref.telefono,
+        leadId: existente?.id,
+        estado: 'duplicado',
+        mensaje: 'Ya existía un contacto con ese teléfono.',
+      };
+      resultados.push(item);
+      generadosNuevos.push(item);
+      continue;
+    }
+
+    const nuevo = createDemoLead({
+      nombre: ref.nombre,
+      telefono: ref.telefono,
+      lista: 'contacto',
+      quiereEntrevista: false,
+      agendarEntrevista: false,
+      promotorId: leadPadre.promotorId,
+      promotorNombre: leadPadre.promotorNombre,
+      origen: 'referido',
+      observaciones: `Referido de ${leadPadre.nombre} (lead #${leadPadre.id}).`,
+    });
+    const item: ReferidoProcesado = {
+      nombre: ref.nombre,
+      telefono: ref.telefono,
+      leadId: nuevo.id,
+      estado: 'creado',
+    };
+    resultados.push(item);
+    generadosNuevos.push(item);
+    nuevosLeads.push(nuevo);
+  }
+
+  return {
+    referidosGenerados: mergeReferidosGenerados(seguimiento.referidosGenerados, generadosNuevos),
+    resultados,
+    nuevosLeads,
+  };
+}
+
+/** Datos sintéticos de encuesta para demo superadmin (Conoce MPC / PIJ). */
+function enrichDemoEncuestaConocimiento<T extends Lead>(lead: T): T {
+  if (lead.conoceMpc != null && lead.sabiaPlanInversionJoven != null) return lead;
+  const h = [...lead.id].reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  return {
+    ...lead,
+    conoceMpc: lead.conoceMpc ?? h % 4 !== 0,
+    sabiaPlanInversionJoven: lead.sabiaPlanInversionJoven ?? h % 3 !== 0,
+  };
+}
+
+/** Panel superadmin demo: dos supervisores y historial sintético reciente. */
+export function getDemoAdminDashboard() {
+  const ahora = new Date();
+  const hoyIso = ahora.toISOString();
+  const hace3Dias = new Date(ahora);
+  hace3Dias.setDate(hace3Dias.getDate() - 3);
+
+  const leads = getDemoLeads()
+    .map((lead) => ({
+      ...lead,
+      supervisorNombre: ['prom-3', 'prom-4'].includes(lead.promotorId)
+        ? 'Norma M'
+        : 'Adela Alcaraz',
+    }))
+    .map(enrichDemoEncuestaConocimiento);
+
+  const historialRows: Array<Record<string, unknown>> = [];
+
+  for (const lead of leads) {
+    for (const entry of getDemoHistorialSeguimiento(lead.id)) {
+      historialRows.push({
+        leadId: entry.leadId,
+        creadoEn: entry.creadoEn,
+        huboEntrevista: entry.seguimientoSnapshot.huboEntrevista,
+        resultadoEntrevista: entry.resultadoEntrevista,
+        idProducto: entry.seguimientoSnapshot.idProducto,
+      });
+    }
+
+    const seg = lead.seguimiento;
+    if (seg.huboEntrevista != null || seg.resultadoEntrevista) {
+      historialRows.push({
+        leadId: lead.id,
+        creadoEn: hoyIso,
+        huboEntrevista: seg.huboEntrevista ?? true,
+        resultadoEntrevista: seg.resultadoEntrevista,
+        idProducto: seg.idProducto,
+      });
+      if (seg.resultadoEntrevista === 'compro' || seg.huboEntrevista) {
+        historialRows.push({
+          leadId: lead.id,
+          creadoEn: hace3Dias.toISOString(),
+          huboEntrevista: true,
+          resultadoEntrevista: seg.resultadoEntrevista,
+          idProducto: seg.idProducto,
+        });
+      }
+    }
+  }
+
+  return buildAdminDashboardFromLeads(leads, historialRows, ahora);
 }

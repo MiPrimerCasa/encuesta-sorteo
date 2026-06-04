@@ -15,14 +15,18 @@ const TABS_PROMOTOR = [
   { value: 'metricas' as const, label: 'Métricas' },
 ];
 
+const TABS_SUPERADMIN = [{ value: 'admin' as const, label: 'Panel global' }];
+
 const ROL_LABEL: Record<RolUsuario, string> = {
   promotor: 'Promotor',
   supervisor: 'Supervisor',
+  superadmin: 'Superadmin',
 };
 
 const ROL_BADGE_CLASS: Record<RolUsuario, string> = {
   promotor: 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200',
   supervisor: 'bg-blue-100 text-blue-700 ring-1 ring-blue-200',
+  superadmin: 'bg-violet-100 text-violet-700 ring-1 ring-violet-200',
 };
 
 interface NavBarProps {
@@ -34,7 +38,11 @@ interface NavBarProps {
 
 export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBarProps) {
   const tabs: Array<{ value: VistaActiva; label: string }> =
-    usuario.rol === 'supervisor' ? TABS_SUPERVISOR : TABS_PROMOTOR;
+    usuario.rol === 'superadmin'
+      ? TABS_SUPERADMIN
+      : usuario.rol === 'supervisor'
+        ? TABS_SUPERVISOR
+        : TABS_PROMOTOR;
 
   return (
     <header

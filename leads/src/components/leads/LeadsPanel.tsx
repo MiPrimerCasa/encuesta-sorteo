@@ -14,7 +14,7 @@ import {
 } from '../../domain/prioridad-leads';
 import { useHistorialLeads } from '../../hooks/useHistorialLeads';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
-import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
+import type { Barrio, GuardarSeguimientoResult, Lead, NuevoLeadData, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
 import { AlertasSinContactar } from './AlertasSinContactar';
 import { LeadCard } from './LeadCard';
 import { LeadModalForm } from './LeadModalForm';
@@ -81,7 +81,10 @@ interface LeadsPanelProps {
   promotores: Promotor[];
   productos: Producto[];
   barrios: Barrio[];
-  onActualizarLead: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
+  onActualizarLead: (
+    leadId: string,
+    seguimiento: SeguimientoLead,
+  ) => void | Promise<void | GuardarSeguimientoResult>;
   onCrearLead: (data: NuevoLeadData, promotorNombre?: string) => void | Promise<void>;
   onModificarTelefonoLead?: (leadId: string, telefono: string) => void | Promise<void>;
   direccionOficinas?: string;

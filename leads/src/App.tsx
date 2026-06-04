@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import {
   crearLead,
   modificarTelefonoLead,
+  fetchAdminDashboard,
   fetchBarrios,
   fetchLeads,
   fetchPromotores,
@@ -11,7 +12,16 @@ import {
 import { LoginPage } from './components/auth/LoginPage';
 import { NavBar } from './components/layout/NavBar';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, SeguimientoLead, VistaActiva } from './types';
+import type {
+  AdminDashboardData,
+  Barrio,
+  Lead,
+  NuevoLeadData,
+  Producto,
+  Promotor,
+  SeguimientoLead,
+  VistaActiva,
+} from './types';
 
 const LeadsPanel = lazy(() =>
   import('./components/leads/LeadsPanel').then((m) => ({ default: m.LeadsPanel })),
@@ -27,6 +37,11 @@ const PromotorMetricasPanel = lazy(() =>
     default: m.PromotorMetricasPanel,
   })),
 );
+const SuperadminDashboard = lazy(() =>
+  import('./components/admin/SuperadminDashboard').then((m) => ({
+    default: m.SuperadminDashboard,
+  })),
+);
 
 function VistaCargando({ texto = 'Cargando…' }: { texto?: string }) {
   return <p className="px-4 py-12 text-center text-neutral-600">{texto}</p>;
@@ -34,21 +49,30 @@ function VistaCargando({ texto = 'Cargando…' }: { texto?: string }) {
 
 function AppShell() {
   const { usuario, login, logout } = useAuth();
-  const [vistaActiva, setVistaActiva] = useState<VistaActiva>('leads');
+  const esSuperadmin = usuario?.rol === 'superadmin';
+  const [vistaActiva, setVistaActiva] = useState<VistaActiva>(esSuperadmin ? 'admin' : 'leads');
   const [leadIdSeguimiento, setLeadIdSeguimiento] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [adminDashboard, setAdminDashboard] = useState<AdminDashboardData | null>(null);
   const [direccionOficinas, setDireccionOficinas] = useState<string | undefined>();
   const [promotores, setPromotores] = useState<Promotor[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [barrios, setBarrios] = useState<Barrio[]>([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
+  const [aviso, setAviso] = useState('');
 
   const cargarDatos = useCallback(async () => {
     if (!usuario) return;
     setCargando(true);
     setError('');
     try {
+      if (usuario.rol === 'superadmin') {
+        const dash = await fetchAdminDashboard();
+        setAdminDashboard(dash);
+        return;
+      }
+
       const esSupervisor = usuario.rol === 'supervisor';
       const [leadsRes, prod, barr, prom] = await Promise.all([
         fetchLeads(),
@@ -74,8 +98,25 @@ function AppShell() {
 
   const onActualizarLead = useCallback(
     async (leadId: string, seguimiento: SeguimientoLead) => {
-      const updated = await guardarSeguimiento(leadId, seguimiento);
-      setLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
+      const result = await guardarSeguimiento(leadId, seguimiento);
+      setLeads((prev) => {
+        let next = prev.map((l) => (l.id === leadId ? result.lead : l));
+        if (result.nuevosLeads?.length) {
+          const ids = new Set(next.map((l) => l.id));
+          for (const nl of result.nuevosLeads) {
+            if (!ids.has(nl.id)) {
+              next = [...next, nl];
+              ids.add(nl.id);
+            }
+          }
+        }
+        return next;
+      });
+      if (result.message?.includes('referido')) {
+        setAviso(result.message);
+        setError('');
+      }
+      return result;
     },
     [],
   );
@@ -107,8 +148,10 @@ function AppShell() {
   }
 
   const contenidoPrincipal =
-    cargando && leads.length === 0 ? (
+    cargando && !adminDashboard && leads.length === 0 ? (
       <VistaCargando texto="Cargando datos…" />
+    ) : esSuperadmin && adminDashboard ? (
+      <SuperadminDashboard data={adminDashboard} />
     ) : vistaActiva === 'calendario' ? (
       <CalendarioView
         leads={leads}
@@ -151,6 +194,11 @@ function AppShell() {
         onLogout={logout}
       />
       <main>
+        {aviso && (
+          <p className="mx-auto max-w-5xl px-4 pt-4 text-sm font-medium text-emerald-800">
+            {aviso}
+          </p>
+        )}
         {error && (
           <p className="mx-auto max-w-5xl whitespace-pre-wrap px-4 pt-4 text-sm font-medium text-red-700">
             {error}

@@ -972,6 +972,10 @@ export function LeadModalForm({
 
               {showReferidos && (
                 <div className="space-y-4 pt-1">
+                  <p className="text-[12px] text-zinc-500">
+                    Al guardar, cada referido nuevo se carga automáticamente como lead del mismo
+                    promotor (si el teléfono no existe ya en la campaña).
+                  </p>
                   {form.referidos.map((ref, idx) => (
                     <div key={idx} className="space-y-2">
                       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">

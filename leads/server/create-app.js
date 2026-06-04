@@ -32,6 +32,8 @@ import {
   enriquecerUsuarioConCodigoCarga,
   loadOperadoresCatalogAsync,
 } from './db/operadores-catalog.js';
+import { fetchAdminDashboard } from './db/admin-dashboard.js';
+import { aplicarRolSuperadmin, esSuperadminUsuario } from './db/superadmin-auth.js';
 import { modificarTelefonoLeadSchema } from './schemas/modificar-telefono-lead.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
@@ -57,7 +59,7 @@ function usuarioDesdeRequest(req) {
   const loginId = String(req.headers['x-usuario-login-id'] || '').trim();
   const codigoCarga = String(req.headers['x-usuario-codigo-carga'] || '').trim();
   const idVendedorHdr = String(req.headers['x-usuario-id-vendedor'] || '').trim();
-  if (rol !== 'promotor' && rol !== 'supervisor') return null;
+  if (rol !== 'promotor' && rol !== 'supervisor' && rol !== 'superadmin') return null;
   if (!nombre || !id) return null;
   return {
     id,
@@ -112,19 +114,22 @@ function registerApiRoutes(api) {
       if (!user) {
         return res.status(401).json({ message: 'Usuario o contraseña incorrectos.' });
       }
-      user = await enrichOperadorRolDesdeEncuestas(user);
-      try {
-        const rowsLogin = await fetchEncuestasMuestraRaw({
-          id: user.id,
-          nombre: user.nombre,
-          rol: user.rol,
-        });
-        user = enriquecerUsuarioConCodigoCarga(user, rowsLogin);
-      } catch (err) {
-        console.warn(
-          'codigoCarga desde encuestas no disponible en login:',
-          err instanceof Error ? err.message : err,
-        );
+      user = aplicarRolSuperadmin(user, usuario);
+      if (!esSuperadminUsuario(user)) {
+        user = await enrichOperadorRolDesdeEncuestas(user);
+        try {
+          const rowsLogin = await fetchEncuestasMuestraRaw({
+            id: user.id,
+            nombre: user.nombre,
+            rol: user.rol,
+          });
+          user = enriquecerUsuarioConCodigoCarga(user, rowsLogin);
+        } catch (err) {
+          console.warn(
+            'codigoCarga desde encuestas no disponible en login:',
+            err instanceof Error ? err.message : err,
+          );
+        }
       }
       return res.json({
         token: `sql-${user.id}`,
@@ -289,6 +294,29 @@ function registerApiRoutes(api) {
     }
   });
 
+  api.get('/admin/dashboard', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    if (!esSuperadminUsuario(usuario)) {
+      return res.status(403).json({
+        message: 'Panel de administración solo disponible para superadmin.',
+      });
+    }
+
+    try {
+      const dashboard = await fetchAdminDashboard();
+      return res.json(dashboard);
+    } catch (error) {
+      console.error('Error admin dashboard:', error);
+      const err = formatSqlError(error);
+      return res.status(500).json(err);
+    }
+  });
+
   api.get('/barrios', (_req, res) => {
     if (!respondIfNotConfigured(res)) return;
     try {
@@ -308,8 +336,10 @@ function registerApiRoutes(api) {
       getDb();
       const rol = String(req.query.rol || '');
       let productos = listProductos();
-      if (rol === 'promotor' || rol === 'supervisor') {
-        productos = productos.filter((p) => p.rolesPermitidos.includes(rol));
+      if (rol === 'promotor' || rol === 'supervisor' || rol === 'superadmin') {
+        productos = productos.filter((p) =>
+          p.rolesPermitidos.includes(rol === 'superadmin' ? 'supervisor' : rol),
+        );
       }
       return res.json({ productos });
     } catch (error) {
@@ -499,7 +529,7 @@ function registerApiRoutes(api) {
       if (!result?.lead) {
         return res.status(404).json({ message: 'Lead no encontrado en tus encuestas asignadas.' });
       }
-      const { lead, saved, entradaHistorial } = result;
+      const { lead, saved, entradaHistorial, referidosCreados, nuevosLeads } = result;
       const idOperador = parseInt(String(usuario.id ?? ''), 10);
       let historial = await listHistorialForLead(req.params.id, lead, {
         limit: 30,
@@ -511,11 +541,23 @@ function registerApiRoutes(api) {
           ...historial.filter((h) => h.id !== entradaHistorial.id),
         ];
       }
+      let message = saved ? 'Seguimiento actualizado.' : 'Sin cambios respecto al último guardado.';
+      const creados = (referidosCreados ?? []).filter((r) => r.estado === 'creado');
+      const duplicados = (referidosCreados ?? []).filter((r) => r.estado === 'duplicado');
+      if (creados.length) {
+        message += ` Se cargaron ${creados.length} referido(s) como lead(s) nuevo(s).`;
+      }
+      if (duplicados.length) {
+        message += ` ${duplicados.length} referido(s) ya estaban registrados.`;
+      }
+
       return res.json({
-        message: saved ? 'Seguimiento actualizado.' : 'Sin cambios respecto al último guardado.',
+        message,
         lead,
         historial,
         entradaHistorial: saved ? entradaHistorial : null,
+        referidosCreados: referidosCreados ?? [],
+        nuevosLeads: nuevosLeads ?? [],
       });
     } catch (error) {
       if (error?.code === 'CIERRE_SUPERVISOR_SOLO_LECTURA') {
@@ -525,6 +567,12 @@ function registerApiRoutes(api) {
         });
       }
       if (error instanceof SeguimientoRegistroError) {
+        return res.status(400).json({
+          message: error.message,
+          code: error.code,
+        });
+      }
+      if (error instanceof CodigoPromotorCargaError) {
         return res.status(400).json({
           message: error.message,
           code: error.code,

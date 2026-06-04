@@ -16,6 +16,10 @@ GRANT EXECUTE ON dbo.encuestasMuestraOperador TO [MPCSP];
 -- Seguimiento CRM (SP + lectura/escritura historial en tabla)
 GRANT EXECUTE ON dbo.SP_RegistrarSeguimientoLead TO [MPCSP];
 GRANT SELECT, INSERT ON dbo.registrarSeguimientoLead TO [MPCSP];
+-- Referidos (sql/lead_referido-tabla-sp.sql) — solo SP, sin GRANT en tablas
+GRANT EXECUTE ON dbo.SP_RegistrarReferidoLead TO [MPCSP];
+GRANT EXECUTE ON dbo.SP_ContarReferidosLead TO [MPCSP];
+GRANT EXECUTE ON dbo.SP_ObtenerMetaReferidosLead TO [MPCSP];
 -- Si tras EXECUTE falla por SELECT en tablas internas del SP:
 -- ALTER ROLE db_datareader ADD MEMBER [MPCSP];
 GO

@@ -127,6 +127,8 @@ function digitsTelefono(raw) {
   return String(raw ?? '').replace(/\D/g, '');
 }
 
+export { digitsTelefono };
+
 /**
  * Clave única encuesta: @telefono + @encuesta.
  * Con @origen = '2' (app manual) el SP actualiza y devuelve gestionCodigo = 1.

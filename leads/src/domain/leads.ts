@@ -52,6 +52,7 @@ export function leadSoloLecturaSupervisor(lead: Lead) {
 }
 
 export const ETIQUETA_CIERRE_SUPERVISOR = 'Cierre registrado por supervisor';
+export const ETIQUETA_REFERIDO = 'Referido';
 
 function normalizarRolOperador(rol?: string | null): RolUsuario | null {
   const r = String(rol ?? '').trim().toLowerCase();
@@ -235,10 +236,12 @@ export function getProductoNombre(idProducto: string | null | undefined, product
 }
 
 export function getProductosPorRol(productos: Producto[], rol: RolUsuario) {
-  return productos.filter((p) => p.rolesPermitidos.includes(rol));
+  const rolFiltro = rol === 'superadmin' ? 'supervisor' : rol;
+  return productos.filter((p) => p.rolesPermitidos.includes(rolFiltro));
 }
 
 export function puedeVenderProducto(productos: Producto[], rol: RolUsuario, idProducto: string) {
+  const rolFiltro = rol === 'superadmin' ? 'supervisor' : rol;
   const prod = productos.find((p) => p.id === idProducto);
-  return Boolean(prod?.rolesPermitidos.includes(rol));
+  return Boolean(prod?.rolesPermitidos.includes(rolFiltro));
 }

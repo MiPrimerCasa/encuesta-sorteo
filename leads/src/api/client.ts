@@ -1,35 +1,47 @@
 import type {
+  AdminDashboardData,
   Barrio,
+  GuardarSeguimientoResult,
   Lead,
   LinksRedes,
   NotificacionLinkRed,
   NuevoLeadData,
   Producto,
   Promotor,
+  ReferidoProcesado,
   RolUsuario,
   SeguimientoHistorialEntry,
   SeguimientoLead,
   UsuarioSesion,
 } from '../types';
+import { mensajeReferidosCreados } from '../domain/referidos-carga';
 import {
   DEMO_BARRIOS,
   DEMO_PRODUCTOS,
   DEMO_PROMOTORES,
   DEMO_USUARIO,
   DEMO_USUARIO_PROMOTOR,
+  DEMO_USUARIO_SUPERADMIN,
   createDemoLead,
+  getDemoAdminDashboard,
   getDemoLeads,
   getDemoHistorialSeguimiento,
   getDemoLinksRedes,
   getDemoPromotoresParaSupervisor,
+  processDemoReferidos,
   updateDemoLead,
   updateDemoLeadTelefono,
 } from './demoData';
 
 let _isDemoActive = import.meta.env.VITE_DEMO === 'true';
-export function enableDemoMode(rol: 'supervisor' | 'promotor' = 'supervisor') {
+export function enableDemoMode(rol: 'supervisor' | 'promotor' | 'superadmin' = 'supervisor') {
   _isDemoActive = true;
-  _demoUsuario = rol === 'promotor' ? DEMO_USUARIO_PROMOTOR : DEMO_USUARIO;
+  _demoUsuario =
+    rol === 'promotor'
+      ? DEMO_USUARIO_PROMOTOR
+      : rol === 'superadmin'
+        ? DEMO_USUARIO_SUPERADMIN
+        : DEMO_USUARIO;
 }
 
 const STORAGE_KEY = 'mpc-crm-session';
@@ -131,7 +143,13 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export async function login(usuario: string, password: string) {
   if (_isDemoActive) {
-    _demoUsuario = usuario === '__demo_promotor__' ? DEMO_USUARIO_PROMOTOR : DEMO_USUARIO;
+    if (usuario === '__demo_promotor__') {
+      _demoUsuario = DEMO_USUARIO_PROMOTOR;
+    } else if (usuario === '__demo_superadmin__') {
+      _demoUsuario = DEMO_USUARIO_SUPERADMIN;
+    } else {
+      _demoUsuario = DEMO_USUARIO;
+    }
     return { token: 'demo', usuario: _demoUsuario };
   }
   return apiFetch<{ token: string; usuario: UsuarioSesion }>('/api/auth/login', {
@@ -216,9 +234,17 @@ export async function fetchBarrios() {
 }
 
 export async function fetchProductos(rol: RolUsuario) {
-  if (_isDemoActive) return DEMO_PRODUCTOS.filter((p) => p.rolesPermitidos.includes(rol));
-  const data = await apiFetch<{ productos: Producto[] }>(`/api/productos?rol=${rol}`);
+  const rolFiltro = rol === 'superadmin' ? 'supervisor' : rol;
+  if (_isDemoActive) {
+    return DEMO_PRODUCTOS.filter((p) => p.rolesPermitidos.includes(rolFiltro));
+  }
+  const data = await apiFetch<{ productos: Producto[] }>(`/api/productos?rol=${rolFiltro}`);
   return data.productos;
+}
+
+export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
+  if (_isDemoActive) return getDemoAdminDashboard();
+  return apiFetch<AdminDashboardData>('/api/admin/dashboard');
 }
 
 export async function fetchHistorialSeguimiento(
@@ -233,10 +259,34 @@ export async function fetchHistorialSeguimiento(
   return data.historial ?? [];
 }
 
-export async function guardarSeguimiento(leadId: string, seguimiento: SeguimientoLead) {
+export async function guardarSeguimiento(
+  leadId: string,
+  seguimiento: SeguimientoLead,
+): Promise<GuardarSeguimientoResult> {
   if (_isDemoActive) {
     const usuario = getSession()?.usuario;
-    return updateDemoLead(leadId, seguimiento, usuario);
+    const leadPadre = getDemoLeads().find((l) => l.id === leadId);
+    let seg = seguimiento;
+    let referidosCreados: ReferidoProcesado[] = [];
+    let nuevosLeads: Lead[] = [];
+
+    if (leadPadre) {
+      const proc = processDemoReferidos(leadPadre, seguimiento);
+      referidosCreados = proc.resultados;
+      nuevosLeads = proc.nuevosLeads;
+      if (proc.referidosGenerados?.length) {
+        seg = { ...seguimiento, referidosGenerados: proc.referidosGenerados };
+      }
+    }
+
+    const lead = updateDemoLead(leadId, seg, usuario);
+    const extra = mensajeReferidosCreados(referidosCreados);
+    return {
+      lead,
+      referidosCreados,
+      nuevosLeads,
+      message: extra ? `Seguimiento actualizado. ${extra}.` : 'Seguimiento actualizado.',
+    };
   }
   const data = await apiFetch<{
     lead: Lead;
@@ -244,11 +294,18 @@ export async function guardarSeguimiento(leadId: string, seguimiento: Seguimient
     historial?: SeguimientoHistorialEntry[];
     entradaHistorial?: SeguimientoHistorialEntry | null;
     aviso?: string;
+    referidosCreados?: ReferidoProcesado[];
+    nuevosLeads?: Lead[];
   }>(`/api/leads/${leadId}/seguimiento`, {
     method: 'PATCH',
     body: JSON.stringify(seguimiento),
   });
-  return data.lead;
+  return {
+    lead: data.lead,
+    message: data.message,
+    referidosCreados: data.referidosCreados,
+    nuevosLeads: data.nuevosLeads,
+  };
 }
 
 /** Alta manual vía dbo.encuestaCargaSorteo01 (producción) o demo local. */

@@ -3,13 +3,14 @@ import {
   fetchNotificacionesLinksRedes,
   marcarNotificacionLinkVista,
 } from '../../api/client';
-import type { NotificacionLinkRed } from '../../types';
+import type { NotificacionLinkRed, RolUsuario } from '../../types';
 
 interface NotificationsCenterProps {
-  rol: 'supervisor' | 'promotor';
+  rol: RolUsuario;
 }
 
 export function NotificationsCenter({ rol }: NotificationsCenterProps) {
+  if (rol === 'superadmin') return null;
   const [abierto, setAbierto] = useState(false);
   const [items, setItems] = useState<NotificacionLinkRed[]>([]);
   const [cargando, setCargando] = useState(false);

@@ -11,6 +11,7 @@ import {
   parseIdEntero,
 } from './mssql.js';
 import { cierreRegistradoPorSupervisor } from '../domain/cierre-supervisor.js';
+import { CodigoPromotorCargaError } from './encuesta-carga.js';
 import { getSeguimientoExterno } from './sqlite.js';
 import {
   batchLatestSeguimientoSql,
@@ -95,6 +96,31 @@ function parseSiNo(valor) {
     .trim()
     .toUpperCase()
     .startsWith('S');
+}
+
+/** S/N de encuesta → true/false; vacío o ambiguo → null. */
+function parseSiNoTriState(valor) {
+  const v = String(valor ?? '').trim();
+  if (!v) return null;
+  const upper = v.toUpperCase();
+  if (upper.startsWith('S') || upper === '1' || upper === 'SI' || upper === 'SÍ') return true;
+  if (upper.startsWith('N') || upper === '0' || upper === 'NO') return false;
+  return null;
+}
+
+function pickConoceMpcRow(row) {
+  return pickField(row, 'Conoce MPC', 'Conoce MPC ') ?? pickFieldStartsWith(row, 'Conoce MPC', 'conoce mpc');
+}
+
+function pickSabiaPlanInversionJovenRow(row) {
+  return (
+    pickField(
+      row,
+      'Sabias que c...',
+      'Sabias que con MPC podes acceder a la vivienda propia',
+    ) ??
+    pickFieldStartsWith(row, 'Sabias que', 'sabias que')
+  );
 }
 
 function parseHorarioEntrevista(raw) {
@@ -323,12 +349,8 @@ export function analyzeEncuestasIdColumns(rows) {
 function buildObservacionesEncuesta(row) {
   const partes = [];
   const domicilio = pickField(row, 'Domicilio', 'domicilio');
-  const conoce = pickField(row, 'Conoce MPC', 'Conoce MPC ');
-  const sabias = pickField(
-    row,
-    'Sabias que c...',
-    'Sabias que con MPC podes acceder a la vivienda propia',
-  );
+  const conoce = pickConoceMpcRow(row);
+  const sabias = pickSabiaPlanInversionJovenRow(row);
   const lugar = pickField(row, 'Domicilio de encuest...', 'Domicilio de encuesta');
   if (domicilio) partes.push(`Domicilio encuesta: ${domicilio}`);
   if (conoce) partes.push(`Conoce MPC: ${conoce}`);
@@ -384,6 +406,8 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
     (usuarioKey ? seguimientoLocal[usuarioKey] : undefined) ??
     {};
   const observacionesEncuesta = buildObservacionesEncuesta(row);
+  const conoceMpc = parseSiNoTriState(pickConoceMpcRow(row));
+  const sabiaPlanInversionJoven = parseSiNoTriState(pickSabiaPlanInversionJovenRow(row));
   const seguimiento = {
     ...seguimientoRemoto,
     // Origen desde encuesta; el caché local solo pisa si el usuario guardó fuente explícita.
@@ -397,6 +421,26 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
   const codigoCampania = encuestaRaw
     ? normalizarEncuestaCargaId(encuestaRaw)
     : undefined;
+
+  const esReferidoRaw = pickField(
+    row,
+    'es_referido',
+    'esReferido',
+    'EsReferido',
+    'es referido',
+  );
+  const esReferido =
+    esReferidoRaw === true ||
+    esReferidoRaw === 1 ||
+    String(esReferidoRaw ?? '').trim().toLowerCase() === 's' ||
+    String(esReferidoRaw ?? '').trim() === '1';
+  const leadReferidoDeIdRaw = pickField(
+    row,
+    'id_encuesta_origen',
+    'idEncuestaOrigen',
+    'lead_referido_de',
+  );
+  const nivelReferidoRaw = pickField(row, 'nivel_referido', 'nivelReferido', 'nivel');
 
   return {
     id: leadKey,
@@ -418,6 +462,17 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
     fechaAlta: horarioIso ?? `${fechaBase}T09:00:00`,
     codigoCampania,
     origenEncuesta: origenRaw != null ? String(origenRaw).trim() : undefined,
+    conoceMpc,
+    sabiaPlanInversionJoven,
+    esReferido: esReferido || undefined,
+    leadReferidoDeId:
+      leadReferidoDeIdRaw != null && String(leadReferidoDeIdRaw).trim() !== ''
+        ? String(leadReferidoDeIdRaw)
+        : undefined,
+    nivelReferido:
+      nivelReferidoRaw != null && String(nivelReferidoRaw).trim() !== ''
+        ? Number(nivelReferidoRaw) || undefined
+        : undefined,
     seguimiento,
   };
 }
@@ -638,7 +693,16 @@ export async function listLeadsFromEncuestas(usuario) {
     return enrichLeadParaCliente(mapEncuestaRowToLead(row, { [id]: seguimientoById[id] }));
   });
   leads.sort((a, b) => (a.fechaAlta ?? '').localeCompare(b.fechaAlta ?? ''));
-  return leads;
+
+  try {
+    const { fetchReferidosMetaPorIds, aplicarMetaReferidosEnLeads } = await import(
+      './referidos-carga.js'
+    );
+    const metaMap = await fetchReferidosMetaPorIds(leads.map((l) => l.id));
+    return aplicarMetaReferidosEnLeads(leads, metaMap, usuario);
+  } catch {
+    return leads;
+  }
 }
 
 /** Leads desde SQL Server (encuestasMuestraOperador filtrado en la DB). */
@@ -666,9 +730,34 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     throw err;
   }
   const base = mapEncuestaRowToLead(row, { [leadId]: prevSeg });
+  let seguimientoParaGuardar = { ...seguimiento };
+  let referidosCreados = [];
+  let nuevosLeads = [];
+
+  if (seguimiento.brindoReferidos === true && (seguimiento.referidos?.length ?? 0) > 0) {
+    try {
+      const { crearLeadsDesdeReferidos } = await import('./referidos-carga.js');
+      const proc = await crearLeadsDesdeReferidos(base, seguimiento, usuario);
+      referidosCreados = proc.resultados ?? [];
+      nuevosLeads = proc.nuevosLeads ?? [];
+      if (proc.referidosGenerados?.length) {
+        seguimientoParaGuardar = {
+          ...seguimientoParaGuardar,
+          referidosGenerados: proc.referidosGenerados,
+        };
+      }
+    } catch (error) {
+      if (error instanceof CodigoPromotorCargaError) throw error;
+      console.warn(
+        '[referidos] Carga automática parcial:',
+        error instanceof Error ? error.message : error,
+      );
+    }
+  }
+
   const { merged, saved, entradaHistorial } = await persistirSeguimientoLead(
     leadId,
-    seguimiento,
+    seguimientoParaGuardar,
     usuario,
     base,
   );
@@ -683,5 +772,5 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     { ...base, seguimiento: seguimientoConOperador },
     seguimientoConOperador,
   );
-  return { lead, saved, entradaHistorial };
+  return { lead, saved, entradaHistorial, referidosCreados, nuevosLeads };
 }

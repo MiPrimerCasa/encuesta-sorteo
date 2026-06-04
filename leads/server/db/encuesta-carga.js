@@ -520,7 +520,7 @@ export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuario
   if (porTel) return porTel;
 
   throw new CargaEncuestaSinPersistirError(
-    'El SP ejecutó pero el teléfono no aparece actualizado. Pedí al DBA que el branch @origen=2 haga telefono = @telefonoNuevo (ver sql/encuestaCargaSorteo01-modificar-telefono.sql).',
+    'El SP ejecutó pero el teléfono no aparece actualizado. Pedí al DBA aplicar el ALTER de sql/encuestaCargaSorteo01-modificar-telefono.sql (branch @origen=2: localizar por usuario+campo1Valor y UPDATE telefono=@telefono).',
     `SP ok leadId=${leadId}, telAnterior=${cargaParams.telefonoAnterior}, telNuevo=${telefonoNorm}`,
   );
 }

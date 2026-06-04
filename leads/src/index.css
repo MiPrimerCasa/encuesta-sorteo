@@ -113,32 +113,147 @@
   cursor: not-allowed;
 }
 
-.mpc-calendar .react-datepicker__time-container {
+/* Calendario + panel hora AM/PM (sin lista deslizable) */
+.mpc-calendar--con-hora .react-datepicker__time-container {
+  display: none;
+}
+
+.mpc-calendar-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+.mpc-calendar-layout__date {
+  flex: 1;
+  min-width: 0;
+}
+
+.mpc-time-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  width: 148px;
+  padding: 12px 10px;
   border-left: 1px solid #E4E4E7;
-  width: 96px;
+  background: #FAFAFA;
 }
-.mpc-calendar .react-datepicker__time-container .react-datepicker__time {
+
+.mpc-time-panel__title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #71717A;
+  text-align: center;
+}
+
+.mpc-time-panel__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 6px;
+}
+
+.mpc-time-panel__field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.mpc-time-panel__label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #A1A1AA;
+  text-transform: uppercase;
+}
+
+.mpc-time-panel__select {
+  width: 52px;
+  height: 40px;
+  border: 1px solid #E4E4E7;
+  border-radius: 8px;
   background: #fff;
+  color: #18181B;
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+  appearance: none;
+  padding: 0 4px;
 }
-.mpc-calendar .react-datepicker-time__header {
-  padding: 8px 0;
+
+.mpc-time-panel__select:focus {
+  outline: 2px solid #E9B8BC;
+  outline-offset: 1px;
+  border-color: #9A1620;
 }
-.mpc-calendar .react-datepicker__time-list-item {
-  color: #3F3F46;
+
+.mpc-time-panel__sep {
+  font-size: 18px;
+  font-weight: 700;
+  color: #71717A;
+  line-height: 40px;
+  padding-bottom: 0;
+}
+
+.mpc-time-panel__periodo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.mpc-time-panel__periodo-btn {
+  flex: 1;
+  height: 36px;
+  border: 1px solid #E4E4E7;
+  border-radius: 8px;
+  background: #fff;
+  color: #52525B;
   font-size: 13px;
-  height: 36px !important;
-  line-height: 36px !important;
-  padding: 0 12px !important;
-  transition: background 100ms ease-out;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 100ms ease-out, color 100ms ease-out, border-color 100ms ease-out;
 }
-.mpc-calendar .react-datepicker__time-list-item:hover {
-  background: #FBF2F3 !important;
-  color: #9A1620 !important;
+
+.mpc-time-panel__periodo-btn:hover {
+  background: #FBF2F3;
+  border-color: #E9B8BC;
+  color: #9A1620;
 }
-.mpc-calendar .react-datepicker__time-list-item--selected {
-  background: #9A1620 !important;
-  color: #fff !important;
-  font-weight: 600 !important;
+
+.mpc-time-panel__periodo-btn--active {
+  background: #9A1620;
+  border-color: #9A1620;
+  color: #fff;
+}
+
+.mpc-time-panel__periodo-btn--active:hover {
+  background: #7A1019;
+  border-color: #7A1019;
+  color: #fff;
+}
+
+@media (max-width: 380px) {
+  .mpc-calendar-layout {
+    flex-direction: column;
+  }
+  .mpc-time-panel {
+    width: auto;
+    border-left: none;
+    border-top: 1px solid #E4E4E7;
+  }
+  .mpc-time-panel__periodo {
+    flex-direction: row;
+  }
 }
 /* ── fin react-datepicker ─────────────────────────────────────────────── */
 

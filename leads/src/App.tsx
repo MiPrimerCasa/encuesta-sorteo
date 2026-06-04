@@ -71,13 +71,6 @@ function AppShell() {
     void cargarDatos();
   }, [cargarDatos]);
 
-  useEffect(() => {
-    if (!usuario) return;
-    if (usuario.rol === 'promotor' && vistaActiva === 'calendario') {
-      setVistaActiva('leads');
-    }
-  }, [usuario, vistaActiva]);
-
   const onActualizarLead = useCallback(
     async (leadId: string, seguimiento: SeguimientoLead) => {
       const updated = await guardarSeguimiento(leadId, seguimiento);
@@ -109,10 +102,11 @@ function AppShell() {
   const contenidoPrincipal =
     cargando && leads.length === 0 ? (
       <VistaCargando texto="Cargando datos…" />
-    ) : vistaActiva === 'calendario' && usuario.rol === 'supervisor' ? (
+    ) : vistaActiva === 'calendario' ? (
       <CalendarioView
         leads={leads}
         promotores={promotores}
+        rolUsuario={usuario.rol}
         onActualizarLead={onActualizarLead}
         onVolver={() => setVistaActiva('leads')}
         onAbrirSeguimientoLead={(leadId) => {

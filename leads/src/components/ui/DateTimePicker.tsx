@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useMemo, useRef } from 'react';
+import { forwardRef, useEffect, useRef, useState } from 'react';
 import ReactDatePicker, { registerLocale } from 'react-datepicker';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale/es';
@@ -9,11 +9,22 @@ registerLocale('es', es);
 type Periodo = 'am' | 'pm';
 
 const MINUTOS_OPCIONES = [0, 15, 30, 45] as const;
-const HORAS_12 = [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11] as const;
+const HORAS_24 = Array.from({ length: 24 }, (_, i) => i);
 
-function isoToDate(isoStr: string): Date | null {
+/** Parsea `YYYY-MM-DDTHH:mm` como hora local (sin UTC). */
+function parseIsoLocal(isoStr: string): Date | null {
   if (!isoStr?.trim()) return null;
-  const d = new Date(`${isoStr.trim()}:00`);
+  const m = isoStr.trim().match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) return null;
+  const d = new Date(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    Number(m[4]),
+    Number(m[5]),
+    Number(m[6] ?? 0),
+    0,
+  );
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
@@ -23,37 +34,53 @@ function dateToIso(date: Date | null): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function partesDesdeDate(date: Date): { hora12: number; minuto: number; periodo: Periodo } {
+function partesDesdeDate(date: Date): { h24: number; minuto: number; periodo: Periodo } {
   const h24 = date.getHours();
   return {
-    hora12: h24 % 12 || 12,
+    h24,
     minuto: date.getMinutes(),
     periodo: h24 >= 12 ? 'pm' : 'am',
   };
 }
 
 function partesDesdeIso(iso: string) {
-  const d = isoToDate(iso);
-  if (!d) return { hora12: 9, minuto: 0, periodo: 'am' as Periodo };
+  const d = parseIsoLocal(iso);
+  if (!d) return { h24: 9, minuto: 0, periodo: 'am' as Periodo };
   return partesDesdeDate(d);
 }
 
-/** Mantiene la hora en reloj 12 h y cambia solo AM/PM (ej. 11 AM → 11 PM = 23:00). */
-function hora24ConPeriodo(hora12: number, periodo: Periodo): number {
-  if (periodo === 'am') return hora12 === 12 ? 0 : hora12;
-  return hora12 === 12 ? 12 : hora12 + 12;
+/**
+ * Al cambiar AM ↔ PM convierte la hora (ej. 11 AM → 23, 23 → 11).
+ * Mantiene el “número de reloj” 12 h al cruzar mediodía/medianoche.
+ */
+function h24TrasCambiarPeriodo(h24: number, periodoNuevo: Periodo): number {
+  const periodoActual: Periodo = h24 >= 12 ? 'pm' : 'am';
+  if (periodoActual === periodoNuevo) return h24;
+
+  const cara12 = h24 % 12 || 12;
+
+  if (periodoNuevo === 'pm') {
+    return cara12 === 12 ? 12 : cara12 + 12;
+  }
+  return cara12 === 12 ? 0 : cara12;
 }
 
-function dateConPartes(base: Date, hora12: number, minuto: number, periodo: Periodo): Date {
+function dateConH24(base: Date, h24: number, minuto: number): Date {
   const next = new Date(base);
-  next.setHours(hora24ConPeriodo(hora12, periodo), minuto, 0, 0);
+  next.setHours(h24, minuto, 0, 0);
   return next;
 }
 
 function formatIsoLegible(iso: string): string {
-  const d = isoToDate(iso);
+  const d = parseIsoLocal(iso);
   if (!d) return '';
-  return format(d, "d 'de' MMMM yyyy, h:mm a", { locale: es });
+  return format(d, "d 'de' MMMM yyyy, HH:mm", { locale: es });
+}
+
+function minutoCercano(minuto: number) {
+  return MINUTOS_OPCIONES.reduce((prev, curr) =>
+    Math.abs(curr - minuto) < Math.abs(prev - minuto) ? curr : prev,
+  );
 }
 
 interface TriggerButtonProps {
@@ -124,16 +151,23 @@ interface TimePanelProps {
 }
 
 function TimePanel({ isoValue, selectedDate, onTimeChange }: TimePanelProps) {
-  const base = selectedDate ?? isoToDate(isoValue) ?? new Date();
-  const { hora12, minuto, periodo } = useMemo(() => partesDesdeIso(isoValue), [isoValue]);
+  const base = selectedDate ?? parseIsoLocal(isoValue) ?? new Date();
+  const [h24, setH24] = useState(() => partesDesdeIso(isoValue).h24);
+  const [minuto, setMinuto] = useState<number>(() => minutoCercano(partesDesdeIso(isoValue).minuto));
 
-  const aplicar = (nextHora12: number, nextMinuto: number, nextPeriodo: Periodo) => {
-    onTimeChange(dateToIso(dateConPartes(base, nextHora12, nextMinuto, nextPeriodo)));
+  useEffect(() => {
+    const p = partesDesdeIso(isoValue);
+    setH24(p.h24);
+    setMinuto(minutoCercano(p.minuto));
+  }, [isoValue]);
+
+  const periodo: Periodo = h24 >= 12 ? 'pm' : 'am';
+
+  const emitir = (nextH24: number, nextMinuto: number) => {
+    setH24(nextH24);
+    setMinuto(nextMinuto);
+    onTimeChange(dateToIso(dateConH24(base, nextH24, nextMinuto)));
   };
-
-  const minutoCercano = MINUTOS_OPCIONES.reduce((prev, curr) =>
-    Math.abs(curr - minuto) < Math.abs(prev - minuto) ? curr : prev,
-  );
 
   return (
     <div className="mpc-time-panel" role="group" aria-label="Hora">
@@ -143,13 +177,13 @@ function TimePanel({ isoValue, selectedDate, onTimeChange }: TimePanelProps) {
           <span className="mpc-time-panel__label">H</span>
           <select
             className="mpc-time-panel__select"
-            value={hora12}
-            onChange={(e) => aplicar(Number(e.target.value), minutoCercano, periodo)}
-            aria-label="Hora"
+            value={h24}
+            onChange={(e) => emitir(Number(e.target.value), minuto)}
+            aria-label="Hora (0 a 23)"
           >
-            {HORAS_12.map((h) => (
+            {HORAS_24.map((h) => (
               <option key={h} value={h}>
-                {h}
+                {String(h).padStart(2, '0')}
               </option>
             ))}
           </select>
@@ -163,8 +197,8 @@ function TimePanel({ isoValue, selectedDate, onTimeChange }: TimePanelProps) {
           <span className="mpc-time-panel__label">Min</span>
           <select
             className="mpc-time-panel__select"
-            value={minutoCercano}
-            onChange={(e) => aplicar(hora12, Number(e.target.value), periodo)}
+            value={minuto}
+            onChange={(e) => emitir(h24, Number(e.target.value))}
             aria-label="Minutos"
           >
             {MINUTOS_OPCIONES.map((m) => (
@@ -184,7 +218,8 @@ function TimePanel({ isoValue, selectedDate, onTimeChange }: TimePanelProps) {
               aria-pressed={periodo === p}
               onClick={() => {
                 if (p === periodo) return;
-                aplicar(hora12, minutoCercano, p);
+                const nextH24 = h24TrasCambiarPeriodo(h24, p);
+                emitir(nextH24, minuto);
               }}
             >
               {p.toUpperCase()}
@@ -238,7 +273,7 @@ export function DateTimePicker({
   usePortal = false,
 }: DateTimePickerProps) {
   const pickerRef = useRef<ReactDatePicker>(null);
-  const selected = isoToDate(value);
+  const selected = parseIsoLocal(value);
 
   useEffect(() => {
     if (!autoOpen) return;
@@ -253,8 +288,8 @@ export function DateTimePicker({
       onChange('');
       return;
     }
-    const { hora12, minuto, periodo } = partesDesdeIso(value);
-    onChange(dateToIso(dateConPartes(date, hora12, minuto, periodo)));
+    const { h24, minuto } = partesDesdeIso(value);
+    onChange(dateToIso(dateConH24(date, h24, minutoCercano(minuto))));
   };
 
   return (

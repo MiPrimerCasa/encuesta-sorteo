@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import { startOfMonth } from 'date-fns';
 import { Drawer } from 'vaul';
 
-import type { Lead, Promotor, SeguimientoLead } from '../../types';
+import type { Lead, Promotor, RolUsuario, SeguimientoLead } from '../../types';
 import { getHolidaysAR } from '../../lib/holidays-ar';
 import { isDiaDestacadoCalendario } from '../../lib/holidays-ar';
 import {
@@ -14,7 +14,7 @@ import {
   prevMonthDate,
 } from '../../lib/calendar';
 
-import { leadSoloLecturaSupervisor } from '../../domain/leads';
+import { leadSoloLecturaPromotor, leadSoloLecturaSupervisor } from '../../domain/leads';
 import { buildCalendarEvents, type CalendarEvent } from './calendar-types';
 import { CalendarGrid } from './CalendarGrid';
 import { DayEventsPanel } from './DayEventsPanel';
@@ -30,15 +30,21 @@ function buildWhatsAppUrl(phone: string): string {
 interface CalendarioViewProps {
   leads: Lead[];
   promotores: Promotor[];
+  rolUsuario: RolUsuario;
   onActualizarLead: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
   onVolver: () => void;
   /** Ir a Leads y abrir el formulario de seguimiento del cliente. */
   onAbrirSeguimientoLead: (leadId: string) => void;
 }
 
+function leadSoloLecturaEnCalendario(lead: Lead, rol: RolUsuario) {
+  return rol === 'promotor' ? leadSoloLecturaPromotor(lead) : leadSoloLecturaSupervisor(lead);
+}
+
 export function CalendarioView({
   leads,
   promotores,
+  rolUsuario,
   onActualizarLead,
   onVolver,
   onAbrirSeguimientoLead,
@@ -258,14 +264,18 @@ export function CalendarioView({
 
             {eventoAbierto && (() => {
               const leadEvento = leads.find((l) => l.id === eventoAbierto.leadId);
-              const soloLecturaPij = leadEvento
-                ? leadSoloLecturaSupervisor(leadEvento)
+              const soloLectura = leadEvento
+                ? leadSoloLecturaEnCalendario(leadEvento, rolUsuario)
                 : false;
+              const mensajeSoloLectura =
+                rolUsuario === 'promotor'
+                  ? 'Cierre registrado por el supervisor. Solo lectura en calendario.'
+                  : 'Seguimiento del promotor por Plan Inversión Joven. Solo lectura en calendario.';
               return (
               <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5">
-                {soloLecturaPij && (
+                {soloLectura && (
                   <p className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5 text-[13px] text-indigo-900">
-                    Seguimiento del promotor por Plan Inversión Joven. Solo lectura en calendario.
+                    {mensajeSoloLectura}
                   </p>
                 )}
                 {/* Metadatos del evento */}
@@ -284,14 +294,16 @@ export function CalendarioView({
                       </span>
                     </dd>
                   </div>
-                  <div className="flex justify-between">
-                    <dt className="text-zinc-400">Promotor</dt>
-                    <dd className="font-medium text-zinc-700">{eventoAbierto.promotor}</dd>
-                  </div>
+                  {rolUsuario === 'supervisor' && (
+                    <div className="flex justify-between">
+                      <dt className="text-zinc-400">Promotor</dt>
+                      <dd className="font-medium text-zinc-700">{eventoAbierto.promotor}</dd>
+                    </div>
+                  )}
                 </dl>
 
                 {/* Acciones */}
-                {!soloLecturaPij && (
+                {!soloLectura && (
                   <div className="space-y-3">
                     <button
                       type="button"

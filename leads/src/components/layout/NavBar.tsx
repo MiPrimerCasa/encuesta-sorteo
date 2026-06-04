@@ -10,6 +10,7 @@ const TABS_SUPERVISOR = [
 
 const TABS_PROMOTOR = [
   { value: 'leads' as const, label: 'Leads' },
+  { value: 'calendario' as const, label: 'Calendario' },
   { value: 'metricas' as const, label: 'Métricas' },
 ];
 

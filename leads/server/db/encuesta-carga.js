@@ -90,6 +90,11 @@ function getCargaProcedureName() {
   return raw.replace(/^\[?dbo\]?\./i, '').replace(/[\[\]]/g, '');
 }
 
+function getModificarProcedureName() {
+  const raw = process.env.SP_MODIFICAR_ENCUESTA || 'encuestaModificarSorteo01';
+  return raw.replace(/^\[?dbo\]?\./i, '').replace(/[\[\]]/g, '');
+}
+
 function includeOrigenParam() {
   return String(process.env.SP_CARGA_INCLUDE_ORIGEN ?? process.env.SP_INCLUDE_ORIGEN ?? 'true')
     .trim()
@@ -247,7 +252,6 @@ function bindCampo(request, codigo, valor, { vacioComoCadenaVacia = false } = {}
 
 /**
  * exec dbo.encuestaCargaSorteo01 — carga manual (@origen = 2).
- * Solo los 20 parámetros del SP (sin @telefonoNuevo ni extras).
  */
 export async function execEncuestaCargaSorteo01(params) {
   const pool = await getSqlPoolEncuestas();
@@ -280,6 +284,52 @@ export async function execEncuestaCargaSorteo01(params) {
   }
   if (cargaRetornoIndicaDuplicado(result)) {
     throw new ContactoYaRegistradoError();
+  }
+  return result;
+}
+
+/**
+ * exec dbo.encuestaModificarSorteo01 — modificar lead manual existente (teléfono y campos).
+ */
+export async function execEncuestaModificarSorteo01(params) {
+  const pool = await getSqlPoolEncuestas();
+  const proc = getModificarProcedureName();
+  const request = pool.request();
+
+  const idEncuesta = Number.parseInt(String(params.idEncuesta), 10);
+  if (!Number.isFinite(idEncuesta) || idEncuesta <= 0) {
+    throw new LeadNoEncontradoError();
+  }
+
+  request.input('idEncuesta', sql.Int, idEncuesta);
+
+  const telefonoSp =
+    digitsTelefono(params.telefono) || String(params.telefono ?? '').trim();
+  request.input('telefono', sql.NVarChar(50), telefonoSp);
+  request.input('encuesta', sql.NVarChar(50), params.encuesta);
+  request.input('usuario', sql.NVarChar(100), params.usuario);
+
+  bindCampo(request, 1, params.campo1Valor);
+  bindCampo(request, 2, params.campo2Valor);
+  bindCampo(request, 3, params.campo3Valor);
+  bindCampo(request, 4, params.campo4Valor);
+  bindCampo(request, 5, 'NO');
+  bindCampo(request, 6, params.campo6Valor, { vacioComoCadenaVacia: true });
+  bindCampo(request, 7, params.campo7Valor, { vacioComoCadenaVacia: true });
+  bindCampo(request, 8, params.campo8Valor, { vacioComoCadenaVacia: true });
+
+  const result = await request.execute(proc);
+  if (process.env.DEBUG_CARGA_ENCUESTA === '1') {
+    console.info('[encuestaModificar] returnValue=%s rows=%s', result.returnValue, JSON.stringify(result.recordset));
+  }
+  if (cargaRetornoIndicaDuplicado(result)) {
+    throw new ContactoYaRegistradoError();
+  }
+  if (!cargaRetornoIndicaExito(result)) {
+    throw new CargaEncuestaSinPersistirError(
+      'No se pudo modificar el lead. Verificá que exista el SP de modificación en la base.',
+      `SP=${proc}, idEncuesta=${idEncuesta}, rows=${JSON.stringify(result.recordset ?? [])}`,
+    );
   }
   return result;
 }
@@ -446,11 +496,7 @@ function leadEsCargaManualServidor(lead) {
 }
 
 /**
- * Modifica teléfono de un lead manual vía dbo.encuestaCargaSorteo01 (@origen = 2).
- * Solo los 20 parámetros del SP — sin @telefonoNuevo.
- *
- * Envía @telefono = teléfono nuevo. Para que actualice la fila existente (y no
- * inserte otra), el DBA debe ajustar el branch @origen='2' (ver sql/...).
+ * Modifica teléfono de un lead manual vía dbo.encuestaModificarSorteo01.
  */
 export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuarioSesion) {
   const idEncuesta = Number.parseInt(String(leadId), 10);
@@ -490,7 +536,11 @@ export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuario
   const cambiaTelefono =
     Boolean(telefonoAnterior) && telefonoAnterior !== telefonoNorm;
 
-  await execEncuestaCargaSorteo01({ ...cargaParams, telefono: telefonoNorm });
+  await execEncuestaModificarSorteo01({
+    ...cargaParams,
+    telefono: telefonoNorm,
+    idEncuesta,
+  });
 
   const leadsPost = await listLeadsFromEncuestas(usuario);
   const porId = leadsPost.find((l) => String(l.id) === String(leadId));
@@ -505,14 +555,14 @@ export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuario
 
   if (cambiaTelefono && porTel && String(porTel.id) !== String(leadId)) {
     throw new CargaEncuestaSinPersistirError(
-      'Se creó un registro duplicado en lugar de actualizar el teléfono. El DBA debe ajustar encuestaCargaSorteo01 (ver sql/encuestaCargaSorteo01-modificar-telefono.sql).',
+      'Se creó un registro duplicado en lugar de actualizar el teléfono. Verificá que el DBA haya creado encuestaModificarSorteo01 (ver sql/encuestaModificarSorteo01.sql).',
       `idOriginal=${leadId}, idNuevo=${porTel.id}, telAnterior=${telefonoAnterior}, telNuevo=${telefonoNorm}`,
     );
   }
 
   if (cambiaTelefono && porId && digitsTelefono(porId.telefono) === telefonoAnterior) {
     throw new CargaEncuestaSinPersistirError(
-      'El SP no actualizó el teléfono. Pedí al DBA agregar telefono al UPDATE con origen=2 (ver sql/encuestaCargaSorteo01-modificar-telefono.sql).',
+      'El SP no actualizó el teléfono. Pedí al DBA crear encuestaModificarSorteo01 (ver sql/encuestaModificarSorteo01.sql).',
       `id=${leadId}, telAnterior=${telefonoAnterior}, telNuevo=${telefonoNorm}`,
     );
   }
@@ -520,7 +570,7 @@ export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuario
   if (porTel) return porTel;
 
   throw new CargaEncuestaSinPersistirError(
-    'El SP ejecutó pero el teléfono no aparece actualizado. Pedí al DBA aplicar el ALTER de sql/encuestaCargaSorteo01-modificar-telefono.sql (branch @origen=2: localizar por usuario+campo1Valor y UPDATE telefono=@telefono).',
+    'El SP ejecutó pero el teléfono no aparece actualizado. Verificá SP_MODIFICAR_ENCUESTA y sql/encuestaModificarSorteo01.sql.',
     `SP ok leadId=${leadId}, telAnterior=${cargaParams.telefonoAnterior}, telNuevo=${telefonoNorm}`,
   );
 }

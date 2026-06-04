@@ -127,6 +127,21 @@
 .mpc-calendar-layout__date {
   flex: 1;
   min-width: 0;
+  position: relative;
+}
+
+/* Flechas de mes dentro del calendario, no sobre el panel Hora */
+.mpc-calendar--con-hora.react-datepicker {
+  position: static;
+}
+
+.mpc-calendar--con-hora .react-datepicker__navigation--previous {
+  left: 8px;
+}
+
+.mpc-calendar--con-hora .react-datepicker__navigation--next {
+  right: 8px;
+  left: auto;
 }
 
 .mpc-time-panel {

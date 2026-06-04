@@ -220,7 +220,11 @@ export function getPromotorNombre(
 }
 
 export function getProductoNombre(idProducto: string | null | undefined, productos: Producto[]) {
-  return productos.find((p) => p.id === idProducto)?.nombre ?? null;
+  const fromCatalog = productos.find((p) => p.id === idProducto)?.nombre;
+  if (fromCatalog) return fromCatalog;
+  if (idProducto === 'prod-pij') return 'Plan Inversión Joven';
+  if (idProducto === 'prod-terreno') return 'Terreno';
+  return null;
 }
 
 export function getProductosPorRol(productos: Producto[], rol: RolUsuario) {

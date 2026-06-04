@@ -380,7 +380,10 @@ export function LeadModalForm({
         : form.huboEntrevista === true && form.resultadoEntrevista != null)) ||
     (confirmoNo && showCanalTrasNoConfirmo && form.canal != null);
 
-  const idProductoCierre = form.idProducto || lead.seguimiento?.idProducto || '';
+  const idProductoCierre =
+    form.idProducto ||
+    lead.seguimiento?.idProducto ||
+    (soloLectura && (form.idBarrio || lead.seguimiento?.idBarrio) ? ID_PRODUCTO_TERRENO : '');
   const idBarrioCierre = form.idBarrio || lead.seguimiento?.idBarrio || '';
   const estadoPagoCierre = form.estadoPago ?? lead.seguimiento?.estadoPago ?? null;
   const numeroReciboCierre = form.numeroRecibo || lead.seguimiento?.numeroRecibo || '';

@@ -44,6 +44,7 @@ function usuarioDesdeRequest(req) {
   const id = String(req.headers['x-usuario-id'] || '').trim();
   const loginId = String(req.headers['x-usuario-login-id'] || '').trim();
   const codigoCarga = String(req.headers['x-usuario-codigo-carga'] || '').trim();
+  const idVendedorHdr = String(req.headers['x-usuario-id-vendedor'] || '').trim();
   if (rol !== 'promotor' && rol !== 'supervisor') return null;
   if (!nombre || !id) return null;
   return {
@@ -53,6 +54,7 @@ function usuarioDesdeRequest(req) {
     loginId: loginId || undefined,
     codigoCarga: codigoCarga || undefined,
     idOperador: id,
+    idVendedor: idVendedorHdr || id,
   };
 }
 

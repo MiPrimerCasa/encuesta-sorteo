@@ -2,7 +2,11 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { esCodigoUsuarioCargaValido } from './codigo-promotor.js';
-import { normalizeNombre, resolveCodigoCargaPorPromotor } from './encuestas.js';
+import {
+  buildCodigoPromotorIndex,
+  normalizeNombre,
+  resolveCodigoCargaPorPromotor,
+} from './encuestas.js';
 import { compactarCodigoSorteo } from './whatsapp-link-text.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -61,10 +65,74 @@ function codigoDesdeEntrada(entry) {
   return entry.codigo ?? null;
 }
 
+export function idVendedorOperador(usuarioSesion) {
+  return usuarioSesion?.idVendedor ?? usuarioSesion?.idOperador ?? usuarioSesion?.id ?? null;
+}
+
+/** El código @usuario pertenece a filas previas de este idVendedor (o no hay filas para comparar). */
+export function codigoEnFilasDelPromotor(codigo, encuestaRows, idVendedor) {
+  if (!esCodigoUsuarioCargaValido(codigo)) return false;
+  if (!encuestaRows?.length) return true;
+  const index = buildCodigoPromotorIndex(encuestaRows);
+  const prefix = `${idVendedor}|`;
+  for (const [key, v] of index) {
+    if (key.startsWith(prefix) && v.codigoCarga === codigo) return true;
+  }
+  return false;
+}
+
+/**
+ * Promotor: solo código ligado a su idVendedor en encuestas o catálogo exacto (sin fuzzy).
+ * Evita asignar código de supervisor u otro promotor por coincidencia parcial de nombre.
+ */
+export function resolveCodigoCargaPromotorStrict(usuarioSesion, encuestaRows = []) {
+  if (!usuarioSesion || usuarioSesion.rol !== 'promotor') return null;
+  const idV = idVendedorOperador(usuarioSesion);
+
+  const desdeFilas = resolveCodigoCargaPorPromotor(
+    encuestaRows,
+    usuarioSesion.nombre,
+    idV,
+  );
+  if (esCodigoUsuarioCargaValido(desdeFilas)) return desdeFilas;
+
+  const catalog = loadOperadoresCatalog();
+  const idOp = String(idV ?? '').trim();
+  if (idOp && catalog.byIdOperador?.[idOp]) {
+    const codigo = normalizeCodigoCatalog(codigoDesdeEntrada(catalog.byIdOperador[idOp]));
+    if (esCodigoUsuarioCargaValido(codigo)) return codigo;
+  }
+
+  const login = normalizeLoginId(usuarioSesion.loginId);
+  if (login && catalog.byLoginId?.[login]) {
+    const codigo = normalizeCodigoCatalog(codigoDesdeEntrada(catalog.byLoginId[login]));
+    if (esCodigoUsuarioCargaValido(codigo)) return codigo;
+  }
+
+  const norm = normalizeNombre(String(usuarioSesion.nombre ?? '').trim());
+  if (norm && catalog.byNombre?.[norm]) {
+    const entry = catalog.byNombre[norm];
+    if (entry?.rol !== 'supervisor') {
+      const codigo = normalizeCodigoCatalog(codigoDesdeEntrada(entry));
+      if (esCodigoUsuarioCargaValido(codigo)) return codigo;
+    }
+  }
+
+  const sesion = String(usuarioSesion.codigoCarga ?? '').trim();
+  if (esCodigoUsuarioCargaValido(sesion) && codigoEnFilasDelPromotor(sesion, encuestaRows, idV)) {
+    return sesion;
+  }
+
+  return null;
+}
+
 /**
  * Resuelve código SORTEO (@usuario) desde sesión, planilla JSON o filas encuesta.
  */
 export function resolveCodigoCargaOperador(usuarioSesion, encuestaRows = []) {
+  if (usuarioSesion?.rol === 'promotor') {
+    return resolveCodigoCargaPromotorStrict(usuarioSesion, encuestaRows);
+  }
   if (!usuarioSesion) return null;
 
   const candidatosDirectos = [usuarioSesion.codigoCarga, usuarioSesion.loginId];
@@ -122,6 +190,19 @@ export function resolveCodigoCargaOperador(usuarioSesion, encuestaRows = []) {
 
 export function enriquecerUsuarioConCodigoCarga(usuario, encuestaRows = []) {
   if (!usuario) return usuario;
+  if (usuario.rol === 'promotor') {
+    const codigo = resolveCodigoCargaPromotorStrict(usuario, encuestaRows);
+    if (codigo) return { ...usuario, codigoCarga: codigo };
+    const idV = idVendedorOperador(usuario);
+    if (
+      esCodigoUsuarioCargaValido(usuario.codigoCarga) &&
+      codigoEnFilasDelPromotor(usuario.codigoCarga, encuestaRows, idV)
+    ) {
+      return usuario;
+    }
+    const { codigoCarga: _omit, ...sinCodigo } = usuario;
+    return sinCodigo;
+  }
   if (esCodigoUsuarioCargaValido(usuario.codigoCarga)) return usuario;
   const codigo = resolveCodigoCargaOperador(usuario, encuestaRows);
   if (!codigo) return usuario;

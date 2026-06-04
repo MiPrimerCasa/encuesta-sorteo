@@ -11,7 +11,13 @@ import {
   extraerCodigoPromotorDesdeFilaEncuesta,
   normalizarEncuestaCargaId,
 } from './codigo-promotor.js';
-import { resolveCodigoCargaOperador } from './operadores-catalog.js';
+import {
+  codigoEnFilasDelPromotor,
+  enriquecerUsuarioConCodigoCarga,
+  idVendedorOperador,
+  resolveCodigoCargaOperador,
+  resolveCodigoCargaPromotorStrict,
+} from './operadores-catalog.js';
 import { getSqlPoolEncuestas } from './mssql.js';
 
 const MSG_CONTACTO_YA_REGISTRADO = 'Este contacto ya está registrado.';
@@ -143,7 +149,34 @@ function codigoDesdeFilasEncuesta(rows, nombrePromotor, idVendedor) {
  * @usuario del SP = código promotor (SORTEO01_V1), no el email de login.
  */
 export function resolveUsuarioSpCarga(usuarioSesion, context, payload) {
+  const idV = idVendedorOperador(usuarioSesion);
   const explicito = payload.promotorCodigo?.trim();
+
+  if (usuarioSesion.rol === 'promotor') {
+    const desdeFilas = codigoDesdeFilasEncuesta(
+      context.rows,
+      usuarioSesion.nombre,
+      idV,
+    );
+    if (esCodigoUsuarioCargaValido(desdeFilas)) return desdeFilas;
+
+    if (
+      esCodigoUsuarioCargaValido(explicito) &&
+      codigoEnFilasDelPromotor(explicito, context.rows, idV)
+    ) {
+      return explicito;
+    }
+
+    const strict = resolveCodigoCargaPromotorStrict(usuarioSesion, context.rows);
+    if (esCodigoUsuarioCargaValido(strict)) return strict;
+
+    if (esCodigoUsuarioCargaValido(explicito) && !context.rows?.length) {
+      return explicito;
+    }
+
+    throw new CodigoPromotorCargaError();
+  }
+
   if (esCodigoUsuarioCargaValido(explicito)) return explicito;
 
   const sesionCodigo = usuarioSesion.codigoCarga?.trim();
@@ -152,21 +185,11 @@ export function resolveUsuarioSpCarga(usuarioSesion, context, payload) {
   const desdeCatalogo = resolveCodigoCargaOperador(usuarioSesion, context.rows);
   if (esCodigoUsuarioCargaValido(desdeCatalogo)) return desdeCatalogo;
 
-  if (usuarioSesion.rol === 'promotor') {
-    const desdeFilas = codigoDesdeFilasEncuesta(
-      context.rows,
-      usuarioSesion.nombre,
-      usuarioSesion.idOperador ?? usuarioSesion.id,
-    );
-    if (esCodigoUsuarioCargaValido(desdeFilas)) return desdeFilas;
-    throw new CodigoPromotorCargaError();
-  }
-
   if (usuarioSesion.rol === 'supervisor') {
     const desdeFilas = codigoDesdeFilasEncuesta(
       context.rows,
       usuarioSesion.nombre,
-      usuarioSesion.idOperador ?? usuarioSesion.id,
+      idV,
     );
     if (esCodigoUsuarioCargaValido(desdeFilas)) return desdeFilas;
     throw new CodigoPromotorCargaError();
@@ -278,32 +301,59 @@ export function buildCargaParamsFromPayload(payload, usuarioSesion, context) {
   };
 }
 
-export async function crearEncuestaManual(payload, usuarioSesion, opciones = {}) {
-  const context = await resolveCargaEncuestaContext(usuarioSesion);
-  const cargaParams = buildCargaParamsFromPayload(payload, usuarioSesion, context);
-
-  const leadsPrevios = await listLeadsFromEncuestas(usuarioSesion);
-  if (telefonoYaEnCampania(leadsPrevios, payload.telefono, cargaParams.encuesta)) {
-    throw new ContactoYaRegistradoError();
-  }
-
-  await execEncuestaCargaSorteo01(cargaParams);
-
-  const leads = await listLeadsFromEncuestas(usuarioSesion);
+function buscarLeadTrasCarga(leads, payload, encCarga) {
   const telObjetivo = digitsTelefono(payload.telefono);
-  const encCarga = cargaParams.encuesta;
-  const lead =
+  return (
     leads.find(
       (l) =>
         digitsTelefono(l.telefono) === telObjetivo &&
         normalizarEncuestaCargaId(l.codigoCampania || encCarga) === encCarga,
     ) ??
-    leads.find((l) => normalizeNombre(l.nombre) === normalizeNombre(payload.nombre));
+    leads.find((l) => normalizeNombre(l.nombre) === normalizeNombre(payload.nombre))
+  );
+}
 
+export async function crearEncuestaManual(payload, usuarioSesion, opciones = {}) {
+  const context = await resolveCargaEncuestaContext(usuarioSesion);
+  const usuario = enriquecerUsuarioConCodigoCarga(usuarioSesion, context.rows);
+  const cargaParams = buildCargaParamsFromPayload(payload, usuario, context);
+  const idListado = idVendedorOperador(usuario);
+
+  const leadsPrevios = await listLeadsFromEncuestas(usuario);
+  if (telefonoYaEnCampania(leadsPrevios, payload.telefono, cargaParams.encuesta)) {
+    throw new ContactoYaRegistradoError();
+  }
+
+  let duplicadoSp = false;
+  try {
+    await execEncuestaCargaSorteo01(cargaParams);
+  } catch (err) {
+    if (err instanceof ContactoYaRegistradoError) {
+      duplicadoSp = true;
+    } else {
+      throw err;
+    }
+  }
+
+  const leads = await listLeadsFromEncuestas(usuario);
+  const lead = buscarLeadTrasCarga(leads, payload, cargaParams.encuesta);
   if (lead) return lead;
+
+  const detalle =
+    `SP ${duplicadoSp ? 'duplicado' : 'ok'} @usuario=${cargaParams.usuario}, encuesta=${cargaParams.encuesta}, tel=${cargaParams.telefono}, listado @idVendedor=${idListado}.`;
+
+  if (usuario.rol === 'promotor') {
+    throw new CargaEncuestaSinPersistirError(
+      duplicadoSp
+        ? 'El contacto ya está en el sorteo pero no aparece en tu bandeja. Probable código promotor incorrecto — tu supervisor puede verlo. Pedí revisión a soporte.'
+        : 'La encuesta se guardó pero no aparece en tu bandeja. Verificá con soporte que tu código promotor (QR) sea el correcto.',
+      detalle,
+    );
+  }
 
   throw new CargaEncuestaSinPersistirError(
     'SP ejecutado pero el contacto no aparece en encuestasMuestraOperador (teléfono o permisos).',
+    detalle,
   );
 }
 

@@ -9,6 +9,7 @@ import {
   getBarrioNombre,
   ID_PRODUCTO_TERRENO,
   etiquetasResultadoEntrevista,
+  estadoPagoEditablePlanInversion,
   opcionesPagoParaRol,
   tituloEstadoCompra,
   etiquetaNumeroDocumentoVenta,
@@ -59,8 +60,10 @@ function buildInitialForm(lead: Lead | null): FormState {
   const horarioDeriv =
     s.horarioEntrevistaPropuesto?.trim() || lead?.horarioEntrevista?.trim() || '';
   let estadoPago = s.estadoPago ?? null;
-  if (esPlanInversion(s.idProducto) && estadoPago === 'cien') {
-    estadoPago = 'entrega_33';
+  if (esPlanInversion(s.idProducto)) {
+    estadoPago = estadoPagoEditablePlanInversion(
+      estadoPago === 'cien' ? 'entrega_33' : estadoPago,
+    );
   }
   return {
     confirmoEntrevista: s.confirmoEntrevista ?? null,
@@ -239,6 +242,10 @@ export function LeadModalForm({
       }
       if (!form.estadoPago) {
         setErrorVenta('Indicá el estado del pago.');
+        return;
+      }
+      if (esPlanInversion(form.idProducto) && form.estadoPago !== 'entrega_33') {
+        setErrorVenta('Seleccioná Entrega $33.000.');
         return;
       }
       if (esTerreno(form.idProducto) && !form.idBarrio) {
@@ -820,11 +827,14 @@ export function LeadModalForm({
                           <div className="space-y-2">
                             {opcionesPago.map((op) => {
                               const sel = form.estadoPago === op.value;
+                              const bloqueada = Boolean(op.disabled);
                               return (
                                 <button
                                   key={op.value}
                                   type="button"
+                                  disabled={bloqueada}
                                   onClick={() => {
+                                    if (bloqueada) return;
                                     setErrorVenta('');
                                     const limpiaRecibo = !requiereNumeroRecibo(form.idProducto, op.value);
                                     patch({
@@ -832,15 +842,22 @@ export function LeadModalForm({
                                       numeroRecibo: limpiaRecibo ? '' : form.numeroRecibo,
                                     });
                                   }}
-                                  style={{ touchAction: 'manipulation' }}
+                                  style={{ touchAction: bloqueada ? undefined : 'manipulation' }}
                                   className={`min-h-[48px] w-full rounded-lg border px-4 py-2 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${
-                                    sel
-                                      ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
-                                      : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
+                                    bloqueada
+                                      ? 'cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400'
+                                      : sel
+                                        ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
+                                        : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
                                   }`}
                                 >
                                   {op.label}
-                                  {op.hint && sel && (
+                                  {bloqueada && (
+                                    <span className="mt-0.5 block text-[12px] font-normal text-zinc-400">
+                                      No disponible
+                                    </span>
+                                  )}
+                                  {op.hint && sel && !bloqueada && (
                                     <span className="mt-0.5 block text-[12px] font-normal opacity-90">
                                       {op.hint}
                                     </span>

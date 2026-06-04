@@ -66,18 +66,14 @@ export const seguimientoSchema = z
     }
 
     if (data.idProducto === ID_PIJ) {
-      const validos = ['sena', 'entrega_33', 'entrega_55'];
-      if (!validos.includes(data.estadoPago)) {
+      if (data.estadoPago !== 'entrega_33') {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Estado de pago inválido para Plan Inversión Joven.',
+          message: 'Para Plan Inversión Joven solo se registra Entrega $33.000.',
           path: ['estadoPago'],
         });
       }
-      if (
-        (data.estadoPago === 'entrega_33' || data.estadoPago === 'entrega_55') &&
-        !data.numeroRecibo?.trim()
-      ) {
+      if (data.estadoPago === 'entrega_33' && !data.numeroRecibo?.trim()) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: 'Ingresá el número de recibo.',

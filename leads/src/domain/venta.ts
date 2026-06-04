@@ -18,18 +18,31 @@ export function esTerreno(idProducto: string | null | undefined) {
   return idProducto === ID_PRODUCTO_TERRENO;
 }
 
-export type OpcionPago = { value: EstadoPago; label: string; hint?: string };
+export type OpcionPago = {
+  value: EstadoPago;
+  label: string;
+  hint?: string;
+  /** Visible pero no seleccionable (ej. Entrega $55.000 en PIJ). */
+  disabled?: boolean;
+};
 
+/** Plan Inversión Joven: sin seña; solo entrega $33k activa; $55k informativa. */
 export function opcionesPagoPlanInversion(): OpcionPago[] {
   return [
-    { value: 'sena', label: 'Operaciones en Seña' },
     {
       value: 'entrega_33',
       label: 'Entrega $33.000',
       hint: 'Equivale al 100% del plan. Adhesión a terreno tras 12 meses.',
     },
-    { value: 'entrega_55', label: 'Entrega $55.000' },
+    { value: 'entrega_55', label: 'Entrega $55.000', disabled: true },
   ];
+}
+
+/** Al editar un cierre PIJ, solo se puede elegir entrega $33k. */
+export function estadoPagoEditablePlanInversion(
+  estadoPago: EstadoPago | null | undefined,
+): EstadoPago | null {
+  return estadoPago === 'entrega_33' ? 'entrega_33' : null;
 }
 
 export function opcionesPagoTerreno(): OpcionPago[] {

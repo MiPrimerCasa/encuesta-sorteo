@@ -1,4 +1,5 @@
 import { LOGO_MPC_ALT, LOGO_MPC_URL } from '../../brand';
+import { NotificationsCenter } from './NotificationsCenter';
 import { SegmentedControl } from '../ui/SegmentedControl';
 import type { RolUsuario, UsuarioSesion, VistaActiva } from '../../types';
 
@@ -76,6 +77,8 @@ export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBa
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <NotificationsCenter rol={usuario.rol} />
+
           {/* Rol badge — visible en todos los tamaños */}
           <span
             className={`rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${ROL_BADGE_CLASS[usuario.rol]}`}

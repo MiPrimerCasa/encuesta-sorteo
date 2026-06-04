@@ -23,6 +23,9 @@
     "inspect:leads": "node scripts/inspect-leads-sp.js",
     "generate:operadores": "node scripts/generate-operadores-planilla.mjs",
     "generate:links-redes": "node scripts/generate-operadores-planilla.mjs",
+    "links:acortar": "node scripts/acortar-links-redes.mjs",
+    "links:verificar": "node scripts/verificar-links-redes.mjs",
+    "links:sheet-export": "node scripts/leer-sheet-instagram.mjs",
     "deploy:vps": "bash scripts/deploy-vps-remote.sh"
   },
   "dependencies": {

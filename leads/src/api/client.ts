@@ -2,6 +2,7 @@ import type {
   Barrio,
   Lead,
   LinksRedes,
+  NotificacionLinkRed,
   NuevoLeadData,
   Producto,
   Promotor,
@@ -160,6 +161,28 @@ export async function fetchLeads(): Promise<{
     leads: data.leads,
     direccionOficinasSupervisor: data.meta?.direccionOficinasSupervisor ?? undefined,
   };
+}
+
+export async function fetchNotificacionesLinksRedes(): Promise<{
+  total: number;
+  items: NotificacionLinkRed[];
+}> {
+  if (_isDemoActive) {
+    return { total: 0, items: [] };
+  }
+  return apiFetch('/api/notificaciones/links-redes');
+}
+
+export async function marcarNotificacionLinkAtendida(
+  codigo: string,
+  red: 'instagram' | 'facebook',
+): Promise<{ ok: boolean; total: number }> {
+  if (_isDemoActive) {
+    return { ok: true, total: 0 };
+  }
+  return apiFetch(`/api/notificaciones/links-redes/${encodeURIComponent(codigo)}/${red}/atendida`, {
+    method: 'POST',
+  });
 }
 
 export async function fetchLinksRedes(): Promise<LinksRedes> {

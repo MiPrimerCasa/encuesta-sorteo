@@ -147,6 +147,19 @@ export interface LinksRedes {
   mensaje?: string | null;
 }
 
+export interface NotificacionLinkRed {
+  id: string;
+  codigo: string;
+  vendedor: string;
+  red: 'instagram';
+  redLabel: string;
+  mensaje: string;
+  urlLargo: string;
+  urlCorto: string | null;
+  ultimoError?: string | null;
+  verificadoEn?: string | null;
+}
+
 export interface UsuarioSesion {
   id: string;
   nombre: string;

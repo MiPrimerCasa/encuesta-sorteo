@@ -20,6 +20,11 @@ import {
   resolveCargaEncuestaContext,
 } from './db/encuesta-carga.js';
 import { resolveLinksRedesParaUsuario } from './db/links-redes.js';
+import {
+  contarNotificacionesActivas,
+  listarNotificacionesActivas,
+  marcarNotificacionAtendida,
+} from './db/links-acortados-store.js';
 import { enriquecerUsuarioConCodigoCarga } from './db/operadores-catalog.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
@@ -180,6 +185,62 @@ function registerApiRoutes(api) {
       const err = formatSqlError(error);
       return res.status(500).json(err);
     }
+  });
+
+  api.get('/notificaciones/links-redes', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    if (usuario.rol !== 'supervisor') {
+      return res.status(403).json({
+        message: 'Las notificaciones de links solo están disponibles para supervisores.',
+      });
+    }
+
+    try {
+      const items = listarNotificacionesActivas();
+      return res.json({
+        total: items.length,
+        items,
+      });
+    } catch (error) {
+      console.error('Error notificaciones links:', error);
+      return res.status(500).json({
+        message: 'No se pudieron cargar las notificaciones.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
+  api.post('/notificaciones/links-redes/:codigo/:red/atendida', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    if (usuario.rol !== 'supervisor') {
+      return res.status(403).json({ message: 'Solo supervisores.' });
+    }
+
+    const red = String(req.params.red || '').toLowerCase();
+    if (red !== 'instagram') {
+      return res.status(400).json({ message: 'Solo notificaciones de Instagram.' });
+    }
+
+    const codigo = String(req.params.codigo || '').trim();
+    if (!codigo) {
+      return res.status(400).json({ message: 'Código inválido.' });
+    }
+
+    marcarNotificacionAtendida(codigo, red);
+    return res.json({
+      ok: true,
+      total: contarNotificacionesActivas(),
+    });
   });
 
   api.get('/links-redes', async (req, res) => {

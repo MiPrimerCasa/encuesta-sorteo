@@ -114,47 +114,60 @@ function formatCreadoEn(row) {
 export function mapSqlRowToSeguimiento(row) {
   if (!row) return {};
 
+  let base = {};
   const jsonRaw = row.seguimiento_json ?? row.seguimientoJson;
   if (jsonRaw) {
     try {
       const parsed = typeof jsonRaw === 'string' ? JSON.parse(jsonRaw) : jsonRaw;
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        return { ...parsed };
+        base = { ...parsed };
       }
     } catch {
       /* columnas planas */
     }
   }
 
-  let referidos;
+  let referidos = base.referidos;
   const refRaw = row.referidos_json ?? row.referidosJson;
   if (refRaw) {
     try {
       referidos = typeof refRaw === 'string' ? JSON.parse(refRaw) : refRaw;
     } catch {
-      referidos = undefined;
+      referidos = referidos ?? undefined;
     }
   }
 
   return {
-    confirmoEntrevista: bitOrNull(row.confirmo_entrevista ?? row.confirmoEntrevista),
-    canal: row.canal ?? null,
-    huboEntrevista: bitOrNull(row.hubo_entrevista ?? row.huboEntrevista),
-    resultadoEntrevista: row.resultado_entrevista ?? row.resultadoEntrevista ?? null,
+    ...base,
+    confirmoEntrevista:
+      base.confirmoEntrevista ??
+      bitOrNull(row.confirmo_entrevista ?? row.confirmoEntrevista),
+    canal: base.canal ?? row.canal ?? null,
+    huboEntrevista:
+      base.huboEntrevista ?? bitOrNull(row.hubo_entrevista ?? row.huboEntrevista),
+    resultadoEntrevista:
+      base.resultadoEntrevista ?? row.resultado_entrevista ?? row.resultadoEntrevista ?? null,
     horarioEntrevistaPropuesto:
-      row.horario_entrevista_propuesto ?? row.horarioEntrevistaPropuesto ?? null,
-    fechaReagenda: row.fecha_reagenda ?? row.fechaReagenda ?? null,
-    seguimientoPijPromotor: bitOrNull(
-      row.seguimiento_pij_promotor ?? row.seguimientoPijPromotor,
-    ),
-    idProducto: row.id_producto ?? row.idProducto ?? null,
-    estadoPago: row.estado_pago ?? row.estadoPago ?? null,
-    idBarrio: row.id_barrio ?? row.idBarrio ?? null,
-    numeroRecibo: row.numero_recibo ?? row.numeroRecibo ?? null,
-    brindoReferidos: bitOrNull(row.brindo_referidos ?? row.brindoReferidos),
+      base.horarioEntrevistaPropuesto ??
+      row.horario_entrevista_propuesto ??
+      row.horarioEntrevistaPropuesto ??
+      null,
+    fechaReagenda: base.fechaReagenda ?? row.fecha_reagenda ?? row.fechaReagenda ?? null,
+    seguimientoPijPromotor:
+      base.seguimientoPijPromotor ??
+      bitOrNull(row.seguimiento_pij_promotor ?? row.seguimientoPijPromotor),
+    idProducto: base.idProducto ?? row.id_producto ?? row.idProducto ?? null,
+    estadoPago: base.estadoPago ?? row.estado_pago ?? row.estadoPago ?? null,
+    idBarrio: base.idBarrio ?? row.id_barrio ?? row.idBarrio ?? null,
+    numeroRecibo: base.numeroRecibo ?? row.numero_recibo ?? row.numeroRecibo ?? null,
+    brindoReferidos:
+      base.brindoReferidos ?? bitOrNull(row.brindo_referidos ?? row.brindoReferidos),
     referidos: Array.isArray(referidos) ? referidos : undefined,
-    observaciones: row.observaciones ?? undefined,
-    fuente: row.fuente ?? undefined,
+    observaciones: base.observaciones ?? row.observaciones ?? undefined,
+    fuente: base.fuente ?? row.fuente ?? undefined,
+    operadorRol: row.operador_rol ?? row.operadorRol ?? base.operadorRol ?? null,
+    operadorNombre:
+      row.operador_nombre ?? row.operadorNombre ?? base.operadorNombre ?? null,
   };
 }
 

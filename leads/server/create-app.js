@@ -407,6 +407,12 @@ function registerApiRoutes(api) {
         entradaHistorial: saved ? entradaHistorial : null,
       });
     } catch (error) {
+      if (error?.code === 'CIERRE_SUPERVISOR_SOLO_LECTURA') {
+        return res.status(403).json({
+          message: error.message,
+          code: error.code,
+        });
+      }
       if (error instanceof SeguimientoRegistroError) {
         return res.status(400).json({
           message: error.message,

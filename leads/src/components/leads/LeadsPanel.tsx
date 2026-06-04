@@ -4,6 +4,7 @@ import {
   leadCompro,
   leadReagendaEntrevista,
   leadSoloLecturaSupervisor,
+  leadSoloLecturaPromotor,
   tabIdListaLead,
 } from '../../domain/leads';
 import {
@@ -439,6 +440,14 @@ export function LeadsPanel({
         rolUsuario={rolUsuario}
         productos={productos}
         barrios={barrios}
+        soloLectura={
+          esPromotor &&
+          leadSeleccionado != null &&
+          leadSoloLecturaPromotor(
+            leadSeleccionado,
+            historialPorLead[leadSeleccionado.id] ?? [],
+          )
+        }
         onClose={cerrarModal}
         onSave={async (leadId, seg) => {
           await guardarSeguimientoLead(leadId, seg);

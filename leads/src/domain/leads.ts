@@ -1,4 +1,13 @@
-import type { Lead, LugarEntrevista, Producto, Promotor, RolUsuario, SeguimientoLead } from '../types';
+import type {
+  Lead,
+  LugarEntrevista,
+  Producto,
+  Promotor,
+  RolUsuario,
+  SeguimientoHistorialEntry,
+  SeguimientoLead,
+} from '../types';
+import { ID_PRODUCTO_TERRENO } from './venta';
 
 /** Lista única de promotores a partir de los leads ya cargados (evita 2.º SP en supervisor). */
 export function buildPromotoresFromLeads(leads: Lead[]): Promotor[] {
@@ -33,6 +42,52 @@ export function leadSeguimientoPijPromotor(lead: Lead) {
 
 export function leadSoloLecturaSupervisor(lead: Lead) {
   return leadSeguimientoPijPromotor(lead);
+}
+
+export const ETIQUETA_CIERRE_SUPERVISOR = 'Cierre registrado por supervisor';
+
+function normalizarRolOperador(rol?: string | null): RolUsuario | null {
+  const r = String(rol ?? '').trim().toLowerCase();
+  if (r === 'supervisor' || r === 'promotor') return r;
+  return null;
+}
+
+/** Señales de cierre hecho por supervisor cuando operador_rol no viene de SQL. */
+function seguimientoIndicaCierreSupervisor(seguimiento: SeguimientoLead) {
+  if (normalizarRolOperador(seguimiento.operadorRol) === 'supervisor') return true;
+  if (seguimiento.idProducto === ID_PRODUCTO_TERRENO) return true;
+  // Flujo supervisor: «¿Confirmó entrevista?» — el promotor en calle no usa este campo.
+  if (seguimiento.confirmoEntrevista != null) return true;
+  return false;
+}
+
+function historialIndicaCierreSupervisor(historial: SeguimientoHistorialEntry[]) {
+  for (const entry of historial) {
+    if (entry.resultadoEntrevista !== 'compro') continue;
+    const snap = entry.seguimientoSnapshot ?? {};
+    if (normalizarRolOperador(entry.operadorRol) === 'supervisor') return true;
+    if (normalizarRolOperador(entry.operadorRol) === 'promotor') return false;
+    if (seguimientoIndicaCierreSupervisor(snap)) return true;
+  }
+  return false;
+}
+
+/** Cierre «Compró» cargado por el supervisor (promotor solo consulta). */
+export function leadCierreRegistradoSupervisor(
+  lead: Lead,
+  historial: SeguimientoHistorialEntry[] = [],
+) {
+  if (!leadCompro(lead)) return false;
+  const seg = lead.seguimiento ?? {};
+  if (seguimientoIndicaCierreSupervisor(seg)) return true;
+  return historialIndicaCierreSupervisor(historial);
+}
+
+export function leadSoloLecturaPromotor(
+  lead: Lead,
+  historial: SeguimientoHistorialEntry[] = [],
+) {
+  return leadCierreRegistradoSupervisor(lead, historial);
 }
 
 export function leadDerivaSupervisorTerreno(lead: Lead) {

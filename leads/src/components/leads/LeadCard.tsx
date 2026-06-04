@@ -1,4 +1,5 @@
 import {
+  ETIQUETA_CIERRE_SUPERVISOR,
   ETIQUETA_SEGUIMIENTO_PIJ,
   getProductoNombre,
   getPromotorNombre,
@@ -7,6 +8,7 @@ import {
   leadEnEntrevistaPendiente,
   leadReagendaEntrevista,
   leadSeguimientoPijPromotor,
+  leadSoloLecturaPromotor,
   leadSoloLecturaSupervisor,
 } from '../../domain/leads';
 import { etiquetaCortaNumeroDocumentoVenta, etiquetaPagoProducto } from '../../domain/venta';
@@ -70,8 +72,9 @@ export function LeadCard({
     (leadEnEntrevistaPendiente(lead) || reagenda);
   const etiquetaSorteo = etiquetaCampania(lead.codigoCampania);
   const seguimientoPij = leadSeguimientoPijPromotor(lead);
+  const cierreSupervisor = leadSoloLecturaPromotor(lead, historial);
   const soloLectura =
-    rolUsuario === 'supervisor' && leadSoloLecturaSupervisor(lead);
+    (rolUsuario === 'supervisor' && leadSoloLecturaSupervisor(lead));
   const nombrePromotor =
     lead.promotorNombre ?? getPromotorNombre(lead.promotorId, promotores);
 
@@ -123,6 +126,13 @@ export function LeadCard({
                     Promotor: {nombrePromotor}
                   </p>
                 )}
+              </div>
+            )}
+            {cierreSupervisor && (
+              <div className="mt-2">
+                <span className="inline-flex items-center rounded-md border border-zinc-300 bg-zinc-100 px-2 py-1 text-[11px] font-semibold leading-snug text-zinc-700">
+                  {ETIQUETA_CIERRE_SUPERVISOR}
+                </span>
               </div>
             )}
           </div>

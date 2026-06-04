@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
-import { getProductosPorRol, puedeVenderProducto } from '../../domain/leads';
+import { getProductosPorRol, puedeVenderProducto, ETIQUETA_CIERRE_SUPERVISOR } from '../../domain/leads';
 import {
   esPlanInversion,
   esTerreno,
@@ -94,6 +94,8 @@ interface LeadModalFormProps {
   rolUsuario: RolUsuario;
   productos: Producto[];
   barrios: Barrio[];
+  /** Promotor consultando un cierre cargado por el supervisor. */
+  soloLectura?: boolean;
   onClose: () => void;
   onSave: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
 }
@@ -104,6 +106,7 @@ export function LeadModalForm({
   rolUsuario,
   productos,
   barrios,
+  soloLectura = false,
   onClose,
   onSave,
 }: LeadModalFormProps) {
@@ -419,12 +422,22 @@ export function LeadModalForm({
             </button>
           </div>
 
+          {soloLectura && (
+            <div className="mx-4 mb-3 shrink-0 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+              <p className="text-[13px] font-medium text-zinc-700">{ETIQUETA_CIERRE_SUPERVISOR}</p>
+              <p className="mt-0.5 text-[12px] leading-snug text-zinc-500">
+                Podés consultar los datos del cierre, pero no modificarlos desde tu cuenta.
+              </p>
+            </div>
+          )}
+
           {/* Scrollable form */}
           <form
             id="lead-form"
             onSubmit={handleGuardar}
             className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5"
           >
+            <fieldset disabled={soloLectura} className="m-0 space-y-6 border-0 p-0">
             {/* Supervisor: confirmación + canal; promotor en calle: arranca en hubo entrevista */}
             {!esFlujoCampo && (
               <FormSection title="¿Confirmó entrevista?" step={1} totalSteps={totalPasos}>
@@ -946,6 +959,7 @@ export function LeadModalForm({
             )}
 
             <div className="h-4" aria-hidden="true" />
+            </fieldset>
           </form>
 
           {/* Footer sticky con safe area */}
@@ -953,14 +967,25 @@ export function LeadModalForm({
             className="shrink-0 border-t border-zinc-100 px-4 pt-3"
             style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
           >
-            <button
-              type="submit"
-              form="lead-form"
-              style={{ touchAction: 'manipulation' }}
-              className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:bg-brand-800 active:scale-[0.98]"
-            >
-              Guardar y actualizar lead
-            </button>
+            {soloLectura ? (
+              <button
+                type="button"
+                onClick={onClose}
+                style={{ touchAction: 'manipulation' }}
+                className="h-[52px] w-full rounded-xl border border-zinc-200 bg-white text-[15px] font-semibold text-zinc-700 transition-all duration-[120ms] ease-out active:bg-zinc-50 active:scale-[0.98]"
+              >
+                Cerrar
+              </button>
+            ) : (
+              <button
+                type="submit"
+                form="lead-form"
+                style={{ touchAction: 'manipulation' }}
+                className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:bg-brand-800 active:scale-[0.98]"
+              >
+                Guardar y actualizar lead
+              </button>
+            )}
           </div>
         </Drawer.Content>
       </Drawer.Portal>

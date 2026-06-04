@@ -107,6 +107,9 @@ export interface SeguimientoLead {
   brindoReferidos?: boolean | null;
   referidos?: Referido[];
   observaciones?: string;
+  /** Rol del operador que registró este estado (última fila SQL). */
+  operadorRol?: RolUsuario | null;
+  operadorNombre?: string | null;
 }
 
 export interface Lead {

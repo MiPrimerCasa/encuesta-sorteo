@@ -327,7 +327,7 @@ export function buildCargaParamsFromPayload(payload, usuarioSesion, context) {
   };
 }
 
-/** Parámetros SP desde un lead existente (modificar teléfono u otros datos de encuesta). */
+/** Parámetros SP desde un lead existente — mapeo a @campo1Valor…@campo8Valor del SP. */
 export function buildCargaParamsFromLead(lead, telefonoNuevo, usuarioSp) {
   const agendar = Boolean(lead.horarioEntrevista || lead.quiereEntrevista);
   const campo6 = lead.horarioEntrevista
@@ -355,10 +355,14 @@ export function buildCargaParamsFromLead(lead, telefonoNuevo, usuarioSp) {
     telefonoAnterior,
     encuesta: lead.codigoCampania || getEncuestaCampaniaId(),
     usuario,
+    // @campo1 = apellido y nombres (SP encuestaCargaSorteo01)
     campo1Valor: lead.nombre?.trim() || null,
+    // @campo2 = dirección
     campo2Valor: lead.domicilio?.trim() || null,
+    // @campo3 / @campo4 — no usados en carga manual
     campo3Valor: null,
     campo4Valor: null,
+    // @campo6 / @campo7 / @campo8 — entrevista (si aplica)
     campo6Valor: campo6,
     campo7Valor: campo7,
     campo8Valor: campo8,

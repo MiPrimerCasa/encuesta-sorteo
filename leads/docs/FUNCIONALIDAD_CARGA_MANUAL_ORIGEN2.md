@@ -21,14 +21,22 @@ La app **siempre** envía `@origen = '2'` en carga manual (`buildCargaParamsFrom
 | `crearEncuestaManual` | **No** bloquea por teléfono duplicado en listado local; deja que el SP actualice |
 | `POST /api/leads` | `201` alta nueva · `200` si el teléfono ya estaba en la misma campaña |
 
-Campos enviados al SP (resumen):
+Campos enviados al SP — la tabla `encuesta` guarda **`campo1Valor`, `campo2Valor`, …** (no columnas con nombre de negocio):
 
-- `campo1` — apellido y nombres  
-- `campo2` — domicilio  
-- `campo5` — fijo `NO` en primer alta  
-- `campo6` — fecha/hora entrevista (`AAAA/MM/DD hh:mm`)  
-- `campo7` — modo contacto (`2` sucursal, `3` domicilio)  
-- `campo8` — dirección sucursal o domicilio cliente  
+| Código | Parámetro SP | Valor que envía la app (carga / modificar teléfono) |
+|--------|--------------|-----------------------------------------------------|
+| 1 | `@campo1Codigo` / `@campo1Valor` | Nombre del lead |
+| 2 | `@campo2Codigo` / `@campo2Valor` | Domicilio |
+| 3 | `@campo3Codigo` / `@campo3Valor` | `NULL` en manual |
+| 4 | `@campo4Codigo` / `@campo4Valor` | `NULL` en manual |
+| 5 | `@campo5Codigo` / `@campo5Valor` | `'NO'` |
+| 6 | `@campo6Codigo` / `@campo6Valor` | Entrevista `AAAA/MM/DD hh:mm` o vacío |
+| 7 | `@campo7Codigo` / `@campo7Valor` | `2` sucursal / `3` domicilio o vacío |
+| 8 | `@campo8Codigo` / `@campo8Valor` | Dirección sucursal o domicilio entrevista |
+
+También: `@telefono`, `@encuesta`, `@origen` = `'2'`, `@usuario` = código promotor (ej. `SORTEO01S21P01`).
+
+**Modificar número:** mismos `@campo1`…`@campo8`, `@telefono` = teléfono **nuevo**. El SP debe localizar la fila por `@telefono` existente o por `@usuario` + `@campo1Valor` + `@encuesta` cuando el teléfono cambia (ver `sql/encuestaCargaSorteo01-modificar-telefono.sql`).
 
 ## Variables
 

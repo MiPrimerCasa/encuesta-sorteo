@@ -1,0 +1,11 @@
+-- DBA: permitir cambio de teléfono en carga manual (@origen = '2') sin UPDATE directo desde la app.
+-- La app envía @telefono = teléfono ACTUAL (busca la fila) y @telefonoNuevo = teléfono destino.
+
+-- Dentro del branch IF @origen = '2' del SP encuestaCargaSorteo01, agregar al UPDATE:
+--
+--   telefono = COALESCE(NULLIF(@telefonoNuevo, ''), @telefono),
+--
+-- Declarar al inicio del procedimiento:
+--   @telefonoNuevo nvarchar(50) = NULL
+--
+-- La app usa SP_CARGA_PARAM_TELEFONO_NUEVO=telefonoNuevo (default) si el nombre difiere.

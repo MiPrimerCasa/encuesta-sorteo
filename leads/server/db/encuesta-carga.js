@@ -246,14 +246,34 @@ function bindCampo(request, codigo, valor, { vacioComoCadenaVacia = false } = {}
 }
 
 /**
- * exec dbo.encuestaCargaSorteo01 — primer POST (campo5 = NO; 6–8 vacíos salvo entrevista agendada).
+ * exec dbo.encuestaCargaSorteo01 — carga manual (@origen = 2) o modificación de teléfono.
+ * @param {object} params
+ * @param {string} [params.telefonoAnterior] — teléfono actual (localiza fila en UPDATE)
+ * @param {string} [params.telefonoNuevo] — alias explícito del teléfono destino
  */
 export async function execEncuestaCargaSorteo01(params) {
   const pool = await getSqlPoolEncuestas();
   const proc = getCargaProcedureName();
   const request = pool.request();
 
-  request.input('telefono', sql.NVarChar(50), params.telefono);
+  const telDestino =
+    digitsTelefono(params.telefonoNuevo ?? params.telefono) ||
+    String(params.telefonoNuevo ?? params.telefono ?? '').trim();
+  const telAnterior =
+    params.telefonoAnterior != null
+      ? digitsTelefono(params.telefonoAnterior) || String(params.telefonoAnterior).trim()
+      : null;
+  const cambiaTelefono = Boolean(telAnterior && telDestino && telAnterior !== telDestino);
+
+  // UPDATE origen=2: el SP busca por @telefono (viejo); el nuevo va en param dedicado si existe.
+  const telSp = cambiaTelefono ? telAnterior : telDestino;
+  request.input('telefono', sql.NVarChar(50), telSp);
+  if (cambiaTelefono) {
+    const nuevoParam =
+      process.env.SP_CARGA_PARAM_TELEFONO_NUEVO?.trim() || 'telefonoNuevo';
+    request.input(nuevoParam, sql.NVarChar(50), telDestino);
+  }
+
   request.input('encuesta', sql.NVarChar(50), params.encuesta);
   request.input('usuario', sql.NVarChar(100), params.usuario);
 
@@ -315,6 +335,46 @@ export function buildCargaParamsFromPayload(payload, usuarioSesion, context) {
     usuario: usuarioSp,
     campo1Valor: payload.nombre.trim(),
     campo2Valor: payload.domicilio?.trim() || null,
+    campo3Valor: null,
+    campo4Valor: null,
+    campo6Valor: campo6,
+    campo7Valor: campo7,
+    campo8Valor: campo8,
+    origen: 2,
+  };
+}
+
+/** Parámetros SP desde un lead existente (modificar teléfono u otros datos de encuesta). */
+export function buildCargaParamsFromLead(lead, telefonoNuevo, usuarioSp) {
+  const agendar = Boolean(lead.horarioEntrevista || lead.quiereEntrevista);
+  const campo6 = lead.horarioEntrevista
+    ? formatHorarioEntrevistaSp(lead.horarioEntrevista)
+    : null;
+  const campo7 = lead.lugarEntrevista ? mapLugarEntrevistaSp(lead.lugarEntrevista) : null;
+  let campo8 = lead.domicilioEntrevista?.trim() || null;
+  if (!campo8 && lead.lugarEntrevista === 'domicilio') {
+    campo8 = lead.domicilio?.trim() || null;
+  }
+
+  const telefonoNorm =
+    digitsTelefono(telefonoNuevo) || String(telefonoNuevo ?? '').trim();
+  const telefonoAnterior =
+    digitsTelefono(lead.telefono) || String(lead.telefono ?? '').trim();
+
+  const usuario =
+    usuarioSp ||
+    lead.codigoPromotorCarga?.trim() ||
+    lead.encuestaUsuario?.trim() ||
+    null;
+
+  return {
+    telefono: telefonoNorm,
+    telefonoAnterior,
+    telefonoNuevo: telefonoNorm,
+    encuesta: lead.codigoCampania || getEncuestaCampaniaId(),
+    usuario,
+    campo1Valor: lead.nombre?.trim() || null,
+    campo2Valor: lead.domicilio?.trim() || null,
     campo3Valor: null,
     campo4Valor: null,
     campo6Valor: campo6,
@@ -400,8 +460,8 @@ function leadEsCargaManualServidor(lead) {
 }
 
 /**
- * Cambia `encuesta.telefono` para un lead manual (id = PK encuesta).
- * No usa encuestaCargaSorteo01: el SP de carga no actualiza teléfono en el branch UPDATE.
+ * Modifica teléfono de un lead manual vía dbo.encuestaCargaSorteo01 (@origen = 2).
+ * No usa UPDATE directo sobre encuesta (MPCSP solo tiene EXECUTE en el SP).
  */
 export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuarioSesion) {
   const idEncuesta = Number.parseInt(String(leadId), 10);
@@ -416,7 +476,8 @@ export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuario
   if (!lead) throw new LeadNoEncontradoError();
   if (!leadEsCargaManualServidor(lead)) throw new LeadNoManualError();
 
-  const telefonoNorm = digitsTelefono(telefonoNuevo) || String(telefonoNuevo).trim();
+  const telefonoNorm =
+    digitsTelefono(telefonoNuevo) || String(telefonoNuevo ?? '').trim();
   const encuesta = lead.codigoCampania || getEncuestaCampaniaId();
 
   if (digitsTelefono(lead.telefono) === telefonoNorm) {
@@ -428,24 +489,32 @@ export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuario
     throw new ContactoYaRegistradoError();
   }
 
-  const pool = await getSqlPoolEncuestas();
-  const result = await pool
-    .request()
-    .input('id', sql.Int, idEncuesta)
-    .input('telefono', sql.NVarChar(50), telefonoNorm)
-    .input('encuesta', sql.NVarChar(50), encuesta)
-    .query(
-      `UPDATE encuesta SET telefono = @telefono WHERE id = @id AND encuesta = @encuesta`,
-    );
+  const usuarioSp =
+    lead.codigoPromotorCarga?.trim() ||
+    lead.encuestaUsuario?.trim() ||
+    resolveCodigoCargaOperador(usuario, context.rows) ||
+    null;
+  if (!usuarioSp) throw new CodigoPromotorCargaError();
 
-  if (!result.rowsAffected?.[0]) {
-    throw new LeadNoEncontradoError();
-  }
+  const cargaParams = buildCargaParamsFromLead(lead, telefonoNorm, usuarioSp);
+  await execEncuestaCargaSorteo01(cargaParams);
 
   const leadsPost = await listLeadsFromEncuestas(usuario);
-  const actualizado = leadsPost.find((l) => String(l.id) === String(leadId));
-  if (actualizado) return actualizado;
-  return { ...lead, telefono: telefonoNorm };
+  const porId = leadsPost.find((l) => String(l.id) === String(leadId));
+  if (porId && digitsTelefono(porId.telefono) === telefonoNorm) return porId;
+
+  const porTel = leadsPost.find(
+    (l) =>
+      digitsTelefono(l.telefono) === telefonoNorm &&
+      normalizarEncuestaCargaId(l.codigoCampania || encuesta) ===
+        normalizarEncuestaCargaId(encuesta),
+  );
+  if (porTel) return porTel;
+
+  throw new CargaEncuestaSinPersistirError(
+    'El SP ejecutó pero el teléfono no aparece actualizado. Pedí al DBA que el branch @origen=2 haga telefono = @telefonoNuevo (ver sql/encuestaCargaSorteo01-modificar-telefono.sql).',
+    `SP ok leadId=${leadId}, telAnterior=${cargaParams.telefonoAnterior}, telNuevo=${telefonoNorm}`,
+  );
 }
 
 export { MSG_CONTACTO_YA_REGISTRADO };

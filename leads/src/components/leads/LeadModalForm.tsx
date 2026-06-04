@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
-import { getProductosPorRol, puedeVenderProducto, ETIQUETA_CIERRE_SUPERVISOR } from '../../domain/leads';
+import { getProductoNombre, getProductosPorRol, puedeVenderProducto, ETIQUETA_CIERRE_SUPERVISOR } from '../../domain/leads';
 import {
   esPlanInversion,
   esTerreno,
+  etiquetaEstadoPagoVisible,
+  etiquetaCortaNumeroDocumentoVenta,
+  getBarrioNombre,
   ID_PRODUCTO_TERRENO,
   etiquetasResultadoEntrevista,
   opcionesPagoParaRol,
@@ -122,13 +125,17 @@ export function LeadModalForm({
   useEffect(() => {
     if (open && lead) {
       const initial = buildInitialForm(lead);
-      if (initial.idProducto && !puedeVenderProducto(productos, rol, initial.idProducto)) {
+      if (
+        !soloLectura &&
+        initial.idProducto &&
+        !puedeVenderProducto(productos, rol, initial.idProducto)
+      ) {
         initial.idProducto = '';
       }
       setForm(initial);
       setErrorVenta('');
     }
-  }, [open, lead, rol, productos]);
+  }, [open, lead, rol, productos, soloLectura]);
 
   if (!open || !lead) return null;
 
@@ -372,9 +379,14 @@ export function LeadModalForm({
         ? form.resultadoEntrevista != null
         : form.huboEntrevista === true && form.resultadoEntrevista != null)) ||
     (confirmoNo && showCanalTrasNoConfirmo && form.canal != null);
-  const productoEsPij = esPlanInversion(form.idProducto);
-  const productoEsTerreno = esTerreno(form.idProducto);
-  const opcionesPago = opcionesPagoParaRol(rol, form.idProducto);
+
+  const idProductoCierre = form.idProducto || lead.seguimiento?.idProducto || '';
+  const idBarrioCierre = form.idBarrio || lead.seguimiento?.idBarrio || '';
+  const estadoPagoCierre = form.estadoPago ?? lead.seguimiento?.estadoPago ?? null;
+  const numeroReciboCierre = form.numeroRecibo || lead.seguimiento?.numeroRecibo || '';
+  const productoEsPij = esPlanInversion(idProductoCierre);
+  const productoEsTerreno = esTerreno(idProductoCierre);
+  const opcionesPago = opcionesPagoParaRol(rol, idProductoCierre);
   const labelsEntrevista = etiquetasResultadoEntrevista(rol);
   const labelDerivarTerreno =
     'derivarTerreno' in labelsEntrevista
@@ -674,7 +686,51 @@ export function LeadModalForm({
                     </div>
                   )}
 
-                  {showCompro && (
+                  {showCompro && soloLectura && (
+                    <div className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                          Producto cerrado
+                        </p>
+                        <p className="mt-1 text-[15px] font-medium text-zinc-900">
+                          {getProductoNombre(idProductoCierre, productos) ?? '—'}
+                        </p>
+                      </div>
+                      {productoEsTerreno && (
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                            Barrio
+                          </p>
+                          <p className="mt-1 text-[15px] font-medium text-zinc-900">
+                            {getBarrioNombre(idBarrioCierre, barrios) ?? '—'}
+                          </p>
+                        </div>
+                      )}
+                      {estadoPagoCierre && (
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                            {tituloEstadoCompra('supervisor')}
+                          </p>
+                          <p className="mt-1 text-[15px] font-medium text-zinc-900">
+                            {etiquetaEstadoPagoVisible('supervisor', estadoPagoCierre, idProductoCierre) ??
+                              estadoPagoCierre}
+                          </p>
+                        </div>
+                      )}
+                      {numeroReciboCierre.trim() && (
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                            {etiquetaCortaNumeroDocumentoVenta('supervisor')}
+                          </p>
+                          <p className="mt-1 text-[15px] font-medium tabular-nums text-zinc-900">
+                            {numeroReciboCierre}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {showCompro && !soloLectura && (
                     <div className="space-y-5 rounded-xl border border-brand-100 bg-brand-50 p-4">
                       {/* Producto */}
                       <div className="space-y-2">

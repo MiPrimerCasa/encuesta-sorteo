@@ -74,7 +74,7 @@ export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBa
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {/* Rol badge — visible en todos los tamaños */}
           <span
             className={`rounded-md px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${ROL_BADGE_CLASS[usuario.rol]}`}
@@ -82,18 +82,19 @@ export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBa
             {ROL_LABEL[usuario.rol]}
           </span>
 
-          {/* Desktop: nombre + logout */}
-          <div className="hidden items-center gap-3 md:flex">
-            <span className="max-w-[140px] truncate text-[13px] text-zinc-500">{usuario.nombre}</span>
-            <button
-              type="button"
-              onClick={onLogout}
-              style={{ touchAction: 'manipulation' }}
-              className="rounded-lg px-3 py-1.5 text-[12px] font-semibold text-zinc-500 transition-colors active:bg-brand-50 active:text-brand-700 hover:text-zinc-700"
-            >
-              Salir
-            </button>
-          </div>
+          {/* Nombre — solo desktop (en mobile va bajo la marca) */}
+          <span className="hidden max-w-[140px] truncate text-[13px] text-zinc-500 md:inline">
+            {usuario.nombre}
+          </span>
+
+          <button
+            type="button"
+            onClick={onLogout}
+            style={{ touchAction: 'manipulation' }}
+            className="rounded-lg px-2.5 py-1.5 text-[12px] font-semibold text-zinc-500 transition-colors active:bg-brand-50 active:text-brand-700 hover:text-zinc-700 md:px-3"
+          >
+            Salir
+          </button>
         </div>
       </div>
 

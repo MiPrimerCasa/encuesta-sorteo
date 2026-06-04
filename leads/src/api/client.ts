@@ -23,6 +23,7 @@ import {
   getDemoLinksRedes,
   getDemoPromotoresParaSupervisor,
   updateDemoLead,
+  updateDemoLeadTelefono,
 } from './demoData';
 
 let _isDemoActive = import.meta.env.VITE_DEMO === 'true';
@@ -173,14 +174,13 @@ export async function fetchNotificacionesLinksRedes(): Promise<{
   return apiFetch('/api/notificaciones/links-redes');
 }
 
-export async function marcarNotificacionLinkAtendida(
-  codigo: string,
-  red: 'instagram' | 'facebook',
+export async function marcarNotificacionLinkVista(
+  notificacionId: string,
 ): Promise<{ ok: boolean; total: number }> {
   if (_isDemoActive) {
     return { ok: true, total: 0 };
   }
-  return apiFetch(`/api/notificaciones/links-redes/${encodeURIComponent(codigo)}/${red}/atendida`, {
+  return apiFetch(`/api/notificaciones/links-redes/${encodeURIComponent(notificacionId)}/vista`, {
     method: 'POST',
   });
 }
@@ -263,5 +263,17 @@ export async function crearLead(nuevoLead: NuevoLeadData, opciones?: { promotorN
     headers,
     body: JSON.stringify(nuevoLead),
   });
+  return data.lead;
+}
+
+export async function modificarTelefonoLead(leadId: string, telefono: string): Promise<Lead> {
+  if (_isDemoActive) return updateDemoLeadTelefono(leadId, telefono);
+  const data = await apiFetch<{ lead: Lead; message?: string }>(
+    `/api/leads/${encodeURIComponent(leadId)}/telefono`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ telefono }),
+    },
+  );
   return data.lead;
 }

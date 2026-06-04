@@ -138,6 +138,17 @@ export function LinksRedesSection({ className = 'mb-5' }: LinksRedesSectionProps
         Links para compartir en redes
       </p>
 
+      {links.instagramAcortado && (
+        <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
+            Link corto para bio de Instagram
+          </p>
+          <p className="mt-1 break-all text-[12px] font-medium tabular-nums text-emerald-900">
+            {links.instagramAcortado}
+          </p>
+        </div>
+      )}
+
       {tieneLinks ? (
         <div className="flex gap-3">
           <CompartirButton url={links.instagram!} label="Instagram" icon="instagram" />

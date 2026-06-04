@@ -7,7 +7,7 @@
 **Conviene JavaScript (Node)** en este proyecto:
 
 - Mismo runtime que la API (`server/`), mismo deploy en el VPS.
-- Los links ya viven en `server/data/links-redes.json` y SQLite local.
+- En producción los links vienen de **STRSYSTEM**: `exec dbo.rptLinkQRenRedesSociales` (ver `.env`: `SP_LINKS_REDES`). Respaldo: `server/data/links-redes.json`.
 - El script Python se portó a `server/lib/url-shortener.js` + scripts npm.
 - Cron en el VPS: `node scripts/verificar-links-redes.mjs` (sin instalar Python).
 
@@ -15,11 +15,13 @@ Podés mantener el script Python solo para exportar la planilla de Google Sheets
 
 ## Flujo
 
-1. **Catálogo** — `links-redes.json` (generado con `npm run generate:links-redes`).
-2. **Acortar** — `npm run links:acortar` guarda URL corta en SQLite solo para **Instagram** (`data/app-cache.db`, tabla `links_acortados`).
+1. **Catálogo** — SP en STRSYSTEM (default) o `links-redes.json` si `LINKS_REDES_SOURCE=json`. Inspección: `npm run inspect:links-redes`.
+2. **Acortar** — `npm run links:acortar` (solo pendientes) o **`npm run links:actualizar-todos`** (todos promotores + supervisores del catálogo).
 3. **Verificar** — `npm run links:verificar` revisa links vencidos (por defecto 1 por ejecución, cada 7 días).
 4. Si el acortado **no responde**, se **regenera** automáticamente.
-5. Si sigue fallando → **notificación** en la campana del supervisor (NavBar).
+5. Si cambia o se regenera → **notificación** en la campana (NavBar):
+   - **Promotor**: solo avisos de **su** código (`codigoCarga`).
+   - **Supervisor**: avisos de **todo el equipo** (cada promotor y cada supervisor con link propio).
 
 Los promotores comparten el link **largo** `wa.me` desde Leads (Instagram y Facebook). Solo **Instagram** tiene link acortado para bio/planilla; **Facebook** siempre es el link normal, sin acortar ni verificar.
 
@@ -45,8 +47,8 @@ Variables opcionales en `.env`:
 
 | Método | Ruta | Rol |
 |--------|------|-----|
-| GET | `/api/notificaciones/links-redes` | supervisor |
-| POST | `/api/notificaciones/links-redes/:codigo/:red/atendida` | supervisor |
+| GET | `/api/notificaciones/links-redes` | promotor + supervisor |
+| POST | `/api/notificaciones/links-redes/:id/vista` | promotor + supervisor |
 
 ## Archivos
 

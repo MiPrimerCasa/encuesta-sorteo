@@ -7,10 +7,13 @@ import {
   normalizeNombre,
   resolveCodigoCargaPorPromotor,
 } from './encuestas.js';
+import { fetchLinksRedesCatalogFromSp } from './links-redes-sp.js';
+import { isSqlServerConfigured } from './mssql.js';
 import { compactarCodigoSorteo } from './whatsapp-link-text.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 let catalogCache = null;
+let catalogLoadPromise = null;
 
 export function normalizeLoginId(valor) {
   return String(valor ?? '').trim().toLowerCase();
@@ -48,15 +51,82 @@ export function nombresCoinciden(nombreOperador, nombrePlanilla) {
   return false;
 }
 
+function loadOperadoresCatalogFromJson() {
+  const path = join(__dirname, '..', 'data', 'links-redes.json');
+  const data = JSON.parse(readFileSync(path, 'utf8'));
+  data.catalogSource = 'json';
+  return data;
+}
+
+export function useLinksRedesFromSql() {
+  const source = String(process.env.LINKS_REDES_SOURCE || 'sql').trim().toLowerCase();
+  if (source === 'json' || source === 'file') return false;
+  return isSqlServerConfigured();
+}
+
+function mergeCatalogIndexes(fromSp, fromJson) {
+  return {
+    ...fromSp,
+    catalogSource: 'sql',
+    byCodigo: fromSp.byCodigo,
+    byLoginId: { ...fromJson.byLoginId, ...fromSp.byLoginId },
+    byIdOperador: { ...fromJson.byIdOperador, ...fromSp.byIdOperador },
+    byNombre: { ...fromJson.byNombre, ...fromSp.byNombre },
+  };
+}
+
+/** Catálogo en memoria (JSON de respaldo si el SP aún no cargó). */
 export function loadOperadoresCatalog() {
   if (catalogCache) return catalogCache;
-  const path = join(__dirname, '..', 'data', 'links-redes.json');
-  catalogCache = JSON.parse(readFileSync(path, 'utf8'));
+  catalogCache = loadOperadoresCatalogFromJson();
   return catalogCache;
+}
+
+/**
+ * Catálogo desde STRSYSTEM ([dbo].[rptLinkQRenRedesSociales]) con respaldo en links-redes.json.
+ */
+export async function loadOperadoresCatalogAsync() {
+  if (catalogCache?.catalogSource === 'sql') return catalogCache;
+  if (catalogLoadPromise) return catalogLoadPromise;
+
+  catalogLoadPromise = (async () => {
+    if (useLinksRedesFromSql()) {
+      try {
+        const fromSp = await fetchLinksRedesCatalogFromSp();
+        if (Object.keys(fromSp.byCodigo ?? {}).length > 0) {
+          const fromJson = loadOperadoresCatalogFromJson();
+          catalogCache = mergeCatalogIndexes(fromSp, fromJson);
+          return catalogCache;
+        }
+        console.warn(
+          '[links-redes] El SP no devolvió códigos; se usa links-redes.json.',
+        );
+      } catch (error) {
+        console.warn(
+          '[links-redes] SP falló, se usa links-redes.json:',
+          error instanceof Error ? error.message : error,
+        );
+      }
+    }
+    catalogCache = loadOperadoresCatalogFromJson();
+    return catalogCache;
+  })();
+
+  try {
+    return await catalogLoadPromise;
+  } finally {
+    catalogLoadPromise = null;
+  }
+}
+
+/** Precarga al arrancar la API (no bloquea el listen). */
+export function warmOperadoresCatalog() {
+  return loadOperadoresCatalogAsync();
 }
 
 export function invalidateOperadoresCatalogCache() {
   catalogCache = null;
+  catalogLoadPromise = null;
 }
 
 function codigoDesdeEntrada(entry) {

@@ -42,6 +42,24 @@ export class CodigoPromotorCargaError extends Error {
   }
 }
 
+export class LeadNoEncontradoError extends Error {
+  constructor() {
+    super('No se encontró el lead en tu listado.');
+    this.name = 'LeadNoEncontradoError';
+    this.code = 'LEAD_NO_ENCONTRADO';
+    this.status = 404;
+  }
+}
+
+export class LeadNoManualError extends Error {
+  constructor() {
+    super('Solo podés modificar el teléfono de leads cargados manualmente desde la app.');
+    this.name = 'LeadNoManualError';
+    this.code = 'LEAD_NO_MANUAL';
+    this.status = 403;
+  }
+}
+
 export class CargaEncuestaSinPersistirError extends Error {
   constructor(detail) {
     super(
@@ -104,7 +122,11 @@ function digitsTelefono(raw) {
   return String(raw ?? '').replace(/\D/g, '');
 }
 
-/** Clave única encuesta: @telefono + @encuesta. El SP devuelve codigo=0 o gestionCodigo=0 si ya existe. */
+/**
+ * Clave única encuesta: @telefono + @encuesta.
+ * Con @origen = '2' (app manual) el SP actualiza y devuelve gestionCodigo = 1.
+ * Sin origen 2, duplicado → gestionCodigo = 0.
+ */
 function valorIndicaDuplicado(val) {
   return val === 0 || val === '0';
 }
@@ -245,7 +267,8 @@ export async function execEncuestaCargaSorteo01(params) {
   bindCampo(request, 8, params.campo8Valor, { vacioComoCadenaVacia: true });
 
   if (includeOrigenParam()) {
-    request.input('origen', sql.Int, params.origen ?? 2);
+    const origen = String(params.origen ?? 2).trim().charAt(0) || '2';
+    request.input('origen', sql.Char(1), origen);
   }
 
   const result = await request.execute(proc);
@@ -320,32 +343,26 @@ export async function crearEncuestaManual(payload, usuarioSesion, opciones = {})
   const idListado = idVendedorOperador(usuario);
 
   const leadsPrevios = await listLeadsFromEncuestas(usuario);
-  if (telefonoYaEnCampania(leadsPrevios, payload.telefono, cargaParams.encuesta)) {
-    throw new ContactoYaRegistradoError();
-  }
+  const yaExistia = telefonoYaEnCampania(
+    leadsPrevios,
+    payload.telefono,
+    cargaParams.encuesta,
+  );
 
-  let duplicadoSp = false;
-  try {
-    await execEncuestaCargaSorteo01(cargaParams);
-  } catch (err) {
-    if (err instanceof ContactoYaRegistradoError) {
-      duplicadoSp = true;
-    } else {
-      throw err;
-    }
-  }
+  await execEncuestaCargaSorteo01(cargaParams);
 
   const leads = await listLeadsFromEncuestas(usuario);
   const lead = buscarLeadTrasCarga(leads, payload, cargaParams.encuesta);
-  if (lead) return lead;
+  if (lead) {
+    return { lead, actualizado: yaExistia };
+  }
 
-  const detalle =
-    `SP ${duplicadoSp ? 'duplicado' : 'ok'} @usuario=${cargaParams.usuario}, encuesta=${cargaParams.encuesta}, tel=${cargaParams.telefono}, listado @idVendedor=${idListado}.`;
+  const detalle = `SP ok @usuario=${cargaParams.usuario}, encuesta=${cargaParams.encuesta}, tel=${cargaParams.telefono}, listado @idVendedor=${idListado}, actualizado=${yaExistia}.`;
 
   if (usuario.rol === 'promotor') {
     throw new CargaEncuestaSinPersistirError(
-      duplicadoSp
-        ? 'El contacto ya está en el sorteo pero no aparece en tu bandeja. Probable código promotor incorrecto — tu supervisor puede verlo. Pedí revisión a soporte.'
+      yaExistia
+        ? 'El contacto se actualizó en el sorteo pero no aparece en tu bandeja. Probable código promotor incorrecto — tu supervisor puede verlo.'
         : 'La encuesta se guardó pero no aparece en tu bandeja. Verificá con soporte que tu código promotor (QR) sea el correcto.',
       detalle,
     );
@@ -374,6 +391,61 @@ export function telefonoYaEnCampania(leads, telefono, encuesta) {
 /** @deprecated Usar telefonoYaEnCampania con getEncuestaCampaniaId(). */
 export function telefonoYaEnListado(leads, telefono) {
   return telefonoYaEnCampania(leads, telefono, getEncuestaCampaniaId());
+}
+
+function leadEsCargaManualServidor(lead) {
+  if (lead?.seguimiento?.fuente === 'app') return true;
+  const raw = String(lead?.origenEncuesta ?? '').trim().toLowerCase();
+  return raw === '2' || raw.includes('manual') || raw.includes('app');
+}
+
+/**
+ * Cambia `encuesta.telefono` para un lead manual (id = PK encuesta).
+ * No usa encuestaCargaSorteo01: el SP de carga no actualiza teléfono en el branch UPDATE.
+ */
+export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuarioSesion) {
+  const idEncuesta = Number.parseInt(String(leadId), 10);
+  if (!Number.isFinite(idEncuesta) || idEncuesta <= 0) {
+    throw new LeadNoEncontradoError();
+  }
+
+  const context = await resolveCargaEncuestaContext(usuarioSesion);
+  const usuario = enriquecerUsuarioConCodigoCarga(usuarioSesion, context.rows);
+  const leads = await listLeadsFromEncuestas(usuario);
+  const lead = leads.find((l) => String(l.id) === String(leadId));
+  if (!lead) throw new LeadNoEncontradoError();
+  if (!leadEsCargaManualServidor(lead)) throw new LeadNoManualError();
+
+  const telefonoNorm = digitsTelefono(telefonoNuevo) || String(telefonoNuevo).trim();
+  const encuesta = lead.codigoCampania || getEncuestaCampaniaId();
+
+  if (digitsTelefono(lead.telefono) === telefonoNorm) {
+    return lead;
+  }
+
+  const otros = leads.filter((l) => String(l.id) !== String(leadId));
+  if (telefonoYaEnCampania(otros, telefonoNorm, encuesta)) {
+    throw new ContactoYaRegistradoError();
+  }
+
+  const pool = await getSqlPoolEncuestas();
+  const result = await pool
+    .request()
+    .input('id', sql.Int, idEncuesta)
+    .input('telefono', sql.NVarChar(50), telefonoNorm)
+    .input('encuesta', sql.NVarChar(50), encuesta)
+    .query(
+      `UPDATE encuesta SET telefono = @telefono WHERE id = @id AND encuesta = @encuesta`,
+    );
+
+  if (!result.rowsAffected?.[0]) {
+    throw new LeadNoEncontradoError();
+  }
+
+  const leadsPost = await listLeadsFromEncuestas(usuario);
+  const actualizado = leadsPost.find((l) => String(l.id) === String(leadId));
+  if (actualizado) return actualizado;
+  return { ...lead, telefono: telefonoNorm };
 }
 
 export { MSG_CONTACTO_YA_REGISTRADO };

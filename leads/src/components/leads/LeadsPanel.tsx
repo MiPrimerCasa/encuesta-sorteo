@@ -18,6 +18,7 @@ import type { Barrio, Lead, NuevoLeadData, Producto, Promotor, RolUsuario, Segui
 import { AlertasSinContactar } from './AlertasSinContactar';
 import { LeadCard } from './LeadCard';
 import { LeadModalForm } from './LeadModalForm';
+import { ModificarTelefonoSheet } from './ModificarTelefonoSheet';
 import { NuevoLeadSheet } from './NuevoLeadSheet';
 import { LinksRedesSection } from './LinksRedesSection';
 import { PromotorResumen } from './PromotorResumen';
@@ -82,6 +83,7 @@ interface LeadsPanelProps {
   barrios: Barrio[];
   onActualizarLead: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
   onCrearLead: (data: NuevoLeadData, promotorNombre?: string) => void | Promise<void>;
+  onModificarTelefonoLead?: (leadId: string, telefono: string) => void | Promise<void>;
   direccionOficinas?: string;
   /** Desde calendario: abrir seguimiento de este lead al montar. */
   leadIdSeguimientoInicial?: string | null;
@@ -98,6 +100,7 @@ export function LeadsPanel({
   barrios,
   onActualizarLead,
   onCrearLead,
+  onModificarTelefonoLead,
   leadIdSeguimientoInicial,
   onLeadSeguimientoConsumido,
 }: LeadsPanelProps) {
@@ -128,6 +131,7 @@ export function LeadsPanel({
   const [leadSeleccionado, setLeadSeleccionado] = useState<Lead | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [agendarAbierto, setAgendarAbierto] = useState(false);
+  const [leadModificarTelefono, setLeadModificarTelefono] = useState<Lead | null>(null);
   const [busqueda, setBusqueda] = useState('');
 
   const todosLosLeads = useMemo(
@@ -196,6 +200,10 @@ export function LeadsPanel({
     await refrescarHistorial(leadId);
   };
 
+  const abrirModificarTelefono = onModificarTelefonoLead
+    ? (lead: Lead) => setLeadModificarTelefono(lead)
+    : undefined;
+
   const renderTarjetaLead = (lead: Lead, variante: VarianteCard) =>
     esPromotor && variante !== 'compro' ? (
       <SwipeableLeadCard
@@ -211,6 +219,7 @@ export function LeadsPanel({
         rolUsuario={rolUsuario}
         onQuickSave={guardarSeguimientoLead}
         historial={historialPorLead[lead.id] ?? []}
+        onModificarTelefono={abrirModificarTelefono}
       />
     ) : (
       <LeadCard
@@ -225,6 +234,7 @@ export function LeadsPanel({
         ocultarPromotor={esPromotor}
         rolUsuario={rolUsuario}
         historial={historialPorLead[lead.id] ?? []}
+        onModificarTelefono={abrirModificarTelefono}
       />
     );
 
@@ -322,6 +332,7 @@ export function LeadsPanel({
                     rolUsuario={rolUsuario}
                     onQuickSave={guardarSeguimientoLead}
                     historial={historialPorLead[lead.id] ?? []}
+                    onModificarTelefono={abrirModificarTelefono}
                   />
                 ) : (
                   <LeadCard
@@ -336,6 +347,7 @@ export function LeadsPanel({
                     ocultarPromotor={esPromotor}
                     rolUsuario={rolUsuario}
                     historial={historialPorLead[lead.id] ?? []}
+                    onModificarTelefono={abrirModificarTelefono}
                   />
                 );
               })}
@@ -466,6 +478,15 @@ export function LeadsPanel({
         onClose={() => setAgendarAbierto(false)}
         onSave={onCrearLead}
       />
+
+      {onModificarTelefonoLead && (
+        <ModificarTelefonoSheet
+          lead={leadModificarTelefono}
+          open={leadModificarTelefono != null}
+          onClose={() => setLeadModificarTelefono(null)}
+          onSave={onModificarTelefonoLead}
+        />
+      )}
     </div>
   );
 }

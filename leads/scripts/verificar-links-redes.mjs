@@ -25,6 +25,4 @@ for (const r of res.resultados) {
   }
 }
 
-console.log(
-  `\nRevisados: ${res.revisados}. Notificaciones activas: ${res.notificacionesActivas}.`,
-);
+console.log(`\nRevisados: ${res.revisados}.`);

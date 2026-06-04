@@ -1,4 +1,8 @@
-import { loadOperadoresCatalog, invalidateOperadoresCatalogCache } from './operadores-catalog.js';
+import {
+  loadOperadoresCatalogAsync,
+  invalidateOperadoresCatalogCache,
+  normalizeCodigoCatalog,
+} from './operadores-catalog.js';
 import {
   acortarEnlace,
   indiceAcortadorDesdeCodigo,
@@ -17,19 +21,45 @@ function initLinksAcortadosSchema() {
       codigo TEXT NOT NULL,
       red TEXT NOT NULL,
       vendedor TEXT,
+      rol_catalogo TEXT,
       url_largo TEXT NOT NULL,
       url_corto TEXT,
       servicio TEXT,
       estado TEXT NOT NULL DEFAULT 'pendiente',
       verificado_en TEXT,
-      notificacion_activa INTEGER NOT NULL DEFAULT 0,
       ultimo_error TEXT,
       actualizado_en TEXT NOT NULL DEFAULT (datetime('now')),
       PRIMARY KEY (codigo, red)
     );
-    CREATE INDEX IF NOT EXISTS idx_links_acortados_notif
-      ON links_acortados (notificacion_activa, verificado_en);
+    CREATE TABLE IF NOT EXISTS links_notificaciones (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      codigo TEXT NOT NULL,
+      red TEXT NOT NULL DEFAULT 'instagram',
+      tipo TEXT NOT NULL,
+      vendedor TEXT,
+      rol_catalogo TEXT,
+      url_corto TEXT,
+      url_corto_anterior TEXT,
+      mensaje TEXT NOT NULL,
+      ultimo_error TEXT,
+      creado_en TEXT NOT NULL DEFAULT (datetime('now')),
+      activa INTEGER NOT NULL DEFAULT 1
+    );
+    CREATE TABLE IF NOT EXISTS links_notificacion_vista (
+      notificacion_id INTEGER NOT NULL,
+      usuario_id TEXT NOT NULL,
+      visto_en TEXT NOT NULL DEFAULT (datetime('now')),
+      PRIMARY KEY (notificacion_id, usuario_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_links_notif_codigo
+      ON links_notificaciones (codigo, activa, creado_en DESC);
   `);
+
+  try {
+    db.exec(`ALTER TABLE links_acortados ADD COLUMN rol_catalogo TEXT`);
+  } catch {
+    /* ya existe */
+  }
 }
 
 function rowFromDb(row) {
@@ -38,27 +68,103 @@ function rowFromDb(row) {
     codigo: row.codigo,
     red: row.red,
     vendedor: row.vendedor,
+    rolCatalogo: row.rol_catalogo,
     urlLargo: row.url_largo,
     urlCorto: row.url_corto,
     servicio: row.servicio,
     estado: row.estado,
     verificadoEn: row.verificado_en,
-    notificacionActiva: Boolean(row.notificacion_activa),
     ultimoError: row.ultimo_error,
     actualizadoEn: row.actualizado_en,
   };
 }
 
-/** Sincroniza filas desde links-redes.json (url larga); no borra acortados existentes. */
-export function sincronizarCatalogoEnDb() {
+function mapNotificacionRow(r) {
+  const esActualizado = r.tipo === 'link_actualizado';
+  return {
+    id: String(r.id),
+    codigo: r.codigo,
+    vendedor: r.vendedor ?? r.codigo,
+    red: 'instagram',
+    redLabel: 'Instagram',
+    tipo: r.tipo,
+    rolCatalogo: r.rol_catalogo,
+    mensaje: r.mensaje,
+    urlLargo: '',
+    urlCorto: r.url_corto,
+    urlCortoAnterior: r.url_corto_anterior,
+    ultimoError: r.ultimo_error,
+    verificadoEn: r.creado_en,
+    esActualizado,
+    esAtencionRequerida: r.tipo === 'link_requiere_accion',
+  };
+}
+
+function codigoCoincideUsuario(usuario, codigoNotif) {
+  const codigoUsuario = normalizeCodigoCatalog(usuario?.codigoCarga);
+  if (!codigoUsuario) return false;
+  return codigoUsuario === normalizeCodigoCatalog(codigoNotif);
+}
+
+function crearNotificacion({
+  codigo,
+  tipo,
+  vendedor,
+  rolCatalogo,
+  urlCorto,
+  urlCortoAnterior,
+  ultimoError,
+}) {
+  const db = getDb();
+  db.prepare(
+    `UPDATE links_notificaciones SET activa = 0
+     WHERE codigo = ? AND red = 'instagram' AND activa = 1`,
+  ).run(codigo);
+
+  const nombre = vendedor ?? codigo;
+  const rolTxt = rolCatalogo === 'supervisor' ? 'supervisor' : 'promotor';
+  let mensaje;
+  if (tipo === 'link_actualizado') {
+    mensaje = `Nuevo link de Instagram (${rolTxt} ${nombre}, código ${codigo}). Copiá el link corto en la bio de Instagram.`;
+  } else {
+    mensaje = `El link de Instagram de ${nombre} (${codigo}, ${rolTxt}) no pudo renovarse. Revisá la bio o contactá soporte.`;
+  }
+
+  const info = db
+    .prepare(
+      `INSERT INTO links_notificaciones (
+        codigo, red, tipo, vendedor, rol_catalogo,
+        url_corto, url_corto_anterior, mensaje, ultimo_error, activa
+      ) VALUES (
+        @codigo, 'instagram', @tipo, @vendedor, @rol_catalogo,
+        @url_corto, @url_corto_anterior, @mensaje, @ultimo_error, 1
+      )`,
+    )
+    .run({
+      codigo,
+      tipo,
+      vendedor: vendedor ?? null,
+      rol_catalogo: rolCatalogo ?? null,
+      url_corto: urlCorto ?? null,
+      url_corto_anterior: urlCortoAnterior ?? null,
+      mensaje,
+      ultimo_error: ultimoError ?? null,
+    });
+
+  return info.lastInsertRowid;
+}
+
+/** Sincroniza promotores y supervisores desde el catálogo (SP STRSYSTEM o JSON). */
+export async function sincronizarCatalogoEnDb() {
   initLinksAcortadosSchema();
-  const { byCodigo } = loadOperadoresCatalog();
+  const { byCodigo } = await loadOperadoresCatalogAsync();
   const db = getDb();
   const upsert = db.prepare(`
-    INSERT INTO links_acortados (codigo, red, vendedor, url_largo, estado)
-    VALUES (@codigo, @red, @vendedor, @url_largo, 'pendiente')
+    INSERT INTO links_acortados (codigo, red, vendedor, rol_catalogo, url_largo, estado)
+    VALUES (@codigo, @red, @vendedor, @rol_catalogo, @url_largo, 'pendiente')
     ON CONFLICT(codigo, red) DO UPDATE SET
       vendedor = excluded.vendedor,
+      rol_catalogo = excluded.rol_catalogo,
       url_largo = excluded.url_largo,
       actualizado_en = datetime('now')
   `);
@@ -75,6 +181,7 @@ export function sincronizarCatalogoEnDb() {
         codigo: entry.codigo,
         red,
         vendedor: entry.vendedor ?? null,
+        rol_catalogo: entry.rol ?? null,
         url_largo: urlLargo,
       });
       n += 1;
@@ -83,45 +190,49 @@ export function sincronizarCatalogoEnDb() {
   return n;
 }
 
-export function listarNotificacionesActivas() {
+export function listarNotificacionesParaUsuario(usuario) {
   initLinksAcortadosSchema();
+  if (!usuario?.id) return [];
+
   const rows = getDb()
     .prepare(
-      `SELECT * FROM links_acortados
-       WHERE notificacion_activa = 1
-       ORDER BY verificado_en ASC, codigo, red`,
+      `SELECT n.* FROM links_notificaciones n
+       WHERE n.activa = 1
+         AND NOT EXISTS (
+           SELECT 1 FROM links_notificacion_vista v
+           WHERE v.notificacion_id = n.id AND v.usuario_id = @uid
+         )
+       ORDER BY n.creado_en DESC`,
     )
-    .all();
-  return rows.map((r) => {
-    const item = rowFromDb(r);
-    const redLabel = 'Instagram';
-    return {
-      id: `${r.codigo}-${r.red}`,
-      codigo: r.codigo,
-      vendedor: r.vendedor ?? r.codigo,
-      red: r.red,
-      redLabel,
-      mensaje: `Actualizá el link de ${redLabel} de ${r.vendedor ?? r.codigo} en la bio / planilla.`,
-      urlLargo: r.url_largo,
-      urlCorto: r.url_corto,
-      ultimoError: r.ultimo_error,
-      verificadoEn: r.verificado_en,
-    };
-  });
+    .all({ uid: String(usuario.id) });
+
+  return rows
+    .filter((r) => {
+      if (usuario.rol === 'supervisor') return true;
+      return codigoCoincideUsuario(usuario, r.codigo);
+    })
+    .map(mapNotificacionRow);
 }
 
+export function contarNotificacionesParaUsuario(usuario) {
+  return listarNotificacionesParaUsuario(usuario).length;
+}
+
+/** @deprecated usar contarNotificacionesParaUsuario */
 export function contarNotificacionesActivas() {
-  initLinksAcortadosSchema();
-  const row = getDb()
-    .prepare(`SELECT COUNT(*) AS n FROM links_acortados WHERE notificacion_activa = 1`)
-    .get();
-  return row?.n ?? 0;
+  return getDb()
+    .prepare(`SELECT COUNT(*) AS n FROM links_notificaciones WHERE activa = 1`)
+    .get()?.n ?? 0;
 }
 
-/** Links con verificación vencida (más de N días). */
-function listarPendientesVerificacion(diasIntervalo = 7, limite = 1) {
+/** @deprecated */
+export function listarNotificacionesActivas() {
+  return [];
+}
+
+async function listarPendientesVerificacion(diasIntervalo = 7, limite = 1) {
   initLinksAcortadosSchema();
-  sincronizarCatalogoEnDb();
+  await sincronizarCatalogoEnDb();
   const rows = getDb()
     .prepare(
       `SELECT * FROM links_acortados
@@ -149,7 +260,6 @@ function guardarAcortado(codigo, red, datos) {
         servicio = @servicio,
         estado = @estado,
         verificado_en = datetime('now'),
-        notificacion_activa = @notificacion_activa,
         ultimo_error = @ultimo_error,
         actualizado_en = datetime('now')
        WHERE codigo = @codigo AND red = @red`,
@@ -160,68 +270,94 @@ function guardarAcortado(codigo, red, datos) {
       url_corto: datos.urlCorto ?? null,
       servicio: datos.servicio ?? null,
       estado: datos.estado,
-      notificacion_activa: datos.notificacionActiva ? 1 : 0,
       ultimo_error: datos.ultimoError ?? null,
     });
 }
 
+function notificarLinkActualizado(item, urlCortoNuevo, urlCortoAnterior) {
+  crearNotificacion({
+    codigo: item.codigo,
+    tipo: 'link_actualizado',
+    vendedor: item.vendedor,
+    rolCatalogo: item.rolCatalogo,
+    urlCorto: urlCortoNuevo,
+    urlCortoAnterior: urlCortoAnterior ?? null,
+  });
+}
+
+function notificarAtencionRequerida(item, urlCorto, ultimoError) {
+  crearNotificacion({
+    codigo: item.codigo,
+    tipo: 'link_requiere_accion',
+    vendedor: item.vendedor,
+    rolCatalogo: item.rolCatalogo,
+    urlCorto,
+    ultimoError,
+  });
+}
+
 /**
- * Acorta un registro si falta url corta o se fuerza regeneración.
+ * Acorta o regenera un registro. Si cambia la URL corta, notifica a promotor (dueño) y supervisores.
  */
 export async function acortarRegistro(item, { forzar = false } = {}) {
-  if (!forzar && item.urlCorto && item.estado === 'ok') {
-    return { ...item, regenerado: false };
+  const urlAnterior = item.urlCorto ?? null;
+
+  if (!forzar && urlAnterior && item.estado === 'ok') {
+    return { ...item, regenerado: false, notificado: false };
   }
 
   const idx = indiceAcortadorDesdeCodigo(item.codigo, item.red);
   const res = await acortarEnlace(item.urlLargo, idx);
   if (!res) {
     guardarAcortado(item.codigo, item.red, {
-      urlCorto: item.urlCorto,
+      urlCorto: urlAnterior,
       servicio: item.servicio,
       estado: 'error_acortar',
-      notificacionActiva: true,
       ultimoError: 'No se pudo acortar con ningún servicio',
     });
+    notificarAtencionRequerida(item, urlAnterior, 'No se pudo acortar con ningún servicio');
     return {
       ...item,
       estado: 'error_acortar',
-      notificacionActiva: true,
       regenerado: false,
+      notificado: true,
     };
   }
 
+  const cambio = !urlAnterior || urlAnterior !== res.corto;
   guardarAcortado(item.codigo, item.red, {
     urlCorto: res.corto,
     servicio: res.servicio,
     estado: 'ok',
-    notificacionActiva: false,
     ultimoError: null,
   });
+
+  if (cambio || forzar) {
+    notificarLinkActualizado(item, res.corto, urlAnterior);
+  }
 
   return {
     ...item,
     urlCorto: res.corto,
     servicio: res.servicio,
     estado: 'ok',
-    notificacionActiva: false,
     regenerado: true,
+    notificado: cambio || forzar,
   };
 }
 
-/**
- * Verifica un link; si falla intenta regenerar. Devuelve resumen.
- */
 export async function verificarYRegenerarRegistro(item) {
   if (!item.urlCorto) {
     const acortado = await acortarRegistro(item, { forzar: true });
     return {
       codigo: item.codigo,
       red: item.red,
+      vendedor: item.vendedor,
+      rolCatalogo: item.rolCatalogo,
       accion: 'acortado',
       ok: acortado.estado === 'ok',
       urlCorto: acortado.urlCorto,
-      notificacion: acortado.notificacionActiva,
+      notificado: acortado.notificado,
     };
   }
 
@@ -231,7 +367,6 @@ export async function verificarYRegenerarRegistro(item) {
       urlCorto: item.urlCorto,
       servicio: item.servicio,
       estado: 'ok',
-      notificacionActiva: false,
       ultimoError: null,
     });
     return {
@@ -240,10 +375,11 @@ export async function verificarYRegenerarRegistro(item) {
       accion: 'ok',
       ok: true,
       urlCorto: item.urlCorto,
-      notificacion: false,
+      notificado: false,
     };
   }
 
+  const urlAnterior = item.urlCorto;
   const regenerado = await acortarRegistro(item, { forzar: true });
   const check2 = regenerado.urlCorto ? await verificarUrl(regenerado.urlCorto) : { ok: false };
 
@@ -254,7 +390,8 @@ export async function verificarYRegenerarRegistro(item) {
       accion: 'regenerado',
       ok: true,
       urlCorto: regenerado.urlCorto,
-      notificacion: false,
+      urlCortoAnterior: urlAnterior,
+      notificado: regenerado.notificado,
     };
   }
 
@@ -262,9 +399,13 @@ export async function verificarYRegenerarRegistro(item) {
     urlCorto: regenerado.urlCorto,
     servicio: regenerado.servicio,
     estado: 'roto',
-    notificacionActiva: true,
     ultimoError: check.error ?? check2.error ?? 'Link caído tras regenerar',
   });
+  notificarAtencionRequerida(
+    item,
+    regenerado.urlCorto,
+    check.error ?? check2.error ?? 'Link caído tras regenerar',
+  );
 
   return {
     codigo: item.codigo,
@@ -272,41 +413,57 @@ export async function verificarYRegenerarRegistro(item) {
     accion: 'notificar',
     ok: false,
     urlCorto: regenerado.urlCorto,
-    notificacion: true,
+    notificado: true,
     error: check.error ?? check2.error,
   };
 }
 
-/**
- * Proceso batch: verifica hasta `limite` links vencidos (intervalo en días).
- */
 export async function ejecutarVerificacionProgramada({
   diasIntervalo = Number(process.env.LINKS_VERIFY_INTERVAL_DAYS || 7),
   limite = Number(process.env.LINKS_VERIFY_MAX_PER_RUN || 1),
 } = {}) {
-  sincronizarCatalogoEnDb();
-  const pendientes = listarPendientesVerificacion(diasIntervalo, limite);
+  await sincronizarCatalogoEnDb();
+  const pendientes = await listarPendientesVerificacion(diasIntervalo, limite);
   const resultados = [];
   for (const item of pendientes) {
     resultados.push(await verificarYRegenerarRegistro(item));
   }
   return {
     revisados: resultados.length,
-    notificacionesActivas: contarNotificacionesActivas(),
     resultados,
   };
 }
 
-/** Acorta todos los que no tienen url_corto. */
+/** Acorta solo los que aún no tienen URL corta. */
 export async function acortarTodosPendientes() {
   initLinksAcortadosSchema();
-  sincronizarCatalogoEnDb();
+  await sincronizarCatalogoEnDb();
   const rows = getDb()
     .prepare(
       `SELECT * FROM links_acortados
        WHERE url_corto IS NULL OR estado IN ('pendiente', 'error_acortar')
        ORDER BY codigo, red`,
     )
+    .all();
+  const resultados = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    resultados.push(await acortarRegistro(rowFromDb(rows[i]), { forzar: true }));
+    if (i < rows.length - 1) {
+      await new Promise((r) => setTimeout(r, pausaEntreAcortadosMs()));
+    }
+  }
+  invalidateOperadoresCatalogCache();
+  return resultados;
+}
+
+/**
+ * Regenera TODOS los Instagram (promotores + supervisores del catálogo) y notifica el cambio.
+ */
+export async function actualizarTodosLinksInstagram() {
+  initLinksAcortadosSchema();
+  const totalSync = await sincronizarCatalogoEnDb();
+  const rows = getDb()
+    .prepare(`SELECT * FROM links_acortados WHERE red = 'instagram' ORDER BY codigo`)
     .all();
   const resultados = [];
   for (let i = 0; i < rows.length; i += 1) {
@@ -317,25 +474,28 @@ export async function acortarTodosPendientes() {
     }
   }
   invalidateOperadoresCatalogCache();
-  return resultados;
+  return { totalSync, total: resultados.length, resultados };
 }
 
-export function marcarNotificacionAtendida(codigo, red) {
+export function marcarNotificacionVista(notificacionId, usuarioId) {
   initLinksAcortadosSchema();
+  const id = Number(notificacionId);
+  if (!Number.isFinite(id)) return;
   getDb()
     .prepare(
-      `UPDATE links_acortados SET
-        notificacion_activa = 0,
-        actualizado_en = datetime('now')
-       WHERE codigo = ? AND red = ?`,
+      `INSERT OR IGNORE INTO links_notificacion_vista (notificacion_id, usuario_id)
+       VALUES (?, ?)`,
     )
-    .run(codigo, red);
+    .run(id, String(usuarioId));
 }
 
-export function getAcortadoParaCodigo(codigo, red) {
+/** @deprecated */
+export function marcarNotificacionAtendida(_codigo, _red) {}
+
+export function getAcortadoParaCodigo(codigo, red = 'instagram') {
   initLinksAcortadosSchema();
   const row = getDb()
     .prepare(`SELECT * FROM links_acortados WHERE codigo = ? AND red = ?`)
-    .get(codigo, red);
+    .get(normalizeCodigoCatalog(codigo), red);
   return rowFromDb(row);
 }

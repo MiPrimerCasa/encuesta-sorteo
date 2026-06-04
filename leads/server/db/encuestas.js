@@ -417,6 +417,7 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
     fechaObtencion: fechaBase,
     fechaAlta: horarioIso ?? `${fechaBase}T09:00:00`,
     codigoCampania,
+    origenEncuesta: origenRaw != null ? String(origenRaw).trim() : undefined,
     seguimiento,
   };
 }

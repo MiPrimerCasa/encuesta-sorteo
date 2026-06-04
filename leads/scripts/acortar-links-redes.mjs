@@ -10,7 +10,7 @@ import {
 } from '../server/db/links-acortados-store.js';
 import { pausaEntreAcortadosMs } from '../server/lib/url-shortener.js';
 
-const n = sincronizarCatalogoEnDb();
+const n = await sincronizarCatalogoEnDb();
 console.log(`Catálogo sincronizado: ${n} filas (solo Instagram).`);
 
 const resultados = await acortarTodosPendientes();

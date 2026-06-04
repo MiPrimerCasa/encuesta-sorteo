@@ -1,18 +1,19 @@
 import {
-  loadOperadoresCatalog,
+  loadOperadoresCatalogAsync,
   normalizeCodigoCatalog,
   resolveCodigoCargaOperador,
 } from './operadores-catalog.js';
+import { getAcortadoParaCodigo } from './links-acortados-store.js';
 
 export { normalizeCodigoCatalog as normalizeCodigoLinks };
 
 /**
  * Resuelve links WhatsApp (Instagram / Facebook) por código SORTEO del operador.
  */
-export function resolveLinksRedesPorCodigo(codigoRaw) {
+export async function resolveLinksRedesPorCodigo(codigoRaw) {
   const codigo = normalizeCodigoCatalog(codigoRaw);
   if (!codigo) return null;
-  const { byCodigo } = loadOperadoresCatalog();
+  const { byCodigo } = await loadOperadoresCatalogAsync();
   return byCodigo[codigo] ?? null;
 }
 
@@ -20,7 +21,7 @@ export function resolveCodigoCargaUsuario(usuarioSesion, encuestaRows = []) {
   return resolveCodigoCargaOperador(usuarioSesion, encuestaRows);
 }
 
-export function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows = []) {
+export async function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows = []) {
   const codigo = resolveCodigoCargaOperador(usuarioSesion, encuestaRows);
   if (!codigo) {
     return {
@@ -32,7 +33,7 @@ export function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows = []) {
         'No se encontró tu código de promotor (ej. SORTEO01S21P01). Volvé a iniciar sesión o contactá soporte.',
     };
   }
-  const entry = resolveLinksRedesPorCodigo(codigo);
+  const entry = await resolveLinksRedesPorCodigo(codigo);
   if (!entry) {
     return {
       codigo,
@@ -42,11 +43,13 @@ export function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows = []) {
       mensaje: `No hay links de redes cargados para el código ${codigo}. Pedí a administración que actualice la planilla.`,
     };
   }
+  const acortado = getAcortadoParaCodigo(entry.codigo, 'instagram');
   return {
     codigo: entry.codigo,
     vendedor: entry.vendedor ?? usuarioSesion?.nombre ?? null,
     instagram: entry.instagram,
     facebook: entry.facebook,
+    instagramAcortado: acortado?.urlCorto ?? null,
     mensaje: null,
   };
 }

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import {
   crearLead,
+  modificarTelefonoLead,
   fetchBarrios,
   fetchLeads,
   fetchPromotores,
@@ -95,6 +96,12 @@ function AppShell() {
     }
   }, []);
 
+  const onModificarTelefonoLead = useCallback(async (leadId: string, telefono: string) => {
+    const updated = await modificarTelefonoLead(leadId, telefono);
+    setLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
+    setError('');
+  }, []);
+
   if (!usuario) {
     return <LoginPage onLogin={login} />;
   }
@@ -129,6 +136,7 @@ function AppShell() {
         barrios={barrios}
         onActualizarLead={onActualizarLead}
         onCrearLead={onCrearLead}
+        onModificarTelefonoLead={onModificarTelefonoLead}
         leadIdSeguimientoInicial={leadIdSeguimiento}
         onLeadSeguimientoConsumido={onLeadSeguimientoConsumido}
       />

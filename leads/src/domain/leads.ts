@@ -23,6 +23,13 @@ export function buildPromotoresFromLeads(leads: Lead[]): Promotor[] {
   return [...map.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
 
+/** Lead dado de alta desde la app (origen manual / @origen = 2 en encuesta). */
+export function leadEsCargaManual(lead: Lead): boolean {
+  if (lead.seguimiento?.fuente === 'app') return true;
+  const raw = String(lead.origenEncuesta ?? '').trim().toLowerCase();
+  return raw === '2' || raw.includes('manual') || raw.includes('app');
+}
+
 export function leadCompro(lead: Lead) {
   return lead.seguimiento?.resultadoEntrevista === 'compro';
 }

@@ -548,6 +548,17 @@ export function updateDemoLead(
   return { ...updated };
 }
 
+export function updateDemoLeadTelefono(leadId: string, telefono: string): Lead {
+  const lead = demoLeads.find((l) => l.id === leadId);
+  if (!lead) throw new Error('Lead no encontrado en demo');
+  if (lead.seguimiento?.fuente !== 'app') {
+    throw new Error('Solo podés modificar el teléfono de leads cargados manualmente desde la app.');
+  }
+  const updated = { ...lead, telefono: telefono.trim() };
+  demoLeads = demoLeads.map((l) => (l.id === leadId ? updated : l));
+  return { ...updated };
+}
+
 export function createDemoLead(data: NuevoLeadData): Lead {
   const now = new Date();
   const promotorNombre =

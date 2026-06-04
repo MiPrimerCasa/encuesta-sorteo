@@ -21,9 +21,11 @@
     "iniciar:api": "node server/index.js",
     "inspect:login": "node scripts/inspect-login-sp.js",
     "inspect:leads": "node scripts/inspect-leads-sp.js",
+    "inspect:links-redes": "node scripts/inspect-links-redes-sp.js",
     "generate:operadores": "node scripts/generate-operadores-planilla.mjs",
     "generate:links-redes": "node scripts/generate-operadores-planilla.mjs",
     "links:acortar": "node scripts/acortar-links-redes.mjs",
+    "links:actualizar-todos": "node scripts/actualizar-todos-links-instagram.mjs",
     "links:verificar": "node scripts/verificar-links-redes.mjs",
     "links:sheet-export": "node scripts/leer-sheet-instagram.mjs",
     "deploy:vps": "bash scripts/deploy-vps-remote.sh"

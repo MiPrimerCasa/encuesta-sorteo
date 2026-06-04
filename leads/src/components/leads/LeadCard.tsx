@@ -7,6 +7,7 @@ import {
   leadDerivaSupervisorTerreno,
   leadEnEntrevistaPendiente,
   leadReagendaEntrevista,
+  leadEsCargaManual,
   leadSeguimientoPijPromotor,
   leadSoloLecturaPromotor,
   leadSoloLecturaSupervisor,
@@ -32,6 +33,7 @@ interface LeadCardProps {
   ocultarPromotor?: boolean;
   rolUsuario?: RolUsuario;
   historial?: SeguimientoHistorialEntry[];
+  onModificarTelefono?: (lead: Lead) => void;
 }
 
 export function LeadCard({
@@ -45,6 +47,7 @@ export function LeadCard({
   ocultarPromotor = false,
   rolUsuario = 'supervisor',
   historial = [],
+  onModificarTelefono,
 }: LeadCardProps) {
   const compro = leadCompro(lead);
   const reagenda = leadReagendaEntrevista(lead);
@@ -73,8 +76,15 @@ export function LeadCard({
   const etiquetaSorteo = etiquetaCampania(lead.codigoCampania);
   const seguimientoPij = leadSeguimientoPijPromotor(lead);
   const cierreSupervisor = leadSoloLecturaPromotor(lead, historial);
-  const soloLectura =
-    (rolUsuario === 'supervisor' && leadSoloLecturaSupervisor(lead));
+  const soloLecturaSupervisor =
+    rolUsuario === 'supervisor' && leadSoloLecturaSupervisor(lead);
+  const soloLecturaPromotor =
+    rolUsuario === 'promotor' && cierreSupervisor;
+  const soloLectura = soloLecturaSupervisor || soloLecturaPromotor;
+  const mostrarModificarTelefono =
+    Boolean(onModificarTelefono) &&
+    leadEsCargaManual(lead) &&
+    !soloLectura;
   const nombrePromotor =
     lead.promotorNombre ?? getPromotorNombre(lead.promotorId, promotores);
 
@@ -161,6 +171,21 @@ export function LeadCard({
                 <span className="italic text-zinc-400">Sin teléfono en encuesta</span>
               )}
             </dd>
+            {mostrarModificarTelefono && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onModificarTelefono?.(lead);
+                }}
+                style={{ touchAction: 'manipulation' }}
+                className={`ml-2 text-[12px] font-semibold underline-offset-2 hover:underline ${
+                  esNoCompro ? 'text-brand-200' : 'text-brand-600'
+                }`}
+              >
+                Modificar número
+              </button>
+            )}
           </div>
           {!ocultarPromotor && (
             <div className="text-[13px]">

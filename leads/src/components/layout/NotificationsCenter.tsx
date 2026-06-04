@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fetchNotificacionesLinksRedes,
-  marcarNotificacionLinkAtendida,
+  marcarNotificacionLinkVista,
 } from '../../api/client';
 import type { NotificacionLinkRed } from '../../types';
 
@@ -16,7 +16,6 @@ export function NotificationsCenter({ rol }: NotificationsCenterProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
   const cargar = useCallback(async () => {
-    if (rol !== 'supervisor') return;
     setCargando(true);
     try {
       const data = await fetchNotificacionesLinksRedes();
@@ -26,14 +25,13 @@ export function NotificationsCenter({ rol }: NotificationsCenterProps) {
     } finally {
       setCargando(false);
     }
-  }, [rol]);
+  }, []);
 
   useEffect(() => {
-    if (rol !== 'supervisor') return;
     void cargar();
     const t = setInterval(() => void cargar(), 5 * 60 * 1000);
     return () => clearInterval(t);
-  }, [cargar, rol]);
+  }, [cargar]);
 
   useEffect(() => {
     if (!abierto) return;
@@ -46,14 +44,17 @@ export function NotificationsCenter({ rol }: NotificationsCenterProps) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [abierto]);
 
-  if (rol !== 'supervisor') return null;
-
   const total = items.length;
 
-  const atender = async (item: NotificacionLinkRed) => {
-    await marcarNotificacionLinkAtendida(item.codigo, item.red);
+  const marcarVisto = async (item: NotificacionLinkRed) => {
+    await marcarNotificacionLinkVista(item.id);
     setItems((prev) => prev.filter((x) => x.id !== item.id));
   };
+
+  const subtitulo =
+    rol === 'supervisor'
+      ? 'Instagram — actualizaciones de todo el equipo (promotores y supervisores)'
+      : 'Instagram — tu link único fue actualizado; copiá el nuevo en la bio';
 
   return (
     <div className="relative" ref={panelRef}>
@@ -84,46 +85,68 @@ export function NotificationsCenter({ rol }: NotificationsCenterProps) {
 
       {abierto && (
         <div
-          className="absolute right-0 top-full z-50 mt-2 w-[min(100vw-2rem,22rem)] rounded-xl border border-zinc-200 bg-white shadow-lg"
+          className="absolute right-0 top-full z-50 mt-2 w-[min(100vw-2rem,24rem)] rounded-xl border border-zinc-200 bg-white shadow-lg"
           role="dialog"
           aria-label="Notificaciones de links"
         >
           <div className="border-b border-zinc-100 px-4 py-3">
-            <p className="text-[14px] font-semibold text-zinc-900">Links de redes</p>
-            <p className="text-[12px] text-zinc-500">
-              Instagram — acortadores caídos; actualizá la bio o la planilla
-            </p>
+            <p className="text-[14px] font-semibold text-zinc-900">Links de Instagram</p>
+            <p className="text-[12px] text-zinc-500">{subtitulo}</p>
           </div>
 
-          <div className="max-h-[min(60vh,320px)] overflow-y-auto">
+          <div className="max-h-[min(60vh,360px)] overflow-y-auto">
             {cargando && items.length === 0 ? (
               <p className="px-4 py-6 text-center text-[13px] text-zinc-400">Cargando…</p>
             ) : items.length === 0 ? (
               <p className="px-4 py-6 text-center text-[13px] text-zinc-500">
-                No hay links pendientes de actualizar.
+                No hay avisos pendientes.
               </p>
             ) : (
               <ul className="divide-y divide-zinc-100">
                 {items.map((item) => (
                   <li key={item.id} className="px-4 py-3">
-                    <p className="text-[13px] font-semibold text-brand-800">
-                      {item.redLabel} · {item.vendedor}
-                    </p>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-[13px] font-semibold text-brand-800">
+                        {item.redLabel}
+                        {rol === 'supervisor' && (
+                          <span className="font-normal text-zinc-500">
+                            {' '}
+                            · {item.vendedor}
+                            {item.rolCatalogo ? ` (${item.rolCatalogo})` : ''}
+                          </span>
+                        )}
+                      </p>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                          item.esActualizado
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-amber-100 text-amber-900'
+                        }`}
+                      >
+                        {item.esActualizado ? 'Nuevo' : 'Revisar'}
+                      </span>
+                    </div>
                     <p className="mt-1 text-[12px] text-zinc-600">{item.mensaje}</p>
                     {item.urlCorto && (
-                      <p className="mt-1 break-all text-[11px] tabular-nums text-zinc-500">
+                      <p className="mt-2 break-all rounded-md bg-zinc-50 px-2 py-1.5 text-[11px] font-medium tabular-nums text-brand-800">
                         {item.urlCorto}
+                      </p>
+                    )}
+                    {item.urlCortoAnterior && item.esActualizado && (
+                      <p className="mt-1 break-all text-[10px] text-zinc-400 line-through">
+                        {item.urlCortoAnterior}
                       </p>
                     )}
                     {item.ultimoError && (
                       <p className="mt-1 text-[11px] text-amber-700">{item.ultimoError}</p>
                     )}
+                    <p className="mt-1 text-[10px] text-zinc-400">Código: {item.codigo}</p>
                     <button
                       type="button"
-                      onClick={() => void atender(item)}
+                      onClick={() => void marcarVisto(item)}
                       className="mt-2 text-[12px] font-semibold text-brand-600 hover:text-brand-800"
                     >
-                      Marcar como actualizado
+                      {item.esActualizado ? 'Entendido, ya actualicé la bio' : 'Marcar como visto'}
                     </button>
                   </li>
                 ))}

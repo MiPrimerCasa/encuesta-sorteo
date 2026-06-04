@@ -134,6 +134,8 @@ export interface Lead {
   fechaAlta?: string;
   /** Campaña / sorteo (`encuesta` en SQL: sorteo01, sorteo02, …). */
   codigoCampania?: string;
+  /** Valor columna `origen` de encuesta (ej. `2`, Manual, App). */
+  origenEncuesta?: string;
   /** Código @usuario del promotor en el SP (SORTEO01S21P01). */
   codigoPromotorCarga?: string;
   seguimiento: SeguimientoLead;
@@ -144,8 +146,12 @@ export interface LinksRedes {
   vendedor: string | null;
   instagram: string | null;
   facebook: string | null;
+  /** Link corto para bio de Instagram (único por código). */
+  instagramAcortado?: string | null;
   mensaje?: string | null;
 }
+
+export type TipoNotificacionLinkRed = 'link_actualizado' | 'link_requiere_accion';
 
 export interface NotificacionLinkRed {
   id: string;
@@ -153,11 +159,16 @@ export interface NotificacionLinkRed {
   vendedor: string;
   red: 'instagram';
   redLabel: string;
+  tipo: TipoNotificacionLinkRed;
+  rolCatalogo?: string | null;
   mensaje: string;
   urlLargo: string;
   urlCorto: string | null;
+  urlCortoAnterior?: string | null;
   ultimoError?: string | null;
   verificadoEn?: string | null;
+  esActualizado: boolean;
+  esAtencionRequerida: boolean;
 }
 
 export interface UsuarioSesion {

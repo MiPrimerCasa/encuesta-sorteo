@@ -17,15 +17,22 @@ import {
   CodigoPromotorCargaError,
   ContactoYaRegistradoError,
   crearEncuestaManual,
+  LeadNoEncontradoError,
+  LeadNoManualError,
+  modificarTelefonoLeadManual,
   resolveCargaEncuestaContext,
 } from './db/encuesta-carga.js';
 import { resolveLinksRedesParaUsuario } from './db/links-redes.js';
 import {
-  contarNotificacionesActivas,
-  listarNotificacionesActivas,
-  marcarNotificacionAtendida,
+  contarNotificacionesParaUsuario,
+  listarNotificacionesParaUsuario,
+  marcarNotificacionVista,
 } from './db/links-acortados-store.js';
-import { enriquecerUsuarioConCodigoCarga } from './db/operadores-catalog.js';
+import {
+  enriquecerUsuarioConCodigoCarga,
+  loadOperadoresCatalogAsync,
+} from './db/operadores-catalog.js';
+import { modificarTelefonoLeadSchema } from './schemas/modificar-telefono-lead.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
 import {
@@ -194,14 +201,8 @@ function registerApiRoutes(api) {
     if (!usuario) {
       return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
     }
-    if (usuario.rol !== 'supervisor') {
-      return res.status(403).json({
-        message: 'Las notificaciones de links solo están disponibles para supervisores.',
-      });
-    }
-
     try {
-      const items = listarNotificacionesActivas();
+      const items = listarNotificacionesParaUsuario(usuario);
       return res.json({
         total: items.length,
         items,
@@ -215,31 +216,23 @@ function registerApiRoutes(api) {
     }
   });
 
-  api.post('/notificaciones/links-redes/:codigo/:red/atendida', async (req, res) => {
+  api.post('/notificaciones/links-redes/:id/vista', async (req, res) => {
     if (!respondIfNotConfigured(res)) return;
 
     const usuario = usuarioDesdeRequest(req);
     if (!usuario) {
       return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
     }
-    if (usuario.rol !== 'supervisor') {
-      return res.status(403).json({ message: 'Solo supervisores.' });
+
+    const id = String(req.params.id || '').trim();
+    if (!id) {
+      return res.status(400).json({ message: 'Id de notificación inválido.' });
     }
 
-    const red = String(req.params.red || '').toLowerCase();
-    if (red !== 'instagram') {
-      return res.status(400).json({ message: 'Solo notificaciones de Instagram.' });
-    }
-
-    const codigo = String(req.params.codigo || '').trim();
-    if (!codigo) {
-      return res.status(400).json({ message: 'Código inválido.' });
-    }
-
-    marcarNotificacionAtendida(codigo, red);
+    marcarNotificacionVista(id, usuario.id);
     return res.json({
       ok: true,
-      total: contarNotificacionesActivas(),
+      total: contarNotificacionesParaUsuario(usuario),
     });
   });
 
@@ -252,10 +245,14 @@ function registerApiRoutes(api) {
     }
 
     try {
-      // Catálogo JSON (planilla): no requiere EXECUTE en encuestasMuestraOperador.
       const usuarioConCodigo = enriquecerUsuarioConCodigoCarga(usuario, []);
-      const links = resolveLinksRedesParaUsuario(usuarioConCodigo, []);
-      return res.json({ links, source: 'links-redes.json' });
+      const links = await resolveLinksRedesParaUsuario(usuarioConCodigo, []);
+      const catalog = await loadOperadoresCatalogAsync();
+      const source =
+        catalog.catalogSource === 'sql'
+          ? catalog.source ?? `STRSYSTEM.${process.env.SP_LINKS_REDES || 'rptLinkQRenRedesSociales'}`
+          : 'links-redes.json';
+      return res.json({ links, source });
     } catch (error) {
       console.error('Error al resolver links de redes:', error);
       return res.status(500).json({
@@ -343,15 +340,18 @@ function registerApiRoutes(api) {
       getDb();
       const context = await resolveCargaEncuestaContext(usuario);
       const usuarioEnriquecido = enriquecerUsuarioConCodigoCarga(usuario, context.rows);
-      const lead = await crearEncuestaManual(parsed.data, usuarioEnriquecido, {
+      const { lead, actualizado } = await crearEncuestaManual(parsed.data, usuarioEnriquecido, {
         promotorNombre:
           usuario.rol === 'promotor'
             ? usuario.nombre
             : String(req.headers['x-promotor-nombre'] || '').trim() || undefined,
       });
-      return res.status(201).json({
-        message: 'Lead cargado correctamente.',
+      return res.status(actualizado ? 200 : 201).json({
+        message: actualizado
+          ? 'Lead actualizado correctamente.'
+          : 'Lead cargado correctamente.',
         lead,
+        actualizado: Boolean(actualizado),
       });
     } catch (error) {
       if (error instanceof CodigoPromotorCargaError) {
@@ -376,6 +376,56 @@ function registerApiRoutes(api) {
       console.error('Error al cargar lead manual:', error);
       return res.status(500).json({
         message: 'No se pudo cargar el lead.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
+  api.patch('/leads/:id/telefono', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const parsed = modificarTelefonoLeadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: 'Teléfono inválido.',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+
+    const leadId = String(req.params.id || '').trim();
+    if (!leadId) {
+      return res.status(400).json({ message: 'Id de lead inválido.' });
+    }
+
+    try {
+      getDb();
+      const lead = await modificarTelefonoLeadManual(
+        leadId,
+        parsed.data.telefono,
+        usuario,
+      );
+      return res.json({
+        message: 'Teléfono actualizado correctamente.',
+        lead,
+      });
+    } catch (error) {
+      if (error instanceof LeadNoEncontradoError) {
+        return res.status(404).json({ message: error.message, code: error.code });
+      }
+      if (error instanceof LeadNoManualError) {
+        return res.status(403).json({ message: error.message, code: error.code });
+      }
+      if (error instanceof ContactoYaRegistradoError) {
+        return res.status(409).json({ message: error.message, code: error.code });
+      }
+      console.error('Error al modificar teléfono:', error);
+      return res.status(500).json({
+        message: 'No se pudo modificar el teléfono.',
         detail: error instanceof Error ? error.message : 'Error desconocido',
       });
     }

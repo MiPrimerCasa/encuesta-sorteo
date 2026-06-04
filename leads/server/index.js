@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createApp, getAppBasePath } from './create-app.js';
 import { getDb } from './db/sqlite.js';
 import { isSqlServerConfigured } from './db/mssql.js';
+import { warmOperadoresCatalog } from './db/operadores-catalog.js';
 
 const PORT = Number(process.env.PORT || process.env.API_PORT || 3001);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -27,6 +28,22 @@ app.listen(PORT, () => {
     console.log(
       `  Seguimiento → ${process.env.SP_SEGUIMIENTO || '(SQLite local)'} @ ${process.env.ENCUESTAS_DB_NAME || process.env.DB_NAME}`,
     );
+    const linksSp = process.env.SP_LINKS_REDES || 'rptLinkQRenRedesSociales';
+    const linksSrc = (process.env.LINKS_REDES_SOURCE || 'sql').toLowerCase();
+    console.log(
+      `  Links redes → ${linksSrc === 'json' ? 'links-redes.json' : `dbo.${linksSp.replace(/^dbo\./i, '')}`} @ ${process.env.DB_NAME}`,
+    );
+    warmOperadoresCatalog()
+      .then((catalog) => {
+        const n = Object.keys(catalog.byCodigo ?? {}).length;
+        console.log(`  Links redes cargados: ${n} códigos (${catalog.catalogSource ?? '?'})`);
+      })
+      .catch((err) => {
+        console.warn(
+          '  Links redes preload:',
+          err instanceof Error ? err.message : err,
+        );
+      });
     console.log(`  Health rápido → ${base}api/health/live`);
   } else {
     console.error('FALTA .env: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME — no hay modo demo.');

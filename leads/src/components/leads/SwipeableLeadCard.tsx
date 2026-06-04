@@ -25,6 +25,7 @@ interface Props {
   rolUsuario?: RolUsuario;
   onQuickSave: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
   historial?: SeguimientoHistorialEntry[];
+  onModificarTelefono?: (lead: Lead) => void;
 }
 
 export function SwipeableLeadCard({
@@ -39,6 +40,7 @@ export function SwipeableLeadCard({
   rolUsuario = 'promotor',
   onQuickSave,
   historial = [],
+  onModificarTelefono,
 }: Props) {
   const [offset, setOffset] = useState(0);
   const [revealed, setRevealed] = useState(false);
@@ -285,6 +287,7 @@ export function SwipeableLeadCard({
             ocultarPromotor={ocultarPromotor}
             rolUsuario={rolUsuario}
             historial={historial}
+            onModificarTelefono={onModificarTelefono}
           />
         </div>
       </div>

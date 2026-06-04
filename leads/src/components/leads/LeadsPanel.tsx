@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import {
   leadCompro,
   leadReagendaEntrevista,
@@ -99,6 +100,15 @@ export function LeadsPanel({
   leadIdSeguimientoInicial,
   onLeadSeguimientoConsumido,
 }: LeadsPanelProps) {
+  const { usuario } = useAuth();
+  const codigoCargaFallback = useMemo(() => {
+    if (!usuario || rolUsuario !== 'promotor') return undefined;
+    if (usuario.codigoCarga?.trim()) return usuario.codigoCarga.trim();
+    const idOp = String(usuario.idOperador ?? usuario.id ?? '').trim();
+    const propio = leads.find((l) => String(l.idVendedor ?? '') === idOp);
+    return propio?.codigoPromotorCarga?.trim();
+  }, [usuario, rolUsuario, leads]);
+
   const {
     entrevistaPendiente,
     paraContactar,
@@ -442,6 +452,7 @@ export function LeadsPanel({
         open={agendarAbierto}
         rolUsuario={rolUsuario}
         promotores={promotores}
+        codigoCargaFallback={codigoCargaFallback}
         direccionOficinas={direccionOficinas}
         onClose={() => setAgendarAbierto(false)}
         onSave={onCrearLead}

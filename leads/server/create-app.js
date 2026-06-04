@@ -5,12 +5,6 @@ import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  CargaEncuestaSinPersistirError,
-  CodigoPromotorCargaError,
-  ContactoYaRegistradoError,
-  crearEncuestaManual,
-} from './db/encuesta-carga.js';
-import {
   buildPromotoresFromLeads,
   enrichOperadorRolDesdeEncuestas,
   fetchEncuestasMuestraRaw,
@@ -18,6 +12,13 @@ import {
   resolveDireccionOficinasSupervisor,
   updateLeadSeguimientoEncuesta,
 } from './db/encuestas.js';
+import {
+  CargaEncuestaSinPersistirError,
+  CodigoPromotorCargaError,
+  ContactoYaRegistradoError,
+  crearEncuestaManual,
+  resolveCargaEncuestaContext,
+} from './db/encuesta-carga.js';
 import { resolveLinksRedesParaUsuario } from './db/links-redes.js';
 import { enriquecerUsuarioConCodigoCarga } from './db/operadores-catalog.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
@@ -98,6 +99,19 @@ function registerApiRoutes(api) {
         return res.status(401).json({ message: 'Usuario o contraseña incorrectos.' });
       }
       user = await enrichOperadorRolDesdeEncuestas(user);
+      try {
+        const rowsLogin = await fetchEncuestasMuestraRaw({
+          id: user.id,
+          nombre: user.nombre,
+          rol: user.rol,
+        });
+        user = enriquecerUsuarioConCodigoCarga(user, rowsLogin);
+      } catch (err) {
+        console.warn(
+          'codigoCarga desde encuestas no disponible en login:',
+          err instanceof Error ? err.message : err,
+        );
+      }
       return res.json({
         token: `sql-${user.id}`,
         usuario: {
@@ -154,7 +168,7 @@ function registerApiRoutes(api) {
             ? {
                 seguimientoSinPermisoLectura: true,
                 avisoSeguimiento:
-                  'Falta permiso SELECT en registrarSeguimientoLead: los leads se muestran sin estado de seguimiento guardado.',
+                  'No se puede leer el seguimiento guardado (falta EXECUTE en SP_HistorialSeguimientoLead / SP_UltimoSeguimientoOperador, o SELECT en la tabla). Tras F5 los leads vuelven al estado de la encuesta.',
               }
             : {}),
         },
@@ -264,7 +278,9 @@ function registerApiRoutes(api) {
 
     try {
       getDb();
-      const lead = await crearEncuestaManual(parsed.data, usuario, {
+      const context = await resolveCargaEncuestaContext(usuario);
+      const usuarioEnriquecido = enriquecerUsuarioConCodigoCarga(usuario, context.rows);
+      const lead = await crearEncuestaManual(parsed.data, usuarioEnriquecido, {
         promotorNombre:
           usuario.rol === 'promotor'
             ? usuario.nombre

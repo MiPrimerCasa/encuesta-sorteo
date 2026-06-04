@@ -131,6 +131,8 @@ export interface Lead {
   fechaAlta?: string;
   /** Campaña / sorteo (`encuesta` en SQL: sorteo01, sorteo02, …). */
   codigoCampania?: string;
+  /** Código @usuario del promotor en el SP (SORTEO01S21P01). */
+  codigoPromotorCarga?: string;
   seguimiento: SeguimientoLead;
 }
 

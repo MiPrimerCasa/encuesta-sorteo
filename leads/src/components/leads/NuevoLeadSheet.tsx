@@ -8,6 +8,8 @@ interface NuevoLeadSheetProps {
   open: boolean;
   rolUsuario: RolUsuario;
   promotores: Promotor[];
+  /** Código @usuario del SP (desde sesión o leads propios del promotor). */
+  codigoCargaFallback?: string;
   /** Dirección oficinas del supervisor (desde SP muestra / landing). */
   direccionOficinas?: string;
   onClose: () => void;
@@ -59,6 +61,7 @@ export function NuevoLeadSheet({
   open,
   rolUsuario,
   promotores,
+  codigoCargaFallback,
   direccionOficinas,
   onClose,
   onSave,
@@ -135,17 +138,20 @@ export function NuevoLeadSheet({
       }
     }
 
-    const promotorSel = esSupervisor ? undefined : promotores.find((p) => p.id === promotorId);
+    const idOperador = String(usuario.idOperador ?? usuario.id ?? '').trim();
+    const promotorSel = esSupervisor
+      ? undefined
+      : promotores.find(
+          (p) =>
+            p.id === promotorId ||
+            String(p.idVendedor ?? '') === promotorId ||
+            String(p.idVendedor ?? '') === idOperador,
+        );
     const promotorCodigo =
-      usuario.codigoCarga?.trim() || promotorSel?.codigoCarga?.trim();
-    if (!promotorCodigo) {
-      setError(
-        esSupervisor
-          ? 'No se encontró tu código de carga. Volvé a iniciar sesión o contactá soporte.'
-          : 'No se encontró tu código de promotor para la carga. Volvé a iniciar sesión.',
-      );
-      return;
-    }
+      usuario.codigoCarga?.trim() ||
+      codigoCargaFallback?.trim() ||
+      promotorSel?.codigoCarga?.trim() ||
+      undefined;
 
     setSaving(true);
     setError('');

@@ -444,7 +444,17 @@ export function buildCodigoPromotorIndex(encuestaRows = []) {
 export function resolveCodigoCargaPorPromotor(encuestaRows, promotorNombre, idVendedor) {
   const index = buildCodigoPromotorIndex(encuestaRows);
   const key = `${idVendedor ?? ''}|${normalizeNombre(promotorNombre ?? '')}`;
-  return index.get(key)?.codigoCarga ?? index.get(`|${normalizeNombre(promotorNombre ?? '')}`)?.codigoCarga;
+  const byKey = index.get(key)?.codigoCarga;
+  if (byKey) return byKey;
+  const byNombre = index.get(`|${normalizeNombre(promotorNombre ?? '')}`)?.codigoCarga;
+  if (byNombre) return byNombre;
+  if (idVendedor != null && String(idVendedor).trim() !== '') {
+    const prefix = `${idVendedor}|`;
+    for (const [k, v] of index) {
+      if (k.startsWith(prefix)) return v.codigoCarga;
+    }
+  }
+  return undefined;
 }
 
 function pickDomicilioEncuestaRow(row) {

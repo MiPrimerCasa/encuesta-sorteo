@@ -19,6 +19,14 @@ function IconInstagram({ className }: { className?: string }) {
   );
 }
 
+function IconTikTok({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.27 6.27 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.34-6.34V8.69a8.18 8.18 0 004.78 1.52V6.76a4.85 4.85 0 01-1.01-.07z" />
+    </svg>
+  );
+}
+
 function IconWhatsApp({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -44,7 +52,7 @@ async function abrirCompartir(url: string) {
 interface CompartirButtonProps {
   url: string;
   ariaLabel: string;
-  icon: 'facebook' | 'instagram' | 'whatsapp';
+  icon: 'facebook' | 'instagram' | 'whatsapp' | 'tiktok';
 }
 
 function CompartirButton({ url, ariaLabel, icon }: CompartirButtonProps) {
@@ -53,7 +61,9 @@ function CompartirButton({ url, ariaLabel, icon }: CompartirButtonProps) {
       ? 'border-fuchsia-600 bg-gradient-to-br from-purple-600 via-fuchsia-600 to-orange-500'
       : icon === 'facebook'
         ? 'border-blue-700 bg-[#1877F2]'
-        : 'border-emerald-600 bg-[#25D366]';
+        : icon === 'tiktok'
+          ? 'border-zinc-800 bg-black'
+          : 'border-emerald-600 bg-[#25D366]';
 
   return (
     <button
@@ -67,6 +77,7 @@ function CompartirButton({ url, ariaLabel, icon }: CompartirButtonProps) {
       {icon === 'instagram' && <IconInstagram className="h-6 w-6" />}
       {icon === 'facebook' && <IconFacebook className="h-6 w-6" />}
       {icon === 'whatsapp' && <IconWhatsApp className="h-6 w-6" />}
+      {icon === 'tiktok' && <IconTikTok className="h-6 w-6" />}
     </button>
   );
 }
@@ -111,6 +122,7 @@ export function LinksRedesSection({ className = 'mb-5' }: LinksRedesSectionProps
             instagram: null,
             facebook: null,
             whatsapp: null,
+            tiktok: null,
             mensaje: detalle,
           });
         }
@@ -137,7 +149,9 @@ export function LinksRedesSection({ className = 'mb-5' }: LinksRedesSectionProps
 
   if (!links) return null;
 
-  const tieneLinks = Boolean(links.instagram || links.facebook || links.whatsapp);
+  const tieneLinks = Boolean(
+    links.instagram || links.facebook || links.whatsapp || links.tiktok,
+  );
 
   return (
     <section
@@ -146,17 +160,6 @@ export function LinksRedesSection({ className = 'mb-5' }: LinksRedesSectionProps
       <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
         Links para compartir en redes
       </p>
-
-      {links.instagramAcortado && (
-        <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800">
-            Link corto para bio de Instagram
-          </p>
-          <p className="mt-1 break-all text-[12px] font-medium tabular-nums text-emerald-900">
-            {links.instagramAcortado}
-          </p>
-        </div>
-      )}
 
       {tieneLinks ? (
         <div className="flex gap-3">
@@ -179,6 +182,13 @@ export function LinksRedesSection({ className = 'mb-5' }: LinksRedesSectionProps
               url={links.whatsapp}
               ariaLabel="Compartir link de WhatsApp"
               icon="whatsapp"
+            />
+          )}
+          {links.tiktok && (
+            <CompartirButton
+              url={links.tiktok}
+              ariaLabel="Compartir link de TikTok"
+              icon="tiktok"
             />
           )}
         </div>

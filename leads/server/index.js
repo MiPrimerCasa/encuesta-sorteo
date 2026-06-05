@@ -5,6 +5,7 @@ import { createApp, getAppBasePath } from './create-app.js';
 import { getDb } from './db/sqlite.js';
 import { isSqlServerConfigured } from './db/mssql.js';
 import { warmOperadoresCatalog } from './db/operadores-catalog.js';
+import { isLinksAcortadorEnabled } from './db/links-acortador.js';
 import { startLinksInstagramScheduler } from './jobs/links-instagram-job.js';
 
 const PORT = Number(process.env.PORT || process.env.API_PORT || 3001);
@@ -45,7 +46,11 @@ app.listen(PORT, () => {
           err instanceof Error ? err.message : err,
         );
       });
-    startLinksInstagramScheduler();
+    if (isLinksAcortadorEnabled()) {
+      startLinksInstagramScheduler();
+    } else {
+      console.log('  Links acortador → deshabilitado (links directos desde SP)');
+    }
     console.log(`  Health rápido → ${base}api/health/live`);
   } else {
     console.error('FALTA .env: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME — no hay modo demo.');

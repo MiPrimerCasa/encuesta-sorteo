@@ -47,6 +47,7 @@ const CANAL_POR_RED = {
   instagram: 'INSTAGRAM',
   facebook: 'FACEBOOK',
   whatsapp: 'WHATSAPP',
+  tiktok: 'TIKTOK',
 };
 
 function urlRedFromRow(row, red) {
@@ -77,6 +78,7 @@ function mapRowToEntry(row) {
   let instagram = urlRedFromRow(row, 'instagram');
   let facebook = urlRedFromRow(row, 'facebook');
   let whatsapp = urlRedFromRow(row, 'whatsapp');
+  let tiktok = urlRedFromRow(row, 'tiktok');
 
   let codigo = compactarCodigoSorteo(
     pickField(
@@ -98,12 +100,14 @@ function mapRowToEntry(row) {
   if (!codigo && instagram) codigo = extractCodigoFromWaUrl(instagram);
   if (!codigo && facebook) codigo = extractCodigoFromWaUrl(facebook);
   if (!codigo && whatsapp) codigo = extractCodigoFromWaUrl(whatsapp);
+  if (!codigo && tiktok) codigo = extractCodigoFromWaUrl(tiktok);
   if (!codigo) return null;
 
   const phone =
     waPhoneFromUrl(instagram) ??
     waPhoneFromUrl(facebook) ??
     waPhoneFromUrl(whatsapp) ??
+    waPhoneFromUrl(tiktok) ??
     process.env.WA_PHONE ??
     WA_PHONE_DEFAULT;
 
@@ -115,6 +119,9 @@ function mapRowToEntry(row) {
   }
   if (!whatsapp) {
     whatsapp = buildWaMeUrl(phone, codigo, 'whatsapp');
+  }
+  if (!tiktok) {
+    tiktok = buildWaMeUrl(phone, codigo, 'tiktok');
   }
 
   const vendedor =
@@ -146,6 +153,7 @@ function mapRowToEntry(row) {
     instagram,
     facebook,
     whatsapp,
+    tiktok,
   };
 }
 

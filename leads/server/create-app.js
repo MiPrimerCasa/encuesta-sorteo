@@ -22,6 +22,7 @@ import {
   modificarTelefonoLeadManual,
   resolveCargaEncuestaContext,
 } from './db/encuesta-carga.js';
+import { isLinksAcortadorEnabled } from './db/links-acortador.js';
 import { resolveLinksRedesParaUsuario } from './db/links-redes.js';
 import {
   contarNotificacionesParaUsuario,
@@ -207,6 +208,9 @@ function registerApiRoutes(api) {
       return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
     }
     try {
+      if (!isLinksAcortadorEnabled()) {
+        return res.json({ total: 0, items: [] });
+      }
       const usuarioConCodigo = enriquecerUsuarioConCodigoCarga(usuario, []);
       const items = listarNotificacionesParaUsuario(usuarioConCodigo);
       return res.json({
@@ -235,10 +239,12 @@ function registerApiRoutes(api) {
       return res.status(400).json({ message: 'Id de notificación inválido.' });
     }
 
-    marcarNotificacionVista(id, usuario.id);
+    if (isLinksAcortadorEnabled()) {
+      marcarNotificacionVista(id, usuario.id);
+    }
     return res.json({
       ok: true,
-      total: contarNotificacionesParaUsuario(usuario),
+      total: isLinksAcortadorEnabled() ? contarNotificacionesParaUsuario(usuario) : 0,
     });
   });
 

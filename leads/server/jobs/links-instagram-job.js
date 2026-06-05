@@ -1,3 +1,4 @@
+import { isLinksAcortadorEnabled } from '../db/links-acortador.js';
 import { isSqlServerConfigured } from '../db/mssql.js';
 import {
   ejecutarBootstrapLinksInstagram,
@@ -13,7 +14,8 @@ let weeklyTimer = null;
 let jobRunning = false;
 
 function isJobEnabled() {
-  const flag = String(process.env.LINKS_JOB_ENABLED ?? 'true').trim().toLowerCase();
+  if (!isLinksAcortadorEnabled()) return false;
+  const flag = String(process.env.LINKS_JOB_ENABLED ?? 'false').trim().toLowerCase();
   if (flag === 'false' || flag === '0' || flag === 'off') return false;
   return isSqlServerConfigured();
 }

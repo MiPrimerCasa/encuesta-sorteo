@@ -21,6 +21,7 @@ const CANAL_POR_RED = {
   instagram: 'INSTAGRAM',
   facebook: 'FACEBOOK',
   whatsapp: 'WHATSAPP',
+  tiktok: 'TIKTOK',
 };
 
 export function buildMensajeLinkRedes(codigoCompacto, red) {

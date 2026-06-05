@@ -27,6 +27,8 @@
     "links:acortar": "node scripts/acortar-links-redes.mjs",
     "links:actualizar-todos": "node scripts/actualizar-todos-links-instagram.mjs",
     "links:verificar": "node scripts/verificar-links-redes.mjs",
+    "links:export-prueba": "node scripts/export-links-redes-prueba.mjs",
+    "links:export-prueba:verificar": "node scripts/export-links-redes-prueba.mjs --verificar",
     "links:sheet-export": "node scripts/leer-sheet-instagram.mjs",
     "deploy:vps": "bash scripts/deploy-vps-remote.sh"
   },
@@ -53,6 +55,7 @@
     "concurrently": "^10.0.0",
     "tailwindcss": "^4.1.8",
     "typescript": "~5.8.3",
-    "vite": "^7.0.0"
+    "vite": "^7.0.0",
+    "xlsx": "^0.18.5"
   }
 }

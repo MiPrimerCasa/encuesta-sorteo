@@ -182,7 +182,8 @@ export interface LinksRedes {
   instagram: string | null;
   facebook: string | null;
   whatsapp: string | null;
-  /** Link corto para bio de Instagram (único por código). */
+  tiktok: string | null;
+  /** Link corto legacy (solo si LINKS_ACORTADOR_ENABLED=true). */
   instagramAcortado?: string | null;
   mensaje?: string | null;
 }

@@ -3,6 +3,7 @@ import {
   normalizeCodigoCatalog,
   resolveCodigoCargaOperador,
 } from './operadores-catalog.js';
+import { isLinksAcortadorEnabled } from './links-acortador.js';
 import { getAcortadoParaCodigo } from './links-acortados-store.js';
 import { buildWaMeUrl } from './whatsapp-link-text.js';
 
@@ -15,15 +16,27 @@ function waPhoneFromUrl(url) {
   return m?.[1] ?? null;
 }
 
+function waPhoneFromEntry(entry) {
+  return (
+    waPhoneFromUrl(entry?.instagram) ??
+    waPhoneFromUrl(entry?.facebook) ??
+    waPhoneFromUrl(entry?.whatsapp) ??
+    waPhoneFromUrl(entry?.tiktok) ??
+    process.env.WA_PHONE ??
+    WA_PHONE_DEFAULT
+  );
+}
+
 function resolveWhatsappLink(entry) {
   if (entry?.whatsapp?.startsWith('http')) return entry.whatsapp;
   if (!entry?.codigo) return null;
-  const phone =
-    waPhoneFromUrl(entry.instagram) ??
-    waPhoneFromUrl(entry.facebook) ??
-    process.env.WA_PHONE ??
-    WA_PHONE_DEFAULT;
-  return buildWaMeUrl(phone, entry.codigo, 'whatsapp');
+  return buildWaMeUrl(waPhoneFromEntry(entry), entry.codigo, 'whatsapp');
+}
+
+function resolveTiktokLink(entry) {
+  if (entry?.tiktok?.startsWith('http')) return entry.tiktok;
+  if (!entry?.codigo) return null;
+  return buildWaMeUrl(waPhoneFromEntry(entry), entry.codigo, 'tiktok');
 }
 
 /**
@@ -49,6 +62,7 @@ export async function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows =
       instagram: null,
       facebook: null,
       whatsapp: null,
+      tiktok: null,
       mensaje:
         'No se encontró tu código de promotor (ej. SORTEO01S21P01). Volvé a iniciar sesión o contactá soporte.',
     };
@@ -61,16 +75,19 @@ export async function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows =
       instagram: null,
       facebook: null,
       whatsapp: null,
+      tiktok: null,
       mensaje: `No hay links de redes cargados para el código ${codigo}. Pedí a administración que actualice la planilla.`,
     };
   }
-  const acortado = getAcortadoParaCodigo(entry.codigo, 'instagram');
+  const acortado =
+    isLinksAcortadorEnabled() ? getAcortadoParaCodigo(entry.codigo, 'instagram') : null;
   return {
     codigo: entry.codigo,
     vendedor: entry.vendedor ?? usuarioSesion?.nombre ?? null,
     instagram: entry.instagram,
     facebook: entry.facebook,
     whatsapp: resolveWhatsappLink(entry),
+    tiktok: resolveTiktokLink(entry),
     instagramAcortado: acortado?.urlCorto ?? null,
     mensaje: null,
   };

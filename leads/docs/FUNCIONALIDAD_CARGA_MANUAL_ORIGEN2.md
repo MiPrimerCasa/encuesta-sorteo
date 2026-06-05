@@ -38,12 +38,24 @@ También: `@telefono`, `@encuesta`, `@origen` = `'2'`, `@usuario` = código prom
 
 ## Modificar número (SP exclusivo)
 
-**SP:** `[dbo].[encuestaModificarSorteo01]` — script DBA: `sql/encuestaModificarSorteo01.sql`
+**SP:** `[dbo].[encuestaSorteo01Update]` — script DBA: `sql/encuestaSorteo01Update.sql`  
+(Sustituye `encuestaModificarSorteo01`.)
 
 | Capa | Qué hace |
 |------|----------|
-| `execEncuestaModificarSorteo01` | `PATCH /api/leads/:id/telefono` — `@idEncuesta` + teléfono nuevo + campos 1–8 |
+| `execEncuestaSorteo01Update` | `PATCH /api/leads/:id/telefono` — `@id` + teléfono + campos 1–8 + `@origen` |
 | Validación app | Solo leads manuales; teléfono nuevo no puede pertenecer a otro lead |
+
+Parámetros clave del SP:
+
+| Parámetro | App envía |
+|-----------|-----------|
+| `@id` | `lead.id` (PK encuesta) |
+| `@telefono`, `@encuesta`, `@usuario` | Igual que carga |
+| `@origen` | `'2'` (manual/app) |
+| `@campo1Valor` … `@campo8Valor` | Nombre, domicilio, Conoce MPC, PIJ, asesoramiento, entrevista |
+
+Retorno: `SELECT codigo, mensaje` — `codigo = 1` OK, `codigo = 0` error.
 
 `encuestaCargaSorteo01` **no** se usa para cambiar teléfono A → B.
 
@@ -51,7 +63,7 @@ También: `@telefono`, `@encuesta`, `@origen` = `'2'`, `@usuario` = código prom
 
 ```env
 SP_CARGA_ENCUESTA=encuestaCargaSorteo01
-SP_MODIFICAR_ENCUESTA=encuestaModificarSorteo01
+SP_MODIFICAR_ENCUESTA=encuestaSorteo01Update
 SP_CARGA_INCLUDE_ORIGEN=true
 ENCUESTA_CARGA_ID=sorteo01
 ```

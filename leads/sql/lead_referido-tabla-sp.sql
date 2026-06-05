@@ -195,18 +195,17 @@ BEGIN
   BEGIN TRY
     BEGIN TRAN;
 
-    -- Alta/upsert en encuesta (mismo SP que carga manual)
-    DECLARE @campo3 NVARCHAR(200) = LEFT(N'Referido de lead #' + CAST(@id_encuesta_origen AS NVARCHAR(20)), 200);
-    DECLARE @campo4 NVARCHAR(200) = LEFT(N'Raíz #' + CAST(@id_raiz AS NVARCHAR(20)), 200);
-
+    -- Alta/upsert en encuesta (mismo SP que carga manual).
+    -- campo3 = Conoce MPC, campo4 = pregunta PIJ — NO usar para metadatos de referido
+    -- (el vínculo padre/raíz vive solo en dbo.lead_referido).
     EXEC dbo.encuestaCargaSorteo01
       @telefono = @tel_norm,
       @encuesta = @encuesta,
       @usuario = @usuario,
       @campo1Codigo = 1, @campo1Valor = @nombre_trim,
       @campo2Codigo = 2, @campo2Valor = @campo2_valor,
-      @campo3Codigo = 3, @campo3Valor = @campo3,
-      @campo4Codigo = 4, @campo4Valor = @campo4,
+      @campo3Codigo = 3, @campo3Valor = NULL,
+      @campo4Codigo = 4, @campo4Valor = NULL,
       @campo5Codigo = 5, @campo5Valor = N'NO',
       @campo6Codigo = 6, @campo6Valor = N'',
       @campo7Codigo = 7, @campo7Valor = N'',

@@ -109,6 +109,19 @@ Flujo interno:
 4. `INSERT lead_referido`.
 5. Retorna `id_encuesta_referido`, `codigo`, `gestionCodigo`, `mensaje`.
 
+**Importante — campos de encuesta:** en `encuestaCargaSorteo01`, `campo3` = «Conoce MPC» y `campo4` = pregunta PIJ («Sabías que con 55.000…»). **No** guardar ahí «Referido de…» ni «Raíz #…». Esos datos van solo en `lead_referido` (`id_encuesta_origen`, `id_encuesta_raiz`, `nivel`). La app muestra badge **Referido** vía `SP_ObtenerMetaReferidosLead`.
+
+Si quedaron filas de prueba con texto en campo3/campo4, el DBA puede limpiarlas (ajustar nombres de columnas según esquema real):
+
+```sql
+-- Ejemplo: referidos creados antes del fix (campo3/4 con texto de referido)
+UPDATE e SET campo3Valor = NULL, campo4Valor = NULL
+FROM dbo.encuesta e
+INNER JOIN dbo.lead_referido lr ON lr.id_encuesta_referido = e.id
+WHERE e.campo3Valor LIKE N'Referido de lead #%'
+   OR e.campo4Valor LIKE N'Raíz #%';
+```
+
 ---
 
 ## SP `SP_ObtenerMetaReferidosLead` (consulta para la app)

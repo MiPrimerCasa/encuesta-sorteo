@@ -1,38 +1,8 @@
 /*
-============================================================================
- DBA — SP exclusivo: modificar datos de leads manuales ya existentes
-============================================================================
+ Obsoleto — reemplazado por encuestaSorteo01Update (sql/encuestaSorteo01Update.sql).
+ La app usa SP_MODIFICAR_ENCUESTA=encuestaSorteo01Update
 
- Nombre sugerido: [dbo].[encuestaModificarSorteo01]
- Base: STRSYSTEM
-
- La app lo usa en PATCH /api/leads/:id/telefono (botón "Modificar número").
- NO reemplaza encuestaCargaSorteo01 (alta / re-guardar con mismo teléfono).
-
- Parámetros que envía la API (execEncuestaModificarSorteo01):
-
-   @idEncuesta   = id del lead en tabla encuesta (leadId del CRM)
-   @telefono     = teléfono NUEVO (o el mismo si solo cambian otros campos)
-   @encuesta     = sorteo01 / sorteo02 ...
-   @usuario      = código promotor (ej. SORTEO01S21P01)
-   @campo1Valor  = nombre
-   @campo2Valor  = domicilio
-   @campo3/4     = NULL en manual
-   @campo5Valor  = 'NO'
-   @campo6/7/8   = entrevista (fecha, modo, dirección) o vacío
-
- Retorno (igual que encuestaCargaSorteo01):
-   SELECT codigo, mensaje
-   codigo = 1 → OK
-   codigo = 0 → error (lead no encontrado, no es origen 2, teléfono duplicado)
-
- Permiso app:
-   GRANT EXECUTE ON dbo.encuestaModificarSorteo01 TO [MPCSP];
-
- Variable en la app:
-   SP_MODIFICAR_ENCUESTA=encuestaModificarSorteo01
-
-============================================================================
+ El script de abajo se conserva solo como referencia histórica.
 */
 
 USE [STRSYSTEM]

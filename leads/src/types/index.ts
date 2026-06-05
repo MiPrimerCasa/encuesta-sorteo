@@ -136,6 +136,8 @@ export interface Lead {
   /** Valor columna `usuario` del SP (= código promotor en QR, no PK). */
   encuestaUsuario?: string;
   idVendedor?: string | number;
+  /** idSupervisor del listado (JOIN en encuestasMuestraOperador, no columna encuesta). */
+  idSupervisor?: string | number;
   nombre: string;
   telefono: string;
   promotorId: string;
@@ -179,6 +181,7 @@ export interface LinksRedes {
   vendedor: string | null;
   instagram: string | null;
   facebook: string | null;
+  whatsapp: string | null;
   /** Link corto para bio de Instagram (único por código). */
   instagramAcortado?: string | null;
   mensaje?: string | null;

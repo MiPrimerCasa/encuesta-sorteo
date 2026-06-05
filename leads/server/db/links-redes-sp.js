@@ -43,8 +43,14 @@ function waPhoneFromUrl(url) {
   return m?.[1] ?? null;
 }
 
+const CANAL_POR_RED = {
+  instagram: 'INSTAGRAM',
+  facebook: 'FACEBOOK',
+  whatsapp: 'WHATSAPP',
+};
+
 function urlRedFromRow(row, red) {
-  const canal = red === 'instagram' ? 'INSTAGRAM' : 'FACEBOOK';
+  const canal = CANAL_POR_RED[red] ?? String(red).toUpperCase();
   const direct = pickField(
     row,
     red,
@@ -70,6 +76,7 @@ function urlRedFromRow(row, red) {
 function mapRowToEntry(row) {
   let instagram = urlRedFromRow(row, 'instagram');
   let facebook = urlRedFromRow(row, 'facebook');
+  let whatsapp = urlRedFromRow(row, 'whatsapp');
 
   let codigo = compactarCodigoSorteo(
     pickField(
@@ -90,11 +97,13 @@ function mapRowToEntry(row) {
   );
   if (!codigo && instagram) codigo = extractCodigoFromWaUrl(instagram);
   if (!codigo && facebook) codigo = extractCodigoFromWaUrl(facebook);
+  if (!codigo && whatsapp) codigo = extractCodigoFromWaUrl(whatsapp);
   if (!codigo) return null;
 
   const phone =
     waPhoneFromUrl(instagram) ??
     waPhoneFromUrl(facebook) ??
+    waPhoneFromUrl(whatsapp) ??
     process.env.WA_PHONE ??
     WA_PHONE_DEFAULT;
 
@@ -103,6 +112,9 @@ function mapRowToEntry(row) {
   }
   if (!facebook) {
     facebook = buildWaMeUrl(phone, codigo, 'facebook');
+  }
+  if (!whatsapp) {
+    whatsapp = buildWaMeUrl(phone, codigo, 'whatsapp');
   }
 
   const vendedor =
@@ -133,6 +145,7 @@ function mapRowToEntry(row) {
     rol,
     instagram,
     facebook,
+    whatsapp,
   };
 }
 

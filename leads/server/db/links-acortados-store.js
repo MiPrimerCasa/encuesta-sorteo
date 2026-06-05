@@ -53,6 +53,11 @@ function initLinksAcortadosSchema() {
     );
     CREATE INDEX IF NOT EXISTS idx_links_notif_codigo
       ON links_notificaciones (codigo, activa, creado_en DESC);
+    CREATE TABLE IF NOT EXISTS app_scheduler_meta (
+      clave TEXT PRIMARY KEY,
+      valor TEXT NOT NULL,
+      actualizado_en TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   try {
@@ -425,11 +430,102 @@ export async function ejecutarVerificacionProgramada({
   await sincronizarCatalogoEnDb();
   const pendientes = await listarPendientesVerificacion(diasIntervalo, limite);
   const resultados = [];
-  for (const item of pendientes) {
-    resultados.push(await verificarYRegenerarRegistro(item));
+  for (let i = 0; i < pendientes.length; i += 1) {
+    resultados.push(await verificarYRegenerarRegistro(pendientes[i]));
+    if (i < pendientes.length - 1) {
+      await new Promise((r) => setTimeout(r, pausaEntreAcortadosMs()));
+    }
   }
   return {
     revisados: resultados.length,
+    resultados,
+  };
+}
+
+function pausaEntreRegistros() {
+  return new Promise((r) => setTimeout(r, pausaEntreAcortadosMs()));
+}
+
+export function getSchedulerMeta(clave) {
+  initLinksAcortadosSchema();
+  const row = getDb()
+    .prepare(`SELECT valor FROM app_scheduler_meta WHERE clave = ?`)
+    .get(clave);
+  return row?.valor ?? null;
+}
+
+export function setSchedulerMeta(clave, valor) {
+  initLinksAcortadosSchema();
+  getDb()
+    .prepare(
+      `INSERT INTO app_scheduler_meta (clave, valor, actualizado_en)
+       VALUES (?, ?, datetime('now'))
+       ON CONFLICT(clave) DO UPDATE SET
+         valor = excluded.valor,
+         actualizado_en = datetime('now')`,
+    )
+    .run(clave, valor);
+}
+
+/** Sincroniza catálogo (SP/JSON) y acorta Instagram sin URL corta. */
+export async function ejecutarBootstrapLinksInstagram() {
+  initLinksAcortadosSchema();
+  const sincronizados = await sincronizarCatalogoEnDb();
+  const resultados = await acortarTodosPendientes();
+  const ok = resultados.filter((r) => r.estado === 'ok').length;
+  return {
+    sincronizados,
+    procesados: resultados.length,
+    ok,
+    resultados,
+  };
+}
+
+/**
+ * Verifica TODOS los Instagram acortados; regenera solo los que fallen.
+ * Usado por el programador semanal del servidor.
+ */
+export async function ejecutarVerificacionSemanalCompleta() {
+  initLinksAcortadosSchema();
+  await sincronizarCatalogoEnDb();
+
+  const sinCorto = getDb()
+    .prepare(
+      `SELECT * FROM links_acortados
+       WHERE red = 'instagram'
+         AND (url_corto IS NULL OR estado IN ('pendiente', 'error_acortar'))
+       ORDER BY codigo`,
+    )
+    .all();
+
+  for (let i = 0; i < sinCorto.length; i += 1) {
+    await acortarRegistro(rowFromDb(sinCorto[i]), { forzar: true });
+    if (i < sinCorto.length - 1) await pausaEntreRegistros();
+  }
+
+  const rows = getDb()
+    .prepare(`SELECT * FROM links_acortados WHERE red = 'instagram' ORDER BY codigo`)
+    .all();
+
+  const resultados = [];
+  for (let i = 0; i < rows.length; i += 1) {
+    resultados.push(await verificarYRegenerarRegistro(rowFromDb(rows[i])));
+    if (i < rows.length - 1) await pausaEntreRegistros();
+  }
+
+  invalidateOperadoresCatalogCache();
+
+  const ok = resultados.filter((r) => r.ok).length;
+  const regenerados = resultados.filter((r) => r.accion === 'regenerado').length;
+  const acortados = resultados.filter((r) => r.accion === 'acortado').length;
+  const rotos = resultados.filter((r) => !r.ok).length;
+
+  return {
+    revisados: resultados.length,
+    ok,
+    regenerados,
+    acortados,
+    rotos,
     resultados,
   };
 }

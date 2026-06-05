@@ -17,8 +17,14 @@ export function compactarCodigoSorteo(valor) {
 /**
  * Texto del parámetro ?text= (guiones bajos, código pegado como en la planilla).
  */
+const CANAL_POR_RED = {
+  instagram: 'INSTAGRAM',
+  facebook: 'FACEBOOK',
+  whatsapp: 'WHATSAPP',
+};
+
 export function buildMensajeLinkRedes(codigoCompacto, red) {
-  const canal = red === 'instagram' ? 'INSTAGRAM' : 'FACEBOOK';
+  const canal = CANAL_POR_RED[red] ?? String(red).toUpperCase();
   const codigo = compactarCodigoSorteo(codigoCompacto);
   return `Gracias_por_su_atencion!!.ENVIE_este_codigo_${canal}_y_PARTICIPE_GRATIS_del:_${codigo}`;
 }

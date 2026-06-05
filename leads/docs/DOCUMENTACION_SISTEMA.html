@@ -547,7 +547,67 @@ END;</pre>
 </table>
 <blockquote>Consultas para que el DBA obtenga el DDL real (definición de SP y tablas que tocan) están en <code>docs/ESTRUCTURAS_TABLAS_SP.md</code> (sección 5: <code>sp_helptext</code>, <code>sys.sql_expression_dependencies</code>, <code>sp_help</code>).</blockquote>
 
-<p class="subtitle">Documento generado a partir del análisis integral del repositorio. Mantener actualizado ante cambios funcionales relevantes. Cada vez que se agregan requerimientos se actualiza esta documentación y el anexo del DBA (sección 13).</p>
+<h2>14. Actualización — nuevas funcionalidades</h2>
+<p class="subtitle"><strong>Añadido:</strong> junio 2026. Esta sección no reemplaza las secciones 1–13; documenta lo incorporado después y enlaza la documentación de detalle en <code>docs/</code>.</p>
+
+<h3>14.0 Revisión de estados (respecto a §4 y §13.8)</h3>
+<table>
+  <tr><th>Ítem</th><th>Estado anterior</th><th>Estado actual</th></tr>
+  <tr><td><strong>RNF-04</strong> Seguimiento SQLite</td><td>Solo SQLite</td><td class="st-partial"><strong>Parcial</strong> — con <code>SP_SEGUIMIENTO</code> → SQL Server; sin variable → SQLite</td></tr>
+  <tr><td><strong>DBA ítem 3</strong> SP seguimiento</td><td class="st-pending">Pendiente</td><td class="st-partial"><strong>Parcial</strong> — app conectada; DBA corregir <code>resultado_entrevista</code> NVARCHAR</td></tr>
+  <tr><td><strong>DBA ítem 9</strong> Permisos MPCSP</td><td class="st-partial">Parcial</td><td class="st-partial"><strong>Parcial+</strong> — <code>sql/grants-mpcsp-leads.sql</code></td></tr>
+  <tr><td><strong>RF-26</strong> Efectividad entrevistas</td><td class="st-pending">Pendiente</td><td class="st-partial"><strong>Parcial</strong> — superadmin productividad; falta vista supervisor</td></tr>
+</table>
+
+<h3>14.1 Nuevos requerimientos funcionales</h3>
+<table>
+  <tr><th>ID</th><th>Estado</th><th>Requerimiento</th><th>Doc</th></tr>
+  <tr><td>RF-29</td><td class="st-partial">Parcial</td><td>Seguimiento en SQL Server vía <code>SP_RegistrarSeguimientoLead</code></td><td>FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md</td></tr>
+  <tr><td>RF-30</td><td class="st-ok">Implementado</td><td>Historial append-only de seguimiento</td><td>FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md</td></tr>
+  <tr><td>RF-31</td><td class="st-partial">Parcial</td><td>Referidos → encuesta + <code>lead_referido</code></td><td>FUNCIONALIDAD_REFERIDOS_ENCUESTA.md</td></tr>
+  <tr><td>RF-32</td><td class="st-ok">Implementado</td><td>Carga manual origen 2 (upsert)</td><td>FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md</td></tr>
+  <tr><td>RF-33</td><td class="st-ok">Implementado</td><td>Modificar teléfono lead manual</td><td>FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md</td></tr>
+  <tr><td>RF-34</td><td class="st-ok">Implementado</td><td>Acortador y notificaciones links redes</td><td>FUNCIONALIDAD_ACORTADOR_LINKS.md</td></tr>
+  <tr><td>RF-35</td><td class="st-ok">Implementado</td><td>Panel superadmin (métricas empresa)</td><td>§14.2.7</td></tr>
+  <tr><td>RF-36</td><td class="st-ok">Implementado</td><td><code>@confirmo_entrevista</code> en SP seguimiento</td><td>FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md</td></tr>
+</table>
+
+<h3>14.2 Resumen por funcionalidad</h3>
+<ul>
+  <li><strong>14.2.1 SP seguimiento (RF-29):</strong> <code>seguimiento-sql.js</code>, variables <code>SP_SEGUIMIENTO</code>, tabla <code>registrarSeguimientoLead</code>.</li>
+  <li><strong>14.2.2 Historial (RF-30):</strong> <code>GET /api/leads/:id/historial</code>, UI en <code>LeadModalForm</code>, <code>seguimiento-historial.ts</code>.</li>
+  <li><strong>14.2.3 Referidos (RF-31):</strong> <code>SP_RegistrarReferidoLead</code>, tabla <code>lead_referido</code>, <code>referidos-carga.js</code>.</li>
+  <li><strong>14.2.4 Carga origen 2 / teléfono (RF-32, RF-33):</strong> upsert manual, <code>PATCH /api/leads/:id/telefono</code>.</li>
+  <li><strong>14.2.5 Acortador links (RF-34):</strong> scripts npm, notificaciones NavBar.</li>
+  <li><strong>14.2.6 Modelo SQL (RF-36):</strong> <code>@confirmo_entrevista</code>, <code>@referidos_json</code>.</li>
+  <li><strong>14.2.7 Superadmin (RF-35):</strong> <code>GET /api/admin/dashboard</code>, <code>SuperadminDashboard</code>.</li>
+</ul>
+
+<h3>14.3 Nuevos endpoints API</h3>
+<table>
+  <tr><th>Método</th><th>Ruta</th><th>Rol</th><th>Descripción</th></tr>
+  <tr><td>GET</td><td>/leads/:id/historial</td><td>promotor, supervisor</td><td>Historial seguimiento</td></tr>
+  <tr><td>PATCH</td><td>/leads/:id/telefono</td><td>promotor, supervisor</td><td>Modificar teléfono manual</td></tr>
+  <tr><td>GET</td><td>/notificaciones/links-redes</td><td>ambos</td><td>Avisos links</td></tr>
+  <tr><td>POST</td><td>/notificaciones/links-redes/:id/vista</td><td>ambos</td><td>Marcar leída</td></tr>
+  <tr><td>GET</td><td>/admin/dashboard</td><td>superadmin</td><td>Panel empresa</td></tr>
+</table>
+
+<h3>14.4 Nuevos entregables DBA (añadir a §13.8)</h3>
+<table>
+  <tr><th>#</th><th>Estado</th><th>Entregable</th><th>Script</th></tr>
+  <tr><td>11</td><td class="st-partial">Parcial</td><td>SP seguimiento operativo</td><td>SP_RegistrarSeguimientoLead-notas.sql</td></tr>
+  <tr><td>12</td><td class="st-pending">Pendiente</td><td>lead_referido + SPs</td><td>lead_referido-tabla-sp.sql</td></tr>
+  <tr><td>13</td><td class="st-ok">Implementado</td><td>Carga origen 2 upsert</td><td>encuestaCargaSorteo01-origen2-upsert.sql</td></tr>
+  <tr><td>14</td><td class="st-ok">Implementado</td><td>Update teléfono</td><td>encuestaSorteo01Update.sql</td></tr>
+  <tr><td>15</td><td class="st-partial">Parcial</td><td>Grants MPCSP</td><td>grants-mpcsp-leads.sql</td></tr>
+  <tr><td>16</td><td class="st-pending">Pendiente</td><td>Listado con referidos/visibilidad</td><td>FUNCIONALIDAD_REFERIDOS_ENCUESTA.md</td></tr>
+</table>
+
+<h3>14.5 Índice documentación nueva</h3>
+<p>Ver <code>docs/INDICE_FUNCIONALIDADES.md</code> y los archivos <code>FUNCIONALIDAD_*.md</code> enlazados en §14.1.</p>
+
+<p class="subtitle">Las novedades se agregan en <strong>§14</strong> sin reescribir el cuerpo principal (secciones 1–13).</p>
 
 </body>
 </html>

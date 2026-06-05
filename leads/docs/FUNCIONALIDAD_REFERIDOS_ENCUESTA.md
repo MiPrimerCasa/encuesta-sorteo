@@ -99,15 +99,27 @@ Parámetros principales:
 | `@encuesta` | `sorteo01` / `ENCUESTA_CARGA_ID` |
 | `@usuario` | Código promotor del lead padre |
 | `@operador_id`, `@operador_rol` | Sesión login |
+| `@id_vendedor`, `@id_supervisor` | Del listado `encuestasMuestraOperador` (no existen en tabla `encuesta`) |
 | `@id_registro_seguimiento` | Id fila recién insertada en seguimiento (opcional) |
 
 Flujo interno:
 
 1. Valida origen en `encuesta`.
-2. Calcula `nivel` e `id_encuesta_raiz` si el origen ya era referido.
-3. `EXEC encuestaCargaSorteo01` (mismo upsert que carga manual).
-4. `INSERT lead_referido`.
-5. Retorna `id_encuesta_referido`, `codigo`, `gestionCodigo`, `mensaje`.
+2. Resuelve `@id_vendedor` / `@id_supervisor` con JOIN `encuesta.usuario = mensajeria.dbo.vendedor.codigo` (respaldo: params app o fila previa en `lead_referido`).
+3. Calcula `nivel` e `id_encuesta_raiz` si el origen ya era referido.
+4. `EXEC encuestaCargaSorteo01` (campo3/campo4 en NULL).
+5. `INSERT lead_referido`.
+6. Retorna `id_encuesta_referido`, `codigo`, `gestionCodigo`, `mensaje`.
+
+```sql
+-- Resolución de ids (dentro del SP)
+SELECT
+  @id_vendedor = COALESCE(TRY_CAST(v.idVendedor AS INT), @id_vendedor),
+  @id_supervisor = COALESCE(TRY_CAST(v.idSupervisor AS INT), @id_supervisor)
+FROM dbo.encuesta e
+INNER JOIN mensajeria.dbo.vendedor v ON e.usuario = v.codigo
+WHERE e.id = @id_encuesta_origen;
+```
 
 **Importante — campos de encuesta:** en `encuestaCargaSorteo01`, `campo3` = «Conoce MPC» y `campo4` = pregunta PIJ («Sabías que con 55.000…»). **No** guardar ahí «Referido de…» ni «Raíz #…». Esos datos van solo en `lead_referido` (`id_encuesta_origen`, `id_encuesta_raiz`, `nivel`). La app muestra badge **Referido** vía `SP_ObtenerMetaReferidosLead`.
 
@@ -178,11 +190,9 @@ Campos app nuevos en seguimiento:
 ## Checklist DBA
 
 - [ ] Crear `lead_referido` + SPs (`sql/lead_referido-tabla-sp.sql`)
-- [ ] Ajustar nombres de columnas `idVendedor` / `idSupervisor` en el script si difieren en `encuesta`
-- [ ] Validar parámetros reales de `encuestaCargaSorteo01` (nombres `@campoNCodigo`)
+- [ ] `SP_RegistrarReferidoLead`: ids vía `encuesta.usuario` → `mensajeria.dbo.vendedor.codigo`
 - [ ] Modificar `encuestasMuestraOperador`: filtro visibilidad + columnas `es_referido`, `id_encuesta_origen`, `nivel`
 - [ ] `GRANT EXECUTE` a `MPCSP` en SPs (no en tabla `lead_referido`)
-- [ ] Definir con negocio: `@origen` específico para referidos (ej. `'3'`) vs manual `'2'`
 - [ ] Reglas de descuento por cuota (cuántos referidos, directos vs cadena, solo cierres)
 
 ---

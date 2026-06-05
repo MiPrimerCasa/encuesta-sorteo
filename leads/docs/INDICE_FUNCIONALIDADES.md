@@ -25,6 +25,9 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | Modelo SQL seguimiento (análisis parámetros SP) | [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md) | DBA + dev | Propuesta `@lead_id`, `@resultado_entrevista`, etc. |
 | Multisorteo / participantes | [SORTEOS_Y_PARTICIPANTES.md](./SORTEOS_Y_PARTICIPANTES.md) | Ambos | `encuesta-carga.js`, SP |
 | Referidos → encuesta + árbol + visibilidad | [FUNCIONALIDAD_REFERIDOS_ENCUESTA.md](./FUNCIONALIDAD_REFERIDOS_ENCUESTA.md) | Promotor, supervisor, DBA | `lead_referido`, `referidos-carga.js`, `LeadCard.tsx` |
+| Carga manual origen 2 (upsert) + modificar teléfono | [FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md](./FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md) | Promotor, supervisor | `encuesta-carga.js`, `encuestaSorteo01Update` |
+| Acortador y verificación links redes | [FUNCIONALIDAD_ACORTADOR_LINKS.md](./FUNCIONALIDAD_ACORTADOR_LINKS.md) | Supervisor (cron), ambos (notif.) | `url-shortener.js`, NavBar |
+| Panel superadmin (métricas empresa) | [DOCUMENTACION_SISTEMA.md](./DOCUMENTACION_SISTEMA.md) §14.2.7 | Superadmin | `SuperadminDashboard`, `admin-dashboard.js` |
 | Login y rol desde `Categoria` | [LOGIN_SP.md](./LOGIN_SP.md) | Ambos | `mssql.js`, `encuestas.js` |
 | Deploy y monorepo | [MONOREPO.md](./MONOREPO.md), [DEPLOY_VPS.md](./DEPLOY_VPS.md) | — | `deploy/` |
 

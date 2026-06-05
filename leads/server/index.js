@@ -5,6 +5,7 @@ import { createApp, getAppBasePath } from './create-app.js';
 import { getDb } from './db/sqlite.js';
 import { isSqlServerConfigured } from './db/mssql.js';
 import { warmOperadoresCatalog } from './db/operadores-catalog.js';
+import { startLinksInstagramScheduler } from './jobs/links-instagram-job.js';
 
 const PORT = Number(process.env.PORT || process.env.API_PORT || 3001);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -44,6 +45,7 @@ app.listen(PORT, () => {
           err instanceof Error ? err.message : err,
         );
       });
+    startLinksInstagramScheduler();
     console.log(`  Health rápido → ${base}api/health/live`);
   } else {
     console.error('FALTA .env: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME — no hay modo demo.');

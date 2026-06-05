@@ -56,6 +56,20 @@ function pickSpRow(row) {
   return out;
 }
 
+function resolveEquipoComercialReferido(leadPadre, usuario, operadorId) {
+  const rol = String(usuario?.rol ?? '').toLowerCase();
+  return {
+    idVendedor:
+      parseIdEncuesta(leadPadre?.idVendedor) ??
+      parseIdEncuesta(usuario?.idVendedor) ??
+      (rol === 'promotor' ? operadorId : null),
+    idSupervisor:
+      parseIdEncuesta(leadPadre?.idSupervisor) ??
+      parseIdEncuesta(usuario?.idSupervisor) ??
+      (rol === 'supervisor' ? operadorId : null),
+  };
+}
+
 /**
  * exec dbo.SP_RegistrarReferidoLead — alta encuesta + vínculo lead_referido.
  * Requiere script sql/lead_referido-tabla-sp.sql desplegado en STRSYSTEM.
@@ -303,6 +317,7 @@ export async function crearLeadsDesdeReferidos(leadPadre, seguimientoPatch, usua
   const operadorId = parseIdEncuesta(usuario?.id ?? usuario?.idOperador);
   const operadorRol = String(usuario?.rol ?? 'promotor').toLowerCase();
   const useSpVinculo = referidosUseSpVinculo() && idEncuestaOrigen != null && operadorId != null;
+  const equipo = resolveEquipoComercialReferido(leadPadre, usuario, operadorId);
 
   for (const ref of pendientes) {
     if (telefonoYaEnCampania(leadsCache, ref.telefono, encuesta)) {

@@ -60,7 +60,7 @@ export const DEMO_PROMOTORES: Promotor[] = [
 type LinksCatalogJson = {
   byCodigo: Record<
     string,
-    { vendedor: string; codigo: string; instagram: string; facebook: string }
+    { vendedor: string; codigo: string; instagram: string; facebook: string; whatsapp?: string }
   >;
 };
 
@@ -84,6 +84,7 @@ export function getDemoLinksRedes(usuario: UsuarioSesion): LinksRedes {
       vendedor: usuario.nombre,
       instagram: null,
       facebook: null,
+      whatsapp: null,
       mensaje: `No hay links de demo para el código ${codigo}.`,
     };
   }
@@ -92,6 +93,9 @@ export function getDemoLinksRedes(usuario: UsuarioSesion): LinksRedes {
     vendedor: entry.vendedor ?? usuario.nombre,
     instagram: entry.instagram,
     facebook: entry.facebook,
+    whatsapp:
+      entry.whatsapp ??
+      entry.instagram.replace('INSTAGRAM', 'WHATSAPP'),
     mensaje: null,
   };
 }

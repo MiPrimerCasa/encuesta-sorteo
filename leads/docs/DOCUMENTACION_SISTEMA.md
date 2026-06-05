@@ -589,4 +589,126 @@ Devuelve, por promotor: `entrevistas_realizadas` (`hubo_entrevista = 1`), `compr
 
 ---
 
-*Documento generado a partir del análisis integral del repositorio. Mantener actualizado ante cambios funcionales relevantes. Cada vez que se agregan requerimientos se actualiza esta documentación y el anexo del DBA (sección 13).*
+## 14. Actualización — nuevas funcionalidades
+
+> **Añadido:** junio 2026. Esta sección **no reemplaza** las secciones 1–13; documenta lo incorporado después y enlaza la documentación de detalle en `docs/`.
+
+### 14.0 Revisión de estados (respecto a §4 y §13.8)
+
+| Ítem | Estado anterior (§4 / §13.8) | Estado actual |
+|------|------------------------------|---------------|
+| **RNF-04** Seguimiento en SQLite | Implementado (solo SQLite) | **Parcial** — con `SP_SEGUIMIENTO` en `.env` persiste en SQL Server (`registrarSeguimientoLead`); sin variable → fallback SQLite |
+| **DBA ítem 3** `SP_RegistrarSeguimientoLead` | Pendiente | **Parcial** — app conectada (`seguimiento-sql.js`); DBA debe corregir `@resultado_entrevista` **NVARCHAR(16)** (no BIT). Ver `sql/SP_RegistrarSeguimientoLead-notas.sql` |
+| **DBA ítem 9** Permisos `MPCSP` | Parcial | **Parcial+** — script `sql/grants-mpcsp-leads.sql` (login, seguimiento, referidos, `encuestaSorteo01Update`) |
+| **RF-26** Efectividad entrevistas | Pendiente | **Parcial** — panel **superadmin** incluye productividad por promotor; falta vista dedicada en supervisor (RF-26 original) |
+
+### 14.1 Nuevos requerimientos funcionales
+
+| ID | Estado | Requerimiento | Doc detalle |
+|----|--------|---------------|-------------|
+| RF-29 | **Parcial** | Persistir seguimiento en SQL Server vía `SP_RegistrarSeguimientoLead` cuando `SP_SEGUIMIENTO` está configurado. | [FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md](./FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md) |
+| RF-30 | **Implementado** | Historial append-only de cada guardado de seguimiento (fecha, operador, etiqueta, pestaña destino). | [FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md](./FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md) |
+| RF-31 | **Parcial** | Al cerrar con referidos, crear leads en `encuesta` + vínculo `lead_referido` (árbol, visibilidad promotor/supervisor). | [FUNCIONALIDAD_REFERIDOS_ENCUESTA.md](./FUNCIONALIDAD_REFERIDOS_ENCUESTA.md) |
+| RF-32 | **Implementado** | Carga manual con `@origen = '2'`: alta nueva o **actualización** si teléfono+campaña ya existen. | [FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md](./FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md) |
+| RF-33 | **Implementado** | Modificar teléfono de lead cargado manualmente (`encuestaSorteo01Update`, `PATCH /api/leads/:id/telefono`). | [FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md](./FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md) |
+| RF-34 | **Implementado** | Acortar y verificar links de redes (Instagram); notificaciones en campana NavBar. | [FUNCIONALIDAD_ACORTADOR_LINKS.md](./FUNCIONALIDAD_ACORTADOR_LINKS.md) |
+| RF-35 | **Implementado** | Rol **superadmin**: panel empresa (KPIs semana, rankings, productividad, conocimiento encuesta). | §14.2.7 (esta sección) |
+| RF-36 | **Implementado** | Parámetro `@confirmo_entrevista` en SP de seguimiento (flujo supervisor). | [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md) |
+
+### 14.2 Resumen por funcionalidad
+
+#### 14.2.1 Conexión SP seguimiento (RF-29, RNF-04)
+
+- **Variables:** `SP_SEGUIMIENTO`, `SEGUIMIENTO_TABLE`, `ENCUESTAS_DB_NAME`.
+- **Guardado:** `PATCH /api/leads/:id/seguimiento` → `execRegistrarSeguimientoLead` con todos los `@param` (incl. `@confirmo_entrevista`, `@referidos_json`, `@seguimiento_json`).
+- **Lectura:** última fila por `lead_id` en `registrarSeguimientoLead`; batch al listar leads.
+- **Código:** `server/db/seguimiento-sql.js`, `server/db/encuestas.js`.
+
+#### 14.2.2 Historial de seguimiento (RF-30)
+
+- Cada cambio distinto agrega fila; sin cambio en JSON → no duplica.
+- **API:** `GET /api/leads/:id/historial`; `PATCH` devuelve `historial` (últimas 30).
+- **UI:** `SeguimientoHistorialPanel` / `LeadHistorialInline` en `LeadModalForm`.
+- **Dominio:** `src/domain/seguimiento-historial.ts`.
+- **SQL propuesto:** `sql/lead-seguimiento-historial.sql`.
+
+#### 14.2.3 Referidos → encuesta (RF-31)
+
+- Al guardar seguimiento con `brindoReferidos`, la app dispara `SP_RegistrarReferidoLead` (o carga legacy).
+- Tabla **`lead_referido`**: origen, raíz, nivel, `operador_rol`, visibilidad (supervisor carga → promotor no ve).
+- **SPs:** `SP_RegistrarReferidoLead`, `SP_ContarReferidosLead`, `SP_ObtenerMetaReferidosLead`.
+- **Script:** `sql/lead_referido-tabla-sp.sql`.
+- **Código:** `server/db/referidos-carga.js`; respuesta PATCH incluye `nuevosLeads`, `referidosCreados`.
+
+#### 14.2.4 Carga manual origen 2 y modificar teléfono (RF-32, RF-33)
+
+- `@origen = '2'` en `encuestaCargaSorteo01`: INSERT o UPDATE campos 1–8.
+- `POST /api/leads` → `201` alta · `200` si actualizó existente.
+- `PATCH /api/leads/:id/telefono` → `encuestaSorteo01Update` (solo leads manuales).
+- **Scripts:** `sql/encuestaCargaSorteo01-origen2-upsert.sql`, `sql/encuestaSorteo01Update.sql`.
+
+#### 14.2.5 Acortador links redes (RF-34)
+
+- Catálogo desde SP `rptLinkQRenRedesSociales` o JSON.
+- Scripts npm: `links:acortar`, `links:verificar`, `links:actualizar-todos`.
+- **API:** `GET /api/notificaciones/links-redes`, `POST .../vista`.
+- Promotor: solo su código; supervisor: equipo completo.
+
+#### 14.2.6 Modelo SQL ampliado (RF-36)
+
+Parámetros del SP alineados con la app (además de los listados en §13.3):
+
+| Parámetro | Uso |
+|-----------|-----|
+| `@confirmo_entrevista` | Supervisor: ¿confirmó la entrevista? |
+| `@fuente` | Opcional; si no, JOIN a `encuesta.origen` |
+| `@referidos_json` | Dispara alta de referidos vía RF-31 |
+
+Análisis completo: [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md).
+
+#### 14.2.7 Panel superadmin (RF-35)
+
+- **Rol:** `superadmin` (login IDs en `SUPERADMIN_LOGIN_IDS` / `superadmin-auth.js`).
+- **Vista:** `SuperadminDashboard` — KPIs semana móvil, rankings (cierres, referidos, actividad), gráfico eventos, productividad por promotor/supervisor, conocimiento encuesta.
+- **API:** `GET /api/admin/dashboard`.
+- **Código:** `server/db/admin-dashboard.js`, `src/domain/admin-metrics.ts`, `src/domain/admin-productividad.ts`.
+
+### 14.3 Nuevos endpoints API
+
+| Método | Ruta | Rol | Descripción |
+|--------|------|-----|-------------|
+| GET | `/api/leads/:id/historial` | promotor, supervisor | Historial de seguimiento del lead |
+| PATCH | `/api/leads/:id/telefono` | promotor, supervisor | Modificar teléfono (lead manual) |
+| GET | `/api/notificaciones/links-redes` | promotor, supervisor | Avisos links vencidos/regenerados |
+| POST | `/api/notificaciones/links-redes/:id/vista` | promotor, supervisor | Marcar notificación leída |
+| GET | `/api/admin/dashboard` | superadmin | Panel métricas empresa |
+
+`PATCH /api/leads/:id/seguimiento` ampliado: respuesta con `historial`, `referidosCreados`, `nuevosLeads`, `message`.
+
+### 14.4 Nuevos entregables DBA (añadir a §13.8)
+
+| # | Estado | Entregable | Script / notas |
+|---|--------|------------|----------------|
+| 11 | **Parcial** | `SP_RegistrarSeguimientoLead` operativo | Corregir tipo `resultado_entrevista`; `sql/SP_RegistrarSeguimientoLead-notas.sql` |
+| 12 | **Pendiente** | Tabla + SP `lead_referido` | `sql/lead_referido-tabla-sp.sql` |
+| 13 | **Implementado** | `encuestaCargaSorteo01` origen 2 upsert | `sql/encuestaCargaSorteo01-origen2-upsert.sql` |
+| 14 | **Implementado** | `encuestaSorteo01Update` | `sql/encuestaSorteo01Update.sql` |
+| 15 | **Parcial** | `grants-mpcsp-leads.sql` | Permisos seguimiento + referidos + update teléfono |
+| 16 | **Pendiente** | Ajuste `encuestasMuestraOperador` para referidos y visibilidad | Ver `FUNCIONALIDAD_REFERIDOS_ENCUESTA.md` |
+
+### 14.5 Índice de documentación nueva
+
+| Tema | Archivo |
+|------|---------|
+| Conexión SP seguimiento | [FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md](./FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md) |
+| Historial seguimiento | [FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md](./FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md) |
+| Referidos encuesta | [FUNCIONALIDAD_REFERIDOS_ENCUESTA.md](./FUNCIONALIDAD_REFERIDOS_ENCUESTA.md) |
+| Carga manual origen 2 | [FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md](./FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md) |
+| Acortador links | [FUNCIONALIDAD_ACORTADOR_LINKS.md](./FUNCIONALIDAD_ACORTADOR_LINKS.md) |
+| Modelo parámetros SP | [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md) |
+| Contactado vs Cierres | [FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md](./FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md) |
+| Índice general | [INDICE_FUNCIONALIDADES.md](./INDICE_FUNCIONALIDADES.md) |
+
+---
+
+*Documento generado a partir del análisis integral del repositorio. Mantener actualizado ante cambios funcionales relevantes. Las novedades se agregan en **§14** sin reescribir el cuerpo principal.*

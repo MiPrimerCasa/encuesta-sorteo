@@ -96,7 +96,8 @@ GO
   4. INSERT lead_referido (nivel / raíz según padre)
   5. Retorna codigo, gestionCodigo, id_encuesta_referido, id_lead_referido
 
-  NOTA DBA: adaptar nombres de columnas idVendedor/idSupervisor en encuesta si difieren.
+  NOTA DBA: idVendedor/idSupervisor vía JOIN encuesta.usuario = mensajeria.dbo.vendedor.codigo
+  (la app también puede enviar @id_vendedor / @id_supervisor como respaldo).
 */
 CREATE OR ALTER PROCEDURE dbo.SP_RegistrarReferidoLead
   @id_encuesta_origen       INT,
@@ -107,7 +108,9 @@ CREATE OR ALTER PROCEDURE dbo.SP_RegistrarReferidoLead
   @operador_id              INT,
   @operador_rol             NVARCHAR(16),    -- promotor | supervisor
   @id_registro_seguimiento  INT = NULL,
-  @origen_carga             CHAR(1) = '2',   -- mismo que carga manual; DBA puede usar otro para referidos
+  @id_vendedor              INT = NULL,      -- equipo comercial (desde listado SP, NO columna encuesta)
+  @id_supervisor            INT = NULL,
+  @origen_carga             CHAR(1) = '2',
   @campo2_valor             NVARCHAR(200) = NULL,
   @id_encuesta_referido     INT = NULL OUTPUT,
   @id_lead_referido         INT = NULL OUTPUT,
@@ -119,8 +122,6 @@ BEGIN
   SET NOCOUNT ON;
   SET XACT_ABORT ON;
 
-  DECLARE @id_vendedor INT;
-  DECLARE @id_supervisor INT;
   DECLARE @id_raiz INT;
   DECLARE @nivel INT = 1;
   DECLARE @tel_norm NVARCHAR(50) = LTRIM(RTRIM(@telefono));
@@ -150,29 +151,38 @@ BEGIN
     RETURN;
   END;
 
-  -- Datos del lead origen (ajustar columnas según esquema real de encuesta)
-  SELECT
-    @id_vendedor = TRY_CAST(e.idVendedor AS INT),
-    @id_supervisor = TRY_CAST(e.idSupervisor AS INT)
-  FROM dbo.encuesta e
-  WHERE e.id = @id_encuesta_origen;
-
-  IF @@ROWCOUNT = 0
+  -- idVendedor/idSupervisor: encuesta.usuario → mensajeria.dbo.vendedor.codigo (no columnas en encuesta)
+  IF NOT EXISTS (SELECT 1 FROM dbo.encuesta e WHERE e.id = @id_encuesta_origen)
   BEGIN
     SET @mensaje = N'Lead origen no encontrado en encuesta.';
     RETURN;
   END;
 
-  -- Cadena: si el origen ya es un referido, subir nivel y conservar raíz
+  SELECT
+    @id_vendedor = COALESCE(TRY_CAST(v.idVendedor AS INT), @id_vendedor),
+    @id_supervisor = COALESCE(TRY_CAST(v.idSupervisor AS INT), @id_supervisor)
+  FROM dbo.encuesta e
+  INNER JOIN mensajeria.dbo.vendedor v ON e.usuario = v.codigo
+  WHERE e.id = @id_encuesta_origen;
+
+  -- Cadena: si el origen ya es un referido, subir nivel, raíz y heredar equipo si sigue NULL
   SELECT TOP (1)
     @nivel = lr.nivel + 1,
-    @id_raiz = COALESCE(lr.id_encuesta_raiz, lr.id_encuesta_origen)
+    @id_raiz = COALESCE(lr.id_encuesta_raiz, lr.id_encuesta_origen),
+    @id_vendedor = COALESCE(@id_vendedor, lr.id_vendedor),
+    @id_supervisor = COALESCE(@id_supervisor, lr.id_supervisor)
   FROM dbo.lead_referido lr
   WHERE lr.id_encuesta_referido = @id_encuesta_origen
   ORDER BY lr.id DESC;
 
   IF @id_raiz IS NULL
     SET @id_raiz = @id_encuesta_origen;
+
+  -- Fallback mínimo si la app no envió ids (promotor → vendedor; supervisor → supervisor)
+  IF @id_vendedor IS NULL AND @rol_norm = N'promotor'
+    SET @id_vendedor = @operador_id;
+  IF @id_supervisor IS NULL AND @rol_norm = N'supervisor'
+    SET @id_supervisor = @operador_id;
 
   -- Ya vinculado como referido en esta campaña
   IF EXISTS (

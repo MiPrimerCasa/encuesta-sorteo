@@ -449,6 +449,7 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
     telefono: telefonoEncuesta,
     codigoPromotorCarga: extraerCodigoPromotorDesdeFilaEncuesta(row) ?? undefined,
     idVendedor: pickField(row, 'idVendedor', 'IdVendedor') ?? undefined,
+    idSupervisor: pickField(row, 'idSupervisor', 'IdSupervisor') ?? undefined,
     promotorId: slugId(promotorNombre),
     promotorNombre: String(promotorNombre),
     supervisorNombre: supervisorNombre ? String(supervisorNombre) : undefined,

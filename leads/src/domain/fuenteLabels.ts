@@ -5,6 +5,8 @@ export const FUENTE_LABEL: Record<FuenteLead, string> = {
   app: 'Manual',
   facebook: 'Facebook',
   instagram: 'Instagram',
+  whatsapp: 'WhatsApp',
+  tiktok: 'TikTok',
 };
 
 /** Mapeo carga manual / SP → fuente de métricas. */
@@ -17,6 +19,10 @@ export function origenIngresoToFuente(origen: OrigenIngresoManual): FuenteLead |
       return 'facebook';
     case 'instagram':
       return 'instagram';
+    case 'whatsapp':
+      return 'whatsapp';
+    case 'tiktok':
+      return 'tiktok';
     case 'manual':
     case 'referido':
       return 'app';
@@ -31,6 +37,13 @@ export function origenIngresoToOrigenLead(
   origen: OrigenIngresoManual,
 ): 'sorteo' | 'manual' | 'redes' {
   if (origen === 'qr' || origen === 'sorteo') return 'sorteo';
-  if (origen === 'facebook' || origen === 'instagram') return 'redes';
+  if (
+    origen === 'facebook' ||
+    origen === 'instagram' ||
+    origen === 'whatsapp' ||
+    origen === 'tiktok'
+  ) {
+    return 'redes';
+  }
   return 'manual';
 }

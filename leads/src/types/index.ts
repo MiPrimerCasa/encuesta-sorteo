@@ -4,7 +4,7 @@ export type ListaLead = 'entrevista' | 'contacto';
 /** Dónde quiere la entrevista el cliente (encuesta / SP). */
 export type LugarEntrevista = 'sucursal' | 'domicilio';
 export type OrigenLead = 'encuesta' | 'sorteo' | 'manual' | 'redes';
-export type FuenteLead = 'qr' | 'app' | 'facebook' | 'instagram';
+export type FuenteLead = 'qr' | 'app' | 'facebook' | 'instagram' | 'whatsapp' | 'tiktok';
 export type CanalContacto = 'llamada' | 'mensaje';
 export type ResultadoEntrevista =
   | 'sin_interes'
@@ -21,6 +21,8 @@ export type OrigenIngresoManual =
   | 'sorteo'
   | 'facebook'
   | 'instagram'
+  | 'whatsapp'
+  | 'tiktok'
   | 'manual'
   | 'referido'
   | 'otro';

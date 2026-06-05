@@ -26,6 +26,7 @@ import type {
   RolUsuario,
   SeguimientoLead,
 } from '../../types';
+import { BarrioPickerSheet } from './BarrioPickerSheet';
 import { ButtonGroup, FormSection, RadioOption } from '../ui/ButtonGroup';
 import { DateTimePicker } from '../ui/DateTimePicker';
 
@@ -118,12 +119,17 @@ export function LeadModalForm({
 }: LeadModalFormProps) {
   const [form, setForm] = useState<FormState>(() => buildInitialForm(lead));
   const [errorVenta, setErrorVenta] = useState('');
+  const [barrioPickerOpen, setBarrioPickerOpen] = useState(false);
 
   const rol: RolUsuario = rolUsuario === 'promotor' ? 'promotor' : 'supervisor';
   const productosDisponibles = useMemo(
     () => getProductosPorRol(productos, rol),
     [productos, rol],
   );
+
+  useEffect(() => {
+    if (!open) setBarrioPickerOpen(false);
+  }, [open]);
 
   useEffect(() => {
     if (open && lead) {
@@ -786,29 +792,46 @@ export function LeadModalForm({
                           {barrios.length === 0 ? (
                             <p className="text-[13px] text-red-600">No hay barrios cargados.</p>
                           ) : (
-                            <div className="space-y-2">
-                              {barrios.map((barrio) => {
-                                const sel = form.idBarrio === barrio.id;
-                                return (
-                                  <button
-                                    key={barrio.id}
-                                    type="button"
-                                    onClick={() => {
-                                      setErrorVenta('');
-                                      patch({ idBarrio: barrio.id });
-                                    }}
-                                    style={{ touchAction: 'manipulation' }}
-                                    className={`h-12 w-full rounded-lg border px-4 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${
-                                      sel
-                                        ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
-                                        : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
-                                    }`}
-                                  >
-                                    {barrio.nombre}
-                                  </button>
-                                );
-                              })}
-                            </div>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setBarrioPickerOpen(true)}
+                                style={{ touchAction: 'manipulation' }}
+                                className={`flex h-12 w-full items-center justify-between rounded-lg border px-4 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${
+                                  form.idBarrio
+                                    ? 'border-brand-600 bg-brand-50 text-brand-800 active:bg-brand-100'
+                                    : 'border-zinc-200 bg-white text-zinc-500 active:bg-zinc-50'
+                                }`}
+                              >
+                                <span>
+                                  {form.idBarrio
+                                    ? (getBarrioNombre(form.idBarrio, barrios) ?? 'Barrio seleccionado')
+                                    : 'Seleccionar barrio'}
+                                </span>
+                                <svg
+                                  className="h-5 w-5 shrink-0 text-zinc-400"
+                                  viewBox="0 0 20 20"
+                                  fill="currentColor"
+                                  aria-hidden="true"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+                                    clipRule="evenodd"
+                                  />
+                                </svg>
+                              </button>
+                              <BarrioPickerSheet
+                                open={barrioPickerOpen}
+                                barrios={barrios}
+                                selectedId={form.idBarrio}
+                                onClose={() => setBarrioPickerOpen(false)}
+                                onSelect={(idBarrio) => {
+                                  setErrorVenta('');
+                                  patch({ idBarrio });
+                                }}
+                              />
+                            </>
                           )}
                         </div>
                       )}

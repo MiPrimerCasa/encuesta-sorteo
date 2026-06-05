@@ -3,6 +3,8 @@ const FUENTE_LABEL = {
   app: 'Manual',
   facebook: 'Facebook',
   instagram: 'Instagram',
+  whatsapp: 'WhatsApp',
+  tiktok: 'TikTok',
 };
 
 function parseFecha(val) {
@@ -238,7 +240,7 @@ export function buildAdminProductividad(leads, historialRows = [], ahora = new D
         ) / 10
       : null;
 
-  const fuenteOrder = ['qr', 'facebook', 'instagram', 'app', 'otros'];
+  const fuenteOrder = ['qr', 'facebook', 'instagram', 'whatsapp', 'tiktok', 'app', 'otros'];
 
   return {
     embudoGlobal: {

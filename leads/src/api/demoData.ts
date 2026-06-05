@@ -140,11 +140,13 @@ export const DEMO_PRODUCTOS: Producto[] = [
 ];
 
 export const DEMO_BARRIOS: Barrio[] = [
-  { id: 'b1', nombre: 'Barrio Los Tilos' },
-  { id: 'b2', nombre: 'Barrio El Mirador' },
-  { id: 'b3', nombre: 'Barrio San Martín' },
-  { id: 'b4', nombre: 'Barrio La Esperanza' },
-  { id: 'b5', nombre: 'Barrio Norte' },
+  { id: 'b1', nombre: 'Cecotto' },
+  { id: 'b5', nombre: 'Doña Valentina I' },
+  { id: 'b6', nombre: 'Doña Valentina II' },
+  { id: 'b3', nombre: 'Los Bufalos' },
+  { id: 'b2', nombre: 'Los Elfos' },
+  { id: 'b4', nombre: 'Palmares' },
+  { id: 'b7', nombre: 'Rigonatto' },
 ];
 
 // ─── Leads ────────────────────────────────────────────────────────────────────
@@ -248,6 +250,32 @@ const BASE_LEADS: Lead[] = [
       resultadoEntrevista: 'no_compro',
       observaciones: 'Necesita consultar con la familia.',
     },
+  },
+  {
+    id: 'lead-06b',
+    nombre: 'Nadia Peralta',
+    telefono: '3517 445566',
+    promotorId: 'prom-1',
+    promotorNombre: 'Martín González',
+    supervisorNombre: 'Demo Supervisor',
+    quiereEntrevista: false,
+    lista: 'contacto',
+    origen: 'redes',
+    fechaObtencion: '2026-05-14',
+    seguimiento: { fuente: 'whatsapp', canal: 'mensaje', huboEntrevista: false },
+  },
+  {
+    id: 'lead-06c',
+    nombre: 'Tomás Ledesma',
+    telefono: '3519 778899',
+    promotorId: 'prom-2',
+    promotorNombre: 'Ana Rodríguez',
+    supervisorNombre: 'Demo Supervisor',
+    quiereEntrevista: true,
+    lista: 'entrevista',
+    origen: 'redes',
+    fechaObtencion: '2026-05-13',
+    seguimiento: { fuente: 'tiktok', canal: 'llamada', huboEntrevista: false },
   },
   {
     id: 'lead-07',

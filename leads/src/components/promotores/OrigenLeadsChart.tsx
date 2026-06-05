@@ -21,6 +21,8 @@ const FUENTES: { key: FuenteLead; label: string; color: string; hex: string }[] 
   { key: 'app',       label: 'Manual',    color: 'bg-red-500',     hex: '#EF4444' },
   { key: 'facebook',  label: 'Facebook',  color: 'bg-blue-500',    hex: '#3B82F6' },
   { key: 'instagram', label: 'Instagram', color: 'bg-fuchsia-500', hex: '#D946EF' },
+  { key: 'whatsapp',  label: 'WhatsApp',  color: 'bg-emerald-500', hex: '#10B981' },
+  { key: 'tiktok',    label: 'TikTok',    color: 'bg-rose-500',    hex: '#F43F5E' },
 ];
 
 const AGRUPACIONES: { value: Agrupacion; label: string }[] = [
@@ -74,7 +76,15 @@ function buildChartData(leads: Lead[], agrupacion: Agrupacion) {
   for (const lead of filtered) {
     const key = getPeriodoKey(lead.fechaObtencion, agrupacion);
     if (!map.has(key)) {
-      map.set(key, { label: getPeriodoLabel(key, agrupacion), qr: 0, app: 0, facebook: 0, instagram: 0 });
+      map.set(key, {
+        label: getPeriodoLabel(key, agrupacion),
+        qr: 0,
+        app: 0,
+        facebook: 0,
+        instagram: 0,
+        whatsapp: 0,
+        tiktok: 0,
+      });
     }
     const fuente = lead.seguimiento?.fuente;
     if (fuente) {
@@ -180,7 +190,7 @@ export function OrigenLeadsChart({ leads, promotores }: Props) {
       )}
 
       {/* Cards de canal */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {stats.map(({ key, label, color, hex, count, pct }) => {
           const activa = fuenteAbierta === key;
           return (

@@ -83,11 +83,19 @@ export function parseFuente(raw) {
   if (raw == null || raw === '') return null;
   const v = String(raw).toLowerCase().trim();
   if (v === '1' || v.includes('qr')) return 'qr';
-  if (v.includes('manual') || v.includes('app') || v === 'apps' || v === 'aplicacion' || v === 'aplicación') {
-    return 'app';
-  }
   if (v.includes('face') || v.includes('fb') || v === 'facebook') return 'facebook';
   if (v.includes('insta') || v.includes('ig') || v === 'instagram') return 'instagram';
+  if (v.includes('whats') || v.includes('wapp') || v === 'whatsapp') return 'whatsapp';
+  if (v.includes('tik') || v === 'tiktok') return 'tiktok';
+  if (
+    v.includes('manual') ||
+    v === 'app' ||
+    v === 'apps' ||
+    v.includes('aplicacion') ||
+    v.includes('aplicación')
+  ) {
+    return 'app';
+  }
   return null;
 }
 

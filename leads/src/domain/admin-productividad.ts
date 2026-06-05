@@ -290,7 +290,15 @@ export function buildAdminProductividad(
         ) / 10
       : null;
 
-  const fuenteOrder: Array<FuenteLead | 'otros'> = ['qr', 'facebook', 'instagram', 'app', 'otros'];
+  const fuenteOrder: Array<FuenteLead | 'otros'> = [
+    'qr',
+    'facebook',
+    'instagram',
+    'whatsapp',
+    'tiktok',
+    'app',
+    'otros',
+  ];
 
   return {
     embudoGlobal: {

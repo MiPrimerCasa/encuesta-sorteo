@@ -89,6 +89,8 @@ const CANAL_COLORS: Record<string, string> = {
   qr: '#18181B',
   facebook: '#3B82F6',
   instagram: '#D946EF',
+  whatsapp: '#10B981',
+  tiktok: '#F43F5E',
   app: '#EF4444',
   otros: '#A1A1AA',
 };

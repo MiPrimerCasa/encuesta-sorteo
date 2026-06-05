@@ -507,6 +507,19 @@ export function buildCodigoPromotorIndex(encuestaRows = []) {
   return index;
 }
 
+/** True si el operador tiene al menos una fila propia en encuestasMuestraOperador. */
+export function promotorTieneFilasEnMuestra(encuestaRows, idVendedor) {
+  if (!encuestaRows?.length || idVendedor == null || String(idVendedor).trim() === '') {
+    return false;
+  }
+  const prefix = `${idVendedor}|`;
+  const index = buildCodigoPromotorIndex(encuestaRows);
+  for (const key of index.keys()) {
+    if (key.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
 export function resolveCodigoCargaPorPromotor(encuestaRows, promotorNombre, idVendedor) {
   const index = buildCodigoPromotorIndex(encuestaRows);
   const key = `${idVendedor ?? ''}|${normalizeNombre(promotorNombre ?? '')}`;

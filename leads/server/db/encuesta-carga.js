@@ -3,6 +3,7 @@ import {
   fetchEncuestasMuestraRaw,
   listLeadsFromEncuestas,
   normalizeNombre,
+  promotorTieneFilasEnMuestra,
   resolveCodigoCargaPorPromotor,
   resolveDireccionOficinasSupervisor,
 } from './encuestas.js';
@@ -15,6 +16,7 @@ import {
   codigoEnFilasDelPromotor,
   enriquecerUsuarioConCodigoCarga,
   idVendedorOperador,
+  loadOperadoresCatalogAsync,
   resolveCodigoCargaOperador,
   resolveCodigoCargaPromotorStrict,
 } from './operadores-catalog.js';
@@ -208,10 +210,14 @@ function codigoDesdeFilasEncuesta(rows, nombrePromotor, idVendedor) {
 export function resolveUsuarioSpCarga(usuarioSesion, context, payload) {
   const idV = idVendedorOperador(usuarioSesion);
   const explicito = payload.promotorCodigo?.trim();
+  const rowsEfectivas =
+    usuarioSesion.rol === 'promotor' && !promotorTieneFilasEnMuestra(context.rows, idV)
+      ? []
+      : context.rows;
 
   if (usuarioSesion.rol === 'promotor') {
     const desdeFilas = codigoDesdeFilasEncuesta(
-      context.rows,
+      rowsEfectivas,
       usuarioSesion.nombre,
       idV,
     );
@@ -219,17 +225,15 @@ export function resolveUsuarioSpCarga(usuarioSesion, context, payload) {
 
     if (
       esCodigoUsuarioCargaValido(explicito) &&
-      codigoEnFilasDelPromotor(explicito, context.rows, idV)
+      codigoEnFilasDelPromotor(explicito, rowsEfectivas, idV)
     ) {
       return explicito;
     }
 
-    const strict = resolveCodigoCargaPromotorStrict(usuarioSesion, context.rows);
+    const strict = resolveCodigoCargaPromotorStrict(usuarioSesion, rowsEfectivas);
     if (esCodigoUsuarioCargaValido(strict)) return strict;
 
-    if (esCodigoUsuarioCargaValido(explicito) && !context.rows?.length) {
-      return explicito;
-    }
+    if (esCodigoUsuarioCargaValido(explicito)) return explicito;
 
     throw new CodigoPromotorCargaError();
   }
@@ -239,12 +243,12 @@ export function resolveUsuarioSpCarga(usuarioSesion, context, payload) {
   const sesionCodigo = usuarioSesion.codigoCarga?.trim();
   if (esCodigoUsuarioCargaValido(sesionCodigo)) return sesionCodigo;
 
-  const desdeCatalogo = resolveCodigoCargaOperador(usuarioSesion, context.rows);
+  const desdeCatalogo = resolveCodigoCargaOperador(usuarioSesion, rowsEfectivas);
   if (esCodigoUsuarioCargaValido(desdeCatalogo)) return desdeCatalogo;
 
   if (usuarioSesion.rol === 'supervisor') {
     const desdeFilas = codigoDesdeFilasEncuesta(
-      context.rows,
+      rowsEfectivas,
       usuarioSesion.nombre,
       idV,
     );
@@ -256,6 +260,7 @@ export function resolveUsuarioSpCarga(usuarioSesion, context, payload) {
 }
 
 export async function resolveCargaEncuestaContext(usuarioSesion) {
+  await loadOperadoresCatalogAsync();
   const rows = await fetchEncuestasMuestraRaw(usuarioSesion);
   const supervisorNombre =
     usuarioSesion.rol === 'promotor'

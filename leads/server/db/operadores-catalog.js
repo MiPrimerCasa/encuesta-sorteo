@@ -5,6 +5,7 @@ import { esCodigoUsuarioCargaValido } from './codigo-promotor.js';
 import {
   buildCodigoPromotorIndex,
   normalizeNombre,
+  promotorTieneFilasEnMuestra,
   resolveCodigoCargaPorPromotor,
 } from './encuestas.js';
 import { fetchLinksRedesCatalogFromSp } from './links-redes-sp.js';
@@ -139,6 +140,29 @@ export function idVendedorOperador(usuarioSesion) {
   return usuarioSesion?.idVendedor ?? usuarioSesion?.idOperador ?? usuarioSesion?.id ?? null;
 }
 
+/** El código de filas propias coincide con el vendedor de la planilla o con el login. */
+function codigoCoherenteConFilasPropias(codigo, nombreOperador, encuestaRows, idVendedor, catalog) {
+  if (codigoPerteneceAVendedor(codigo, nombreOperador, catalog)) return true;
+  const entry = catalog.byCodigo?.[normalizeCodigoCatalog(codigo)];
+  if (!entry?.vendedor) return true;
+  const prefix = `${idVendedor}|`;
+  const index = buildCodigoPromotorIndex(encuestaRows);
+  for (const [key, v] of index) {
+    if (!key.startsWith(prefix) || v.codigoCarga !== codigo) continue;
+    if (nombresCoinciden(v.nombre, entry.vendedor)) return true;
+  }
+  return false;
+}
+
+/** El @usuario del SP pertenece a este operador según catálogo links-redes (vendedor en planilla). */
+export function codigoPerteneceAVendedor(codigo, nombreOperador, catalog = loadOperadoresCatalog()) {
+  if (!esCodigoUsuarioCargaValido(codigo)) return false;
+  const entry = catalog.byCodigo?.[normalizeCodigoCatalog(codigo)];
+  if (!entry?.vendedor) return true;
+  if (entry.rol === 'supervisor') return false;
+  return nombresCoinciden(nombreOperador, entry.vendedor);
+}
+
 /** El código @usuario pertenece a filas previas de este idVendedor (o no hay filas para comparar). */
 export function codigoEnFilasDelPromotor(codigo, encuestaRows, idVendedor) {
   if (!esCodigoUsuarioCargaValido(codigo)) return false;
@@ -158,15 +182,9 @@ export function codigoEnFilasDelPromotor(codigo, encuestaRows, idVendedor) {
 export function resolveCodigoCargaPromotorStrict(usuarioSesion, encuestaRows = []) {
   if (!usuarioSesion || usuarioSesion.rol !== 'promotor') return null;
   const idV = idVendedorOperador(usuarioSesion);
-
-  const desdeFilas = resolveCodigoCargaPorPromotor(
-    encuestaRows,
-    usuarioSesion.nombre,
-    idV,
-  );
-  if (esCodigoUsuarioCargaValido(desdeFilas)) return desdeFilas;
-
   const catalog = loadOperadoresCatalog();
+  const nombre = String(usuarioSesion.nombre ?? '').trim();
+
   const idOp = String(idV ?? '').trim();
   if (idOp && catalog.byIdOperador?.[idOp]) {
     const codigo = normalizeCodigoCatalog(codigoDesdeEntrada(catalog.byIdOperador[idOp]));
@@ -179,7 +197,7 @@ export function resolveCodigoCargaPromotorStrict(usuarioSesion, encuestaRows = [
     if (esCodigoUsuarioCargaValido(codigo)) return codigo;
   }
 
-  const norm = normalizeNombre(String(usuarioSesion.nombre ?? '').trim());
+  const norm = normalizeNombre(nombre);
   if (norm && catalog.byNombre?.[norm]) {
     const entry = catalog.byNombre[norm];
     if (entry?.rol !== 'supervisor') {
@@ -188,8 +206,40 @@ export function resolveCodigoCargaPromotorStrict(usuarioSesion, encuestaRows = [
     }
   }
 
+  if (nombre) {
+    for (const [key, entry] of Object.entries(catalog.byNombre ?? {})) {
+      if (entry?.rol === 'supervisor') continue;
+      if (nombresCoinciden(nombre, key)) {
+        const codigo = normalizeCodigoCatalog(codigoDesdeEntrada(entry));
+        if (esCodigoUsuarioCargaValido(codigo)) return codigo;
+      }
+    }
+    for (const entry of Object.values(catalog.byCodigo ?? {})) {
+      if (entry?.rol === 'supervisor') continue;
+      if (entry?.vendedor && nombresCoinciden(nombre, entry.vendedor)) {
+        const codigo = normalizeCodigoCatalog(entry.codigo);
+        if (esCodigoUsuarioCargaValido(codigo)) return codigo;
+      }
+    }
+  }
+
+  const desdeFilas = resolveCodigoCargaPorPromotor(encuestaRows, nombre, idV);
+  if (esCodigoUsuarioCargaValido(desdeFilas)) {
+    if (codigoPerteneceAVendedor(desdeFilas, nombre, catalog)) return desdeFilas;
+    if (
+      promotorTieneFilasEnMuestra(encuestaRows, idV) &&
+      codigoCoherenteConFilasPropias(desdeFilas, nombre, encuestaRows, idV, catalog)
+    ) {
+      return desdeFilas;
+    }
+  }
+
   const sesion = String(usuarioSesion.codigoCarga ?? '').trim();
-  if (esCodigoUsuarioCargaValido(sesion) && codigoEnFilasDelPromotor(sesion, encuestaRows, idV)) {
+  if (
+    esCodigoUsuarioCargaValido(sesion) &&
+    codigoPerteneceAVendedor(sesion, nombre, catalog) &&
+    codigoEnFilasDelPromotor(sesion, encuestaRows, idV)
+  ) {
     return sesion;
   }
 
@@ -261,12 +311,13 @@ export function resolveCodigoCargaOperador(usuarioSesion, encuestaRows = []) {
 export function enriquecerUsuarioConCodigoCarga(usuario, encuestaRows = []) {
   if (!usuario) return usuario;
   if (usuario.rol === 'promotor') {
-    const codigo = resolveCodigoCargaPromotorStrict(usuario, encuestaRows);
-    if (codigo) return { ...usuario, codigoCarga: codigo };
     const idV = idVendedorOperador(usuario);
+    const rowsEfectivas = promotorTieneFilasEnMuestra(encuestaRows, idV) ? encuestaRows : [];
+    const codigo = resolveCodigoCargaPromotorStrict(usuario, rowsEfectivas);
+    if (codigo) return { ...usuario, codigoCarga: codigo };
     if (
       esCodigoUsuarioCargaValido(usuario.codigoCarga) &&
-      codigoEnFilasDelPromotor(usuario.codigoCarga, encuestaRows, idV)
+      codigoEnFilasDelPromotor(usuario.codigoCarga, rowsEfectivas, idV)
     ) {
       return usuario;
     }

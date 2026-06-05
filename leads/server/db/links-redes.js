@@ -64,7 +64,7 @@ export async function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows =
       whatsapp: null,
       tiktok: null,
       mensaje:
-        'No se encontró tu código de promotor (ej. SORTEO01S21P01). Volvé a iniciar sesión o contactá soporte.',
+        'No se encontró tu código de promotor (ej. SORTEO01S21P02). Volvé a iniciar sesión o contactá soporte.',
     };
   }
   const entry = await resolveLinksRedesPorCodigo(codigo);

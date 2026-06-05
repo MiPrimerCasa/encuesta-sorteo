@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { fetchLinksRedes } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import {
   leadCompro,
@@ -109,13 +110,36 @@ export function LeadsPanel({
   onLeadSeguimientoConsumido,
 }: LeadsPanelProps) {
   const { usuario } = useAuth();
+  const [codigoDesdeLinks, setCodigoDesdeLinks] = useState<string | undefined>();
+
+  useEffect(() => {
+    if (!usuario || rolUsuario !== 'promotor' || usuario.codigoCarga?.trim()) {
+      setCodigoDesdeLinks(undefined);
+      return;
+    }
+    let cancelado = false;
+    fetchLinksRedes()
+      .then((links) => {
+        if (!cancelado && links.codigo?.trim()) {
+          setCodigoDesdeLinks(links.codigo.trim());
+        }
+      })
+      .catch(() => {
+        if (!cancelado) setCodigoDesdeLinks(undefined);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [usuario, rolUsuario]);
+
   const codigoCargaFallback = useMemo(() => {
     if (!usuario || rolUsuario !== 'promotor') return undefined;
     if (usuario.codigoCarga?.trim()) return usuario.codigoCarga.trim();
+    if (codigoDesdeLinks?.trim()) return codigoDesdeLinks.trim();
     const idOp = String(usuario.idOperador ?? usuario.id ?? '').trim();
     const propio = leads.find((l) => String(l.idVendedor ?? '') === idOp);
     return propio?.codigoPromotorCarga?.trim();
-  }, [usuario, rolUsuario, leads]);
+  }, [usuario, rolUsuario, leads, codigoDesdeLinks]);
 
   const {
     entrevistaPendiente,

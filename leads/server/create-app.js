@@ -9,6 +9,7 @@ import {
   enrichOperadorRolDesdeEncuestas,
   fetchEncuestasMuestraRaw,
   listLeadsFromEncuestas,
+  promotorTieneFilasEnMuestra,
   resolveDireccionOficinasSupervisor,
   updateLeadSeguimientoEncuesta,
 } from './db/encuestas.js';
@@ -31,6 +32,7 @@ import {
 } from './db/links-acortados-store.js';
 import {
   enriquecerUsuarioConCodigoCarga,
+  idVendedorOperador,
   loadOperadoresCatalogAsync,
 } from './db/operadores-catalog.js';
 import { fetchAdminDashboard } from './db/admin-dashboard.js';
@@ -119,6 +121,7 @@ function registerApiRoutes(api) {
       if (!esSuperadminUsuario(user)) {
         user = await enrichOperadorRolDesdeEncuestas(user);
         try {
+          await loadOperadoresCatalogAsync();
           const rowsLogin = await fetchEncuestasMuestraRaw({
             id: user.id,
             nombre: user.nombre,
@@ -257,8 +260,13 @@ function registerApiRoutes(api) {
     }
 
     try {
-      const usuarioConCodigo = enriquecerUsuarioConCodigoCarga(usuario, []);
-      const links = await resolveLinksRedesParaUsuario(usuarioConCodigo, []);
+      await loadOperadoresCatalogAsync();
+      const rows = await fetchEncuestasMuestraRaw(usuario);
+      const idV = idVendedorOperador(usuario);
+      const rowsEfectivas =
+        usuario.rol === 'promotor' && !promotorTieneFilasEnMuestra(rows, idV) ? [] : rows;
+      const usuarioConCodigo = enriquecerUsuarioConCodigoCarga(usuario, rowsEfectivas);
+      const links = await resolveLinksRedesParaUsuario(usuarioConCodigo, rowsEfectivas);
       const catalog = await loadOperadoresCatalogAsync();
       const source =
         catalog.catalogSource === 'sql'

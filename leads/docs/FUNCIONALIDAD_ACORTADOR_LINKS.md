@@ -19,9 +19,7 @@ Podés mantener el script Python solo para exportar la planilla de Google Sheets
 2. **Acortar** — `npm run links:acortar` (solo pendientes) o **`npm run links:actualizar-todos`** (todos promotores + supervisores del catálogo).
 3. **Verificar** — `npm run links:verificar` revisa links vencidos (por defecto 1 por ejecución, cada 7 días).
 4. Si el acortado **no responde**, se **regenera** automáticamente.
-5. Si cambia o se regenera → **notificación** en la campana (NavBar):
-   - **Promotor**: solo avisos de **su** código (`codigoCarga`).
-   - **Supervisor**: avisos de **todo el equipo** (cada promotor y cada supervisor con link propio).
+5. Si cambia o se regenera → **notificación** en la campana (NavBar) solo para el operador dueño del código (`codigoCarga`), promotor o supervisor.
 
 Los promotores comparten el link **largo** `wa.me` desde Leads (Instagram y Facebook). Solo **Instagram** tiene link acortado para bio/planilla; **Facebook** siempre es el link normal, sin acortar ni verificar.
 

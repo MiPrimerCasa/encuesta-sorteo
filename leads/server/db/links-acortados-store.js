@@ -2,6 +2,7 @@ import {
   loadOperadoresCatalogAsync,
   invalidateOperadoresCatalogCache,
   normalizeCodigoCatalog,
+  resolveCodigoCargaOperador,
 } from './operadores-catalog.js';
 import {
   acortarEnlace,
@@ -105,10 +106,9 @@ function mapNotificacionRow(r) {
   };
 }
 
-function codigoCoincideUsuario(usuario, codigoNotif) {
-  const codigoUsuario = normalizeCodigoCatalog(usuario?.codigoCarga);
-  if (!codigoUsuario) return false;
-  return codigoUsuario === normalizeCodigoCatalog(codigoNotif);
+function codigoUsuarioSesion(usuario) {
+  const codigo = resolveCodigoCargaOperador(usuario) ?? usuario?.codigoCarga;
+  return normalizeCodigoCatalog(codigo) || null;
 }
 
 function crearNotificacion({
@@ -126,13 +126,11 @@ function crearNotificacion({
      WHERE codigo = ? AND red = 'instagram' AND activa = 1`,
   ).run(codigo);
 
-  const nombre = vendedor ?? codigo;
-  const rolTxt = rolCatalogo === 'supervisor' ? 'supervisor' : 'promotor';
   let mensaje;
   if (tipo === 'link_actualizado') {
-    mensaje = `Nuevo link de Instagram (${rolTxt} ${nombre}, código ${codigo}). Copiá el link corto en la bio de Instagram.`;
+    mensaje = `Tu link corto de Instagram (código ${codigo}) fue actualizado. Copiá el nuevo en la bio.`;
   } else {
-    mensaje = `El link de Instagram de ${nombre} (${codigo}, ${rolTxt}) no pudo renovarse. Revisá la bio o contactá soporte.`;
+    mensaje = `Tu link de Instagram (${codigo}) no pudo renovarse. Revisá la bio o contactá soporte.`;
   }
 
   const info = db
@@ -199,24 +197,23 @@ export function listarNotificacionesParaUsuario(usuario) {
   initLinksAcortadosSchema();
   if (!usuario?.id) return [];
 
+  const codigoPropio = codigoUsuarioSesion(usuario);
+  if (!codigoPropio) return [];
+
   const rows = getDb()
     .prepare(
       `SELECT n.* FROM links_notificaciones n
        WHERE n.activa = 1
+         AND n.codigo = @codigo
          AND NOT EXISTS (
            SELECT 1 FROM links_notificacion_vista v
            WHERE v.notificacion_id = n.id AND v.usuario_id = @uid
          )
        ORDER BY n.creado_en DESC`,
     )
-    .all({ uid: String(usuario.id) });
+    .all({ uid: String(usuario.id), codigo: codigoPropio });
 
-  return rows
-    .filter((r) => {
-      if (usuario.rol === 'supervisor') return true;
-      return codigoCoincideUsuario(usuario, r.codigo);
-    })
-    .map(mapNotificacionRow);
+  return rows.map(mapNotificacionRow);
 }
 
 export function contarNotificacionesParaUsuario(usuario) {

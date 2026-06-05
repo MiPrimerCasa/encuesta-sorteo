@@ -207,7 +207,8 @@ function registerApiRoutes(api) {
       return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
     }
     try {
-      const items = listarNotificacionesParaUsuario(usuario);
+      const usuarioConCodigo = enriquecerUsuarioConCodigoCarga(usuario, []);
+      const items = listarNotificacionesParaUsuario(usuarioConCodigo);
       return res.json({
         total: items.length,
         items,

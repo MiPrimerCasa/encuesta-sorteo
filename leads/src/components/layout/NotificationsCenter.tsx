@@ -53,9 +53,7 @@ export function NotificationsCenter({ rol }: NotificationsCenterProps) {
   };
 
   const subtitulo =
-    rol === 'supervisor'
-      ? 'Instagram — actualizaciones de todo el equipo (promotores y supervisores)'
-      : 'Instagram — tu link único fue actualizado; copiá el nuevo en la bio';
+    'Instagram — avisos de tu link (solo los de tu código de operador)';
 
   return (
     <div className="relative" ref={panelRef}>

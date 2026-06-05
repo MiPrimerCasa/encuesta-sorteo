@@ -711,4 +711,126 @@ Análisis completo: [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MO
 
 ---
 
-*Documento generado a partir del análisis integral del repositorio. Mantener actualizado ante cambios funcionales relevantes. Las novedades se agregan en **§14** sin reescribir el cuerpo principal.*
+## 15. Actualización — nuevas funcionalidades (junio 2026, segunda entrega)
+
+> **Añadido:** 5 jun 2026. Complementa **§14** sin modificar secciones 1–13 ni reescribir §14.
+
+### 15.0 Revisión de estados (respecto a §14)
+
+| Ítem | Estado en §14 | Estado actual |
+|------|-----------------|---------------|
+| **RF-29** SP seguimiento SQL | Parcial | **Parcial+** — lectura vía `SP_HistorialSeguimientoLead` y `SP_UltimoSeguimientoOperador` |
+| **RF-30** Historial seguimiento | Implementado | **Implementado+** — historial también **inline en tarjetas** (`LeadHistorialInline`) |
+| **RF-31** Referidos → encuesta | Parcial | **Parcial+** — badge **Referido**, meta vía `SP_ObtenerMetaReferidosLead`, fix campo3/4 |
+| **RF-34** Links redes | Implementado | **Implementado+** — catálogo default desde SP `rptLinkQRenRedesSociales` (STRSYSTEM) |
+| **DBA ítem 12** `lead_referido` | Pendiente | **Parcial** — scripts desplegables + fix Pablo (`lead_referido-fix-campo3-campo4-pablo.sql`) |
+
+### 15.1 Nuevos requerimientos funcionales
+
+| ID | Estado | Requerimiento | Doc / código |
+|----|--------|---------------|--------------|
+| RF-37 | **Implementado** | Historial de seguimiento **visible en la tarjeta** del lead (últimos estados sin abrir el modal). | `useHistorialLeads.ts`, `LeadHistorialInline.tsx`, `LeadCard.tsx` |
+| RF-38 | **Implementado** | Lectura de seguimiento en SQL Server por SP dedicados (historial por lead + último estado batch por operador). | `sql/SP_ConsultarSeguimientoLead-notas.sql`, `seguimiento-sql.js` |
+| RF-39 | **Implementado** | Badge **Referido** en tarjeta con metadatos (origen, nivel, visibilidad promotor/supervisor). | `FUNCIONALIDAD_REFERIDOS_ENCUESTA.md`, `LeadCard.tsx` |
+| RF-40 | **Implementado** | Idempotencia al cargar referidos (`referidosGenerados` evita duplicar altas). | `src/domain/referidos-carga.ts`, `referidos-carga.js` |
+| RF-41 | **Implementado** | Catálogo de links redes desde **SP en STRSYSTEM** (respaldo JSON). | `links-redes-sp.js`, `SP_LINKS_REDES` |
+| RF-42 | **Implementado** | Exportar CSV de prueba de links redes (`npm run links:export-prueba`). | `scripts/export-links-redes-prueba.mjs` |
+| RF-43 | **Implementado** | Distinguir origen de carga manual vs QR (`@origen` 1/2 en SP carga). | `FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md`, `SP_CARGA_INCLUDE_ORIGEN` |
+
+### 15.2 Resumen por funcionalidad
+
+#### 15.2.1 Historial inline en tarjetas (RF-37)
+
+- `LeadsPanel` precarga historial de los leads visibles con `useHistorialLeads`.
+- `LeadCard` muestra `LeadHistorialInline` (últimas entradas, etiqueta de estado, operador).
+- Complementa el panel del modal (RF-30) para seguimiento rápido en bandeja.
+
+#### 15.2.2 SP de lectura de seguimiento (RF-38)
+
+Variables `.env`:
+
+```env
+SP_SEGUIMIENTO_HISTORIAL=dbo.SP_HistorialSeguimientoLead
+SP_SEGUIMIENTO_ULTIMOS=dbo.SP_UltimoSeguimientoOperador
+```
+
+| SP | Uso |
+|----|-----|
+| `SP_HistorialSeguimientoLead` | Historial de **un** lead (`GET /api/leads/:id/historial`) |
+| `SP_UltimoSeguimientoOperador` | Último seguimiento de **todos** los leads visibles al cargar listado |
+
+Regla de visibilidad: igual que `encuestasMuestraOperador` (supervisor = equipo; promotor = propios).  
+Script DBA: `sql/SP_ConsultarSeguimientoLead-notas.sql`.  
+Permisos: `GRANT EXECUTE` en ambos SP (ver `grants-mpcsp-leads.sql`).
+
+#### 15.2.3 Referidos — refinamiento (RF-39, RF-40)
+
+- **Badge Referido** en `LeadCard` cuando `lead.esReferido` (desde SP listado o `SP_ObtenerMetaReferidosLead`).
+- Campos lead: `esReferido`, `leadReferidoDeId`, `nivelReferido`, `referidoCargadoPorRol`.
+- **Fix DBA:** no escribir metadata de referido en `campo3`/`campo4` de encuesta (son preguntas del sorteo). Script: `sql/lead_referido-fix-campo3-campo4-pablo.sql`.
+- **Idempotencia:** `seguimiento.referidosGenerados[]` guarda teléfonos ya procesados; re-guardar no duplica altas.
+- Resolución `id_vendedor` / `id_supervisor`: JOIN `encuesta.usuario` → `mensajeria.dbo.vendedor.codigo`.
+
+#### 15.2.4 Links redes desde SQL (RF-41, RF-42)
+
+- Catálogo operadores: `EXEC dbo.rptLinkQRenRedesSociales` (default) con fallback `links-redes.json`.
+- `LINKS_REDES_SOURCE=sql` (default) | `json`.
+- Inspección: `npm run inspect:links-redes`.
+- Export CSV prueba (todos los códigos + links IG/FB/WA): `npm run links:export-prueba` → `data/links-redes-prueba-YYYY-MM-DD.csv`.
+- Verificación HTTP opcional: `npm run links:export-prueba:verificar`.
+
+#### 15.2.5 Origen de carga QR vs manual (RF-43)
+
+- `SP_CARGA_INCLUDE_ORIGEN=true` → la app envía `@origen`: `1` = QR, `2` = manual/app.
+- Permite upsert en carga manual (`origen 2`) sin bloquear altas QR (`origen 1`).
+
+### 15.3 Variables `.env` nuevas o ampliadas
+
+| Variable | Default | Uso |
+|----------|---------|-----|
+| `SP_SEGUIMIENTO_HISTORIAL` | `dbo.SP_HistorialSeguimientoLead` | Lectura historial |
+| `SP_SEGUIMIENTO_ULTIMOS` | `dbo.SP_UltimoSeguimientoOperador` | Batch al listar leads |
+| `SP_OBTENER_META_REFERIDO` | `SP_ObtenerMetaReferidosLead` | Badge referido |
+| `SP_REGISTRAR_REFERIDO` | `SP_RegistrarReferidoLead` | Alta referido |
+| `REFERIDOS_AUTO_CARGA` | `true` | Procesar referidos al guardar |
+| `SP_LINKS_REDES` | `dbo.rptLinkQRenRedesSociales` | Catálogo links |
+| `LINKS_REDES_SOURCE` | `sql` | `sql` \| `json` |
+| `SP_CARGA_INCLUDE_ORIGEN` | `true` | Enviar `@origen` en carga |
+| `SUPERADMIN_LOGIN_IDS` | — | Logins con rol superadmin |
+| `ADMIN_SUPERVISOR_IDS` | — | Filtro supervisores en panel admin |
+
+### 15.4 Nuevos entregables DBA (añadir a §14.4)
+
+| # | Estado | Entregable | Script |
+|---|--------|------------|--------|
+| 17 | **Pendiente** | `SP_HistorialSeguimientoLead` | `SP_ConsultarSeguimientoLead-notas.sql` |
+| 18 | **Pendiente** | `SP_UltimoSeguimientoOperador` | `SP_ConsultarSeguimientoLead-notas.sql` |
+| 19 | **Parcial** | Fix referidos campo3/4 + SP actualizado | `lead_referido-fix-campo3-campo4-pablo.sql` |
+| 20 | **Implementado** | SP catálogo links `rptLinkQRenRedesSociales` | STRSYSTEM (DBA) |
+
+### 15.5 Scripts npm / utilidades nuevas
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run inspect:links-redes` | Inspecciona columnas del SP de links |
+| `npm run links:export-prueba` | CSV de links por operador |
+| `npm run links:export-prueba:verificar` | CSV + verificación HTTP |
+| `npm run test:referidos-sp` | Prueba SP referidos (si existe en package.json) |
+
+### 15.6 Documentación de detalle
+
+| Tema | Archivo |
+|------|---------|
+| Referidos (badge, visibilidad, SPs) | [FUNCIONALIDAD_REFERIDOS_ENCUESTA.md](./FUNCIONALIDAD_REFERIDOS_ENCUESTA.md) |
+| SP lectura seguimiento | [sql/SP_ConsultarSeguimientoLead-notas.sql](../sql/SP_ConsultarSeguimientoLead-notas.sql) |
+| Historial (modal + inline) | [FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md](./FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md) |
+| Links redes SP + export | [FUNCIONALIDAD_ACORTADOR_LINKS.md](./FUNCIONALIDAD_ACORTADOR_LINKS.md) |
+| Carga origen 1/2 | [FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md](./FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md) |
+
+### 15.7 URL de producción
+
+Sistema desplegado en: [https://www.miprimercasafsa-sorteo.com/leads/](https://www.miprimercasafsa-sorteo.com/leads/)
+
+---
+
+*Documento generado a partir del análisis integral del repositorio. Las novedades se agregan en **§14** y **§15** sin reescribir el cuerpo principal (secciones 1–13).*

@@ -607,7 +607,44 @@ END;</pre>
 <h3>14.5 Índice documentación nueva</h3>
 <p>Ver <code>docs/INDICE_FUNCIONALIDADES.md</code> y los archivos <code>FUNCIONALIDAD_*.md</code> enlazados en §14.1.</p>
 
-<p class="subtitle">Las novedades se agregan en <strong>§14</strong> sin reescribir el cuerpo principal (secciones 1–13).</p>
+<h2>15. Actualización — nuevas funcionalidades (junio 2026, segunda entrega)</h2>
+<p class="subtitle"><strong>Añadido:</strong> 5 jun 2026. Complementa §14 sin modificar secciones 1–13.</p>
+
+<h3>15.0 Revisión de estados (respecto a §14)</h3>
+<table>
+  <tr><th>Ítem</th><th>Estado §14</th><th>Estado actual</th></tr>
+  <tr><td>RF-29 SP seguimiento</td><td class="st-partial">Parcial</td><td class="st-partial"><strong>Parcial+</strong> — SP lectura historial + últimos</td></tr>
+  <tr><td>RF-30 Historial</td><td class="st-ok">Implementado</td><td class="st-ok"><strong>Implementado+</strong> — inline en tarjetas</td></tr>
+  <tr><td>RF-31 Referidos</td><td class="st-partial">Parcial</td><td class="st-partial"><strong>Parcial+</strong> — badge Referido, fix campo3/4</td></tr>
+  <tr><td>RF-34 Links redes</td><td class="st-ok">Implementado</td><td class="st-ok"><strong>Implementado+</strong> — catálogo desde SP STRSYSTEM</td></tr>
+  <tr><td>DBA ítem 12 lead_referido</td><td class="st-pending">Pendiente</td><td class="st-partial"><strong>Parcial</strong> — scripts + fix Pablo</td></tr>
+</table>
+
+<h3>15.1 Nuevos requerimientos funcionales</h3>
+<table>
+  <tr><th>ID</th><th>Estado</th><th>Requerimiento</th></tr>
+  <tr><td>RF-37</td><td class="st-ok">Implementado</td><td>Historial inline en tarjeta del lead</td></tr>
+  <tr><td>RF-38</td><td class="st-ok">Implementado</td><td>SP lectura seguimiento (historial + batch operador)</td></tr>
+  <tr><td>RF-39</td><td class="st-ok">Implementado</td><td>Badge Referido con metadatos SP</td></tr>
+  <tr><td>RF-40</td><td class="st-ok">Implementado</td><td>Idempotencia referidos (<code>referidosGenerados</code>)</td></tr>
+  <tr><td>RF-41</td><td class="st-ok">Implementado</td><td>Links redes desde <code>rptLinkQRenRedesSociales</code></td></tr>
+  <tr><td>RF-42</td><td class="st-ok">Implementado</td><td>Export CSV prueba links (<code>links:export-prueba</code>)</td></tr>
+  <tr><td>RF-43</td><td class="st-ok">Implementado</td><td>Origen carga QR (1) vs manual (2)</td></tr>
+</table>
+
+<h3>15.2–15.6 Resumen</h3>
+<ul>
+  <li><strong>Historial inline:</strong> <code>useHistorialLeads</code>, <code>LeadHistorialInline</code> en <code>LeadCard</code>.</li>
+  <li><strong>SP lectura:</strong> <code>SP_HistorialSeguimientoLead</code>, <code>SP_UltimoSeguimientoOperador</code> — ver <code>SP_ConsultarSeguimientoLead-notas.sql</code>.</li>
+  <li><strong>Referidos:</strong> badge, <code>SP_ObtenerMetaReferidosLead</code>, fix <code>lead_referido-fix-campo3-campo4-pablo.sql</code>.</li>
+  <li><strong>Links:</strong> SP default STRSYSTEM, export CSV, <code>inspect:links-redes</code>.</li>
+  <li><strong>DBA nuevos ítems 17–20</strong> en §15.4 del .md.</li>
+</ul>
+
+<h3>15.7 URL producción</h3>
+<p><a href="https://www.miprimercasafsa-sorteo.com/leads/">https://www.miprimercasafsa-sorteo.com/leads/</a></p>
+
+<p class="subtitle">Las novedades se agregan en <strong>§14</strong> y <strong>§15</strong> sin reescribir el cuerpo principal (secciones 1–13).</p>
 
 </body>
 </html>

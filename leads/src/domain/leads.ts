@@ -34,6 +34,32 @@ export function leadCompro(lead: Lead) {
   return lead.seguimiento?.resultadoEntrevista === 'compro';
 }
 
+/** Fecha ISO del cierre (venta); prioriza la última entrada «compró» del historial. */
+export function fechaVentaLead(
+  lead: Lead,
+  historial: SeguimientoHistorialEntry[] = [],
+): string {
+  let ultima: string | null = null;
+  for (const entry of historial) {
+    if (entry.resultadoEntrevista !== 'compro') continue;
+    if (!ultima || entry.creadoEn.localeCompare(ultima) > 0) ultima = entry.creadoEn;
+  }
+  if (ultima) return ultima;
+  return lead.fechaAlta ?? `${lead.fechaObtencion}T00:00:00`;
+}
+
+/** Cierres: los vendidos más recientes primero. */
+export function sortLeadsPorVentaReciente(
+  leads: Lead[],
+  historialPorLead: Record<string, SeguimientoHistorialEntry[]> = {},
+): Lead[] {
+  return [...leads].sort((a, b) => {
+    const fa = fechaVentaLead(a, historialPorLead[a.id] ?? []);
+    const fb = fechaVentaLead(b, historialPorLead[b.id] ?? []);
+    return fb.localeCompare(fa);
+  });
+}
+
 export function leadReagendaEntrevista(lead: Lead) {
   return lead.seguimiento?.resultadoEntrevista === 'reagenda';
 }
@@ -132,6 +158,24 @@ export function applySeguimientoAlLead(lead: Lead, patch: SeguimientoLead): Lead
 export function esCerradoNegativoLead(lead: Lead) {
   const r = lead.seguimiento?.resultadoEntrevista;
   return r === 'no_compro' || r === 'sin_interes';
+}
+
+/** Entrevista hecha y resultado negativo (va a Contactado con prioridad visual). */
+export function leadPostEntrevistaSinCompra(lead: Lead) {
+  return esCerradoNegativoLead(lead) && lead.seguimiento?.huboEntrevista === true;
+}
+
+/** Contactado: primero post-entrevista sin compra; el resto en orden cronológico. */
+export function sortLeadsContactados(leads: Lead[]): Lead[] {
+  return [...leads].sort((a, b) => {
+    const aPrior = leadPostEntrevistaSinCompra(a) ? 0 : 1;
+    const bPrior = leadPostEntrevistaSinCompra(b) ? 0 : 1;
+    if (aPrior !== bPrior) return aPrior - bPrior;
+    const fa = a.fechaAlta ?? `${a.fechaObtencion}T00:00:00`;
+    const fb = b.fechaAlta ?? `${b.fechaObtencion}T00:00:00`;
+    if (aPrior === 0) return fb.localeCompare(fa);
+    return fa.localeCompare(fb);
+  });
 }
 
 /** Pestaña de Leads donde corresponde listar el lead. */

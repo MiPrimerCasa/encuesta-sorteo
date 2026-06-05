@@ -7,6 +7,7 @@ import {
   leadCompro,
   leadDerivaSupervisorTerreno,
   leadEnEntrevistaPendiente,
+  leadPostEntrevistaSinCompra,
   leadReagendaEntrevista,
   leadEsCargaManual,
   leadSeguimientoPijPromotor,
@@ -68,8 +69,12 @@ export function LeadCard({
   const esArchivo    = variante === 'compro' || (compro && !esNoCompro);
   const esSeguimiento =
     !esNoCompro && (variante === 'seguimiento' || (variante !== 'compro' && reagenda && !esArchivo));
-  const esContactado = !esArchivo && !esSeguimiento && !esNoCompro && tieneSeguimiento;
-  const esNuevo      = !esArchivo && !esSeguimiento && !esNoCompro && !tieneSeguimiento;
+  const esPostEntrevistaNegativo =
+    !esArchivo && !esSeguimiento && !esNoCompro && leadPostEntrevistaSinCompra(lead);
+  const esContactado =
+    !esArchivo && !esSeguimiento && !esNoCompro && tieneSeguimiento && !esPostEntrevistaNegativo;
+  const esNuevo =
+    !esArchivo && !esSeguimiento && !esNoCompro && !tieneSeguimiento;
   const mostrarAgendaEntrevista =
     !esArchivo &&
     !esNoCompro &&
@@ -101,9 +106,11 @@ export function LeadCard({
             ? 'border-zinc-300 bg-zinc-200 active:bg-zinc-300 active:border-zinc-400 [&:not(:active)]:hover:border-zinc-400 [&:not(:active)]:hover:shadow-sm'
             : esSeguimiento
               ? 'border-brand-100 bg-brand-50 active:bg-brand-100 active:border-brand-300 [&:not(:active)]:hover:border-brand-200 [&:not(:active)]:hover:shadow-sm'
-              : esContactado
-                ? 'border-amber-200 bg-amber-50 active:bg-amber-100 active:border-amber-300 [&:not(:active)]:hover:border-amber-300 [&:not(:active)]:hover:shadow-sm'
-                : esNuevo
+              : esPostEntrevistaNegativo
+                ? 'border-orange-200 bg-orange-50 active:bg-orange-100 active:border-orange-300 [&:not(:active)]:hover:border-orange-300 [&:not(:active)]:hover:shadow-sm'
+                : esContactado
+                  ? 'border-amber-200 bg-amber-50 active:bg-amber-100 active:border-amber-300 [&:not(:active)]:hover:border-amber-300 [&:not(:active)]:hover:shadow-sm'
+                  : esNuevo
                   ? 'border-[#99F6E4] bg-[#F0FDFA] active:bg-[#CCFBF1] active:border-[#5EEAD4] [&:not(:active)]:hover:border-[#5EEAD4] [&:not(:active)]:hover:shadow-sm'
                   : 'border-zinc-200 bg-white active:bg-brand-50 active:border-brand-200 [&:not(:active)]:hover:border-zinc-300 [&:not(:active)]:hover:shadow-sm'
         }`
@@ -171,6 +178,13 @@ export function LeadCard({
             {esArchivo && <StatusPill variant="compro" dot>Cierre</StatusPill>}
             {esSeguimiento && !esArchivo && (
               <StatusPill variant="reagendado" dot>En seguimiento</StatusPill>
+            )}
+            {esPostEntrevistaNegativo && (
+              <StatusPill variant="post-entrevista" dot>
+                {lead.seguimiento?.resultadoEntrevista === 'sin_interes'
+                  ? 'Sin interés'
+                  : 'No compró'}
+              </StatusPill>
             )}
             {esContactado && derivaTerreno && (
               <StatusPill variant="pending" dot>Interés terreno</StatusPill>

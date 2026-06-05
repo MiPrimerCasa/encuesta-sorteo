@@ -5,6 +5,7 @@ import {
   leadReagendaEntrevista,
   leadSoloLecturaSupervisor,
   leadSoloLecturaPromotor,
+  sortLeadsPorVentaReciente,
   tabIdListaLead,
 } from '../../domain/leads';
 import {
@@ -195,6 +196,13 @@ export function LeadsPanel({
 
   const tabData = TABS.find((t) => t.id === tabActivo) ?? TABS[0];
   const itemsActivos = listas[tabData.key];
+  const itemsVisibles = useMemo(
+    () =>
+      tabActivo === 'compro'
+        ? sortLeadsPorVentaReciente(itemsActivos, historialPorLead)
+        : itemsActivos,
+    [tabActivo, itemsActivos, historialPorLead],
+  );
   const esPromotor = rolUsuario === 'promotor';
   const esTabPrioridad = tabActivo === 'entrevista';
 
@@ -264,9 +272,20 @@ export function LeadsPanel({
           <path d="M7.5 6.5v4M7.5 4.5v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
         </svg>
         <p className="text-[13px] text-zinc-500">
-          En <span className="font-medium text-zinc-700">Prioridad</span>: primero derivados a terreno, luego
-          entrevistas agendadas, luego encuestas sin contactar (orden cronológico en cada grupo).{' '}
-          <span className="font-medium text-zinc-700">Reagendar</span> va a En seguimiento.
+          {esPromotor ? (
+            <>
+              En <span className="font-medium text-zinc-700">Prioridad</span>: primero tus entrevistas
+              agendadas, después encuestas sin contactar (las más antiguas primero). Deslizá una tarjeta
+              para contacto rápido o abrila para completar el seguimiento.{' '}
+              <span className="font-medium text-zinc-700">Reagendar</span> va a En seguimiento.
+            </>
+          ) : (
+            <>
+              En <span className="font-medium text-zinc-700">Prioridad</span>: primero derivados a terreno,
+              luego entrevistas agendadas, luego encuestas sin contactar (orden cronológico en cada grupo).{' '}
+              <span className="font-medium text-zinc-700">Reagendar</span> va a En seguimiento.
+            </>
+          )}
         </p>
       </div>
 
@@ -411,18 +430,18 @@ export function LeadsPanel({
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
               {tabData.tituloLargo}
             </h2>
-            <span className="text-[13px] tabular-nums text-zinc-400">{itemsActivos.length}</span>
+            <span className="text-[13px] tabular-nums text-zinc-400">{itemsVisibles.length}</span>
           </div>
 
           {/* Lista */}
-          {itemsActivos.length === 0 ? (
+          {itemsVisibles.length === 0 ? (
             <p className="rounded-lg border border-dashed border-zinc-200 py-10 text-center text-[13px] text-zinc-400">
               {tabData.vacio}
             </p>
           ) : esTabPrioridad ? (
             <div className="space-y-6">
               {ORDEN_PRIORIDAD.map((prioridad) => {
-                const grupo = agruparPorPrioridadTabInicial(itemsActivos)[prioridad];
+                const grupo = agruparPorPrioridadTabInicial(itemsVisibles)[prioridad];
                 if (grupo.length === 0) return null;
                 return (
                   <section key={prioridad}>
@@ -441,7 +460,7 @@ export function LeadsPanel({
             </div>
           ) : (
             <div className="space-y-3">
-              {itemsActivos.map((lead) => renderTarjetaLead(lead, tabData.variante))}
+              {itemsVisibles.map((lead) => renderTarjetaLead(lead, tabData.variante))}
             </div>
           )}
         </>

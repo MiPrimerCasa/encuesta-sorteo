@@ -1,5 +1,10 @@
 import { useMemo } from 'react';
-import { leadCompro, leadReagendaEntrevista } from '../domain/leads';
+import {
+  leadCompro,
+  leadReagendaEntrevista,
+  sortLeadsContactados,
+  sortLeadsPorVentaReciente,
+} from '../domain/leads';
 import {
   fueContactadoLead,
   ordenarPorPrioridadTabInicial,
@@ -39,7 +44,7 @@ function esCerradoNegativo(l: Lead) {
 export function useLeadsFilter(leads: Lead[]) {
   return useMemo(() => {
     // Solo las compras cierran el lead; los negativos pasan a Contactado.
-    const compraron = fifoSort(leads.filter(leadCompro));
+    const compraron = sortLeadsPorVentaReciente(leads.filter(leadCompro));
     const noCompraron = fifoSort(leads.filter(esCerradoNegativo));
     const cerrados = new Set(compraron.map((l) => l.id));
 
@@ -52,8 +57,8 @@ export function useLeadsFilter(leads: Lead[]) {
       activos.filter((l) => perteneceTabInicial(l)),
     );
 
-    // Contactado: contactados pendientes + resultados negativos (no compró / sin interés).
-    const paraContactar = fifoSort(
+    // Contactado: post-entrevista sin compra arriba; luego el resto de contactados.
+    const paraContactar = sortLeadsContactados(
       activos.filter(
         (l) => (fueContactadoLead(l) || esCerradoNegativo(l)) && !perteneceTabInicial(l),
       ),

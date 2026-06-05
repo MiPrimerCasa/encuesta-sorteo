@@ -21,7 +21,8 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | Derivar terreno (promotor → supervisor) | [FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md](./FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md) | Promotor, supervisor | `LeadModalForm.tsx`, `prioridad-leads.ts` |
 | Calendario supervisor | [FUNCIONALIDAD_CALENDARIO_SUPERVISOR.md](./FUNCIONALIDAD_CALENDARIO_SUPERVISOR.md) | Supervisor | `CalendarioView.tsx`, `NavBar.tsx` |
 | Conexión SP_RegistrarSeguimientoLead | [FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md](./FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md) | Ambos | `seguimiento-sql.js`, `.env SP_SEGUIMIENTO` |
-| Historial de estados al guardar seguimiento | [FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md](./FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md) | Ambos | Tabla `registrarSeguimientoLead` |
+| Historial de estados al guardar seguimiento | [FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md](./FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md) | Ambos | Tabla `registrarSeguimientoLead` + SP lectura |
+| Historial inline en tarjeta de lead | [DOCUMENTACION_SISTEMA.md](./DOCUMENTACION_SISTEMA.md) §15.2.1 | Ambos | `useHistorialLeads.ts`, `LeadHistorialInline.tsx` |
 | Modelo SQL seguimiento (análisis parámetros SP) | [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md) | DBA + dev | Propuesta `@lead_id`, `@resultado_entrevista`, etc. |
 | Multisorteo / participantes | [SORTEOS_Y_PARTICIPANTES.md](./SORTEOS_Y_PARTICIPANTES.md) | Ambos | `encuesta-carga.js`, SP |
 | Referidos → encuesta + árbol + visibilidad | [FUNCIONALIDAD_REFERIDOS_ENCUESTA.md](./FUNCIONALIDAD_REFERIDOS_ENCUESTA.md) | Promotor, supervisor, DBA | `lead_referido`, `referidos-carga.js`, `LeadCard.tsx` |
@@ -48,3 +49,5 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | `campania.ts` | Etiquetas Sorteo 01 / 02 desde columna `encuesta` |
 | `venta.ts` | Productos, pagos, etiquetas promotor/supervisor |
 | `fuenteLabels.ts` | Badge QR / redes en tarjeta |
+| `referidos-carga.ts` | Idempotencia y mensajes de alta referidos |
+| `seguimiento-historial.ts` | Etiquetas del historial (modal e inline) |

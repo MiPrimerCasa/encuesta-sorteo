@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
-import { getProductoNombre, getProductosPorRol, puedeVenderProducto, ETIQUETA_CIERRE_SUPERVISOR } from '../../domain/leads';
+import {
+  formatEntrevistaCalendario,
+  getHorarioEntrevistaLead,
+  getLugarEntrevistaLead,
+  getProductoNombre,
+  getProductosPorRol,
+  labelLugarEntrevista,
+  leadTieneCitaPrevia,
+  puedeVenderProducto,
+  ETIQUETA_CIERRE_SUPERVISOR,
+} from '../../domain/leads';
 import {
   esPlanInversion,
   esTerreno,
@@ -95,6 +105,39 @@ function activarReagenda(): Partial<FormState> {
   };
 }
 
+function patchFechaReagenda(
+  v: string,
+  patch: (partial: Partial<FormState>) => void,
+) {
+  patch(
+    v.trim()
+      ? { fechaReagenda: v, ...activarReagenda() }
+      : {
+          fechaReagenda: '',
+          reagendarEntrevista: false,
+          resultadoEntrevista: null,
+          huboEntrevista: null,
+        },
+  );
+}
+
+function CampoFechaReagenda({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-1.5 pt-1">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+        Nueva fecha y hora de entrevista
+      </p>
+      <DateTimePicker value={value} onChange={onChange} usePortal required />
+    </div>
+  );
+}
+
 interface LeadModalFormProps {
   lead: Lead | null;
   open: boolean;
@@ -150,7 +193,15 @@ export function LeadModalForm({
 
   const patch = (partial: Partial<FormState>) => setForm((f) => ({ ...f, ...partial }));
 
-  const handleCanal = (canal: NonNullable<SeguimientoLead['canal']>) => patch({ canal });
+  const handleCanal = (canal: NonNullable<SeguimientoLead['canal']>) => {
+    const esSupervisor = rol !== 'promotor';
+    const sinCita = !leadTieneCitaPrevia(lead);
+    if (esSupervisor && form.confirmoEntrevista === true && sinCita) {
+      patch({ canal, ...activarReagenda(), fechaReagenda: form.fechaReagenda });
+    } else {
+      patch({ canal });
+    }
+  };
 
   const handleConfirmoEntrevista = (confirmo: boolean) => {
     if (confirmo) {
@@ -286,21 +337,21 @@ export function LeadModalForm({
             ? false
             : form.huboEntrevista
         : confirmoNo
-          ? false
-          : esReagenda
             ? false
-            : form.huboEntrevista,
+            : esReagenda
+              ? false
+              : form.huboEntrevista,
       resultadoEntrevista: esFlujoCampo
         ? esReagenda
           ? 'reagenda'
           : form.resultadoEntrevista
         : confirmoNo
-          ? esReagendaNoConfirmo
-            ? 'reagenda'
-            : form.resultadoEntrevista
-          : esReagenda
-            ? 'reagenda'
-            : form.resultadoEntrevista,
+            ? esReagendaNoConfirmo
+              ? 'reagenda'
+              : form.resultadoEntrevista
+            : esReagenda
+              ? 'reagenda'
+              : form.resultadoEntrevista,
       fechaReagenda: esReagenda ? form.fechaReagenda || null : null,
       seguimientoPijPromotor: esReagendaPij,
       horarioEntrevistaPropuesto:
@@ -340,9 +391,20 @@ export function LeadModalForm({
 
   const confirmoSi = !esFlujoCampo && form.confirmoEntrevista === true;
   const confirmoNo = !esFlujoCampo && form.confirmoEntrevista === false;
+  const sinCitaPrevia = !leadTieneCitaPrevia(lead);
 
   const showCanalSiConfirmo = confirmoSi;
-  const showHuboEntrevista = esFlujoCampo || (confirmoSi && form.canal != null);
+  const horarioCitaLead = getHorarioEntrevistaLead(lead);
+  const fmtCitaLead = formatEntrevistaCalendario(horarioCitaLead);
+  const lugarCitaLead = getLugarEntrevistaLead(lead);
+
+  /** Sin cita previa: tras confirmar por canal, misma reagenda que el resto del sistema. */
+  const showReagendaPrimeraCita =
+    confirmoSi && form.canal != null && sinCitaPrevia;
+  const showCitaExistente =
+    confirmoSi && form.canal != null && !sinCitaPrevia && Boolean(horarioCitaLead);
+  const showHuboEntrevista =
+    esFlujoCampo || (confirmoSi && form.canal != null && !sinCitaPrevia);
   const showEntrevistaDetalle = showHuboEntrevista && form.huboEntrevista === true;
   const showSinEntrevistaResultado = showHuboEntrevista && form.huboEntrevista === false;
   const showReagendaSinEntrevistaCampo =
@@ -383,8 +445,16 @@ export function LeadModalForm({
             (form.reagendaPijTrasNoCompro === false || Boolean(form.fechaReagenda.trim()))
           : form.resultadoEntrevista != null);
 
+  const flujoReagendaConFecha =
+    Boolean(form.fechaReagenda.trim()) &&
+    (showReagendaPrimeraCita ||
+      showReagendaNoConfirmo ||
+      showReagendaSinEntrevistaCampo ||
+      showFechaReagendaPij);
+
   const showReferidosObs =
     flujoCampoCompleto ||
+    flujoReagendaConFecha ||
     (confirmoSi &&
       form.canal != null &&
       form.huboEntrevista !== null &&
@@ -495,10 +565,42 @@ export function LeadModalForm({
               </FormSection>
             )}
 
+            {showReagendaPrimeraCita && (
+              <FormSection title="Seguimiento" step={3} totalSteps={totalPasos}>
+                <p className="mb-3 text-[12px] leading-relaxed text-zinc-500">
+                  Sin entrevista previa: cargá la nueva fecha como en cualquier reagenda. Al guardar
+                  el lead pasa a <span className="font-medium text-zinc-700">En seguimiento</span>{' '}
+                  y aparece en el calendario.
+                </p>
+                <CampoFechaReagenda
+                  value={form.fechaReagenda}
+                  onChange={(v) => patchFechaReagenda(v, patch)}
+                />
+              </FormSection>
+            )}
+
+            {showCitaExistente && fmtCitaLead && (
+              <FormSection title="Entrevista agendada" step={3} totalSteps={totalPasos}>
+                <div className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-600">
+                    Fecha y hora
+                  </p>
+                  <p className="mt-1 text-[16px] font-semibold tabular-nums text-brand-900">
+                    {fmtCitaLead.diaSemana} {fmtCitaLead.diaNumero} · {fmtCitaLead.hora}
+                  </p>
+                  {lugarCitaLead && labelLugarEntrevista(lugarCitaLead) && (
+                    <p className="mt-1.5 text-[12px] text-brand-700">
+                      {labelLugarEntrevista(lugarCitaLead)}
+                    </p>
+                  )}
+                </div>
+              </FormSection>
+            )}
+
             {showHuboEntrevista && (
               <FormSection
                 title={esFlujoCampo ? 'Visita en calle' : 'Entrevista'}
-                step={esFlujoCampo ? 1 : 3}
+                step={esFlujoCampo ? 1 : showCitaExistente ? 4 : 3}
                 totalSteps={totalPasos}
               >
                 <ButtonGroup
@@ -545,17 +647,10 @@ export function LeadModalForm({
                       onChange={() => patch({ ...activarReagenda(), reagendarEntrevista: true })}
                     />
                     {showReagendaSinEntrevistaCampo && (
-                      <div className="space-y-1.5 pt-1">
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                          Nueva fecha y hora de entrevista
-                        </p>
-                        <DateTimePicker
-                          value={form.fechaReagenda}
-                          onChange={(v) => patch({ fechaReagenda: v })}
-                          autoOpen={!form.fechaReagenda}
-                          required
-                        />
-                      </div>
+                      <CampoFechaReagenda
+                        value={form.fechaReagenda}
+                        onChange={(v) => patchFechaReagenda(v, patch)}
+                      />
                     )}
                   </>
                 )}
@@ -939,17 +1034,10 @@ export function LeadModalForm({
                   onChange={handleNoConfirmoMotivo}
                 />
                 {showReagendaNoConfirmo && (
-                  <div className="space-y-1.5 pt-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                      Nueva fecha y hora de entrevista
-                    </p>
-                    <DateTimePicker
-                      value={form.fechaReagenda}
-                      onChange={(v) => patch({ fechaReagenda: v })}
-                      autoOpen={!form.fechaReagenda}
-                      required
-                    />
-                  </div>
+                  <CampoFechaReagenda
+                    value={form.fechaReagenda}
+                    onChange={(v) => patchFechaReagenda(v, patch)}
+                  />
                 )}
               </FormSection>
             )}
@@ -969,7 +1057,8 @@ export function LeadModalForm({
             )}
 
             {(showReagendaNoConfirmo && form.canal) ||
-            (showReagendaSinEntrevistaCampo && form.fechaReagenda) ? (
+            (showReagendaSinEntrevistaCampo && form.fechaReagenda) ||
+            (showReagendaPrimeraCita && form.fechaReagenda) ? (
               <p className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-[13px] text-brand-700">
                 Al guardar, el lead pasa a{' '}
                 <span className="font-medium">En seguimiento</span> con la nueva fecha.

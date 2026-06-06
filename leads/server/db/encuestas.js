@@ -19,6 +19,7 @@ import {
   persistirSeguimientoLead,
   useSeguimientoSql,
 } from './seguimiento-sql.js';
+import { adminSupervisorOperadorIds } from './superadmin-auth.js';
 
 function pickField(row, ...candidates) {
   if (!row) return null;
@@ -211,8 +212,20 @@ function getEncuestasProcedureName() {
   return raw.replace(/^\[?dbo\]?\./i, '').replace(/[\[\]]/g, '');
 }
 
+/** SP global sin filtro operador — panel superadmin (exec dbo.encuestasMuestra). */
+function getEncuestasAdminProcedureName() {
+  const raw = process.env.SP_ENCUESTAS_ADMIN || 'encuestasMuestra';
+  return raw.replace(/^\[?dbo\]?\./i, '').replace(/[\[\]]/g, '');
+}
+
 function getEncuestasParamIdVendedor() {
   return process.env.SP_ENCUESTAS_PARAM_ID || 'idVendedor';
+}
+
+/** Algunos drivers devuelven columnas duplicadas como array [valor, valor]. */
+function normalizeSqlScalar(val) {
+  if (Array.isArray(val)) return val[0] ?? null;
+  return val;
 }
 
 /** idOperador del login → @idVendedor del SP. */
@@ -242,6 +255,14 @@ export async function fetchEncuestasMuestraRaw(usuario) {
   const request = pool.request();
   request.input(paramName, sql.Int, idVendedor);
   const result = await request.execute(proc);
+  return result.recordset ?? result.recordsets?.[0] ?? [];
+}
+
+/** exec [dbo].[encuestasMuestra] — todas las encuestas (superadmin). */
+export async function fetchEncuestasMuestraGlobalRaw() {
+  const pool = await getSqlPoolEncuestas();
+  const proc = getEncuestasAdminProcedureName();
+  const result = await pool.request().execute(proc);
   return result.recordset ?? result.recordsets?.[0] ?? [];
 }
 
@@ -456,8 +477,9 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
     nombre: String(nombreLead).trim(),
     telefono: telefonoEncuesta,
     codigoPromotorCarga: extraerCodigoPromotorDesdeFilaEncuesta(row) ?? undefined,
-    idVendedor: pickField(row, 'idVendedor', 'IdVendedor') ?? undefined,
-    idSupervisor: pickField(row, 'idSupervisor', 'IdSupervisor') ?? undefined,
+    idVendedor: normalizeSqlScalar(pickField(row, 'idVendedor', 'IdVendedor')) ?? undefined,
+    idSupervisor:
+      normalizeSqlScalar(pickField(row, 'idSupervisor', 'IdSupervisor')) ?? undefined,
     promotorId: slugId(promotorNombre),
     promotorNombre: String(promotorNombre),
     supervisorNombre: supervisorNombre ? String(supervisorNombre) : undefined,
@@ -693,8 +715,17 @@ function enrichLeadParaCliente(lead) {
   return applyDerivacionTerrenoAlLead(next, next.seguimiento ?? {});
 }
 
-export async function listLeadsFromEncuestas(usuario) {
-  const rows = await fetchEncuestasMuestraRaw(usuario);
+function supervisorIdsDesdeFilasEncuesta(rows) {
+  const ids = new Set(adminSupervisorOperadorIds());
+  for (const row of rows) {
+    const sup = pickField(row, 'idSupervisor', 'IdSupervisor');
+    const n = Number.parseInt(String(sup ?? ''), 10);
+    if (Number.isFinite(n) && n > 0) ids.add(n);
+  }
+  return [...ids];
+}
+
+async function mapEncuestaRowsToLeads(rows, idOperador = null, operadorIdsBatch = null) {
   const ids = rows
     .map((r) => {
       const pk = pickField(r, 'id', 'Id', 'ID');
@@ -702,9 +733,15 @@ export async function listLeadsFromEncuestas(usuario) {
     })
     .filter(Boolean)
     .map(String);
-  const idOperador = parseInt(String(usuario?.id ?? usuario?.idOperador ?? ''), 10);
+  const batchOperadores =
+    operadorIdsBatch ??
+    (idOperador == null && rows.length ? supervisorIdsDesdeFilasEncuesta(rows) : []);
   const seguimientoById = useSeguimientoSql()
-    ? await batchLatestSeguimientoSql(ids, Number.isFinite(idOperador) ? idOperador : null)
+    ? await batchLatestSeguimientoSql(
+        ids,
+        idOperador != null && Number.isFinite(idOperador) ? idOperador : null,
+        batchOperadores,
+      )
     : Object.fromEntries(ids.map((id) => [id, getSeguimientoExterno(id)]));
   const leads = rows.map((row) => {
     const pk = pickField(row, 'id', 'Id', 'ID');
@@ -715,6 +752,33 @@ export async function listLeadsFromEncuestas(usuario) {
     return enrichLeadParaCliente(mapEncuestaRowToLead(row, { [id]: seguimientoById[id] }));
   });
   leads.sort((a, b) => (a.fechaAlta ?? '').localeCompare(b.fechaAlta ?? ''));
+  return leads;
+}
+
+export async function listLeadsFromEncuestas(usuario) {
+  const rows = await fetchEncuestasMuestraRaw(usuario);
+  const idOperador = parseInt(String(usuario?.id ?? usuario?.idOperador ?? ''), 10);
+  const leads = await mapEncuestaRowsToLeads(
+    rows,
+    Number.isFinite(idOperador) ? idOperador : null,
+  );
+
+  try {
+    const { fetchReferidosMetaPorIds, aplicarMetaReferidosEnLeads } = await import(
+      './referidos-carga.js'
+    );
+    const metaMap = await fetchReferidosMetaPorIds(leads.map((l) => l.id));
+    return aplicarMetaReferidosEnLeads(leads, metaMap, usuario);
+  } catch {
+    return leads;
+  }
+}
+
+/** Listado global vía encuestasMuestra — panel superadmin. */
+export async function listAllLeadsFromEncuestas() {
+  const rows = await fetchEncuestasMuestraGlobalRaw();
+  const leads = await mapEncuestaRowsToLeads(rows, null);
+  const usuario = { rol: 'superadmin' };
 
   try {
     const { fetchReferidosMetaPorIds, aplicarMetaReferidosEnLeads } = await import(

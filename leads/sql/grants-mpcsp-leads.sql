@@ -13,10 +13,14 @@ GO
 GRANT CONNECT TO [MPCSP];
 GRANT EXECUTE ON dbo.operadorAccesoCategoria TO [MPCSP];
 GRANT EXECUTE ON dbo.encuestasMuestraOperador TO [MPCSP];
+GRANT EXECUTE ON dbo.encuestasMuestra TO [MPCSP];
 GRANT EXECUTE ON dbo.encuestaSorteo01Update TO [MPCSP];
 -- Seguimiento CRM (SP + lectura/escritura historial en tabla)
 GRANT EXECUTE ON dbo.SP_RegistrarSeguimientoLead TO [MPCSP];
 GRANT SELECT, INSERT ON dbo.registrarSeguimientoLead TO [MPCSP];
+-- Lectura batch / historial (RF-38, panel superadmin)
+GRANT EXECUTE ON dbo.SP_HistorialSeguimientoLead TO [MPCSP];
+GRANT EXECUTE ON dbo.SP_UltimoSeguimientoOperador TO [MPCSP];
 -- Referidos (sql/lead_referido-tabla-sp.sql) — solo SP, sin GRANT en tablas
 GRANT EXECUTE ON dbo.SP_RegistrarReferidoLead TO [MPCSP];
 GRANT EXECUTE ON dbo.SP_ContarReferidosLead TO [MPCSP];

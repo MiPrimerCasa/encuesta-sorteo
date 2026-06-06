@@ -7,9 +7,16 @@ import App from './App';
 
 // /demo/supervisor  o  /demo  → supervisor demo
 // /demo/promotor              → promotor demo
+// /demo/superadmin            → panel global demo
 if (window.location.pathname.startsWith('/demo')) {
-  const isPromotor = window.location.pathname === '/demo/promotor';
-  enableDemoMode(isPromotor ? 'promotor' : 'supervisor');
+  const path = window.location.pathname.replace(/\/$/, '');
+  const rol =
+    path === '/demo/promotor'
+      ? 'promotor'
+      : path === '/demo/superadmin'
+        ? 'superadmin'
+        : 'supervisor';
+  enableDemoMode(rol);
 }
 
 function setFavicon(href: string) {

@@ -85,9 +85,14 @@
 <table>
   <tr><th>Ámbito</th><th>Implementados</th><th>Parciales</th><th>Pendientes</th></tr>
   <tr><td>Requerimientos funcionales (RF-01 … RF-28)</td><td>20</td><td>7</td><td>1</td></tr>
+  <tr><td>Requerimientos funcionales ampliados (RF-29 … RF-43, §14–§15)</td><td>13</td><td>2</td><td>0</td></tr>
+  <tr><td>Requerimientos funcionales UX bandejas (RF-44 … RF-47, §16)</td><td>4</td><td>0</td><td>0</td></tr>
+  <tr><td>Requerimientos funcionales links y código (RF-48 … RF-51, §17)</td><td>4</td><td>0</td><td>0</td></tr>
+  <tr><td><strong>Total requerimientos funcionales (RF-01 … RF-51)</strong></td><td><strong>41</strong></td><td><strong>9</strong></td><td><strong>1</strong></td></tr>
   <tr><td>Requerimientos no funcionales (RNF-01 … RNF-08)</td><td>8</td><td>0</td><td>0</td></tr>
   <tr><td>Entregables DBA (sección 13.8)</td><td>1</td><td>2</td><td>7</td></tr>
 </table>
+<p class="subtitle">RF-26 sigue pendiente en vista supervisor (métrica parcial en superadmin, RF-35).</p>
 
 <h3>4.1 Requerimientos funcionales</h3>
 <table>
@@ -115,8 +120,8 @@
   <tr><td>RF-21</td><td class="st-partial">Parcial</td><td>PIJ promotor → Cierres QC; sale de bandeja supervisor.</td><td>Va a Cierres; sin subsección QC ni exclusión de Prioridad</td></tr>
   <tr><td>RF-22</td><td class="st-partial">Parcial</td><td>Supervisor recibe no cerrados por promotor (todas las fuentes).</td><td>Todo el SP; sin filtro UI</td></tr>
   <tr><td>RF-23</td><td class="st-ok">Implementado</td><td>Máquina de estados Prioridad / Contactado / Seguimiento / Cierre.</td><td>jun. 2026</td></tr>
-  <tr><td>RF-24</td><td class="st-ok">Implementado</td><td>Negativos (<code>sin_interes</code>, <code>no_compro</code>) en Contactado.</td><td>jun. 2026</td></tr>
-  <tr><td>RF-25</td><td class="st-partial">Parcial</td><td>Cierres: ventas supervisor + PIJ promotores para QC.</td><td>Lista <code>compro</code>; sin flujo QC dedicado</td></tr>
+  <tr><td>RF-24</td><td class="st-ok">Implementado</td><td>Negativos en Contactado; post-entrevista arriba (naranja).</td><td><code>sortLeadsContactados</code>, <code>LeadCard</code></td></tr>
+  <tr><td>RF-25</td><td class="st-partial">Parcial</td><td>Cierres: ventas para QC del supervisor.</td><td>Orden por fecha venta; sin flujo QC dedicado</td></tr>
   <tr><td>RF-26</td><td class="st-pending">Pendiente</td><td>Efectividad de entrevistas por promotor.</td><td>Falta métrica entrevistas vs compras/no compras</td></tr>
   <tr><td>RF-27</td><td class="st-partial">Parcial</td><td>Confirmar reagendas una por una en En seguimiento.</td><td>Modal genérico; sin paso guiado</td></tr>
   <tr><td>RF-28</td><td class="st-ok">Implementado</td><td>Lógica independiente del sorteo/campaña.</td><td><code>prioridad-leads.ts</code></td></tr>
@@ -209,9 +214,9 @@ Cierre (venta con producto + pago + recibo) o archivo negativo</pre>
 <p><strong>Pestañas de la vista Leads (LeadsPanel):</strong></p>
 <ol>
   <li><strong>Prioridad</strong> — leads agrupados por prioridad (0 → 1 → 2).</li>
-  <li><strong>Contactado</strong> — ya hubo contacto, no son prioridad ni reagenda.</li>
+  <li><strong>Contactado</strong> — contacto o negativo; post-entrevista sin compra arriba (naranja).</li>
   <li><strong>En seguimiento</strong> — <code>resultadoEntrevista = reagenda</code>.</li>
-  <li><strong>Cierres</strong> — compraron + subsección «No compró».</li>
+  <li><strong>Cierres</strong> — solo ventas (<code>compro</code>), más recientes arriba.</li>
 </ol>
 <p><strong>Modal de seguimiento (LeadModalForm):</strong> drawer que recorre confirmación de entrevista → canal de contacto → ¿hubo entrevista? → resultado (según rol) → venta (producto, pago, barrio, recibo, referidos).</p>
 
@@ -580,7 +585,7 @@ END;</pre>
   <li><strong>14.2.4 Carga origen 2 / teléfono (RF-32, RF-33):</strong> upsert manual, <code>PATCH /api/leads/:id/telefono</code>.</li>
   <li><strong>14.2.5 Acortador links (RF-34):</strong> scripts npm, notificaciones NavBar.</li>
   <li><strong>14.2.6 Modelo SQL (RF-36):</strong> <code>@confirmo_entrevista</code>, <code>@referidos_json</code>.</li>
-  <li><strong>14.2.7 Superadmin (RF-35):</strong> <code>GET /api/admin/dashboard</code>, <code>SuperadminDashboard</code>.</li>
+  <li><strong>14.2.7 Superadmin (RF-35):</strong> <code>GET /api/admin/dashboard</code>, <code>SuperadminDashboard</code>. Catálogo completo de datos en pantalla: <code>FUNCIONALIDAD_PANEL_SUPERADMIN.md</code>.</li>
 </ul>
 
 <h3>14.3 Nuevos endpoints API</h3>
@@ -644,7 +649,77 @@ END;</pre>
 <h3>15.7 URL producción</h3>
 <p><a href="https://www.miprimercasafsa-sorteo.com/leads/">https://www.miprimercasafsa-sorteo.com/leads/</a></p>
 
-<p class="subtitle">Las novedades se agregan en <strong>§14</strong> y <strong>§15</strong> sin reescribir el cuerpo principal (secciones 1–13).</p>
+<h2>16. Actualización — UX bandejas Contactado y Cierres (junio 2026)</h2>
+<p class="subtitle"><strong>Añadido:</strong> 2 jun 2026. Complementa §14 y §15.</p>
+
+<h3>16.0 Revisión de estados</h3>
+<table>
+  <tr><th>Ítem</th><th>Estado anterior</th><th>Estado actual</th></tr>
+  <tr><td>RF-24 Contactado negativos</td><td class="st-ok">Implementado</td><td class="st-ok"><strong>Implementado+</strong> — prioridad y color naranja</td></tr>
+  <tr><td>RF-25 Cierres QC</td><td class="st-partial">Parcial</td><td class="st-partial"><strong>Parcial+</strong> — orden por fecha de venta</td></tr>
+</table>
+
+<h3>16.1 Nuevos requerimientos funcionales</h3>
+<table>
+  <tr><th>ID</th><th>Estado</th><th>Requerimiento</th></tr>
+  <tr><td>RF-44</td><td class="st-ok">Implementado</td><td>Banner informativo adaptado al rol (promotor vs supervisor)</td></tr>
+  <tr><td>RF-45</td><td class="st-ok">Implementado</td><td>Cierres: ventas más recientes arriba</td></tr>
+  <tr><td>RF-46</td><td class="st-ok">Implementado</td><td>Contactado: post-entrevista negativo listado primero</td></tr>
+  <tr><td>RF-47</td><td class="st-ok">Implementado</td><td>Estilo naranja y badge «No compró» / «Sin interés»</td></tr>
+</table>
+
+<h3>16.2 Resumen</h3>
+<ul>
+  <li><strong>RF-44:</strong> <code>LeadsPanel.tsx</code> — texto distinto para <code>esPromotor</code>.</li>
+  <li><strong>RF-45:</strong> <code>fechaVentaLead</code>, <code>sortLeadsPorVentaReciente</code> — historial + Cierres.</li>
+  <li><strong>RF-46–47:</strong> <code>leadPostEntrevistaSinCompra</code>, <code>sortLeadsContactados</code>, pill <code>post-entrevista</code>.</li>
+  <li>Doc detalle: <code>FUNCIONALIDAD_BANDEJAS_CONTACTADO_CIERRES.md</code>.</li>
+</ul>
+
+<h3>16.3 Pendientes / parciales sin cambio</h3>
+<p>RF-17, RF-18, RF-20–22, RF-25 (QC), RF-26 (supervisor), RF-27, RF-29, RF-31 — ver tabla §16.4 en <code>DOCUMENTACION_SISTEMA.md</code>.</p>
+
+<h2>17. Actualización — links redes, métricas, código promotor y panel superadmin</h2>
+<p>Complementa §14–§16. Doc detalle superadmin: <code>FUNCIONALIDAD_PANEL_SUPERADMIN.md</code>.</p>
+
+<h3>17.1–17.4 (resumen)</h3>
+<ul>
+  <li><strong>RF-48–51:</strong> WhatsApp/TikTok en links y métricas; código promotor strict desde planilla SQL.</li>
+  <li>Scripts: <code>npm run links:export-prueba</code>, <code>verificar-asignacion-links.mjs</code>.</li>
+</ul>
+
+<h3>17.5 Panel superadmin — datos en pantalla (RF-35)</h3>
+<p>Rol <code>superadmin</code> · <code>GET /api/admin/dashboard</code> · semana móvil = hoy + 6 días · SP <code>encuestasMuestra</code> + historial seguimiento.</p>
+
+<h4>17.5.2 Hoy — 4 KPIs</h4>
+<table>
+  <tr><th>Tarjeta</th><th>Campo</th></tr>
+  <tr><td>Entrevistas</td><td><code>resumenHoy.entrevistas</code></td></tr>
+  <tr><td>Cierres</td><td><code>resumenHoy.cierres</code></td></tr>
+  <tr><td>Terrenos</td><td><code>resumenHoy.ventasTerreno</code> (<code>prod-terreno</code>)</td></tr>
+  <tr><td>Plan Inv. Joven</td><td><code>resumenHoy.ventasPij</code> (<code>prod-pij</code>)</td></tr>
+</table>
+
+<h4>17.5.3–17.5.5 Gráficos y productividad</h4>
+<table>
+  <tr><th>Bloque</th><th>Contenido</th></tr>
+  <tr><td>Evolución temporal</td><td>Leads, Entrevistas, Cierres, Terrenos, PIJ — filtro supervisor — semana/mes/año</td></tr>
+  <tr><td>Conocimiento encuesta</td><td>¿Conocían MPC? / ¿Sabían PIJ? — Sí, No, Sin dato</td></tr>
+  <tr><td>Embudo global</td><td>Leads → entrevista → cierre + 3 tasas %</td></tr>
+  <tr><td>Mini KPIs</td><td>Tiempo respuesta, recuperación PIJ, cierres con referidos, backlog 7/14/30 días</td></tr>
+  <tr><td>Resultados entrevista</td><td>Compró, No compró, Reagenda, Sin interés, Derivar terreno, Sin resultado</td></tr>
+  <tr><td>Canales</td><td>QR, Manual, Facebook, Instagram, WhatsApp, TikTok — leads, cierres, tasa %</td></tr>
+  <tr><td>Encuesta vs cierre</td><td>Tasa cierre por segmento conocimiento MPC/PIJ</td></tr>
+  <tr><td>Top promotores</td><td>8 promotores por tasa cierre (Lead→Ent., Ent.→Cierre, Lead→Cierre)</td></tr>
+</table>
+
+<h4>17.5.6 Rankings semana (top 5)</h4>
+<p>Más entrevistas · Más cierres · Más leads nuevos · Más terrenos · Más PIJ.</p>
+
+<h4>17.5.7 Tabla por supervisor</h4>
+<p>Encabezado: totales semana/hoy. Por promotor: Leads (hist.), Ent. sem./hoy, Cierres sem./hoy, Terrenos sem., PIJ sem.</p>
+
+<p class="subtitle">Las novedades se agregan en <strong>§14</strong>–<strong>§17</strong> sin reescribir el cuerpo principal (secciones 1–13).</p>
 
 </body>
 </html>

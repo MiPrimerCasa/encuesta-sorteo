@@ -71,10 +71,14 @@ El sistema se conecta a la base de datos de **producción (SQL Server – STRSYS
 | Ámbito | Implementados | Parciales | Pendientes |
 |--------|:-------------:|:---------:|:----------:|
 | Requerimientos funcionales (RF-01 … RF-28) | 20 | 7 | 1 |
+| Requerimientos funcionales ampliados (RF-29 … RF-43, §14–§15) | 13 | 2 | 0 |
+| Requerimientos funcionales UX bandejas (RF-44 … RF-47, §16) | 4 | 0 | 0 |
+| Requerimientos funcionales links y código (RF-48 … RF-51, §17) | 4 | 0 | 0 |
+| **Total requerimientos funcionales (RF-01 … RF-51)** | **41** | **9** | **1** |
 | Requerimientos no funcionales (RNF-01 … RNF-08) | 8 | 0 | 0 |
 | Entregables DBA (sección 13.8, ítems 1 … 10) | 1 | 2 | 7 |
 
-*Nota: en app, RF-17 está parcial (badge + `ENCUESTA_CARGA_ID`); en SQL faltan `dbo.campania`, SP ampliados y persistencia de seguimiento en servidor (ítems 1–4, 6–8 del anexo 13).*
+*Nota: en app, RF-17 está parcial (badge + `ENCUESTA_CARGA_ID`); en SQL faltan `dbo.campania`, SP ampliados y persistencia de seguimiento en servidor (ítems 1–4, 6–8 del anexo 13). RF-26 sigue pendiente en vista supervisor (existe métrica parcial en superadmin, RF-35).*
 
 ### 4.1 Requerimientos funcionales
 
@@ -91,7 +95,7 @@ El sistema se conecta a la base de datos de **producción (SQL Server – STRSYS
 | RF-09 | **Implementado** | El sistema debe permitir la carga manual de leads (SP de carga, por defecto `encuestaCargaSorteo01`). | `NuevoLeadSheet`, `encuesta-carga.js` |
 | RF-10 | **Implementado** | El sistema debe rechazar cargas duplicadas con el mismo teléfono dentro de la misma campaña. | `encuesta-carga.js`, pre-chequeo API |
 | RF-11 | **Implementado** | El sistema debe permitir el contacto vía WhatsApp con mensaje prearmado. | `WhatsAppLeadButton.tsx`, `whatsapp.ts` |
-| RF-12 | **Implementado** | El sistema debe ofrecer enlaces para compartir en Instagram/Facebook según el operador. | `LinksRedesSection.tsx`, `/api/links-redes` |
+| RF-12 | **Implementado** | El sistema debe ofrecer enlaces para compartir en redes según el operador (Instagram, Facebook, WhatsApp, TikTok). | `LinksRedesSection.tsx`, `/api/links-redes`, `rptLinkQRenRedesSociales` |
 | RF-13 | **Implementado** | El supervisor debe poder ver un calendario mensual de entrevistas y reagendas (con feriados de Argentina). | `CalendarioView.tsx`, `lib/feriados` |
 | RF-14 | **Implementado** | El supervisor debe poder ver métricas de conversión y rendimiento por promotor. | `PromotoresPanel`, `PromotoresTable` (total, compró, % conversión) |
 | RF-15 | **Implementado** | El promotor debe poder ver sus métricas personales (resumen, origen de leads, historial). | `PromotorMetricasPanel`, `PromotorResumen` |
@@ -103,8 +107,8 @@ El sistema se conecta a la base de datos de **producción (SQL Server – STRSYS
 | RF-21 | **Parcial** | Cuando el promotor cierra una venta de PIJ con todos los pasos completos, el lead debe pasar a **Cierres** para control de calidad del supervisor y dejar de aparecer en la bandeja de gestión directa del supervisor. | Venta PIJ → pestaña Cierres (`compro`). No hay subsección ni filtro «Cierres promotores» ni exclusión automática de Prioridad/Contactado solo para el supervisor |
 | RF-22 | **Parcial** | La bandeja del supervisor debe recibir los leads de encuestas **no cerrados** por el promotor, sin importar la fuente (QR, Instagram, Facebook, WhatsApp manual). | Supervisor recibe todo lo que devuelve el SP (incl. `origen`); no se filtra «solo no cerrados por promotor» en UI |
 | RF-23 | **Implementado** | El sistema debe aplicar la máquina de estados Prioridad → Contactado / En seguimiento / Cierre según las reglas de la sección «Máquina de estados». | `tabIdListaLead`, `useLeadsFilter` (jun. 2026) |
-| RF-24 | **Implementado** | La pestaña **Contactado** debe incluir los resultados negativos: «no hubo entrevista + no muestra interés» (`sin_interes`) y «hubo entrevista por llamada o mensaje + no compró» (`no_compro`), tanto de promotores como de supervisores. | `useLeadsFilter.ts` (jun. 2026) |
-| RF-25 | **Parcial** | La pestaña **Cierres** debe mostrar las ventas del supervisor (PIJ y Terreno) y las ventas de PIJ de los promotores, para que el supervisor realice el control de calidad contactando al cliente. | Cierres lista todos los `compro` del equipo; falta UI/flujo dedicado de control de calidad (checklist, contacto registrado) |
+| RF-24 | **Implementado** | La pestaña **Contactado** debe incluir los resultados negativos: «no hubo entrevista + no muestra interés» (`sin_interes`) y «hubo entrevista por llamada o mensaje + no compró» (`no_compro`), tanto de promotores como de supervisores. Los post-entrevista sin compra van **arriba** con estilo naranja. | `useLeadsFilter.ts`, `sortLeadsContactados`, `leadPostEntrevistaSinCompra`, `LeadCard.tsx` (jun. 2026) |
+| RF-25 | **Parcial** | La pestaña **Cierres** debe mostrar las ventas del supervisor (PIJ y Terreno) y las ventas de PIJ de los promotores, para que el supervisor realice el control de calidad contactando al cliente. | Lista `compro` del equipo ordenada por fecha de venta (`sortLeadsPorVentaReciente`); falta UI/flujo dedicado de control de calidad (checklist, contacto registrado) |
 | RF-26 | **Pendiente** | El supervisor debe poder ver la **efectividad de entrevistas por promotor** (entrevistas realizadas vs. compras / no compras). | `PromotoresTable` solo tiene conversión global (compró/total), no entrevistas realizadas ni desglose no_compro/sin_interes por promotor |
 | RF-27 | **Parcial** | Las entrevistas reagendadas deben confirmarse una por una desde la pestaña En seguimiento. | Reagendas en pestaña En seguimiento + modal de seguimiento; sin paso guiado «confirmar entrevista» uno a uno |
 | RF-28 | **Implementado** | Toda la lógica de negocio (estados, prioridad, métricas, cierres) debe ser **independiente del sorteo/campaña** para soportar nuevos sorteos sin cambios de código. | `prioridad-leads.ts`, filtros por campos de seguimiento, no por `codigoCampania` |
@@ -206,9 +210,9 @@ Cierre (venta con producto + pago + recibo) o archivo negativo
 **Pestañas de la vista Leads (`LeadsPanel`):**
 
 1. **Prioridad** — leads agrupados por prioridad (0 → 1 → 2).
-2. **Contactado** — ya hubo contacto, no son prioridad ni reagenda.
+2. **Contactado** — ya hubo contacto o resultado negativo; post-entrevista sin compra arriba (naranja).
 3. **En seguimiento** — `resultadoEntrevista = reagenda`.
-4. **Cierres** — compraron + subsección «No compró».
+4. **Cierres** — solo ventas (`compro`), ordenadas por fecha de cierre (más reciente arriba).
 
 **Modal de seguimiento (`LeadModalForm`):** drawer que recorre confirmación de entrevista → canal de contacto → ¿hubo entrevista? → resultado (según rol) → venta (producto, pago, barrio, recibo, referidos).
 
@@ -249,11 +253,11 @@ El estado de un lead se deriva de su seguimiento y define en qué pestaña apare
 | Pestaña / estado | Condición de entrada | Aplica a |
 |------------------|----------------------|----------|
 | **Prioridad** (no contactado) | Sin contacto ni cierre. Ordenado: derivar_terreno (0) → entrevista pendiente (1) → encuesta sin contactar (2). | Promotor y supervisor |
-| **Contactado** | «¿Hubo entrevista?» = **No** + «No muestra interés» (`sin_interes`); o «¿Hubo entrevista?» = **Sí** (llamada/mensaje) + «No compró» (`no_compro`). | Resultados negativos de promotor o supervisor (incluye leads que el promotor cargó con esa info). |
+| **Contactado** | «¿Hubo entrevista?» = **No** + «No muestra interés» (`sin_interes`); o «¿Hubo entrevista?» = **Sí** (llamada/mensaje) + «No compró» (`no_compro`). Los post-entrevista negativos se listan **primero** (naranja); el resto de contactados en amarillo ámbar, FIFO. | Resultados negativos de promotor o supervisor (incluye leads que el promotor cargó con esa info). |
 | **En seguimiento** | La entrevista se **reagenda** (`resultadoEntrevista = reagenda`, con `fechaReagenda`). Permite confirmar las entrevistas una por una. | Promotor y supervisor |
 | **Cierre** | El lead **compró** (`resultadoEntrevista = compro`) Terreno o PIJ. | Ventas del supervisor (PIJ y Terreno) + ventas de PIJ de promotores (control de calidad). |
 
-> **Estado de implementación:** implementado. Los resultados negativos (`no_compro`, `sin_interes`) se muestran en la pestaña **Contactado**; la pestaña **Cierres** solo lista compras (`compro`). Ver `tabIdListaLead` en `src/domain/leads.ts` y `src/hooks/useLeadsFilter.ts`.
+> **Estado de implementación:** implementado. Los resultados negativos (`no_compro`, `sin_interes`) se muestran en la pestaña **Contactado** (post-entrevista arriba, estilo naranja); **Cierres** solo lista compras (`compro`) con ventas recientes arriba. Ver `tabIdListaLead`, `sortLeadsContactados`, `sortLeadsPorVentaReciente` en `src/domain/leads.ts` y `src/hooks/useLeadsFilter.ts`.
 
 ```
 Encuesta/sorteo → Lead en bandeja (PRIORIDAD)
@@ -275,6 +279,7 @@ La pestaña **Cierres** reúne todas las ventas para que el supervisor contacte 
 
 - Ventas del **supervisor**: Plan Inversión Joven y Terreno.
 - Ventas de **PIJ de los promotores**: una vez que el promotor completa todos los pasos, el lead se mueve a Cierres y **sale de la bandeja directa** del supervisor.
+- **Orden:** las ventas más recientes aparecen **arriba** (`fechaVentaLead` desde historial o `fechaAlta` como respaldo).
 
 Objetivo: el supervisor puede verificar cada venta cerrada (recibo/comprobante, producto, estado de pago) y contactar al cliente para asegurar la calidad de la operación.
 
@@ -668,10 +673,49 @@ Análisis completo: [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MO
 
 #### 14.2.7 Panel superadmin (RF-35)
 
-- **Rol:** `superadmin` (login IDs en `SUPERADMIN_LOGIN_IDS` / `superadmin-auth.js`).
-- **Vista:** `SuperadminDashboard` — KPIs semana móvil, rankings (cierres, referidos, actividad), gráfico eventos, productividad por promotor/supervisor, conocimiento encuesta.
-- **API:** `GET /api/admin/dashboard`.
+- **Rol:** `superadmin` (login IDs en `SUPERADMIN_LOGIN_IDS` / `superadmin-auth.js`). No accede a bandejas Prioridad/Contactado/Cierres; vista por defecto `admin`.
+- **Vista:** `SuperadminDashboard` — «Panel global de equipos».
+- **API:** `GET /api/admin/dashboard` → `AdminDashboardData`.
 - **Código:** `server/db/admin-dashboard.js`, `src/domain/admin-metrics.ts`, `src/domain/admin-productividad.ts`.
+- **Doc detalle (catálogo completo de pantalla):** [FUNCIONALIDAD_PANEL_SUPERADMIN.md](./FUNCIONALIDAD_PANEL_SUPERADMIN.md).
+
+**Semana móvil:** hoy + 6 días anteriores. Fuente leads: `SP_ENCUESTAS_ADMIN` (default `encuestasMuestra`). Historial: tabla `registrarSeguimientoLead` (~400 días) si `SP_SEGUIMIENTO` está activo.
+
+##### Datos mostrados en pantalla
+
+| Bloque | Componente | Qué muestra |
+|--------|------------|-------------|
+| Encabezado | `SuperadminDashboard` | Rango semana móvil, fecha de hoy, banner `aviso` si falla el SP |
+| **Hoy** (4 KPIs) | `StatCard` | Entrevistas, cierres, terrenos (`prod-terreno`), PIJ (`prod-pij`) del día — totales empresa |
+| Evolución temporal | `AdminMetricsChart` | Barras Leads / Entrevistas / Cierres / Terrenos / PIJ; filtro supervisor; agrupación semana ISO, mes o año |
+| Conocimiento encuesta | `AdminConocimientoEncuesta` | «¿Conocían MPC?» y «¿Sabían PIJ?» — conteo Sí / No / Sin dato + gráfico apilado (`campo3`/`campo4`) |
+| Productividad | `AdminProductividadPanel` | Embudo global (leads → entrevista → cierre + tasas); tiempo respuesta; recuperación PIJ; cierres con referidos; backlog 7/14/30 días; resultados entrevista; efectividad por canal (QR, Manual, FB, IG, WA, TikTok); tabla encuesta vs cierre; top 8 promotores por tasa de cierre |
+| Destacados semana | `RankingList` ×5 | Top 5: más entrevistas, más cierres, más leads nuevos, más terrenos, más PIJ |
+| Supervisores y equipos | Tabla por supervisor | Encabezado con totales semana/hoy; filas promotor: Leads (hist.), Ent. sem./hoy, Cierres sem./hoy, Terrenos sem., PIJ sem. |
+
+##### Rankings de la semana (top 5 cada uno)
+
+| Ranking | Métrica por promotor |
+|---------|----------------------|
+| Más entrevistas | `entrevistasSemana` |
+| Más cierres | `cierresSemana` |
+| Más leads nuevos | `leadsSemana` (altas en semana móvil) |
+| Más terrenos vendidos | `ventasTerrenoSemana` |
+| Más Plan Inv. Joven | `ventasPijSemana` |
+
+##### Productividad — tasas del embudo global
+
+| Métrica | Fórmula |
+|---------|---------|
+| Tasa entrevista | entrevistas / leads |
+| Tasa cierre (lead) | cierres / leads |
+| Tasa cierre (entrevista) | cierres / entrevistas |
+
+##### Resultados de entrevista en gráfico
+
+`compro`, `no_compro`, `reagenda`, `sin_interes`, `derivar_terreno`, `pendiente` — estado actual por lead.
+
+> **RF-26:** la tabla «Promotores por tasa de cierre» del panel superadmin cubre efectividad parcial; la vista dedicada en **supervisor** sigue pendiente.
 
 ### 14.3 Nuevos endpoints API
 
@@ -707,6 +751,7 @@ Análisis completo: [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MO
 | Acortador links | [FUNCIONALIDAD_ACORTADOR_LINKS.md](./FUNCIONALIDAD_ACORTADOR_LINKS.md) |
 | Modelo parámetros SP | [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md) |
 | Contactado vs Cierres | [FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md](./FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md) |
+| Panel superadmin (datos en pantalla) | [FUNCIONALIDAD_PANEL_SUPERADMIN.md](./FUNCIONALIDAD_PANEL_SUPERADMIN.md) |
 | Índice general | [INDICE_FUNCIONALIDADES.md](./INDICE_FUNCIONALIDADES.md) |
 
 ---
@@ -734,7 +779,7 @@ Análisis completo: [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MO
 | RF-39 | **Implementado** | Badge **Referido** en tarjeta con metadatos (origen, nivel, visibilidad promotor/supervisor). | `FUNCIONALIDAD_REFERIDOS_ENCUESTA.md`, `LeadCard.tsx` |
 | RF-40 | **Implementado** | Idempotencia al cargar referidos (`referidosGenerados` evita duplicar altas). | `src/domain/referidos-carga.ts`, `referidos-carga.js` |
 | RF-41 | **Implementado** | Catálogo de links redes desde **SP en STRSYSTEM** (respaldo JSON). | `links-redes-sp.js`, `SP_LINKS_REDES` |
-| RF-42 | **Implementado** | Exportar CSV de prueba de links redes (`npm run links:export-prueba`). | `scripts/export-links-redes-prueba.mjs` |
+| RF-42 | **Implementado** | Exportar planilla de prueba de links redes en Excel (`npm run links:export-prueba` → `.xlsx`). | `scripts/export-links-redes-prueba.mjs` |
 | RF-43 | **Implementado** | Distinguir origen de carga manual vs QR (`@origen` 1/2 en SP carga). | `FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md`, `SP_CARGA_INCLUDE_ORIGEN` |
 
 ### 15.2 Resumen por funcionalidad
@@ -833,4 +878,304 @@ Sistema desplegado en: [https://www.miprimercasafsa-sorteo.com/leads/](https://w
 
 ---
 
-*Documento generado a partir del análisis integral del repositorio. Las novedades se agregan en **§14** y **§15** sin reescribir el cuerpo principal (secciones 1–13).*
+## 16. Actualización — UX de bandejas Contactado y Cierres (junio 2026, tercera entrega)
+
+> **Añadido:** 2 jun 2026. Complementa **§14** y **§15** sin modificar secciones 1–13.
+
+### 16.0 Revisión de estados (respecto a §4 y §15)
+
+| Ítem | Estado anterior | Estado actual |
+|------|-----------------|---------------|
+| **RF-24** Contactado con negativos | Implementado | **Implementado+** — prioridad y color naranja para post-entrevista sin compra |
+| **RF-25** Cierres control de calidad | Parcial | **Parcial+** — orden por fecha de venta; sigue faltando flujo QC dedicado |
+| **§6.2** texto pestaña Cierres | Desactualizado («No compró» en Cierres) | Corregido: solo `compro` |
+
+### 16.1 Nuevos requerimientos funcionales
+
+| ID | Estado | Requerimiento | Doc / código |
+|----|--------|---------------|--------------|
+| RF-44 | **Implementado** | El banner informativo de la vista Leads debe adaptarse al rol: promotor (entrevistas, swipe, contacto rápido) vs supervisor (terreno derivado, tres grupos de prioridad). | `LeadsPanel.tsx` (`esPromotor`) |
+| RF-45 | **Implementado** | En **Cierres**, promotor y supervisor deben ver arriba las ventas más recientes. | `fechaVentaLead`, `sortLeadsPorVentaReciente`, `useLeadsFilter.ts`, `LeadsPanel.tsx` |
+| RF-46 | **Implementado** | En **Contactado**, los leads con entrevista realizada y resultado negativo (`no_compro` / `sin_interes`) deben listarse **antes** que el resto de contactados. | `leadPostEntrevistaSinCompra`, `sortLeadsContactados` |
+| RF-47 | **Implementado** | Los post-entrevista sin compra en Contactado deben distinguirse visualmente (fondo naranja claro, badge «No compró» / «Sin interés») del amarillo ámbar de contactados habituales. | `LeadCard.tsx`, `StatusPill` variante `post-entrevista` |
+
+### 16.2 Resumen por funcionalidad
+
+#### 16.2.1 Banner contextual por rol (RF-44)
+
+- **Supervisor:** «derivados a terreno → entrevistas agendadas → encuestas sin contactar».
+- **Promotor:** «tus entrevistas agendadas → encuestas sin contactar», swipe para contacto rápido, reagenda a En seguimiento.
+- Sin duplicar el bloque `PromotorResumen` / `AlertasSinContactar` (solo promotor).
+
+#### 16.2.2 Cierres — ventas recientes arriba (RF-45)
+
+- `fechaVentaLead`: última entrada `compro` del historial (`creadoEn`); si no hay historial, `fechaAlta` / `fechaObtencion`.
+- `sortLeadsPorVentaReciente`: orden descendente por esa fecha.
+- `LeadsPanel` reordena la pestaña Cierres al cargar historial (`useHistorialLeads`).
+
+#### 16.2.3 Contactado — post-entrevista prioritario (RF-46, RF-47)
+
+| Grupo | Condición | Orden | Color tarjeta |
+|-------|-----------|-------|---------------|
+| 1 — Post-entrevista negativo | `esCerradoNegativoLead` + `huboEntrevista = true` | Más reciente arriba | Naranja (`orange-50` / `orange-200`) |
+| 2 — Resto contactados | `canal` o `huboEntrevista` sin cierre negativo prioritario | FIFO (`fechaAlta`) | Ámbar (`amber-50`) |
+
+Badge: variante `post-entrevista` en `StatusPill` («No compró» o «Sin interés»).
+
+Doc detalle: [FUNCIONALIDAD_BANDEJAS_CONTACTADO_CIERRES.md](./FUNCIONALIDAD_BANDEJAS_CONTACTADO_CIERRES.md).
+
+### 16.3 Mapa de código
+
+| Función / componente | Archivo |
+|----------------------|---------|
+| `fechaVentaLead`, `sortLeadsPorVentaReciente` | `src/domain/leads.ts` |
+| `leadPostEntrevistaSinCompra`, `sortLeadsContactados` | `src/domain/leads.ts` |
+| Listas `compraron` y `paraContactar` | `src/hooks/useLeadsFilter.ts` |
+| Banner, orden Cierres con historial | `src/components/leads/LeadsPanel.tsx` |
+| Estilo naranja y pill | `src/components/leads/LeadCard.tsx`, `StatusPill.tsx` |
+
+### 16.4 Requerimientos que siguen pendientes o parciales (sin cambio de estado)
+
+| ID | Estado | Motivo |
+|----|--------|--------|
+| RF-17 | Parcial | Multisorteo en SQL (`campania`, SP listado ampliado) |
+| RF-18 | Parcial | Sin pantalla «verificar lead QR» |
+| RF-20 | Parcial | Sin bandeja «sin tratar por promotor» |
+| RF-21 | Parcial | Cierre PIJ promotor en Cierres sí; falta exclusión supervisor y subsección QC |
+| RF-22 | Parcial | Sin filtro UI «solo no cerrados por promotor» |
+| RF-25 | Parcial | Orden de ventas sí; falta flujo control de calidad |
+| RF-26 | Pendiente | Efectividad entrevistas en vista **supervisor** (superadmin tiene parte) |
+| RF-27 | Parcial | Reagendas en bandeja; sin wizard «confirmar una por una» |
+| RF-29 | Parcial | SP escritura seguimiento SQL |
+| RF-31 | Parcial | Referidos en encuesta + visibilidad completa en listado SP |
+
+---
+
+## 17. Actualización — links redes, métricas y código promotor (junio 2026, cuarta entrega)
+
+> **Añadido:** 5 jun 2026. Complementa §14–§16 tras auditoría del código en `main` (commits `d5a81c6`, `a1807ef`, `2bc32e1`).
+
+### 17.0 Revisión de estados (respecto a §4, §14 y §15)
+
+| Ítem | Estado anterior | Estado actual |
+|------|-----------------|---------------|
+| **RF-12** Links redes | Implementado (IG/FB) | **Implementado+** — WhatsApp y TikTok con iconos en `LinksRedesSection` |
+| **RF-15** Métricas promotor | Implementado | **Implementado+** — gráfico origen incluye WhatsApp y TikTok |
+| **RF-42** Export links prueba | Implementado (CSV) | **Implementado+** — export principal en **Excel (.xlsx)**; CSV legacy en `data/` si existe |
+| **RF-09** Carga manual `@usuario` | Implementado | **Implementado+** — resolución estricta sin mezclar códigos ajenos (`operadores-catalog.js`) |
+
+### 17.1 Nuevos requerimientos funcionales
+
+| ID | Estado | Requerimiento | Doc / código |
+|----|--------|---------------|--------------|
+| RF-48 | **Implementado** | Compartir links de **WhatsApp** y **TikTok** desde la sección «Links para compartir en redes», con iconos de marca (igual que Instagram/Facebook). | `LinksRedesSection.tsx`, tipo `LinksRedes`, SP catálogo |
+| RF-49 | **Implementado** | Registrar y visualizar **WhatsApp** y **TikTok** como fuente de lead en métricas del promotor y panel admin (gráficos de origen). | `fuenteLabels.ts`, `OrigenLeadsChart.tsx`, `admin-productividad.ts` |
+| RF-50 | **Implementado** | Resolver el código `@usuario` del promotor desde la **planilla SQL** (`rptLinkQRenRedesSociales`) con reglas estrictas: sin asignar códigos de otro vendedor por coincidencia parcial de nombre. | `operadores-catalog.js` → `resolveCodigoCargaPromotorStrict`, `enriquecerUsuarioConCodigoCarga` |
+| RF-51 | **Implementado** | Si el promotor no trae `codigoCarga` en sesión, obtenerlo de `/api/links-redes` o de un lead propio antes de cargar manualmente. | `LeadsPanel.tsx` (`codigoCargaFallback`), login y `encuesta-carga.js` |
+
+### 17.2 Resumen por funcionalidad
+
+#### 17.2.1 Redes ampliadas — WhatsApp y TikTok (RF-48)
+
+- API `GET /api/links-redes` devuelve `whatsapp` y `tiktok` además de `instagram` y `facebook`.
+- Botones cuadrados con icono SVG de marca; compartir nativo (`navigator.share`) o `window.open`.
+- Solo **Instagram** usa link acortado en cron; Facebook/WhatsApp/TikTok son links largos del SP.
+
+#### 17.2.2 Métricas por fuente (RF-49)
+
+- `FuenteLead` incluye `whatsapp` y `tiktok`.
+- Carga manual: `origenIngresoToFuente` mapea origen → fuente para métricas.
+- `OrigenLeadsChart` (promotor) y `AdminProductividadPanel` (superadmin) muestran las 6 fuentes.
+
+#### 17.2.3 Código promotor desde planilla SQL (RF-50, RF-51)
+
+Prioridad de resolución para **promotor** (`resolveCodigoCargaPromotorStrict`):
+
+1. `byIdOperador` en catálogo SP (precargado con `warmOperadoresCatalog` al arrancar API).
+2. `byLoginId` / `byNombre` exacto en catálogo.
+3. Coincidencia flexible de nombre **solo** si el vendedor del SP coincide (`nombresCoinciden`).
+4. Filas propias del listado `encuestasMuestraOperador` (`idVendedor` + `usuario`).
+5. `codigoCarga` de sesión solo si pasa validación `codigoPerteneceAVendedor`.
+
+**Login, listado leads, carga manual y notificaciones links** usan `enriquecerUsuarioConCodigoCarga` en cada request relevante.
+
+**Frontend:** si falta código en sesión, `LeadsPanel` consulta `fetchLinksRedes()` y usa `links.codigo` como fallback para `NuevoLeadSheet`.
+
+**QA DBA:** `node scripts/verificar-asignacion-links.mjs` — casos Jose G / Leonel C contra STRSYSTEM.
+
+Doc detalle: [FUNCIONALIDAD_CODIGO_PROMOTOR_PLANILLA.md](./FUNCIONALIDAD_CODIGO_PROMOTOR_PLANILLA.md).
+
+#### 17.2.4 Export planilla links (actualización RF-42)
+
+- `npm run links:export-prueba` → `data/links-redes-prueba-YYYY-MM-DD.xlsx` (columnas IG/FB/WA/TikTok por operador).
+- `npm run links:export-prueba:verificar` — añade columnas HTTP ok/error.
+
+### 17.3 Mapa de código
+
+| Componente | Archivo |
+|------------|---------|
+| Catálogo SP + merge JSON | `server/db/operadores-catalog.js`, `links-redes-sp.js` |
+| Enriquecer sesión con código | `enriquecerUsuarioConCodigoCarga` (login, leads, carga) |
+| Carga manual segura | `server/db/encuesta-carga.js` |
+| Fallback UI promotor | `src/components/leads/LeadsPanel.tsx` |
+| Links 4 redes | `src/components/leads/LinksRedesSection.tsx` |
+| Métricas origen | `src/components/promotores/OrigenLeadsChart.tsx` |
+| Verificación QA | `scripts/verificar-asignacion-links.mjs` |
+
+### 17.4 Scripts npm / utilidades
+
+| Comando | Descripción |
+|---------|-------------|
+| `npm run links:export-prueba` | Excel de links por operador (SP) |
+| `npm run links:export-prueba:verificar` | Excel + verificación HTTP |
+| `node scripts/verificar-asignacion-links.mjs` | QA asignación código ↔ planilla SQL |
+
+### 17.5 Panel superadmin — catálogo de datos en pantalla (RF-35)
+
+> Doc ampliada: [FUNCIONALIDAD_PANEL_SUPERADMIN.md](./FUNCIONALIDAD_PANEL_SUPERADMIN.md)
+
+El rol **superadmin** (`SUPERADMIN_LOGIN_IDS`) no usa bandejas de leads. Al iniciar sesión carga `GET /api/admin/dashboard` y muestra `SuperadminDashboard` — **Panel global de equipos**.
+
+**Fuentes:** listado global `SP_ENCUESTAS_ADMIN` (default `encuestasMuestra`) + historial `registrarSeguimientoLead` (~400 días) si `SP_SEGUIMIENTO` está activo. **Semana móvil:** hoy + 6 días anteriores.
+
+#### 17.5.1 Encabezado y avisos
+
+| Elemento | Campo / origen |
+|----------|----------------|
+| Rango semana | `semanaDesde` – `semanaHasta` |
+| Fecha de hoy | `hoy` (formato largo es-AR) |
+| Banner ámbar | `aviso` — fallo del SP, sin permisos MPCSP, listado vacío |
+
+#### 17.5.2 Sección «Hoy» — 4 KPIs globales
+
+| Tarjeta | Campo API | Definición |
+|---------|-----------|------------|
+| Entrevistas | `resumenHoy.entrevistas` | Leads distintos con entrevista hoy (historial: `hubo_entrevista`, `confirmo_entrevista` o resultado de entrevista válido). Máx. 1 por lead/día. |
+| Cierres | `resumenHoy.cierres` | Leads con `resultado_entrevista = compro` hoy. Máx. 1 por lead. |
+| Terrenos | `resumenHoy.ventasTerreno` | Cierres hoy con `id_producto = prod-terreno` |
+| Plan Inv. Joven | `resumenHoy.ventasPij` | Cierres hoy con `id_producto = prod-pij` |
+
+#### 17.5.3 Evolución temporal (`AdminMetricsChart`)
+
+Visible si `eventos.length > 0`.
+
+| Control | Opciones |
+|---------|----------|
+| Supervisor | Todos los equipos · un supervisor (si hay más de uno) |
+| Período | Semana ISO · Mes · Año |
+
+**Series del gráfico:**
+
+| Serie | Tipo evento | Conteo |
+|-------|-------------|--------|
+| Leads | `lead` | Fecha de alta del lead |
+| Entrevistas | `entrevista` | Primera entrevista por lead por día |
+| Cierres | `cierre` | `resultado_entrevista = compro` |
+| Terrenos | `terreno` | Cierre + producto terreno |
+| PIJ | `pij` | Cierre + producto PIJ |
+
+#### 17.5.4 Conocimiento de marca (`AdminConocimientoEncuesta`)
+
+Visible si `conocimientoLeads.total > 0`. Total de leads del SP.
+
+| Pregunta | Campos | Origen SQL |
+|----------|--------|------------|
+| ¿Conocían Mi Primer Casa? | `conoceMpc`: si / no / sinResponder | `campo3` encuesta |
+| ¿Sabían del Plan Inversión Joven? | `sabiaPlanInversionJoven`: si / no / sinResponder | `campo4` encuesta |
+
+Cada pregunta: contadores Sí / No / Sin dato + barra apilada (si hay respuestas).
+
+#### 17.5.5 Productividad — embudo y eficiencia (`AdminProductividadPanel`)
+
+Visible si `productividad.embudoGlobal.leads > 0`.
+
+**Embudo global** (sobre todos los leads):
+
+| Etapa | Campo | Tasa |
+|-------|-------|------|
+| Leads | `embudoGlobal.leads` | 100 % (base) |
+| Con entrevista | `embudoGlobal.conEntrevista` | `tasaEntrevistaPct` |
+| Con cierre | `embudoGlobal.conCierre` | `tasaCierreLeadPct` |
+| Texto adicional | — | Cierre sobre entrevistas: `tasaCierreEntrevistaPct` |
+
+**Mini KPIs:**
+
+| Etiqueta | Campos | Significado |
+|----------|--------|-------------|
+| Tiempo resp. prom. | `tiempoPrimeraEntrevista` | Días alta → primera entrevista (promedio, mediana, muestras) |
+| Recuperación PIJ | `pijRecuperacion` | % seguimientos PIJ promotor que cerraron |
+| Cierres c/ referidos | `referidos` | Cierres con `brindoReferidos` + total referidos brindados |
+| Backlog +30 días | `backlog` | Leads sin gestión ≥30 días (sub: 7d y 14d) |
+
+**Gráfico resultados de entrevista** — estado actual por lead:
+
+`compro` (Compró) · `no_compro` (No compró) · `reagenda` · `sin_interes` · `derivar_terreno` · `pendiente` (Sin resultado)
+
+**Gráfico efectividad por canal** — por fuente con leads (`canales[]`):
+
+| Fuente | Etiqueta UI |
+|--------|-------------|
+| `qr` | QR |
+| `app` | Manual |
+| `facebook` | Facebook |
+| `instagram` | Instagram |
+| `whatsapp` | WhatsApp |
+| `tiktok` | TikTok |
+| `otros` | Otros |
+
+Por canal: leads, cierres, `tasaCierrePct` (badge bajo el gráfico).
+
+**Tabla encuesta vs cierre** (`conocimientoVsCierre`): segmento (Conoce MPC / Sabía PIJ × Sí/No/Sin dato), leads, cierres, tasa %.
+
+**Tabla top 8 promotores por tasa de cierre** (`embudoPromotores`): promotor, supervisor, leads, entrevistas, cierres, Lead→Ent., Ent.→Cierre, Lead→Cierre.
+
+> Cubre parte de **RF-26**; la vista dedicada en supervisor sigue pendiente.
+
+#### 17.5.6 Destacados de la semana — rankings (top 5)
+
+| Ranking | Campo API | Métrica |
+|---------|-----------|---------|
+| Más entrevistas | `rankings.entrevistasSemana` | `entrevistasSemana` |
+| Más cierres | `rankings.cierresSemana` | `cierresSemana` |
+| Más leads nuevos | `rankings.leadsSemana` | Altas en semana móvil |
+| Más terrenos vendidos | `rankings.ventasTerrenoSemana` | Cierres terreno en semana |
+| Más Plan Inv. Joven | `rankings.ventasPijSemana` | Cierres PIJ en semana |
+
+Cada ítem: posición, `promotorNombre`, `supervisorNombre`, `valor`.
+
+#### 17.5.7 Supervisores y equipos — tabla por supervisor
+
+**Encabezado de equipo:**
+
+| Dato | Campo |
+|------|-------|
+| Nombre | `supervisorNombre` |
+| Cantidad promotores | `promotores.length` |
+| Semana | `totales.entrevistasSemana` ent. · `totales.cierresSemana` cierres |
+| Hoy | `totales.entrevistasHoy` ent. · `totales.cierresHoy` cierres |
+
+**Columnas por promotor:**
+
+| Columna UI | Campo | Alcance |
+|------------|-------|---------|
+| Promotor | `promotorNombre` | — |
+| Leads | `leadsTotal` | Histórico (todo el SP) |
+| Ent. sem. | `entrevistasSemana` | Semana móvil |
+| Ent. hoy | `entrevistasHoy` | Hoy |
+| Cierres sem. | `cierresSemana` | Semana móvil |
+| Cierres hoy | `cierresHoy` | Hoy |
+| Terrenos | `ventasTerrenoSemana` | Semana móvil |
+| PIJ | `ventasPijSemana` | Semana móvil |
+
+#### 17.5.8 Mapa de código (superadmin)
+
+| Capa | Archivo |
+|------|---------|
+| UI | `SuperadminDashboard.tsx`, `AdminMetricsChart.tsx`, `AdminConocimientoEncuesta.tsx`, `AdminProductividadPanel.tsx` |
+| Dominio | `admin-metrics.ts`, `admin-productividad.ts` |
+| API | `admin-dashboard.js`, `GET /api/admin/dashboard` en `create-app.js` |
+| Tipos | `AdminDashboardData` en `types/index.ts` |
+
+---
+
+*Documento generado a partir del análisis integral del repositorio. Las novedades se agregan en **§14**–**§17** sin reescribir el cuerpo principal (secciones 1–13).*

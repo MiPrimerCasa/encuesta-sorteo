@@ -24,3 +24,18 @@ export function aplicarRolSuperadmin(usuario, loginId) {
 export function esSuperadminUsuario(usuario) {
   return usuario?.rol === 'superadmin';
 }
+
+/**
+ * IDs operador SQL de supervisores para lectura batch de seguimiento (panel superadmin).
+ * Formato: `132:Norma M,145:Adela` o `132,145`
+ */
+export function adminSupervisorOperadorIds() {
+  const raw = process.env.ADMIN_SUPERVISOR_IDS || '';
+  const ids = new Set();
+  for (const part of raw.split(',')) {
+    const token = part.trim().split(':')[0]?.trim();
+    const n = Number.parseInt(token ?? '', 10);
+    if (Number.isFinite(n) && n > 0) ids.add(n);
+  }
+  return [...ids];
+}

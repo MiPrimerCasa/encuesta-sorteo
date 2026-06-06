@@ -58,12 +58,14 @@ Si el promotor marca **No compró** y elige **reagendar** para volver a ofrecer 
 | Reglas prioridad 0/1/2 | `src/domain/prioridad-leads.ts` | `prioridadTabInicial`, `perteneceTabInicial`, `ordenarPorPrioridadTabInicial`, etiquetas de grupo |
 | Tab destino al abrir lead | `src/domain/leads.ts` → `tabIdListaLead` | Derivados y entrevista pendiente → pestaña `entrevista` (Prioridad) |
 | Listas excluyentes | `src/hooks/useLeadsFilter.ts` | `entrevistaPendiente`, `paraContactar`, `encuestaSinContactar` (alertas +2 días) |
-| UI pestaña y secciones | `src/components/leads/LeadsPanel.tsx` | Tab «Prioridad», `agruparPorPrioridadTabInicial`, banner informativo |
+| UI pestaña y secciones | `src/components/leads/LeadsPanel.tsx` | Tab «Prioridad», `agruparPorPrioridadTabInicial`, banner informativo (texto distinto promotor vs supervisor) |
 | Alertas promotor | `src/components/leads/AlertasSinContactar.tsx` | Solo prioridad 2 (encuesta sin contactar) |
 | Tarjetas | `src/components/leads/LeadCard.tsx` / `SwipeableLeadCard.tsx` | Render por grupo |
 
 ## Relacionado
 
+- [FUNCIONALIDAD_BANDEJAS_CONTACTADO_CIERRES.md](./FUNCIONALIDAD_BANDEJAS_CONTACTADO_CIERRES.md) — orden y colores en Contactado / Cierres; banner promotor
+- [FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md](./FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md) — negativos en Contactado, no en Cierres
 - [FUNCIONALIDAD_SEGUIMIENTO_PIJ_REAGENDA.md](./FUNCIONALIDAD_SEGUIMIENTO_PIJ_REAGENDA.md) — sale de Prioridad al reagendar PIJ
 - [FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md](./FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md) — grupo 0 en Prioridad
 - [SORTEOS_Y_PARTICIPANTES.md](./SORTEOS_Y_PARTICIPANTES.md)

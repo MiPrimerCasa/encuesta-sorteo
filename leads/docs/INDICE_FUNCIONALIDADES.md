@@ -18,6 +18,9 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | Duplicado carga manual (teléfono + encuesta) | [FUNCIONALIDAD_DUPLICADO_CARGA_MANUAL.md](./FUNCIONALIDAD_DUPLICADO_CARGA_MANUAL.md) | Ambos | `encuesta-carga.js` |
 | Seguimiento PIJ tras «No compró» + reagenda | [FUNCIONALIDAD_SEGUIMIENTO_PIJ_REAGENDA.md](./FUNCIONALIDAD_SEGUIMIENTO_PIJ_REAGENDA.md) | Promotor (acción), supervisor (solo lectura) | `LeadModalForm.tsx`, `leads.ts`, `LeadCard.tsx` |
 | No compró / sin interés → Contactado (no Cierres) | [FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md](./FUNCIONALIDAD_CONTACTADO_VS_CIERRES.md) | Ambos | `useLeadsFilter.ts`, `leads.ts`, `LeadsPanel.tsx` |
+| Orden y estilos Contactado / Cierres + banner promotor | [FUNCIONALIDAD_BANDEJAS_CONTACTADO_CIERRES.md](./FUNCIONALIDAD_BANDEJAS_CONTACTADO_CIERRES.md) | Ambos | `leads.ts`, `useLeadsFilter.ts`, `LeadsPanel.tsx`, `LeadCard.tsx` |
+| Código @usuario desde planilla SQL (strict) | [FUNCIONALIDAD_CODIGO_PROMOTOR_PLANILLA.md](./FUNCIONALIDAD_CODIGO_PROMOTOR_PLANILLA.md) | Promotor, supervisor | `operadores-catalog.js`, `encuesta-carga.js` |
+| Links WhatsApp/TikTok + métricas origen | [FUNCIONALIDAD_ACORTADOR_LINKS.md](./FUNCIONALIDAD_ACORTADOR_LINKS.md) §17 | Ambos | `LinksRedesSection.tsx`, `OrigenLeadsChart.tsx` |
 | Derivar terreno (promotor → supervisor) | [FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md](./FUNCIONALIDAD_DERIVAR_TERRENO_PROMOTOR.md) | Promotor, supervisor | `LeadModalForm.tsx`, `prioridad-leads.ts` |
 | Calendario supervisor | [FUNCIONALIDAD_CALENDARIO_SUPERVISOR.md](./FUNCIONALIDAD_CALENDARIO_SUPERVISOR.md) | Supervisor | `CalendarioView.tsx`, `NavBar.tsx` |
 | Conexión SP_RegistrarSeguimientoLead | [FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md](./FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md) | Ambos | `seguimiento-sql.js`, `.env SP_SEGUIMIENTO` |
@@ -28,7 +31,7 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | Referidos → encuesta + árbol + visibilidad | [FUNCIONALIDAD_REFERIDOS_ENCUESTA.md](./FUNCIONALIDAD_REFERIDOS_ENCUESTA.md) | Promotor, supervisor, DBA | `lead_referido`, `referidos-carga.js`, `LeadCard.tsx` |
 | Carga manual origen 2 (upsert) + modificar teléfono | [FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md](./FUNCIONALIDAD_CARGA_MANUAL_ORIGEN2.md) | Promotor, supervisor | `encuesta-carga.js`, `encuestaSorteo01Update` |
 | Acortador y verificación links redes | [FUNCIONALIDAD_ACORTADOR_LINKS.md](./FUNCIONALIDAD_ACORTADOR_LINKS.md) | Supervisor (cron), ambos (notif.) | `url-shortener.js`, NavBar |
-| Panel superadmin (métricas empresa) | [DOCUMENTACION_SISTEMA.md](./DOCUMENTACION_SISTEMA.md) §14.2.7 | Superadmin | `SuperadminDashboard`, `admin-dashboard.js` |
+| Panel superadmin (métricas empresa) | [FUNCIONALIDAD_PANEL_SUPERADMIN.md](./FUNCIONALIDAD_PANEL_SUPERADMIN.md) | Superadmin | `SuperadminDashboard`, `admin-dashboard.js` |
 | Login y rol desde `Categoria` | [LOGIN_SP.md](./LOGIN_SP.md) | Ambos | `mssql.js`, `encuestas.js` |
 | Deploy y monorepo | [MONOREPO.md](./MONOREPO.md), [DEPLOY_VPS.md](./DEPLOY_VPS.md) | — | `deploy/` |
 
@@ -45,7 +48,7 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | Módulo | Responsabilidad |
 |--------|-----------------|
 | `prioridad-leads.ts` | Grupos 0/1/2 de la pestaña Prioridad |
-| `leads.ts` | Cierres, reagenda, derivación, tab destino, PIJ promotor |
+| `leads.ts` | Cierres, reagenda, derivación, tab destino, PIJ promotor, orden Contactado/Cierres |
 | `campania.ts` | Etiquetas Sorteo 01 / 02 desde columna `encuesta` |
 | `venta.ts` | Productos, pagos, etiquetas promotor/supervisor |
 | `fuenteLabels.ts` | Badge QR / redes en tarjeta |

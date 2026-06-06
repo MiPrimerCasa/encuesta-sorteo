@@ -152,6 +152,24 @@ export const DEMO_BARRIOS: Barrio[] = [
 // ─── Leads ────────────────────────────────────────────────────────────────────
 
 const BASE_LEADS: Lead[] = [
+  // ── Demo agendar (sin cita previa) ─────────────────────────────────────────
+
+  {
+    id: 'lead-demo-agendar',
+    nombre: '★ Demo — Sin cita (agendar)',
+    telefono: '3512 000111',
+    promotorId: 'prom-1',
+    promotorNombre: 'Martín González',
+    supervisorNombre: 'Demo Supervisor',
+    quiereEntrevista: false,
+    lista: 'contacto',
+    origen: 'sorteo',
+    fechaObtencion: '2026-06-01',
+    conoceMpc: true,
+    sabiaPlanInversionJoven: false,
+    seguimiento: { fuente: 'qr' },
+  },
+
   // ── Mayo 2026 — entrevista ─────────────────────────────────────────────────
 
   {

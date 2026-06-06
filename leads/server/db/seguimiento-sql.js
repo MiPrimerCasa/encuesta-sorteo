@@ -339,6 +339,44 @@ async function queryUltimosRows(idOperador) {
   return result.recordset ?? [];
 }
 
+/**
+ * Último seguimiento por lead vía SP_UltimoSeguimientoOperador (uno o más supervisores).
+ * Evita SELECT directo en registrarSeguimientoLead cuando MPCSP solo tiene EXECUTE en SPs.
+ */
+export async function fetchUltimosSeguimientoPorOperadores(idOperadores = []) {
+  const ids = [
+    ...new Set(
+      idOperadores
+        .map((id) => Number.parseInt(String(id), 10))
+        .filter((n) => Number.isFinite(n) && n > 0),
+    ),
+  ];
+  if (!ids.length || !useSeguimientoSql()) return [];
+
+  const byLead = new Map();
+  for (const idOp of ids) {
+    try {
+      const rows = await queryUltimosRows(idOp);
+      if (!rows?.length) continue;
+      for (const row of rows) {
+        const key = String(row.lead_id ?? row.leadId ?? '');
+        if (!key) continue;
+        const prev = byLead.get(key);
+        const prevId = Number(prev?.id ?? prev?.idRegistrarSeguimientoLead ?? 0);
+        const nextId = Number(row.id ?? row.idRegistrarSeguimientoLead ?? 0);
+        if (!prev || nextId >= prevId) byLead.set(key, row);
+      }
+    } catch (error) {
+      if (isSeguimientoReadDenied(error)) {
+        warnSeguimientoLecturaDegradada(error);
+        continue;
+      }
+      throw error;
+    }
+  }
+  return [...byLead.values()];
+}
+
 export async function getLatestSeguimientoSql(leadId, idOperador = null) {
   try {
     const rows = await queryHistorialRows(leadId, 1, idOperador);
@@ -352,7 +390,11 @@ export async function getLatestSeguimientoSql(leadId, idOperador = null) {
   }
 }
 
-export async function batchLatestSeguimientoSql(leadIds, idOperador = null) {
+export async function batchLatestSeguimientoSql(
+  leadIds,
+  idOperador = null,
+  idOperadoresExtra = [],
+) {
   const ids = [...new Set(leadIds.map((id) => parseInt(String(id), 10)).filter(Number.isFinite))];
   if (!ids.length) return {};
 
@@ -360,6 +402,15 @@ export async function batchLatestSeguimientoSql(leadIds, idOperador = null) {
   const map = {};
 
   try {
+    if (idOperador == null && idOperadoresExtra.length) {
+      const ultimosRows = await fetchUltimosSeguimientoPorOperadores(idOperadoresExtra);
+      for (const row of ultimosRows) {
+        const key = String(row.lead_id ?? row.leadId);
+        if (idSet.has(key)) map[key] = mapSqlRowToSeguimiento(row);
+      }
+      if (Object.keys(map).length) return map;
+    }
+
     const ultimosRows = await queryUltimosRows(idOperador);
     if (ultimosRows != null) {
       for (const row of ultimosRows) {

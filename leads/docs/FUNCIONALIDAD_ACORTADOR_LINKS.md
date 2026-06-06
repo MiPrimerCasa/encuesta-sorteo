@@ -21,7 +21,7 @@ Podés mantener el script Python solo para exportar la planilla de Google Sheets
 4. Si el acortado **no responde**, se **regenera** automáticamente.
 5. Si cambia o se regenera → **notificación** en la campana (NavBar) solo para el operador dueño del código (`codigoCarga`), promotor o supervisor.
 
-Los promotores comparten el link **largo** `wa.me` desde Leads (Instagram y Facebook). Solo **Instagram** tiene link acortado para bio/planilla; **Facebook** siempre es el link normal, sin acortar ni verificar.
+En **Leads** (`LinksRedesSection`) el operador comparte hasta **cuatro redes** con iconos: Instagram, Facebook, WhatsApp y TikTok (datos del SP). Solo **Instagram** tiene link **acortado** para bio/planilla (cron `links:acortar` / `links:verificar`). Facebook, WhatsApp y TikTok usan el link largo del SP, sin acortar ni verificar en cron.
 
 ## Cron sugerido (VPS)
 
@@ -56,3 +56,7 @@ Variables opcionales en `.env`:
 | `server/lib/link-health.js` | HEAD/GET del link corto |
 | `server/db/links-acortados-store.js` | SQLite + lógica verificar/regenerar |
 | `src/components/layout/NotificationsCenter.tsx` | Campana en NavBar |
+| `src/components/leads/LinksRedesSection.tsx` | Botones IG/FB/WA/TikTok en vista Leads |
+| `server/db/operadores-catalog.js` | Catálogo SP + resolución estricta de código promotor |
+| `scripts/verificar-asignacion-links.mjs` | QA código ↔ planilla SQL |
+| `scripts/export-links-redes-prueba.mjs` | Export Excel `.xlsx` de links por operador |

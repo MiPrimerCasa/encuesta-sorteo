@@ -59,6 +59,35 @@ export interface Promotor {
   esPropioSupervisor?: boolean;
 }
 
+/** RF-26 — métricas de entrevistas por promotor (vista supervisor). */
+export interface EfectividadEntrevistasPromotor {
+  id: string;
+  nombre: string;
+  entrevistas: number;
+  compro: number;
+  noCompro: number;
+  sinInteres: number;
+  reagenda: number;
+  derivarTerreno: number;
+  pendiente: number;
+  /** Compras / entrevistas realizadas (0–100). */
+  tasaCierreEntrevistaPct: number | null;
+}
+
+export interface EfectividadEntrevistasEquipo {
+  resumen: {
+    entrevistas: number;
+    compro: number;
+    noCompro: number;
+    sinInteres: number;
+    reagenda: number;
+    derivarTerreno: number;
+    pendiente: number;
+    tasaCierreEntrevistaPct: number | null;
+  };
+  porPromotor: EfectividadEntrevistasPromotor[];
+}
+
 export interface Producto {
   id: string;
   codigo: string;

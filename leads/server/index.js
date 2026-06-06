@@ -28,6 +28,9 @@ app.listen(PORT, () => {
       `  Leads → ${process.env.SP_ENCUESTAS || 'encuestasMuestraOperador'} @idVendedor @ ${process.env.ENCUESTAS_DB_NAME || process.env.DB_NAME}`,
     );
     console.log(
+      `  Admin → ${process.env.SP_ENCUESTAS_ADMIN || 'encuestasMuestra'} @ ${process.env.ENCUESTAS_DB_NAME || process.env.DB_NAME}`,
+    );
+    console.log(
       `  Seguimiento → ${process.env.SP_SEGUIMIENTO || '(SQLite local)'} @ ${process.env.ENCUESTAS_DB_NAME || process.env.DB_NAME}`,
     );
     const linksSp = process.env.SP_LINKS_REDES || 'rptLinkQRenRedesSociales';

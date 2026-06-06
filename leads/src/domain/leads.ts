@@ -254,6 +254,11 @@ export function getHorarioEntrevistaLead(lead: Lead): string | null {
   return lead.fechaAlta;
 }
 
+/** Lead con día y hora de entrevista ya definidos (encuesta, carga manual o reagenda). */
+export function leadTieneCitaPrevia(lead: Lead): boolean {
+  return Boolean(getHorarioEntrevistaLead(lead));
+}
+
 export function getLugarEntrevistaLead(lead: Lead): LugarEntrevista | null {
   if (leadReagendaEntrevista(lead)) return null;
   return lead.lugarEntrevista ?? null;

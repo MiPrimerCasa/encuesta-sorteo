@@ -54,15 +54,28 @@ interface RadioOptionProps {
   onChange: () => void;
   name: string;
   value: string;
+  tone?: 'brand' | 'terreno';
 }
 
-export function RadioOption({ label, checked, onChange, name, value }: RadioOptionProps) {
+export function RadioOption({
+  label,
+  checked,
+  onChange,
+  name,
+  value,
+  tone = 'brand',
+}: RadioOptionProps) {
+  const esTerreno = tone === 'terreno';
   return (
     <label
       className={`flex min-h-[56px] cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 transition-all duration-[140ms] ease-out ${
         checked
-          ? 'border-brand-600 bg-brand-50 active:bg-brand-100'
-          : 'border-zinc-200 bg-white active:bg-brand-50 active:border-brand-200'
+          ? esTerreno
+            ? 'lead-card--terreno border-red-500 bg-gradient-to-r from-red-50 to-orange-50 active:from-red-100 active:to-orange-100'
+            : 'border-brand-600 bg-brand-50 active:bg-brand-100'
+          : esTerreno
+            ? 'border-red-200 bg-white active:bg-red-50 active:border-red-300'
+            : 'border-zinc-200 bg-white active:bg-brand-50 active:border-brand-200'
       }`}
       style={{ touchAction: 'manipulation' }}
     >
@@ -76,11 +89,21 @@ export function RadioOption({ label, checked, onChange, name, value }: RadioOpti
       />
       <span
         className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all duration-[140ms] ${
-          checked ? 'border-brand-600' : 'border-zinc-300'
+          checked
+            ? esTerreno
+              ? 'border-red-600'
+              : 'border-brand-600'
+            : esTerreno
+              ? 'border-red-300'
+              : 'border-zinc-300'
         }`}
         aria-hidden="true"
       >
-        {checked && <span className="h-2 w-2 rounded-full bg-brand-600" />}
+        {checked && (
+          <span
+            className={`h-2 w-2 rounded-full ${esTerreno ? 'bg-red-600' : 'bg-brand-600'}`}
+          />
+        )}
       </span>
       <span
         className={`text-[15px] transition-colors ${

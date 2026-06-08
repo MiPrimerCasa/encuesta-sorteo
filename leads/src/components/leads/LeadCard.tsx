@@ -76,6 +76,8 @@ export function LeadCard({
     !esArchivo && !esSeguimiento && !esNoCompro && tieneSeguimiento && !esPostEntrevistaNegativo;
   const esNuevo =
     !esArchivo && !esSeguimiento && !esNoCompro && !tieneSeguimiento;
+  const esInteresTerreno =
+    derivaTerreno && !esArchivo && !esNoCompro && !esSeguimiento;
   const mostrarAgendaEntrevista =
     !esArchivo &&
     !esNoCompro &&
@@ -109,6 +111,8 @@ export function LeadCard({
             ? 'border-zinc-300 bg-zinc-200 active:bg-zinc-300 active:border-zinc-400 [&:not(:active)]:hover:border-zinc-400 [&:not(:active)]:hover:shadow-sm'
             : esSeguimiento
               ? 'border-brand-100 bg-brand-50 active:bg-brand-100 active:border-brand-300 [&:not(:active)]:hover:border-brand-200 [&:not(:active)]:hover:shadow-sm'
+              : esInteresTerreno
+                ? 'lead-card--terreno border-red-400 bg-gradient-to-br from-red-50 via-orange-50/80 to-red-50 active:from-red-100 active:to-orange-100 active:border-red-500 [&:not(:active)]:hover:border-red-500'
               : esPostEntrevistaNegativo
                 ? 'border-orange-200 bg-orange-50 active:bg-orange-100 active:border-orange-300 [&:not(:active)]:hover:border-orange-300 [&:not(:active)]:hover:shadow-sm'
                 : esContactado
@@ -201,8 +205,8 @@ export function LeadCard({
                   : 'No compró'}
               </StatusPill>
             )}
-            {esContactado && derivaTerreno && (
-              <StatusPill variant="pending" dot>Interés terreno</StatusPill>
+            {derivaTerreno && !esArchivo && !esSeguimiento && (
+              <StatusPill variant="terreno" dot>Interés terreno</StatusPill>
             )}
             {esContactado && !derivaTerreno && (
               <StatusPill variant="contactado" dot>Contactado</StatusPill>

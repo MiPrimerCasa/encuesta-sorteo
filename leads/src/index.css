@@ -272,6 +272,83 @@
 }
 /* ── fin react-datepicker ─────────────────────────────────────────────── */
 
+/* ── Interés terreno — llamitas y brillo ─────────────────────────────── */
+@keyframes mpc-flame-flicker {
+  0%, 100% {
+    transform: scaleY(1) scaleX(1);
+    opacity: 1;
+  }
+  35% {
+    transform: scaleY(1.1) scaleX(0.94);
+    opacity: 0.88;
+  }
+  70% {
+    transform: scaleY(0.94) scaleX(1.06);
+    opacity: 1;
+  }
+}
+
+@keyframes mpc-flame-inner-pulse {
+  0%, 100% { opacity: 0.95; }
+  50% { opacity: 0.65; }
+}
+
+@keyframes mpc-fire-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(220, 38, 38, 0.12),
+      0 0 14px rgba(249, 115, 22, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(220, 38, 38, 0.28),
+      0 0 22px rgba(249, 115, 22, 0.22);
+  }
+}
+
+@keyframes mpc-ember-float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translateY(-3px) scale(1.15);
+    opacity: 0.9;
+  }
+}
+
+.mpc-flame-icon {
+  color: #DC2626;
+  transform-origin: bottom center;
+  animation: mpc-flame-flicker 1.15s ease-in-out infinite;
+}
+
+.mpc-flame-icon .mpc-flame-inner {
+  animation: mpc-flame-inner-pulse 1.15s ease-in-out infinite;
+}
+
+.lead-card--terreno {
+  animation: mpc-fire-glow 2.4s ease-in-out infinite;
+}
+
+.mpc-terreno-ember {
+  animation: mpc-ember-float 1.8s ease-in-out infinite;
+}
+
+.mpc-terreno-ember--delay {
+  animation-delay: 0.6s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mpc-flame-icon,
+  .mpc-flame-icon .mpc-flame-inner,
+  .lead-card--terreno,
+  .mpc-terreno-ember {
+    animation: none;
+  }
+}
+/* ── fin interés terreno ─────────────────────────────────────────────── */
+
 body {
   margin: 0;
   min-height: 100svh;

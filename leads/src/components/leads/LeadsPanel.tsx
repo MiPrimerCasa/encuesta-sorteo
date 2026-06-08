@@ -25,6 +25,7 @@ import { NuevoLeadSheet } from './NuevoLeadSheet';
 import { LinksRedesSection } from './LinksRedesSection';
 import { PromotorResumen } from './PromotorResumen';
 import { SwipeableLeadCard } from './SwipeableLeadCard';
+import { TerrenoFlameIcon } from '../ui/TerrenoFlameIcon';
 
 type ListaKey = 'entrevistaPendiente' | 'paraContactar' | 'seguimiento' | 'compraron';
 type VarianteCard = 'activo' | 'seguimiento' | 'compro';
@@ -475,9 +476,28 @@ export function LeadsPanel({
                 if (grupo.length === 0) return null;
                 return (
                   <section key={prioridad}>
-                    <h3 className="mb-3 flex items-baseline gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                      {ETIQUETA_PRIORIDAD_TAB_INICIAL[prioridad]}
-                      <span className="text-[13px] font-medium tabular-nums text-zinc-400">
+                    <h3
+                      className={`mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${
+                        prioridad === 0
+                          ? 'rounded-lg border border-red-200 bg-gradient-to-r from-red-50 to-orange-50 px-3 py-2 text-red-700'
+                          : 'items-baseline text-zinc-500'
+                      }`}
+                    >
+                      {prioridad === 0 && (
+                        <span className="flex items-center gap-0.5" aria-hidden="true">
+                          <TerrenoFlameIcon size={16} />
+                          <span className="mpc-terreno-ember h-1 w-1 rounded-full bg-orange-400" />
+                          <span className="mpc-terreno-ember mpc-terreno-ember--delay h-1 w-1 rounded-full bg-red-500" />
+                        </span>
+                      )}
+                      <span className={prioridad === 0 ? 'flex-1' : undefined}>
+                        {ETIQUETA_PRIORIDAD_TAB_INICIAL[prioridad]}
+                      </span>
+                      <span
+                        className={`text-[13px] font-medium tabular-nums ${
+                          prioridad === 0 ? 'text-red-500' : 'text-zinc-400'
+                        }`}
+                      >
                         {grupo.length}
                       </span>
                     </h3>

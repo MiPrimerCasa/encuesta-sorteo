@@ -913,6 +913,7 @@ export function LeadModalForm({
                       name="conEntrevista"
                       value="derivar_terreno"
                       label={labelDerivarTerreno}
+                      tone="terreno"
                       checked={form.resultadoEntrevista === 'derivar_terreno'}
                       onChange={() =>
                         patch({
@@ -926,7 +927,7 @@ export function LeadModalForm({
                   )}
 
                   {showDerivarTerreno && (
-                    <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50 p-4">
+                    <div className="lead-card--terreno space-y-3 rounded-xl border border-red-300 bg-gradient-to-br from-red-50 to-orange-50/90 p-4">
                       <ButtonGroup
                         name="proponeFechaDerivacion"
                         label="¿El cliente propuso fecha para la entrevista?"
@@ -944,7 +945,7 @@ export function LeadModalForm({
                       />
                       {showAgendarDerivacion && (
                         <div className="space-y-1.5">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-red-700">
                             Fecha y hora de entrevista
                           </p>
                           <DateTimePicker
@@ -956,7 +957,7 @@ export function LeadModalForm({
                         </div>
                       )}
                       {form.proponeFechaDerivacion === false && (
-                        <p className="text-[12px] leading-relaxed text-brand-800">
+                        <p className="text-[12px] leading-relaxed text-red-800/90">
                           Sin fecha agendada: el supervisor hará el seguimiento del lead.
                         </p>
                       )}

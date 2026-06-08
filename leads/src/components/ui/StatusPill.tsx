@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { TerrenoFlameIcon } from './TerrenoFlameIcon';
 
 type Variant =
   | 'in-progress'
@@ -10,7 +11,8 @@ type Variant =
   | 'sin-interes'
   | 'nuevo'
   | 'contactado'
-  | 'post-entrevista';
+  | 'post-entrevista'
+  | 'terreno';
 
 const VARIANTS: Record<Variant, string> = {
   'in-progress': 'bg-brand-50 text-brand-700 border border-brand-100',
@@ -23,6 +25,7 @@ const VARIANTS: Record<Variant, string> = {
   'nuevo':       'bg-ok-subtle text-ok border border-ok-subtle',
   'contactado':  'bg-amber-50 text-amber-700 border border-amber-200',
   'post-entrevista': 'bg-orange-50 text-orange-700 border border-orange-200',
+  'terreno':     'bg-red-50 text-red-700 border border-red-300 shadow-sm shadow-red-100/80',
 };
 
 const DOT_COLORS: Record<Variant, string> = {
@@ -36,6 +39,7 @@ const DOT_COLORS: Record<Variant, string> = {
   'nuevo':       'bg-ok',
   'contactado':  'bg-amber-500',
   'post-entrevista': 'bg-orange-500',
+  'terreno':     'bg-red-500',
 };
 
 interface StatusPillProps {
@@ -52,7 +56,8 @@ export function StatusPill({ children, variant = 'pending', dot = false }: Statu
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold tracking-[0.02em] leading-none whitespace-nowrap ${variantClass}`}
     >
-      {dot && (
+      {dot && variant === 'terreno' && <TerrenoFlameIcon size={12} />}
+      {dot && variant !== 'terreno' && (
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${dotColor}`} aria-hidden="true" />
       )}
       {children}

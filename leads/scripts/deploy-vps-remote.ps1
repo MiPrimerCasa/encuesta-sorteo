@@ -28,8 +28,14 @@ else
 fi
 '@
 
-Write-Host "Conectando a ${VpsUser}@${VpsHost} ..."
-ssh -o ConnectTimeout=25 "${VpsUser}@${VpsHost}" $remoteScript
+$sshKey = if ($env:VPS_SSH_KEY) { $env:VPS_SSH_KEY } else { "$env:USERPROFILE\.ssh\id_ed25519_landingqr" }
+$sshArgs = @('-o', 'ConnectTimeout=25')
+if (Test-Path $sshKey) {
+  $sshArgs += @('-i', $sshKey)
+}
+
+Write-Host "Conectando a ${VpsUser}@${VpsHost} (clave: $sshKey) ..."
+ssh @sshArgs "${VpsUser}@${VpsHost}" $remoteScript
 if ($LASTEXITCODE -ne 0) {
   Write-Error "Deploy falló. Si GitHub Actions también falla, revisá VPS_SSH_KEY en encuesta-sorteo → Settings → Secrets."
   exit $LASTEXITCODE

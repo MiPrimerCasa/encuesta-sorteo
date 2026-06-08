@@ -15,6 +15,8 @@ RUN npm ci \
        @tailwindcss/oxide-linux-x64-gnu
 COPY tsconfig.json vite.config.ts index.html ./
 COPY public ./public
+COPY docs/INSTRUCTIVO_USO_APLICACION.html ./docs/INSTRUCTIVO_USO_APLICACION.html
+COPY scripts ./scripts
 COPY src ./src
 # Monorepo: https://dominio.com/leads — subdominio standalone: VITE_BASE=/
 ARG VITE_BASE=/leads/

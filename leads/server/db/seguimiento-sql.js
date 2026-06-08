@@ -30,17 +30,30 @@ export function consumeSeguimientoLecturaDegradada() {
   return v;
 }
 
+function seguimientoErrorText(error) {
+  return error instanceof Error
+    ? `${error.message} ${error.originalError?.message ?? ''}`
+    : String(error ?? '');
+}
+
+function isSpMissing(error) {
+  const raw = seguimientoErrorText(error);
+  return /could not find stored procedure/i.test(raw) || /invalid object name/i.test(raw);
+}
+
 function isSeguimientoReadDenied(error) {
-  const raw =
-    error instanceof Error
-      ? `${error.message} ${error.originalError?.message ?? ''}`
-      : String(error ?? '');
+  const raw = seguimientoErrorText(error);
   return (
     /permission was denied/i.test(raw) &&
     /registrarSeguimientoLead|SEGUIMIENTO_TABLE|SP_HistorialSeguimientoLead|SP_HistorialSeguimientoAdmin|SP_UltimoSeguimientoOperador|SP_UltimoSeguimientoGlobal/i.test(
       raw,
     )
   );
+}
+
+/** SP inexistente o sin permiso — panel superadmin degrada sin romper el listado. */
+function isSeguimientoDegraded(error) {
+  return isSeguimientoReadDenied(error) || isSpMissing(error);
 }
 
 function warnSeguimientoLecturaDegradada(error) {
@@ -388,7 +401,7 @@ export async function fetchHistorialAdminDesde(desde) {
     const result = await pool.request().input('desde', sql.DateTime2, desde).execute(proc);
     return result.recordset ?? [];
   } catch (error) {
-    if (isSeguimientoReadDenied(error)) {
+    if (isSeguimientoDegraded(error)) {
       warnSeguimientoLecturaDegradada(error);
       return [];
     }
@@ -401,7 +414,7 @@ export async function fetchUltimosSeguimientoGlobal() {
   try {
     return (await queryUltimosGlobalRows()) ?? [];
   } catch (error) {
-    if (isSeguimientoReadDenied(error)) {
+    if (isSeguimientoDegraded(error)) {
       warnSeguimientoLecturaDegradada(error);
       return [];
     }
@@ -437,7 +450,7 @@ export async function fetchUltimosSeguimientoPorOperadores(idOperadores = []) {
         if (!prev || nextId >= prevId) byLead.set(key, row);
       }
     } catch (error) {
-      if (isSeguimientoReadDenied(error)) {
+      if (isSeguimientoDegraded(error)) {
         warnSeguimientoLecturaDegradada(error);
         continue;
       }
@@ -452,7 +465,7 @@ export async function getLatestSeguimientoSql(leadId, idOperador = null) {
     const rows = await queryHistorialRows(leadId, 1, idOperador);
     return rows.length ? mapSqlRowToSeguimiento(rows[0]) : {};
   } catch (error) {
-    if (isSeguimientoReadDenied(error)) {
+    if (isSeguimientoDegraded(error)) {
       warnSeguimientoLecturaDegradada(error);
       return {};
     }
@@ -529,7 +542,7 @@ export async function batchLatestSeguimientoSql(
       }
     }
   } catch (error) {
-    if (isSeguimientoReadDenied(error)) {
+    if (isSeguimientoDegraded(error)) {
       warnSeguimientoLecturaDegradada(error);
       return {};
     }
@@ -543,7 +556,7 @@ export async function listHistorialSeguimientoSql(leadId, lead = {}, { limit = 5
     const rows = await queryHistorialRows(leadId, limit, idOperador);
     return rows.map((row) => mapSqlRowToHistorialEntry(row, lead));
   } catch (error) {
-    if (isSeguimientoReadDenied(error)) {
+    if (isSeguimientoDegraded(error)) {
       warnSeguimientoLecturaDegradada(error);
       return [];
     }

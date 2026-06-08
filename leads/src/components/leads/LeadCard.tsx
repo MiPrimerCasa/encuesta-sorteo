@@ -16,6 +16,7 @@ import {
   leadSoloLecturaPromotor,
   leadSoloLecturaSupervisor,
 } from '../../domain/leads';
+import { prioridadTabInicial } from '../../domain/prioridad-leads';
 import { etiquetaCortaNumeroDocumentoVenta, etiquetaPagoProducto } from '../../domain/venta';
 import { etiquetaCampania } from '../../domain/campania';
 import { FUENTE_LABEL } from '../../domain/fuenteLabels';
@@ -77,9 +78,11 @@ export function LeadCard({
     !esArchivo && !esSeguimiento && !esNoCompro && tieneSeguimiento && !esPostEntrevistaNegativo;
   const esNuevo =
     !esArchivo && !esSeguimiento && !esNoCompro && !tieneSeguimiento;
-  const esInteresTerreno = !esArchivo && !esNoCompro && leadEsInteresTerreno(lead);
-  const terrenoCardClass =
-    'lead-card--terreno border-red-500 bg-gradient-to-br from-red-100 via-red-50 to-orange-100 active:from-red-200 active:to-orange-100 active:border-red-600 [&:not(:active)]:hover:border-red-600';
+  const esInteresTerreno =
+    !esArchivo &&
+    !esNoCompro &&
+    (leadEsInteresTerreno(lead) || prioridadTabInicial(lead) === 0);
+  const terrenoCardClass = 'lead-card--terreno';
   const mostrarAgendaEntrevista =
     !esArchivo &&
     !esNoCompro &&
@@ -292,13 +295,18 @@ export function LeadCard({
   return (
     <div className="relative">
       {soloLectura ? (
-        <div className={cardClassName} aria-label={`${lead.nombre} — solo lectura`}>
+        <div
+          className={cardClassName}
+          data-terreno={esInteresTerreno ? 'true' : undefined}
+          aria-label={`${lead.nombre} — solo lectura`}
+        >
           {cardInner}
         </div>
       ) : (
         <button
           type="button"
           onClick={() => onClick(lead)}
+          data-terreno={esInteresTerreno ? 'true' : undefined}
           style={{ touchAction: 'manipulation' }}
           className={cardClassName}
         >

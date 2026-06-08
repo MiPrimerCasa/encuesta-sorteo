@@ -6,6 +6,7 @@ import {
   leadReagendaEntrevista,
   leadSoloLecturaSupervisor,
   leadSoloLecturaPromotor,
+  sortLeadsContactadosPromotor,
   sortLeadsPorVentaReciente,
   tabIdListaLead,
 } from '../../domain/leads';
@@ -43,7 +44,7 @@ const TABS: Array<{
     id: 'entrevista',
     tituloTab: 'Prioridad',
     tituloTabCorto: 'Prioridad',
-    tituloLargo: 'Prioridad — terreno, entrevistas y nuevos',
+    tituloLargo: 'Prioridad — entrevistas y nuevos',
     key: 'entrevistaPendiente',
     variante: 'activo',
     vacio: 'Nada pendiente en esta bandeja',
@@ -227,13 +228,15 @@ export function LeadsPanel({
 
   const tabData = TABS.find((t) => t.id === tabActivo) ?? TABS[0];
   const itemsActivos = listas[tabData.key];
-  const itemsVisibles = useMemo(
-    () =>
-      tabActivo === 'compro'
-        ? sortLeadsPorVentaReciente(itemsActivos, historialPorLead)
-        : itemsActivos,
-    [tabActivo, itemsActivos, historialPorLead],
-  );
+  const itemsVisibles = useMemo(() => {
+    if (tabActivo === 'compro') {
+      return sortLeadsPorVentaReciente(itemsActivos, historialPorLead);
+    }
+    if (tabActivo === 'contacto' && rolUsuario === 'promotor') {
+      return sortLeadsContactadosPromotor(itemsActivos, historialPorLead);
+    }
+    return itemsActivos;
+  }, [tabActivo, itemsActivos, historialPorLead, rolUsuario]);
   const esPromotor = rolUsuario === 'promotor';
   const esTabPrioridad = tabActivo === 'entrevista';
 
@@ -305,16 +308,17 @@ export function LeadsPanel({
         <p className="text-[13px] text-zinc-500">
           {esPromotor ? (
             <>
-              En <span className="font-medium text-zinc-700">Prioridad</span>: primero tus entrevistas
-              agendadas, después encuestas sin contactar (las más antiguas primero). Deslizá una tarjeta
-              para contacto rápido o abrila para completar el seguimiento.{' '}
-              <span className="font-medium text-zinc-700">Reagendar</span> va a En seguimiento.
+              En <span className="font-medium text-zinc-700">Prioridad</span>: entrevistas agendadas y
+              encuestas sin contactar. En <span className="font-medium text-zinc-700">Contactado</span>, el
+              último contacto aparece primero.{' '}
+              <span className="font-medium text-zinc-700">Reagendar</span> y{' '}
+              <span className="font-medium text-zinc-700">derivar terreno</span> van a En seguimiento.
             </>
           ) : (
             <>
-              En <span className="font-medium text-zinc-700">Prioridad</span>: primero derivados a terreno,
-              luego entrevistas agendadas, luego encuestas sin contactar (orden cronológico en cada grupo).{' '}
-              <span className="font-medium text-zinc-700">Reagendar</span> va a En seguimiento.
+              En <span className="font-medium text-zinc-700">Prioridad</span>: entrevistas agendadas y
+              encuestas sin contactar. Los derivados a terreno y las reagendas van a{' '}
+              <span className="font-medium text-zinc-700">En seguimiento</span>.
             </>
           )}
         </p>
@@ -479,7 +483,7 @@ export function LeadsPanel({
                     <h3
                       className={`mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${
                         prioridad === 0
-                          ? 'rounded-lg border border-red-200 bg-gradient-to-r from-red-50 to-orange-50 px-3 py-2 text-red-700'
+                          ? 'mpc-terreno-section-header'
                           : 'items-baseline text-zinc-500'
                       }`}
                     >

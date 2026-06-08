@@ -327,8 +327,31 @@
   animation: mpc-flame-inner-pulse 1.15s ease-in-out infinite;
 }
 
-.lead-card--terreno {
+.lead-card--terreno,
+[data-terreno='true'] {
+  border-color: #dc2626 !important;
+  background: linear-gradient(
+    135deg,
+    #fca5a5 0%,
+    #fecaca 38%,
+    #fee2e2 72%,
+    #fdba74 100%
+  ) !important;
   animation: mpc-fire-glow 2.4s ease-in-out infinite;
+}
+
+.lead-card--terreno:active,
+[data-terreno='true']:active {
+  background: linear-gradient(135deg, #f87171 0%, #fca5a5 50%, #fecaca 100%) !important;
+  border-color: #b91c1c !important;
+}
+
+.mpc-terreno-section-header {
+  border: 1px solid #fecaca;
+  border-radius: 0.5rem;
+  background: linear-gradient(90deg, #fef2f2 0%, #fff7ed 100%);
+  padding: 0.5rem 0.75rem;
+  color: #b91c1c;
 }
 
 .mpc-terreno-ember {

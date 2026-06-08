@@ -24,7 +24,28 @@ export function normalizeCodigoCatalog(valor) {
   return compactarCodigoSorteo(valor);
 }
 
-/** Coincidencia flexible: planilla «Leonel C» ↔ SP «LEONEL CAJAL» / «STRAUSS LEONEL». */
+function primerNombreEquivalente(a, b) {
+  if (a === b) return true;
+  return (
+    (a === 'cristian' && b === 'christian') || (a === 'christian' && b === 'cristian')
+  );
+}
+
+function apellidosCoinciden(apellidoLogin, apellidoPlanilla) {
+  if (!apellidoLogin || !apellidoPlanilla) return false;
+  if (apellidoLogin === apellidoPlanilla) return true;
+  if (apellidoPlanilla.length === 1) return apellidoLogin.startsWith(apellidoPlanilla);
+  if (apellidoLogin.length === 1) return apellidoPlanilla.startsWith(apellidoLogin);
+  if (apellidoLogin[0] !== apellidoPlanilla[0]) return false;
+  let diff = Math.abs(apellidoLogin.length - apellidoPlanilla.length);
+  const len = Math.min(apellidoLogin.length, apellidoPlanilla.length);
+  for (let i = 0; i < len; i += 1) {
+    if (apellidoLogin[i] !== apellidoPlanilla[i]) diff += 1;
+  }
+  return diff <= 2;
+}
+
+/** Coincidencia flexible: planilla «Leonel C» ↔ login «LEONEL CAJAL»; «Christian R» ↔ «Cristian Rocdan». */
 export function nombresCoinciden(nombreOperador, nombrePlanilla) {
   const a = normalizeNombre(nombreOperador);
   const b = normalizeNombre(nombrePlanilla);
@@ -46,7 +67,15 @@ export function nombresCoinciden(nombreOperador, nombrePlanilla) {
   const inicialB = tokensB[tokensB.length - 1];
   if (inicialB.length === 1 && tokensA.some((t) => t.startsWith(inicialB))) {
     const primeroB = tokensB[0];
-    if (tokensA.includes(primeroB)) return true;
+    if (tokensA.includes(primeroB) || primerNombreEquivalente(tokensA[0], primeroB)) return true;
+  }
+
+  if (tokensA.length >= 2 && tokensB.length >= 2) {
+    const apA = tokensA.slice(1).join(' ');
+    const apB = tokensB.slice(1).join(' ');
+    if (primerNombreEquivalente(tokensA[0], tokensB[0]) && apellidosCoinciden(apA, apB)) {
+      return true;
+    }
   }
 
   return false;
@@ -255,13 +284,19 @@ export function resolveCodigoCargaOperador(usuarioSesion, encuestaRows = []) {
   }
   if (!usuarioSesion) return null;
 
+  const catalog = loadOperadoresCatalog();
+
   const candidatosDirectos = [usuarioSesion.codigoCarga, usuarioSesion.loginId];
+  for (const c of candidatosDirectos) {
+    const codigo = normalizeCodigoCatalog(c);
+    if (esCodigoUsuarioCargaValido(codigo) && catalog.byCodigo?.[codigo]) {
+      return codigo;
+    }
+  }
   for (const c of candidatosDirectos) {
     const t = String(c ?? '').trim();
     if (esCodigoUsuarioCargaValido(t)) return t;
   }
-
-  const catalog = loadOperadoresCatalog();
 
   const login = normalizeLoginId(usuarioSesion.loginId);
   if (login && catalog.byLoginId?.[login]) {

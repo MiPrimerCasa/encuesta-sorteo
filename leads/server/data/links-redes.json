@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-05-29",
+  "updatedAt": "2026-06-08",
   "source": "Planilla operadores (C:/CARRERA_LIC/SEGUIMIENTO_LEADS/data/planilla/operadores-codigos.csv)",
   "byCodigo": {
     "SORTEO01ROTATIVO": {
@@ -322,6 +322,11 @@
       "rol": "supervisor"
     },
     "christian r": {
+      "codigo": "SORTEO01S1100",
+      "vendedor": "Christian R",
+      "rol": "supervisor"
+    },
+    "cristian rocdan": {
       "codigo": "SORTEO01S1100",
       "vendedor": "Christian R",
       "rol": "supervisor"

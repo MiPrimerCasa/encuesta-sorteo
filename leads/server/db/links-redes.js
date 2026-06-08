@@ -1,6 +1,8 @@
+import { esCodigoUsuarioCargaValido } from './codigo-promotor.js';
 import {
   loadOperadoresCatalogAsync,
   normalizeCodigoCatalog,
+  normalizeLoginId,
   resolveCodigoCargaOperador,
 } from './operadores-catalog.js';
 import { isLinksAcortadorEnabled } from './links-acortador.js';
@@ -53,8 +55,39 @@ export function resolveCodigoCargaUsuario(usuarioSesion, encuestaRows = []) {
   return resolveCodigoCargaOperador(usuarioSesion, encuestaRows);
 }
 
+/**
+ * Para links de redes: el catálogo SP está indexado por código (ej. SORTEO01S1100).
+ * Si la sesión ya trae ese código y existe en byCodigo, se usa directo — sin validar nombre.
+ */
+async function resolveCodigoParaLinksRedes(usuarioSesion, encuestaRows = []) {
+  const catalog = await loadOperadoresCatalogAsync();
+  const idOp = String(usuarioSesion?.idOperador ?? usuarioSesion?.id ?? '').trim();
+  const login = normalizeLoginId(usuarioSesion?.loginId);
+
+  const candidatos = [
+    usuarioSesion?.codigoCarga,
+    usuarioSesion?.loginId,
+    idOp ? catalog.byIdOperador?.[idOp]?.codigo : null,
+    login ? catalog.byLoginId?.[login]?.codigo : null,
+  ];
+
+  for (const candidato of candidatos) {
+    const codigo = normalizeCodigoCatalog(candidato);
+    if (esCodigoUsuarioCargaValido(codigo) && catalog.byCodigo?.[codigo]) {
+      return codigo;
+    }
+  }
+
+  const codigoResuelto = resolveCodigoCargaOperador(usuarioSesion, encuestaRows);
+  const norm = normalizeCodigoCatalog(codigoResuelto);
+  if (esCodigoUsuarioCargaValido(norm) && catalog.byCodigo?.[norm]) {
+    return norm;
+  }
+  return codigoResuelto;
+}
+
 export async function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows = []) {
-  const codigo = resolveCodigoCargaOperador(usuarioSesion, encuestaRows);
+  const codigo = await resolveCodigoParaLinksRedes(usuarioSesion, encuestaRows);
   if (!codigo) {
     return {
       codigo: null,

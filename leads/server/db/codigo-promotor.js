@@ -86,7 +86,15 @@ export function extraerCodigoPromotorDesdeFilaLogin(row) {
     'operadorCodigoSorteo',
     'OperadorCodigoSorteo',
   );
-  return extraerCodigoSorteoDeTexto(direct) || extraerCodigoPromotorDesdeFilaEncuesta(row);
+  const desdeDirecto = extraerCodigoSorteoDeTexto(direct);
+  if (desdeDirecto) return desdeDirecto;
+
+  // Supervisores/promotores: operadorCodigo suele ser SORTEO01S1100, SORTEO01S21P01, etc.
+  const operadorCodigo = pickField(row, 'operadorCodigo', 'OperadorCodigo');
+  const desdeOperadorCodigo = extraerCodigoSorteoDeTexto(operadorCodigo);
+  if (desdeOperadorCodigo) return desdeOperadorCodigo;
+
+  return extraerCodigoPromotorDesdeFilaEncuesta(row);
 }
 
 /** Alinea @encuesta con la landing (?Encuesta=SORTEO01 → sorteo01 si el SP usa minúsculas). */

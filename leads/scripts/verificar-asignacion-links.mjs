@@ -10,6 +10,8 @@ import {
   invalidateOperadoresCatalogCache,
   loadOperadoresCatalogAsync,
   resolveCodigoCargaPromotorStrict,
+  resolveCodigoCargaOperador,
+  nombresCoinciden,
   codigoPerteneceAVendedor,
   enriquecerUsuarioConCodigoCarga,
 } from '../server/db/operadores-catalog.js';
@@ -86,6 +88,14 @@ try {
   check(Boolean(links.whatsapp), 'whatsapp presente');
   check(Boolean(links.tiktok), 'tiktok presente');
   check(links.whatsapp?.includes('SORTEO01S21P02'), 'whatsapp usa código S21P02');
+
+  console.log('\n=== Christian R / Cristian Rocdan (supervisor S1100) ===');
+  const cristian = resolveCodigoCargaOperador(
+    { id: '1', nombre: 'Cristian Rocdan', rol: 'supervisor', idVendedor: '1' },
+    [],
+  );
+  check(cristian === 'SORTEO01S1100', `Cristian Rocdan → ${cristian ?? 'null'} (esperado SORTEO01S1100)`);
+  check(nombresCoinciden('Cristian Rocdan', 'Christian R'), 'Cristian Rocdan coincide con Christian R en planilla');
 
   console.log('\n=== Sin leads: solo por nombre de login ===');
   check(

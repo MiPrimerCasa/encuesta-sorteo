@@ -81,33 +81,19 @@ async function testUltimosSp(pool, procName, idOperador) {
   return result.recordset ?? [];
 }
 
-async function testSelectSeguimiento(pool, table) {
-  try {
-    const result = await pool.request().query(`
-      SELECT TOP 1 *
-      FROM dbo.[${table}]
-      ORDER BY id DESC
-    `);
-    return { row: result.recordset?.[0] ?? null, error: null };
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (/permission|denied/i.test(msg)) {
-      return { row: null, error: 'permission' };
-    }
-    try {
-      const fallback = await pool.request().query(`
-        SELECT TOP 1 id, lead_id
-        FROM dbo.[${table}]
-        ORDER BY id DESC
-      `);
-      return { row: fallback.recordset?.[0] ?? null, error: msg };
-    } catch (error2) {
-      return {
-        row: null,
-        error: error2 instanceof Error ? error2.message : String(error2),
-      };
-    }
-  }
+async function testAdminHistorialSp(pool, procName) {
+  const desde = new Date();
+  desde.setDate(desde.getDate() - 400);
+  const result = await pool
+    .request()
+    .input('desde', sql.DateTime2, desde)
+    .execute(procName);
+  return result.recordset ?? [];
+}
+
+async function testUltimosGlobalSp(pool, procName) {
+  const result = await pool.request().execute(procName);
+  return result.recordset ?? [];
 }
 
 function checkEnv() {
@@ -222,17 +208,13 @@ async function checkEncuestasMuestra() {
 }
 
 async function checkSeguimiento(sampleLeadId) {
-  section('3. Seguimiento SQL (historial + estado actual)');
+  section('3. Seguimiento SQL (solo SP — sin SELECT directo en tabla)');
 
   if (!useSeguimientoSql()) {
     record('warn', 'seguimiento', 'Omitido — SP_SEGUIMIENTO no activo.');
     return { historialOk: false, batchOk: false, rowCount: 0 };
   }
 
-  const table = String(process.env.SEGUIMIENTO_TABLE || 'registrarSeguimientoLead').replace(
-    /[\[\]]/g,
-    '',
-  );
   const procHist = normalizeProc(
     process.env.SP_SEGUIMIENTO_HISTORIAL || 'SP_HistorialSeguimientoLead',
     'SP_HistorialSeguimientoLead',
@@ -241,60 +223,57 @@ async function checkSeguimiento(sampleLeadId) {
     process.env.SP_SEGUIMIENTO_ULTIMOS || 'SP_UltimoSeguimientoOperador',
     'SP_UltimoSeguimientoOperador',
   );
+  const procAdmin = normalizeProc(
+    process.env.SP_SEGUIMIENTO_ADMIN_HISTORIAL || 'SP_HistorialSeguimientoAdmin',
+    'SP_HistorialSeguimientoAdmin',
+  );
+  const procGlobal = normalizeProc(
+    process.env.SP_SEGUIMIENTO_ULTIMOS_GLOBAL || 'SP_UltimoSeguimientoGlobal',
+    'SP_UltimoSeguimientoGlobal',
+  );
 
-  let pool;
   let historialOk = false;
   let batchOk = false;
   let rowCount = 0;
-  let tableRow = null;
 
   try {
-    pool = await getSqlPoolEncuestas();
+    const pool = await getSqlPoolEncuestas();
 
     try {
-      const selectResult = await testSelectSeguimiento(pool, table);
-      tableRow = selectResult.row;
-      const selectErr = selectResult.error;
-      rowCount = tableRow ? 1 : 0;
-      if (tableRow) {
-        record(
-          'ok',
-          'seguimiento',
-          `SELECT en ${table}: OK (última fila id=${tableRow.id}, lead_id=${tableRow.lead_id}).`,
-        );
-        if (selectErr) {
-          record('warn', 'seguimiento', `SELECT parcial: ${selectErr}`);
-        }
-        if (tableRow.creado_en == null && tableRow.creadoEn == null) {
-          record(
-            'warn',
-            'seguimiento',
-            'Columna creado_en no presente — agregar con sql/SP_RegistrarSeguimientoLead-notas.sql',
-          );
-        }
-      } else if (selectErr === 'permission') {
-        record('fail', 'seguimiento', `SELECT en ${table}: permiso denegado.`);
-        record('fail', 'seguimiento', 'Pedí al DBA: GRANT SELECT ON dbo.registrarSeguimientoLead TO [MPCSP];');
-      } else if (selectErr) {
-        record('fail', 'seguimiento', `SELECT en ${table}: ${selectErr}`);
-      } else {
-        record('warn', 'seguimiento', `SELECT en ${table}: OK pero tabla vacía.`);
-      }
+      const adminRows = await testAdminHistorialSp(pool, procAdmin);
+      rowCount = adminRows.length;
+      historialOk = true;
+      record(
+        'ok',
+        'seguimiento',
+        `${procAdmin}: ${adminRows.length} fila(s) (~400 días) — panel superadmin.`,
+      );
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      record('fail', 'seguimiento', `SELECT en ${table}: ${msg}`);
-      record('fail', 'seguimiento', 'Pedí al DBA: GRANT SELECT ON dbo.registrarSeguimientoLead TO [MPCSP];');
+      record('fail', 'seguimiento', `${procAdmin}: ${msg}`);
+      record(
+        'fail',
+        'seguimiento',
+        `Pedí al DBA crear sql/SP_HistorialSeguimientoAdmin.sql y GRANT EXECUTE.`,
+      );
+    }
+
+    try {
+      const globalRows = await testUltimosGlobalSp(pool, procGlobal);
+      record('ok', 'seguimiento', `${procGlobal}: ${globalRows.length} fila(s) (último por lead).`);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      record('fail', 'seguimiento', `${procGlobal}: ${msg}`);
+      record('fail', 'seguimiento', `GRANT EXECUTE ON dbo.${procGlobal} TO [MPCSP];`);
     }
 
     if (Number.isFinite(sampleLeadId) && sampleLeadId > 0) {
       try {
         const hist = await testHistorialSp(pool, procHist, sampleLeadId);
-        historialOk = true;
         record('ok', 'seguimiento', `${procHist} lead_id=${sampleLeadId}: ${hist.length} fila(s).`);
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        record('fail', 'seguimiento', `${procHist}: ${msg}`);
-        record('fail', 'seguimiento', `GRANT EXECUTE ON dbo.${procHist} TO [MPCSP];`);
+        record('warn', 'seguimiento', `${procHist}: ${msg}`);
       }
     }
 
@@ -304,7 +283,6 @@ async function checkSeguimiento(sampleLeadId) {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       record('warn', 'seguimiento', `${procUlt}: ${msg}`);
-      record('warn', 'seguimiento', `Opcional: GRANT EXECUTE ON dbo.${procUlt} TO [MPCSP];`);
     }
   } catch (error) {
     record('fail', 'seguimiento', error instanceof Error ? error.message : String(error));
@@ -315,16 +293,26 @@ async function checkSeguimiento(sampleLeadId) {
       const batch = await batchLatestSeguimientoSql([String(sampleLeadId)], null);
       batchOk = Object.keys(batch).length > 0;
       if (batchOk) {
-        record('ok', 'seguimiento', `batchLatestSeguimientoSql lead ${sampleLeadId}: estado cargado.`);
+        record('ok', 'seguimiento', `batchLatestSeguimientoSql lead ${sampleLeadId}: estado cargado vía SP.`);
       } else {
-        record('warn', 'seguimiento', `batchLatestSeguimientoSql lead ${sampleLeadId}: sin filas (lead sin seguimiento guardado).`);
+        record(
+          'warn',
+          'seguimiento',
+          `batchLatestSeguimientoSql lead ${sampleLeadId}: sin filas (lead sin seguimiento o SP global pendiente).`,
+        );
       }
     } catch (error) {
       record('fail', 'seguimiento', `batchLatestSeguimientoSql: ${error instanceof Error ? error.message : error}`);
     }
   }
 
-  return { historialOk, batchOk, rowCount, tableRow };
+  record(
+    'ok',
+    'seguimiento',
+    'Política: MPCSP solo EXECUTE en SPs — no GRANT SELECT/INSERT en registrarSeguimientoLead.',
+  );
+
+  return { historialOk, batchOk, rowCount };
 }
 
 async function checkDashboard(encuestasRows) {
@@ -374,14 +362,14 @@ async function checkDashboard(encuestasRows) {
       name: 'KPIs Hoy — entrevistas',
       ok: (d) => (d.resumenHoy?.entrevistas ?? 0) > 0,
       detail: (d) => `entrevistas=${d.resumenHoy?.entrevistas ?? 0}`,
-      needs: 'registrarSeguimientoLead',
+      needs: 'SP_HistorialSeguimientoAdmin',
       soft: true,
     },
     {
       name: 'KPIs Hoy — cierres',
       ok: (d) => (d.resumenHoy?.cierres ?? 0) > 0,
       detail: (d) => `cierres=${d.resumenHoy?.cierres ?? 0}`,
-      needs: 'registrarSeguimientoLead',
+      needs: 'SP_HistorialSeguimientoAdmin',
       soft: true,
     },
     {
@@ -392,21 +380,21 @@ async function checkDashboard(encuestasRows) {
         const ev = d.eventos ?? [];
         return `ent=${ev.filter((e) => e.tipo === 'entrevista').length} cierres=${ev.filter((e) => e.tipo === 'cierre').length}`;
       },
-      needs: 'registrarSeguimientoLead',
+      needs: 'SP_HistorialSeguimientoAdmin',
       soft: true,
     },
     {
       name: 'Embudo — con entrevista',
       ok: (d) => (d.productividad?.embudoGlobal?.conEntrevista ?? 0) > 0,
       detail: (d) => `conEntrevista=${d.productividad?.embudoGlobal?.conEntrevista ?? 0}`,
-      needs: 'registrarSeguimientoLead',
+      needs: 'SP_HistorialSeguimientoAdmin',
       soft: true,
     },
     {
       name: 'Rankings semana — entrevistas',
       ok: (d) => (d.rankings?.entrevistasSemana?.length ?? 0) > 0,
       detail: (d) => `top=${d.rankings?.entrevistasSemana?.length ?? 0}`,
-      needs: 'registrarSeguimientoLead',
+      needs: 'SP_HistorialSeguimientoAdmin',
       soft: true,
     },
   ];

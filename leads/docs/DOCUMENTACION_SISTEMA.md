@@ -1178,4 +1178,46 @@ Cada ítem: posición, `promotorNombre`, `supervisorNombre`, `valor`.
 
 ---
 
-*Documento generado a partir del análisis integral del repositorio. Las novedades se agregan en **§14**–**§17** sin reescribir el cuerpo principal (secciones 1–13).*
+## 18. Instructivo de uso — promotor y supervisor
+
+> **Añadido:** jun 2026. Guía operativa para usuarios finales (no técnica).
+
+**Versión visual (HTML):** [INSTRUCTIVO_USO_APLICACION.html](./INSTRUCTIVO_USO_APLICACION.html) · **Texto:** [INSTRUCTIVO_USO_APLICACION.md](./INSTRUCTIVO_USO_APLICACION.md) · **Word:** [INSTRUCTIVO_USO_APLICACION.docx](./INSTRUCTIVO_USO_APLICACION.docx)
+
+### 18.1 Contenido del instructivo
+
+| Sección | Descripción |
+|---------|-------------|
+| §1–3 | Propósito de la app, login, concepto de bandejas y ciclo del lead |
+| §4 | Elementos comunes de Leads (búsqueda, pestañas, tarjetas, links, teléfono) |
+| §5 | **Guía promotor** — Prioridad, swipe, seguimiento en calle, carga manual, calendario, métricas |
+| §6 | **Guía supervisor** — Derivación terreno, confirmación telefónica, cierres PIJ/terreno, pestaña Promotores |
+| §7 | Tabla comparativa promotor vs supervisor |
+| §8–9 | Rutinas diarias sugeridas y errores frecuentes |
+| §10 | Modo demo para capacitación |
+
+### 18.2 Resumen de pestañas por rol
+
+| Rol | Navegación |
+|-----|------------|
+| Promotor | Leads · Calendario · Métricas |
+| Supervisor | Leads · Promotores · Calendario |
+
+### 18.3 Bandejas de Leads (ambos roles)
+
+| Pestaña | Uso operativo |
+|---------|---------------|
+| Prioridad | Trabajo pendiente: derivación terreno (supervisor), entrevistas agendadas, encuestas sin contactar |
+| Contactado | Seguimiento post-contacto; negativos post-entrevista prioritarios (naranja) |
+| En seguimiento | Reagendas activas (incl. seguimiento PIJ promotor) |
+| Cierres | Ventas cerradas; más recientes arriba |
+
+### 18.4 Flujos de seguimiento (resumen)
+
+**Promotor (visita en calle):** ¿Hubo entrevista? → resultado (no compró / compró PIJ / derivar terreno / reagenda) → referidos → observaciones.
+
+**Supervisor (teléfono/oficina):** ¿Confirmó entrevista? → canal → ¿hubo entrevista? → resultado (incl. terreno) → referidos → observaciones.
+
+---
+
+*Documento generado a partir del análisis integral del repositorio. Las novedades se agregan en **§14**–**§18** sin reescribir el cuerpo principal (secciones 1–13).*

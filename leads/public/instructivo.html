@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Instructivo — Seguimiento de Leads | Mi Primer Casa</title>
+  <style>
+    :root {
+      --brand: #9a1620;
+      --brand-dark: #7a1119;
+      --brand-light: #fdf2f3;
+      --promotor: #059669;
+      --promotor-bg: #ecfdf5;
+      --supervisor: #2563eb;
+      --supervisor-bg: #eff6ff;
+      --ink: #18181b;
+      --muted: #71717a;
+      --border: #e4e4e7;
+      --bg: #fafafa;
+      --card: #ffffff;
+      --radius: 14px;
+      --shadow: 0 1px 3px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.04);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.55;
+      color: var(--ink);
+      background: var(--bg);
+    }
+
+    /* ── Hero ── */
+    .hero {
+      background: linear-gradient(135deg, var(--brand-dark) 0%, var(--brand) 55%, #b91c3c 100%);
+      color: #fff;
+      padding: 2.5rem 1.5rem 3rem;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      background: rgba(255,255,255,.15);
+      padding: .35rem .85rem;
+      border-radius: 999px;
+      margin-bottom: 1rem;
+    }
+    .hero h1 {
+      margin: 0 0 .5rem;
+      font-size: clamp(1.6rem, 4vw, 2.2rem);
+      font-weight: 700;
+      letter-spacing: -.02em;
+    }
+    .hero p { margin: 0; opacity: .9; max-width: 36rem; margin-inline: auto; font-size: .95rem; }
+    .hero-url {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      margin-top: 1.25rem;
+      padding: .5rem 1rem;
+      background: rgba(255,255,255,.12);
+      border-radius: 8px;
+      font-size: .85rem;
+      text-decoration: none;
+      color: #fff;
+    }
+    .hero-url:hover { background: rgba(255,255,255,.2); }
+
+    /* ── Layout ── */
+    .wrap { max-width: 920px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+
+    /* ── Nav sticky ── */
+    .toc {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: .65rem 0;
+      margin: 0 -1.25rem 2rem;
+      padding-inline: 1.25rem;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .toc-inner {
+      display: flex;
+      gap: .5rem;
+      min-width: max-content;
+    }
+    .toc a {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--muted);
+      text-decoration: none;
+      padding: .4rem .75rem;
+      border-radius: 999px;
+      white-space: nowrap;
+      transition: all .15s;
+    }
+    .toc a:hover, .toc a:focus { background: var(--brand-light); color: var(--brand); }
+
+    /* ── Sections ── */
+    section { margin-bottom: 2.75rem; scroll-margin-top: 4rem; }
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      margin: 0 0 1rem;
+      padding-bottom: .5rem;
+      border-bottom: 2px solid var(--brand);
+      color: var(--ink);
+    }
+    h3 { font-size: 1.05rem; font-weight: 700; margin: 1.5rem 0 .75rem; color: var(--ink); }
+    p.lead { font-size: 1.02rem; color: var(--muted); margin: 0 0 1.25rem; }
+
+    /* ── Cards grid ── */
+    .grid-2 { display: grid; gap: 1rem; }
+    @media (min-width: 640px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+    .grid-3 { display: grid; gap: 1rem; }
+    @media (min-width: 700px) { .grid-3 { grid-template-columns: repeat(3, 1fr); } }
+    .grid-4 { display: grid; gap: .75rem; grid-template-columns: repeat(2, 1fr); }
+    @media (min-width: 600px) { .grid-4 { grid-template-columns: repeat(4, 1fr); } }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.15rem 1.25rem;
+      box-shadow: var(--shadow);
+    }
+    .card h4 { margin: 0 0 .35rem; font-size: .95rem; font-weight: 700; }
+    .card p { margin: 0; font-size: .88rem; color: var(--muted); line-height: 1.45; }
+
+    /* ── Role cards ── */
+    .role-card { border-width: 2px; }
+    .role-promotor { border-color: #6ee7b7; background: var(--promotor-bg); }
+    .role-supervisor { border-color: #93c5fd; background: var(--supervisor-bg); }
+    .role-tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: .2rem .55rem;
+      border-radius: 6px;
+      margin-bottom: .6rem;
+    }
+    .role-promotor .role-tag { background: var(--promotor); color: #fff; }
+    .role-supervisor .role-tag { background: var(--supervisor); color: #fff; }
+    .tabs-list {
+      list-style: none;
+      margin: .75rem 0 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+    }
+    .tabs-list li {
+      font-size: 12px;
+      font-weight: 600;
+      padding: .3rem .65rem;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    /* ── Bandejas flow ── */
+    .flow {
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+      margin: 1.25rem 0;
+    }
+    @media (min-width: 720px) {
+      .flow { flex-direction: row; align-items: stretch; flex-wrap: wrap; justify-content: center; }
+      .flow-arrow { display: flex; align-items: center; color: var(--muted); font-size: 1.25rem; padding: 0 .25rem; }
+    }
+    .flow-arrow { text-align: center; color: var(--muted); }
+    .bandeja {
+      flex: 1;
+      min-width: 140px;
+      max-width: 200px;
+      text-align: center;
+      padding: 1rem .75rem;
+      border-radius: var(--radius);
+      border: 2px solid;
+      font-weight: 700;
+      font-size: .9rem;
+    }
+    .bandeja small { display: block; font-weight: 500; font-size: 11px; margin-top: .35rem; opacity: .85; }
+    .b-prioridad { background: #f0fdfa; border-color: #5eead4; color: #0f766e; }
+    .b-contactado { background: #fffbeb; border-color: #fcd34d; color: #b45309; }
+    .b-seguimiento { background: var(--brand-light); border-color: #fca5a5; color: var(--brand); }
+    .b-cierres { background: #ecfdf5; border-color: #34d399; color: #047857; }
+
+    /* ── Color legend ── */
+    .swatch {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .65rem .85rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: .88rem;
+    }
+    .swatch-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      flex-shrink: 0;
+      border: 1px solid rgba(0,0,0,.08);
+    }
+
+    /* ── Steps ── */
+    .steps { counter-reset: step; list-style: none; padding: 0; margin: 0; }
+    .steps li {
+      counter-increment: step;
+      position: relative;
+      padding: 0 0 1.25rem 3rem;
+      margin-bottom: .5rem;
+    }
+    .steps li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 2rem;
+      height: 2rem;
+      background: var(--brand);
+      color: #fff;
+      font-weight: 800;
+      font-size: .9rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .steps li strong { display: block; margin-bottom: .2rem; }
+
+    /* ── Flow diagram (decision) ── */
+    .decision-tree {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin: 1rem 0;
+    }
+    .decision-node {
+      padding: .75rem 1rem;
+      border-radius: 10px;
+      margin: .5rem 0;
+      font-size: .9rem;
+    }
+    .dn-q { background: #f4f4f5; border-left: 4px solid var(--brand); font-weight: 600; }
+    .dn-yes { background: #ecfdf5; border-left: 4px solid var(--promotor); margin-left: 1rem; }
+    .dn-no { background: #fffbeb; border-left: 4px solid #f59e0b; margin-left: 1rem; }
+    .dn-result { background: var(--brand-light); border-left: 4px solid var(--brand); margin-left: 2rem; font-size: .85rem; }
+
+    /* ── Tip box ── */
+    .tip {
+      display: flex;
+      gap: .85rem;
+      padding: 1rem 1.15rem;
+      background: linear-gradient(90deg, #eff6ff, #f0fdfa);
+      border: 1px solid #bfdbfe;
+      border-radius: var(--radius);
+      margin: 1.25rem 0;
+      font-size: .9rem;
+    }
+    .tip-icon { font-size: 1.35rem; line-height: 1; flex-shrink: 0; }
+    .warn {
+      background: #fef2f2;
+      border-color: #fecaca;
+    }
+
+    /* ── Compare table ── */
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; background: var(--card); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+    th { background: var(--ink); color: #fff; text-align: left; padding: .65rem .85rem; font-weight: 600; }
+    td { padding: .6rem .85rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:nth-child(even) td { background: #fafafa; }
+    .yes { color: var(--promotor); font-weight: 700; text-align: center; }
+    .no { color: #d4d4d8; text-align: center; }
+
+    /* ── Routine ── */
+    .routine { display: grid; gap: .75rem; }
+    @media (min-width: 600px) { .routine { grid-template-columns: 1fr 1fr; } }
+    .routine-item {
+      display: flex;
+      gap: .85rem;
+      align-items: flex-start;
+      padding: 1rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+    }
+    .routine-num {
+      width: 2rem;
+      height: 2rem;
+      background: var(--brand-light);
+      color: var(--brand);
+      font-weight: 800;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: .9rem;
+    }
+
+    /* ── Section role headers ── */
+    .section-role {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .35rem .85rem;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: .75rem;
+    }
+    .sr-promotor { background: var(--promotor-bg); color: var(--promotor); }
+    .sr-supervisor { background: var(--supervisor-bg); color: var(--supervisor); }
+    .sr-both { background: #f4f4f5; color: var(--muted); }
+
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      font-size: .8rem;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    @media print {
+      .toc { display: none; }
+      .hero { background: var(--brand); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      section { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="hero">
+  <span class="hero-badge">Guía de usuario · Junio 2026</span>
+  <h1>Seguimiento de Leads</h1>
+  <p>Manual práctico para <strong>promotores</strong> y <strong>supervisores</strong> — cómo usar la app día a día.</p>
+  <a class="hero-url" href="https://www.miprimercasafsa-sorteo.com/leads/" target="_blank" rel="noopener">
+    miprimercasafsa-sorteo.com/leads
+  </a>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc" aria-label="Índice">
+    <div class="toc-inner">
+      <a href="#inicio">Inicio</a>
+      <a href="#bandejas">Bandejas</a>
+      <a href="#pantalla">Pantalla Leads</a>
+      <a href="#promotor">Promotor</a>
+      <a href="#supervisor">Supervisor</a>
+      <a href="#comparar">Comparar</a>
+      <a href="#rutina">Rutina diaria</a>
+      <a href="#errores">Errores</a>
+    </div>
+  </nav>
+
+  <!-- INICIO -->
+  <section id="inicio">
+    <h2>Empezá acá</h2>
+    <p class="lead">La app te ayuda a contactar leads del sorteo, registrar entrevistas, cerrar ventas y ver cómo va tu equipo.</p>
+
+    <div class="grid-2" style="margin-bottom:1.5rem">
+      <div class="card role-card role-promotor">
+        <span class="role-tag">Promotor</span>
+        <h4>Tu espacio de trabajo</h4>
+        <p>Gestionás <strong>tus leads</strong> en la calle o por teléfono. Cerrás Plan Inversión Joven y derivás interés en terreno.</p>
+        <ul class="tabs-list">
+          <li>Leads</li>
+          <li>Calendario</li>
+          <li>Métricas</li>
+        </ul>
+      </div>
+      <div class="card role-card role-supervisor">
+        <span class="role-tag">Supervisor</span>
+        <h4>Tu espacio de trabajo</h4>
+        <p>Veés <strong>todo el equipo</strong>, confirmás entrevistas por teléfono y cerrás PIJ y Terrenos.</p>
+        <ul class="tabs-list">
+          <li>Leads</li>
+          <li>Promotores</li>
+          <li>Calendario</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Ingresar a la app</h3>
+    <ol class="steps">
+      <li><strong>Abrí la URL</strong> en el celular o la PC (Chrome o Safari recomendados).</li>
+      <li><strong>Usuario y contraseña</strong> — los mismos que te dio administración.</li>
+      <li><strong>Ingresar</strong> — entrás directo a la pestaña Leads.</li>
+    </ol>
+
+    <div class="tip">
+      <span class="tip-icon">🔔</span>
+      <div><strong>Campana de notificaciones:</strong> si se regenera tu link de Instagram, aparece un aviso arriba a la derecha. Tocalo para marcarlo leído.</div>
+    </div>
+  </section>
+
+  <!-- BANDEJAS -->
+  <section id="bandejas">
+    <h2>Las 4 bandejas — ¿dónde está cada lead?</h2>
+    <p class="lead">Dentro de <strong>Leads</strong> hay cuatro pestañas. Un lead va pasando de una a otra según lo que registrás.</p>
+
+    <div class="flow">
+      <div class="bandeja b-prioridad">Prioridad<small>Sin contactar · cita · terreno</small></div>
+      <span class="flow-arrow">→</span>
+      <div class="bandeja b-contactado">Contactado<small>Ya hubo contacto</small></div>
+      <span class="flow-arrow">→</span>
+      <div class="bandeja b-cierres">Cierres<small>Venta cerrada</small></div>
+    </div>
+    <div class="flow" style="justify-content:center;margin-top:0">
+      <div class="bandeja b-seguimiento">En seguimiento<small>Reagendó fecha</small></div>
+      <span class="flow-arrow" style="font-size:.85rem">↕ vuelve a Prioridad cuando llega la fecha</span>
+    </div>
+
+    <div class="grid-2" style="margin-top:1.5rem">
+      <div class="card">
+        <h4>🟢 Prioridad</h4>
+        <p>Trabajo pendiente: entrevistas del día, encuestas nuevas, derivados a terreno. <strong>Empezá acá cada mañana.</strong></p>
+      </div>
+      <div class="card">
+        <h4>🟡 Contactado</h4>
+        <p>Ya los contactaste pero no cerraron. Los «No compró» van arriba en naranja.</p>
+      </div>
+      <div class="card">
+        <h4>🔴 En seguimiento</h4>
+        <p>Tienen nueva fecha de entrevista. Ordenados por la fecha más próxima.</p>
+      </div>
+      <div class="card">
+        <h4>✅ Cierres</h4>
+        <p>Ventas registradas. Las más recientes aparecen primero.</p>
+      </div>
+    </div>
+
+    <h3>Colores de las tarjetas</h3>
+    <div class="grid-2">
+      <div class="swatch"><span class="swatch-dot" style="background:#f0fdfa;border-color:#5eead4"></span> Verde agua — lead nuevo</div>
+      <div class="swatch"><span class="swatch-dot" style="background:#fffbeb;border-color:#fcd34d"></span> Ámbar — contactado</div>
+      <div class="swatch"><span class="swatch-dot" style="background:#fff7ed;border-color:#fb923c"></span> Naranja — post-entrevista sin compra</div>
+      <div class="swatch"><span class="swatch-dot" style="background:#fdf2f3;border-color:#fca5a5"></span> Bordó claro — reagenda</div>
+      <div class="swatch"><span class="swatch-dot" style="background:#ecfdf5;border-color:#34d399"></span> Verde — cierre / venta</div>
+      <div class="swatch"><span class="swatch-dot" style="background:#eef2ff;border-color:#a5b4fc"></span> Índigo — solo lectura</div>
+    </div>
+  </section>
+
+  <!-- PANTALLA LEADS -->
+  <section id="pantalla">
+    <span class="section-role sr-both">Ambos roles</span>
+    <h2>Pantalla Leads — qué ves y qué tocás</h2>
+
+    <div class="grid-3">
+      <div class="card">
+        <h4>🔍 Buscador</h4>
+        <p>Nombre, teléfono o dirección. Busca en todas las bandejas.</p>
+      </div>
+      <div class="card">
+        <h4>📊 Pestañas + número</h4>
+        <p>Cuatro botones con la cantidad de leads en cada bandeja.</p>
+      </div>
+      <div class="card">
+        <h4>➕ Cargar lead</h4>
+        <p>Alta manual: feria, referido, contacto en calle.</p>
+      </div>
+    </div>
+
+    <h3>La tarjeta del lead</h3>
+    <p>Tocá cualquier tarjeta para abrir el <strong>formulario de seguimiento</strong> (panel desde abajo).</p>
+    <ul style="color:var(--muted);font-size:.9rem;line-height:1.7">
+      <li>Nombre, teléfono, domicilio</li>
+      <li>Badge del sorteo y si es <strong>Referido</strong></li>
+      <li>Fecha de entrevista (si hay cita)</li>
+      <li>Historial de los últimos movimientos</li>
+      <li>Botón <strong>Modificar teléfono</strong> solo en cargas manuales</li>
+    </ul>
+
+    <h3>Links para redes</h3>
+    <p style="font-size:.9rem;color:var(--muted)">Al final de Leads: botones de Instagram, Facebook, WhatsApp y TikTok para compartir tu link del sorteo.</p>
+  </section>
+
+  <!-- PROMOTOR -->
+  <section id="promotor">
+    <span class="section-role sr-promotor">Guía promotor</span>
+    <h2>Promotor — paso a paso</h2>
+
+    <div class="card" style="margin-bottom:1.25rem;border-color:#fecaca;background:#fef2f2">
+      <h4 style="color:#b91c1c">⚠️ Alerta roja (+2 días)</h4>
+      <p>Encuestas sin contactar hace 2 o más días. Tocá el nombre para abrir el lead de inmediato.</p>
+    </div>
+
+    <h3>Orden en Prioridad (de arriba hacia abajo)</h3>
+    <div class="grid-3">
+      <div class="card"><h4>1. Terreno derivado</h4><p>Derivaste al supervisor — él lo gestiona.</p></div>
+      <div class="card"><h4>2. Entrevista pendiente</h4><p>Tienen cita agendada. <strong>Prioridad del día.</strong></p></div>
+      <div class="card"><h4>3. Sin contactar</h4><p>Encuestas nuevas del sorteo.</p></div>
+    </div>
+
+    <h3>Formulario de seguimiento (visita en calle)</h3>
+    <p style="font-size:.9rem;color:var(--muted);margin:-.5rem 0 1rem">Tocá la tarjeta del lead para abrir el formulario y registrar contacto, entrevista o cierre.</p>
+    <div class="decision-tree">
+      <div class="decision-node dn-q">¿Hubo entrevista?</div>
+      <div class="decision-node dn-no"><strong>No</strong> → Sin interés (Contactado) · Reagendar (En seguimiento)</div>
+      <div class="decision-node dn-yes"><strong>Sí</strong> → Elegí resultado:</div>
+      <div class="decision-node dn-result"><strong>No compró</strong> → Podés reagendar para ofrecer PIJ otra vez</div>
+      <div class="decision-node dn-result"><strong>Compró</strong> → Solo Plan Inv. Joven ($33.000 + recibo) → Cierres</div>
+      <div class="decision-node dn-result"><strong>Derivar terreno</strong> → El supervisor lo ve en Prioridad</div>
+    </div>
+    <p style="font-size:.88rem;color:var(--muted)">Si cerró: podés cargar <strong>referidos</strong> (nombre + teléfono) y se crean leads nuevos automáticamente.</p>
+
+    <h3>Cargar lead manual</h3>
+    <ol class="steps">
+      <li><strong>Cargar lead</strong> → nombre y teléfono obligatorios.</li>
+      <li><strong>¿Agendar entrevista?</strong> Si sí: fecha, sucursal o domicilio.</li>
+      <li><strong>Guardar</strong> — el sistema usa tu código @usuario del sorteo.</li>
+    </ol>
+
+    <h3>Calendario y Métricas</h3>
+    <div class="grid-2">
+      <div class="card">
+        <h4>📅 Calendario</h4>
+        <p>Entrevistas y reagendas del mes. WhatsApp, reagendar o abrir seguimiento desde cada evento.</p>
+      </div>
+      <div class="card">
+        <h4>📈 Métricas</h4>
+        <p>Tus números, gráfico de origen (QR, redes, manual) e historial reciente.</p>
+      </div>
+    </div>
+
+    <div class="tip warn">
+      <span class="tip-icon">🔒</span>
+      <div>Si el <strong>supervisor</strong> registró un cierre (terreno), la tarjeta queda en <strong>solo lectura</strong> para vos: podés ver, no editar.</div>
+    </div>
+  </section>
+
+  <!-- SUPERVISOR -->
+  <section id="supervisor">
+    <span class="section-role sr-supervisor">Guía supervisor</span>
+    <h2>Supervisor — paso a paso</h2>
+
+    <p class="lead">Ves los leads de <strong>todos los promotores</strong>. En cada tarjeta aparece el nombre del promotor asignado.</p>
+
+    <h3>Lo que hacés distinto al promotor</h3>
+    <div class="grid-2">
+      <div class="card">
+        <h4>📞 Confirmás por teléfono</h4>
+        <p>El formulario empieza con «¿Confirmó entrevista?» — no es visita en calle.</p>
+      </div>
+      <div class="card">
+        <h4>🏠 Cerrás Terreno + PIJ</h4>
+        <p>Podés registrar ambos productos. Terreno requiere barrio.</p>
+      </div>
+      <div class="card">
+        <h4>👥 Pestaña Promotores</h4>
+        <p>Efectividad de entrevistas, conversión y origen de leads del equipo.</p>
+      </div>
+    </div>
+
+    <h3>Formulario de seguimiento (teléfono / oficina)</h3>
+    <div class="decision-tree">
+      <div class="decision-node dn-q">¿Confirmó entrevista?</div>
+      <div class="decision-node dn-yes"><strong>Sí</strong> → Canal (llamada/mensaje) → ¿Hubo entrevista?</div>
+      <div class="decision-node dn-no"><strong>No</strong> → Reagendar o sin interés + canal</div>
+      <div class="decision-node dn-q" style="margin-top:.75rem">¿Hubo entrevista?</div>
+      <div class="decision-node dn-result"><strong>Compró</strong> → PIJ o Terreno + pago + recibo → Cierres</div>
+      <div class="decision-node dn-result"><strong>No compró / Sin interés</strong> → Contactado</div>
+      <div class="decision-node dn-result"><strong>Reagendar</strong> → En seguimiento + calendario</div>
+    </div>
+
+    <div class="tip">
+      <span class="tip-icon">ℹ️</span>
+      <div>Los leads en <strong>seguimiento PIJ del promotor</strong> (reagenda tras no comprar) son <strong>solo lectura</strong> para el supervisor.</div>
+    </div>
+
+    <h3>Prioridad — tu orden de atención</h3>
+    <ol class="steps">
+      <li><strong>Derivados a terreno</strong> — el promotor te derivó el cliente.</li>
+      <li><strong>Entrevistas pendientes</strong> — citas del equipo.</li>
+      <li><strong>Sin contactar</strong> — encuestas nuevas.</li>
+    </ol>
+
+    <h3>Pestaña Promotores</h3>
+    <p style="font-size:.9rem;color:var(--muted)">Revisala semanalmente: entrevistas vs compras por promotor, conversión total, canales de captación e historial de actividad.</p>
+  </section>
+
+  <!-- COMPARAR -->
+  <section id="comparar">
+    <h2>Promotor vs Supervisor — de un vistazo</h2>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr><th>Tarea</th><th>Promotor</th><th>Supervisor</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Ver solo sus leads</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td>Ver equipo completo</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td>Confirmar entrevista telefónica</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td>Cerrar Plan Inversión Joven</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Cerrar Terreno</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td>Derivar interés terreno</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td>Gestionar derivación terreno</td><td class="no">—</td><td class="yes">✓</td></tr>
+          <tr><td>Reagendar seguimiento PIJ</td><td class="yes">✓</td><td class="no">solo lectura</td></tr>
+          <tr><td>Referidos en cierre</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Calendario</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Métricas propias</td><td class="yes">✓</td><td class="no">—</td></tr>
+          <tr><td>Métricas del equipo</td><td class="no">—</td><td class="yes">✓</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- RUTINA -->
+  <section id="rutina">
+    <h2>Rutina diaria sugerida</h2>
+    <div class="routine">
+      <div>
+        <p style="font-weight:700;margin:0 0 .75rem;color:var(--promotor)">Promotor</p>
+        <div class="routine-item"><span class="routine-num">1</span><span>Revisá alertas rojas (+2 días sin contactar)</span></div>
+        <div class="routine-item"><span class="routine-num">2</span><span>Prioridad: entrevistas del día → encuestas nuevas</span></div>
+        <div class="routine-item"><span class="routine-num">3</span><span>Abrí cada lead y completá el formulario de seguimiento (contacto, visita o cierre)</span></div>
+        <div class="routine-item"><span class="routine-num">4</span><span>En seguimiento: reagendas de la semana</span></div>
+        <div class="routine-item"><span class="routine-num">5</span><span>Compartí links de redes en feria o visita</span></div>
+      </div>
+      <div>
+        <p style="font-weight:700;margin:0 0 .75rem;color:var(--supervisor)">Supervisor</p>
+        <div class="routine-item"><span class="routine-num">1</span><span>Prioridad: derivados terreno → entrevistas del equipo</span></div>
+        <div class="routine-item"><span class="routine-num">2</span><span>Confirmá citas por teléfono y cerrá terrenos</span></div>
+        <div class="routine-item"><span class="routine-num">3</span><span>Calendario: agenda del día de todos</span></div>
+        <div class="routine-item"><span class="routine-num">4</span><span>Promotores: efectividad y conversión semanal</span></div>
+        <div class="routine-item"><span class="routine-num">5</span><span>Cargá leads si el promotor no pudo en el momento</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ERRORES -->
+  <section id="errores">
+    <h2>Si algo no funciona</h2>
+    <div class="grid-2">
+      <div class="card">
+        <h4>Usuario o clave incorrectos</h4>
+        <p>Verificá con administración. No uses mayúsculas de más en el mail.</p>
+      </div>
+      <div class="card">
+        <h4>Teléfono ya registrado</h4>
+        <p>Buscá el lead existente — no podés duplicar en la misma campaña.</p>
+      </div>
+      <div class="card">
+        <h4>Cierre solo lectura</h4>
+        <p>Lo cargó el supervisor. Consultá con él si hay que corregir.</p>
+      </div>
+      <div class="card">
+        <h4>Error al cargar datos</h4>
+        <p>Revisá internet. Si persiste, avisá a soporte técnico.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  Mi Primer Casa S.A. · Seguimiento de Leads · Instructivo junio 2026<br />
+  También disponible: <code>INSTRUCTIVO_USO_APLICACION.md</code> · <code>.docx</code>
+</footer>
+
+</body>
+</html>

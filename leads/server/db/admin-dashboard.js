@@ -1,12 +1,11 @@
-import sql from 'mssql';
-import { buildAdminDashboard, parseFecha, rangoSemanaMovil, startOfDay } from '../domain/admin-metrics.js';
+import { buildAdminDashboard, rangoSemanaMovil, startOfDay } from '../domain/admin-metrics.js';
 import { listAllLeadsFromEncuestas, normalizeNombre } from './encuestas.js';
-import { getSqlPoolEncuestas } from './mssql.js';
-import { adminSupervisorOperadorIds } from './superadmin-auth.js';
 import {
+  fetchHistorialAdminDesde,
   fetchUltimosSeguimientoPorOperadores,
   useSeguimientoSql,
 } from './seguimiento-sql.js';
+import { adminSupervisorOperadorIds } from './superadmin-auth.js';
 
 function getEncuestasAdminProcedureName() {
   const raw = process.env.SP_ENCUESTAS_ADMIN || 'encuestasMuestra';
@@ -23,56 +22,24 @@ function supervisorIdDesdeLead(lead) {
 async function fetchHistorialDesde(desde) {
   if (!useSeguimientoSql()) return [];
 
-  const table = String(process.env.SEGUIMIENTO_TABLE || 'registrarSeguimientoLead').replace(
-    /[\[\]]/g,
-    '',
-  );
+  let rows = await fetchHistorialAdminDesde(desde);
+  if (rows.length) return rows;
 
-  try {
-    const pool = await getSqlPoolEncuestas();
-    const request = pool.request().input('desde', sql.DateTime2, desde);
-    let rows;
-    try {
-      const result = await request.query(`
-        SELECT *
-        FROM ${table}
-        WHERE creado_en >= @desde
-      `);
-      rows = result.recordset ?? [];
-    } catch (colError) {
-      const msg = colError instanceof Error ? colError.message : String(colError);
-      if (!/Invalid column name/i.test(msg)) throw colError;
-      // Tabla sin creado_en: traer recientes por id y filtrar en Node si hay fecha parseable
-      const result = await pool.request().query(`
-        SELECT TOP 50000 *
-        FROM ${table}
-        ORDER BY id DESC
-      `);
-      rows = (result.recordset ?? []).filter((row) => {
-        const fecha = parseFecha(row.creado_en ?? row.creadoEn);
-        return fecha ? fecha.getTime() >= desde.getTime() : true;
-      });
-    }
-    return rows;
-  } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (/permission|denied/i.test(msg) && useSeguimientoSql()) {
-      const operadores = adminSupervisorOperadorIds();
-      if (operadores.length) {
-        const ultimos = await fetchUltimosSeguimientoPorOperadores(operadores);
-        return ultimos.filter((row) => {
-          const fecha = parseFecha(row.creado_en ?? row.creadoEn);
-          return fecha ? fecha.getTime() >= desde.getTime() : true;
-        });
-      }
-      console.warn(
-        '[admin] Historial: SELECT denegado y ADMIN_SUPERVISOR_IDS vacío — KPIs de entrevistas/cierres en 0.',
-      );
-    } else {
-      console.warn('[admin] Historial no disponible:', msg);
-    }
-    return [];
+  const operadores = adminSupervisorOperadorIds();
+  if (operadores.length) {
+    const ultimos = await fetchUltimosSeguimientoPorOperadores(operadores);
+    return ultimos.filter((row) => {
+      const fecha = row.creado_en ?? row.creadoEn;
+      if (!fecha) return true;
+      const t = new Date(fecha).getTime();
+      return !Number.isNaN(t) && t >= desde.getTime();
+    });
   }
+
+  console.warn(
+    '[admin] Sin historial SP — pedí al DBA SP_HistorialSeguimientoAdmin o configurá ADMIN_SUPERVISOR_IDS.',
+  );
+  return [];
 }
 
 /** Historial extendido (~13 meses) para gráficos semana/mes/año. */

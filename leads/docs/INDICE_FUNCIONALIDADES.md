@@ -39,6 +39,7 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 
 | Tema | Archivo |
 |------|---------|
+| **Instructivo de uso (promotor y supervisor)** | [INSTRUCTIVO_USO_APLICACION.html](./INSTRUCTIVO_USO_APLICACION.html) · [MD](./INSTRUCTIVO_USO_APLICACION.md) · [DOCX](./INSTRUCTIVO_USO_APLICACION.docx) |
 | Estructuras SQL / SP | [ESTRUCTURAS_TABLAS_SP.md](./ESTRUCTURAS_TABLAS_SP.md) |
 | Visión general del sistema | [DOCUMENTACION_SISTEMA.md](./DOCUMENTACION_SISTEMA.md) |
 | CI / frontend deploy | [FLUJO-FRONTEND-DEPLOY.md](./FLUJO-FRONTEND-DEPLOY.md) |

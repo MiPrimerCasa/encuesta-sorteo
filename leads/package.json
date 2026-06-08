@@ -13,6 +13,8 @@
     "dev:api": "node --env-file=src/.env server/index.js",
     "desarrollo": "npm run dev",
     "desarrollo:api": "npm run dev:api",
+    "docs:sync-instructivo": "node scripts/copy-instructivo-public.mjs",
+    "prebuild": "node scripts/copy-instructivo-public.mjs",
     "build": "tsc && vite build",
     "compilar": "tsc && vite build",
     "preview": "vite preview",

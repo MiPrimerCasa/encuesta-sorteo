@@ -14,7 +14,12 @@ import {
   prevMonthDate,
 } from '../../lib/calendar';
 
-import { leadSoloLecturaPromotor, leadSoloLecturaSupervisor } from '../../domain/leads';
+import {
+  etiquetaSeguimientoAgendaOtroRol,
+  leadSeguimientoPijPromotor,
+  leadSoloLecturaPromotor,
+  leadSoloLecturaSupervisor,
+} from '../../domain/leads';
 import { buildCalendarEvents, type CalendarEvent } from './calendar-types';
 import { CalendarGrid } from './CalendarGrid';
 import { DayEventsPanel } from './DayEventsPanel';
@@ -270,10 +275,18 @@ export function CalendarioView({
               const soloLectura = leadEvento
                 ? leadSoloLecturaEnCalendario(leadEvento, rolUsuario)
                 : false;
-              const mensajeSoloLectura =
-                rolUsuario === 'promotor'
-                  ? 'Cierre registrado por el supervisor. Solo lectura en calendario.'
-                  : 'Seguimiento del promotor por Plan Inversión Joven. Solo lectura en calendario.';
+              const mensajeSoloLectura = (() => {
+                if (!leadEvento) return '';
+                if (leadSeguimientoPijPromotor(leadEvento) && rolUsuario === 'supervisor') {
+                  return 'Seguimiento del promotor por Plan Inversión Joven. Solo lectura en calendario.';
+                }
+                const etiq = etiquetaSeguimientoAgendaOtroRol(leadEvento, rolUsuario);
+                if (etiq) return `${etiq}. Solo lectura en calendario.`;
+                if (rolUsuario === 'promotor') {
+                  return 'Cierre registrado por el supervisor. Solo lectura en calendario.';
+                }
+                return 'Seguimiento gestionado por otro rol. Solo lectura en calendario.';
+              })();
               return (
               <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-5">
                 {soloLectura && (

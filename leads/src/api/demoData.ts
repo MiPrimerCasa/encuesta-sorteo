@@ -169,6 +169,27 @@ const BASE_LEADS: Lead[] = [
     sabiaPlanInversionJoven: false,
     seguimiento: { fuente: 'qr' },
   },
+  {
+    id: 'lead-demo-agenda-supervisor',
+    nombre: '★ Demo — Agenda supervisor (solo lectura promotor)',
+    telefono: '3512 000222',
+    promotorId: 'prom-1',
+    promotorNombre: 'Martín González',
+    supervisorNombre: 'Demo Supervisor',
+    quiereEntrevista: false,
+    lista: 'contacto',
+    origen: 'redes',
+    fechaObtencion: '2026-06-02',
+    seguimiento: {
+      fuente: 'facebook',
+      canal: 'mensaje',
+      confirmoEntrevista: true,
+      huboEntrevista: false,
+      resultadoEntrevista: 'reagenda',
+      fechaReagenda: '2026-06-12T10:30',
+      seguimientoAgendaOperadorRol: 'supervisor',
+    },
+  },
 
   // ── Mayo 2026 — entrevista ─────────────────────────────────────────────────
 

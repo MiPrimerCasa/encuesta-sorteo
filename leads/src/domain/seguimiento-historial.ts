@@ -24,6 +24,8 @@ export function etiquetaEstadoHistorial(seguimiento: SeguimientoLead, lead: Lead
     let texto = RESULTADO_LABEL[r] ?? r;
     if (r === 'reagenda' && seguimiento.seguimientoPijPromotor) {
       texto = 'Reagenda PIJ (tras no compró)';
+    } else if (r === 'reagenda' && seguimiento.seguimientoAgendaOperadorRol) {
+      texto = `Reagenda (${seguimiento.seguimientoAgendaOperadorRol})`;
     }
     partes.push(texto);
   } else if (seguimiento.huboEntrevista === true) {

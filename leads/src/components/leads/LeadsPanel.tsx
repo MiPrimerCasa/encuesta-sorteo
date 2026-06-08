@@ -193,6 +193,12 @@ export function LeadsPanel({
 
   const abrirLead = (lead: Lead) => {
     if (rolUsuario === 'supervisor' && leadSoloLecturaSupervisor(lead)) return;
+    if (
+      esPromotor &&
+      leadSoloLecturaPromotor(lead, historialPorLead[lead.id] ?? [])
+    ) {
+      return;
+    }
     setLeadSeleccionado(lead);
     setModalAbierto(true);
   };
@@ -499,18 +505,21 @@ export function LeadsPanel({
         productos={productos}
         barrios={barrios}
         soloLectura={
-          esPromotor &&
           leadSeleccionado != null &&
-          leadSoloLecturaPromotor(
-            leadSeleccionado,
-            historialPorLead[leadSeleccionado.id] ?? [],
-          )
+          (esPromotor
+            ? leadSoloLecturaPromotor(
+                leadSeleccionado,
+                historialPorLead[leadSeleccionado.id] ?? [],
+              )
+            : leadSoloLecturaSupervisor(leadSeleccionado))
         }
         onClose={cerrarModal}
         onSave={async (leadId, seg) => {
           await guardarSeguimientoLead(leadId, seg);
-          if (esPromotor && seg.resultadoEntrevista === 'reagenda') {
+          if (seg.resultadoEntrevista === 'reagenda') {
             setTabActivo('seguimiento');
+          } else if (seg.resultadoEntrevista === 'sin_interes') {
+            setTabActivo('contacto');
           }
         }}
       />

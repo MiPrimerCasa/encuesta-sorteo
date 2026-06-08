@@ -65,6 +65,10 @@ export function leadReagendaEntrevista(lead: Lead) {
 }
 
 export const ETIQUETA_SEGUIMIENTO_PIJ = 'Seguimiento por plan inversión joven';
+export const ETIQUETA_SEGUIMIENTO_AGENDA_SUPERVISOR =
+  'Entrevista agendada por supervisor';
+export const ETIQUETA_SEGUIMIENTO_AGENDA_PROMOTOR =
+  'Entrevista agendada por promotor';
 
 /** Reagenda activa del promotor tras no comprar PIJ (el supervisor no gestiona). */
 export function leadSeguimientoPijPromotor(lead: Lead) {
@@ -73,8 +77,35 @@ export function leadSeguimientoPijPromotor(lead: Lead) {
   );
 }
 
+function normalizarRolAgenda(rol?: RolUsuario | string | null): RolUsuario | null {
+  const r = String(rol ?? '').trim().toLowerCase();
+  if (r === 'supervisor' || r === 'promotor') return r;
+  return null;
+}
+
+/** Reagenda de agenda inicial (sin cita previa) hecha por el otro rol. */
+export function leadSeguimientoAgendaOtroRol(lead: Lead, rolViewer: RolUsuario): boolean {
+  if (!leadReagendaEntrevista(lead) || leadSeguimientoPijPromotor(lead)) return false;
+  const agendaRol = normalizarRolAgenda(lead.seguimiento?.seguimientoAgendaOperadorRol);
+  if (!agendaRol) return false;
+  const viewer = rolViewer === 'promotor' ? 'promotor' : 'supervisor';
+  return agendaRol !== viewer;
+}
+
+export function etiquetaSeguimientoAgendaOtroRol(
+  lead: Lead,
+  rolViewer: RolUsuario,
+): string | null {
+  if (!leadSeguimientoAgendaOtroRol(lead, rolViewer)) return null;
+  const agendaRol = normalizarRolAgenda(lead.seguimiento?.seguimientoAgendaOperadorRol);
+  return agendaRol === 'supervisor'
+    ? ETIQUETA_SEGUIMIENTO_AGENDA_SUPERVISOR
+    : ETIQUETA_SEGUIMIENTO_AGENDA_PROMOTOR;
+}
+
 export function leadSoloLecturaSupervisor(lead: Lead) {
-  return leadSeguimientoPijPromotor(lead);
+  if (leadSeguimientoPijPromotor(lead)) return true;
+  return leadSeguimientoAgendaOtroRol(lead, 'supervisor');
 }
 
 export const ETIQUETA_CIERRE_SUPERVISOR = 'Cierre registrado por supervisor';
@@ -121,7 +152,8 @@ export function leadSoloLecturaPromotor(
   lead: Lead,
   historial: SeguimientoHistorialEntry[] = [],
 ) {
-  return leadCierreRegistradoSupervisor(lead, historial);
+  if (leadCierreRegistradoSupervisor(lead, historial)) return true;
+  return leadSeguimientoAgendaOtroRol(lead, 'promotor');
 }
 
 export function leadDerivaSupervisorTerreno(lead: Lead) {

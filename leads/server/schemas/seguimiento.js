@@ -26,6 +26,7 @@ export const seguimientoSchema = z
     horarioEntrevistaPropuesto: z.string().nullable().optional(),
     fechaReagenda: z.string().nullable().optional(),
     seguimientoPijPromotor: z.boolean().nullable().optional(),
+    seguimientoAgendaOperadorRol: z.enum(['supervisor', 'promotor']).nullable().optional(),
     idProducto: z.string().nullable().optional(),
     estadoPago: z.enum(['sena', 'cien', 'entrega_33', 'entrega_55']).nullable().optional(),
     idBarrio: z.string().nullable().optional(),

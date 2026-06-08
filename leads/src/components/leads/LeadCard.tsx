@@ -10,6 +10,7 @@ import {
   leadPostEntrevistaSinCompra,
   leadReagendaEntrevista,
   leadEsCargaManual,
+  etiquetaSeguimientoAgendaOtroRol,
   leadSeguimientoPijPromotor,
   leadSoloLecturaPromotor,
   leadSoloLecturaSupervisor,
@@ -81,6 +82,8 @@ export function LeadCard({
     (leadEnEntrevistaPendiente(lead) || reagenda);
   const etiquetaSorteo = etiquetaCampania(lead.codigoCampania);
   const seguimientoPij = leadSeguimientoPijPromotor(lead);
+  const etiquetaAgendaOtroRol =
+    rolUsuario != null ? etiquetaSeguimientoAgendaOtroRol(lead, rolUsuario) : null;
   const cierreSupervisor = leadSoloLecturaPromotor(lead, historial);
   const soloLecturaSupervisor =
     rolUsuario === 'supervisor' && leadSoloLecturaSupervisor(lead);
@@ -158,6 +161,18 @@ export function LeadCard({
               <div className="mt-2 space-y-1">
                 <span className="inline-flex items-center rounded-md border border-indigo-300 bg-indigo-100 px-2 py-1 text-[11px] font-semibold leading-snug text-indigo-900">
                   {ETIQUETA_SEGUIMIENTO_PIJ}
+                </span>
+                {rolUsuario === 'supervisor' && (
+                  <p className="text-[12px] font-medium text-indigo-800/90">
+                    Promotor: {nombrePromotor}
+                  </p>
+                )}
+              </div>
+            )}
+            {etiquetaAgendaOtroRol && (
+              <div className="mt-2 space-y-1">
+                <span className="inline-flex items-center rounded-md border border-indigo-300 bg-indigo-100 px-2 py-1 text-[11px] font-semibold leading-snug text-indigo-900">
+                  {etiquetaAgendaOtroRol}
                 </span>
                 {rolUsuario === 'supervisor' && (
                   <p className="text-[12px] font-medium text-indigo-800/90">

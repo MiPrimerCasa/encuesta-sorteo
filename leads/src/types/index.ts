@@ -148,6 +148,8 @@ export interface SeguimientoLead {
   fechaReagenda?: string | null;
   /** Promotor reagendó tras «No compró» para volver a ofrecer PIJ (supervisor solo lectura). */
   seguimientoPijPromotor?: boolean | null;
+  /** Quién agendó la entrevista en seguimiento (sin cita previa); el otro rol queda solo lectura. */
+  seguimientoAgendaOperadorRol?: RolUsuario | null;
   idProducto?: string | null;
   estadoPago?: EstadoPago | null;
   idBarrio?: string | null;

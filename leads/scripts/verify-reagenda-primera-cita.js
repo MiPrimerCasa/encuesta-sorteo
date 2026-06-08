@@ -168,6 +168,54 @@ assert(tabIdListaLead(leadConCita) === 'entrevista', 'con cita → Prioridad (en
 const evCita = eventoCalendarioDesdeLead(leadConCita);
 assert(evCita?.type === 'entrevista', 'calendario: cita encuesta como entrevista');
 
+console.log('\n7. Agenda sin cita — sin interés → Contactado');
+const sinInteres = {
+  ...leadSinCita,
+  seguimiento: {
+    ...seguimientoPrimeraReagenda,
+    resultadoEntrevista: 'sin_interes',
+    fechaReagenda: null,
+    seguimientoAgendaOperadorRol: null,
+  },
+};
+assert(tabIdListaLead(sinInteres) === 'contacto', 'sin interés → pestaña contacto');
+
+console.log('\n8. Solo lectura cruzada por rol que agendó');
+function soloLecturaSupervisor(lead) {
+  if (lead.seguimiento?.seguimientoPijPromotor) return true;
+  const agendaRol = lead.seguimiento?.seguimientoAgendaOperadorRol;
+  return agendaRol === 'promotor';
+}
+function soloLecturaPromotor(lead) {
+  const agendaRol = lead.seguimiento?.seguimientoAgendaOperadorRol;
+  return agendaRol === 'supervisor';
+}
+const agendaSupervisor = {
+  ...leadSinCita,
+  seguimiento: {
+    ...seguimientoPrimeraReagenda,
+    seguimientoAgendaOperadorRol: 'supervisor',
+  },
+};
+assert(soloLecturaPromotor(agendaSupervisor), 'promotor no edita si agendó supervisor');
+assert(!soloLecturaSupervisor(agendaSupervisor), 'supervisor sí edita su propia agenda');
+
+const agendaPromotor = {
+  ...leadSinCita,
+  seguimiento: {
+    ...seguimientoPrimeraReagenda,
+    seguimientoAgendaOperadorRol: 'promotor',
+  },
+};
+assert(soloLecturaSupervisor(agendaPromotor), 'supervisor no edita si agendó promotor');
+assert(!soloLecturaPromotor(agendaPromotor), 'promotor sí edita su propia agenda');
+
+const parsedAgenda = seguimientoSchema.safeParse({
+  ...seguimientoPrimeraReagenda,
+  seguimientoAgendaOperadorRol: 'supervisor',
+});
+assert(parsedAgenda.success, 'schema acepta seguimientoAgendaOperadorRol');
+
 console.log(`\n=== Resumen: ${log.filter((x) => x.level === 'ok').length} OK, ${fails} FAIL ===`);
 if (fails) {
   console.log('\nCorregí los FAIL antes de subir a main.');

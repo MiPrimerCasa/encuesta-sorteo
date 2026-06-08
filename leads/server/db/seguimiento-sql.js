@@ -37,7 +37,7 @@ function isSeguimientoReadDenied(error) {
       : String(error ?? '');
   return (
     /permission was denied/i.test(raw) &&
-    /registrarSeguimientoLead|SEGUIMIENTO_TABLE|SP_HistorialSeguimientoLead|SP_UltimoSeguimientoOperador/i.test(
+    /registrarSeguimientoLead|SEGUIMIENTO_TABLE|SP_HistorialSeguimientoLead|SP_HistorialSeguimientoAdmin|SP_UltimoSeguimientoOperador|SP_UltimoSeguimientoGlobal/i.test(
       raw,
     )
   );
@@ -48,7 +48,7 @@ function warnSeguimientoLecturaDegradada(error) {
   seguimientoLecturaDegradada = true;
   console.warn(
     '[seguimiento] Lectura de seguimiento denegada — leads se listan sin estado guardado. ' +
-      'Pedí GRANT EXECUTE en SP_HistorialSeguimientoLead y SP_UltimoSeguimientoOperador (o GRANT SELECT en la tabla).',
+      'Pedí GRANT EXECUTE en los SP de lectura (Historial/Ultimos/Admin/Global) — sin SELECT directo en la tabla.',
     error instanceof Error ? error.message : error,
   );
 }
@@ -79,6 +79,30 @@ function getUltimosProcedureName() {
   if (String(raw ?? '').trim()) return normalizeProcedureName(raw);
   if (useSeguimientoSql()) return 'SP_UltimoSeguimientoOperador';
   return null;
+}
+
+/** Historial bulk panel superadmin (~400 días). Solo vía SP. */
+function getAdminHistorialProcedureName() {
+  const raw = process.env.SP_SEGUIMIENTO_ADMIN_HISTORIAL;
+  if (raw === '0' || raw === 'false') return null;
+  if (String(raw ?? '').trim()) return normalizeProcedureName(raw);
+  if (useSeguimientoSql()) return 'SP_HistorialSeguimientoAdmin';
+  return null;
+}
+
+/** Último seguimiento de todos los leads (superadmin, sin filtro operador). */
+function getUltimosGlobalProcedureName() {
+  const raw = process.env.SP_SEGUIMIENTO_ULTIMOS_GLOBAL;
+  if (raw === '0' || raw === 'false') return null;
+  if (String(raw ?? '').trim()) return normalizeProcedureName(raw);
+  if (useSeguimientoSql()) return 'SP_UltimoSeguimientoGlobal';
+  return null;
+}
+
+/** true = no usar SELECT directo en registrarSeguimientoLead (política DBA). */
+function seguimientoSoloSp() {
+  const raw = String(process.env.SEGUIMIENTO_SOLO_SP ?? 'true').trim().toLowerCase();
+  return raw !== '0' && raw !== 'false' && raw !== 'no';
 }
 
 function getSeguimientoTableName() {
@@ -156,6 +180,11 @@ export function mapSqlRowToSeguimiento(row) {
     seguimientoPijPromotor:
       base.seguimientoPijPromotor ??
       bitOrNull(row.seguimiento_pij_promotor ?? row.seguimientoPijPromotor),
+    seguimientoAgendaOperadorRol:
+      base.seguimientoAgendaOperadorRol ??
+      row.seguimiento_agenda_operador_rol ??
+      row.seguimientoAgendaOperadorRol ??
+      null,
     idProducto: base.idProducto ?? row.id_producto ?? row.idProducto ?? null,
     estadoPago: base.estadoPago ?? row.estado_pago ?? row.estadoPago ?? null,
     idBarrio: base.idBarrio ?? row.id_barrio ?? row.idBarrio ?? null,
@@ -313,6 +342,8 @@ async function queryHistorialRows(leadId, limit = 50, idOperador = null) {
     return result.recordset ?? [];
   }
 
+  if (seguimientoSoloSp()) return [];
+
   const table = getSeguimientoTableName();
   const result = await pool
     .request()
@@ -337,6 +368,45 @@ async function queryUltimosRows(idOperador) {
     .input('id_operador', sql.Int, idOperador)
     .execute(proc);
   return result.recordset ?? [];
+}
+
+async function queryUltimosGlobalRows() {
+  const proc = getUltimosGlobalProcedureName();
+  if (!proc) return null;
+  const pool = await getSqlPoolEncuestas();
+  const result = await pool.request().execute(proc);
+  return result.recordset ?? [];
+}
+
+/** Historial desde fecha para panel superadmin (SP_HistorialSeguimientoAdmin). */
+export async function fetchHistorialAdminDesde(desde) {
+  const proc = getAdminHistorialProcedureName();
+  if (!proc || !useSeguimientoSql()) return [];
+
+  try {
+    const pool = await getSqlPoolEncuestas();
+    const result = await pool.request().input('desde', sql.DateTime2, desde).execute(proc);
+    return result.recordset ?? [];
+  } catch (error) {
+    if (isSeguimientoReadDenied(error)) {
+      warnSeguimientoLecturaDegradada(error);
+      return [];
+    }
+    throw error;
+  }
+}
+
+/** Último seguimiento global (SP_UltimoSeguimientoGlobal). */
+export async function fetchUltimosSeguimientoGlobal() {
+  try {
+    return (await queryUltimosGlobalRows()) ?? [];
+  } catch (error) {
+    if (isSeguimientoReadDenied(error)) {
+      warnSeguimientoLecturaDegradada(error);
+      return [];
+    }
+    throw error;
+  }
 }
 
 /**
@@ -421,6 +491,19 @@ export async function batchLatestSeguimientoSql(
       }
       return map;
     }
+
+    if (idOperador == null) {
+      const globalRows = await queryUltimosGlobalRows();
+      if (globalRows != null) {
+        for (const row of globalRows) {
+          const key = String(row.lead_id ?? row.leadId);
+          if (idSet.has(key)) map[key] = mapSqlRowToSeguimiento(row);
+        }
+        return map;
+      }
+    }
+
+    if (seguimientoSoloSp()) return map;
 
     const pool = await getSqlPoolEncuestas();
     const table = getSeguimientoTableName();

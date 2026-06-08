@@ -157,7 +157,41 @@ export function leadSoloLecturaPromotor(
 }
 
 export function leadDerivaSupervisorTerreno(lead: Lead) {
-  return lead.seguimiento?.resultadoEntrevista === 'derivar_terreno';
+  const r = String(lead.seguimiento?.resultadoEntrevista ?? '')
+    .trim()
+    .toLowerCase();
+  return r === 'derivar_terreno';
+}
+
+/** Lead activo derivado por interés terreno (prioridad máxima en tarjeta). */
+export function leadEsInteresTerreno(lead: Lead) {
+  if (!leadDerivaSupervisorTerreno(lead)) return false;
+  return !leadCompro(lead) && !leadReagendaEntrevista(lead) && !esCerradoNegativoLead(lead);
+}
+
+/** En seguimiento: reagenda o derivación a terreno (supervisor toma el caso). */
+export function leadEnSeguimientoActivo(lead: Lead) {
+  return leadReagendaEntrevista(lead) || leadDerivaSupervisorTerreno(lead);
+}
+
+/** Fecha de referencia para ordenar la bandeja En seguimiento. */
+export function fechaSeguimientoLead(lead: Lead): string {
+  if (leadReagendaEntrevista(lead) && lead.seguimiento?.fechaReagenda) {
+    return lead.seguimiento.fechaReagenda;
+  }
+  if (leadDerivaSupervisorTerreno(lead)) {
+    const h =
+      lead.seguimiento?.horarioEntrevistaPropuesto?.trim() ||
+      lead.horarioEntrevista?.trim();
+    if (h) return h;
+  }
+  return lead.fechaAlta ?? `${lead.fechaObtencion}T00:00:00`;
+}
+
+export function sortLeadsSeguimiento(leads: Lead[]): Lead[] {
+  return [...leads].sort((a, b) =>
+    fechaSeguimientoLead(a).localeCompare(fechaSeguimientoLead(b)),
+  );
 }
 
 /** Aplica patch de seguimiento y campos de lead (p. ej. derivación a supervisor). */
@@ -175,7 +209,7 @@ export function applySeguimientoAlLead(lead: Lead, patch: SeguimientoLead): Lead
       ...next,
       horarioEntrevista: horario,
       quiereEntrevista: true,
-      lista: 'entrevista',
+      lista: 'contacto',
     };
   }
 
@@ -197,7 +231,7 @@ export function leadPostEntrevistaSinCompra(lead: Lead) {
   return esCerradoNegativoLead(lead) && lead.seguimiento?.huboEntrevista === true;
 }
 
-/** Contactado: primero post-entrevista sin compra; el resto en orden cronológico. */
+/** Contactado (supervisor): primero post-entrevista sin compra; el resto FIFO. */
 export function sortLeadsContactados(leads: Lead[]): Lead[] {
   return [...leads].sort((a, b) => {
     const aPrior = leadPostEntrevistaSinCompra(a) ? 0 : 1;
@@ -210,14 +244,45 @@ export function sortLeadsContactados(leads: Lead[]): Lead[] {
   });
 }
 
+function fueContactadoLead(lead: Lead) {
+  return Boolean(lead.seguimiento?.canal || lead.seguimiento?.huboEntrevista != null);
+}
+
+/** Último movimiento de seguimiento (historial) o fecha de alta si ya fue contactado. */
+export function fechaUltimoContactoLead(
+  lead: Lead,
+  historial: SeguimientoHistorialEntry[] = [],
+): string {
+  let ultima: string | null = null;
+  for (const entry of historial) {
+    if (!ultima || entry.creadoEn.localeCompare(ultima) > 0) ultima = entry.creadoEn;
+  }
+  if (ultima) return ultima;
+  if (fueContactadoLead(lead) || esCerradoNegativoLead(lead)) {
+    return lead.fechaAlta ?? `${lead.fechaObtencion}T00:00:00`;
+  }
+  return lead.fechaAlta ?? `${lead.fechaObtencion}T00:00:00`;
+}
+
+/** Contactado (promotor): el último contactado primero. */
+export function sortLeadsContactadosPromotor(
+  leads: Lead[],
+  historialPorLead: Record<string, SeguimientoHistorialEntry[]> = {},
+): Lead[] {
+  return [...leads].sort((a, b) => {
+    const fa = fechaUltimoContactoLead(a, historialPorLead[a.id] ?? []);
+    const fb = fechaUltimoContactoLead(b, historialPorLead[b.id] ?? []);
+    return fb.localeCompare(fa);
+  });
+}
+
 /** Pestaña de Leads donde corresponde listar el lead. */
 export function tabIdListaLead(lead: Lead): 'entrevista' | 'contacto' | 'seguimiento' | 'compro' {
   if (leadCompro(lead)) return 'compro';
   // Resultados negativos (no compró / sin interés) → Contactado.
   if (esCerradoNegativoLead(lead)) return 'contacto';
-  if (leadReagendaEntrevista(lead)) return 'seguimiento';
-  // Derivados y entrevistas pendientes van a la pestaña inicial (prioridad), no a Contactado.
-  if (leadDerivaSupervisorTerreno(lead)) return 'entrevista';
+  if (leadEnSeguimientoActivo(lead)) return 'seguimiento';
+  // Entrevistas pendientes van a Prioridad, no a Contactado.
   if (leadEnEntrevistaPendiente(lead)) return 'entrevista';
   if (lead.seguimiento?.canal != null || lead.seguimiento?.huboEntrevista != null) return 'contacto';
   return 'entrevista';

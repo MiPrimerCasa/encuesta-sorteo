@@ -198,6 +198,58 @@
     .b-contactado { background: #fffbeb; border-color: #fcd34d; color: #b45309; }
     .b-seguimiento { background: var(--brand-light); border-color: #fca5a5; color: var(--brand); }
     .b-cierres { background: #ecfdf5; border-color: #34d399; color: #047857; }
+    .b-terreno {
+      background: linear-gradient(135deg, #fecaca 0%, #fee2e2 45%, #ffedd5 100%);
+      border-color: #dc2626;
+      color: #b91c1c;
+      box-shadow: 0 0 12px rgba(220, 38, 38, .15);
+    }
+
+    /* Demo llamita terreno (como en la app) */
+    @keyframes instructivo-flame {
+      0%, 100% { transform: scaleY(1); opacity: 1; }
+      50% { transform: scaleY(1.08) scaleX(.95); opacity: .88; }
+    }
+    .flame-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      font-size: 11px;
+      font-weight: 700;
+      padding: .25rem .55rem;
+      border-radius: 999px;
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+    }
+    .flame-icon {
+      display: inline-block;
+      width: 12px;
+      height: 14px;
+      background: linear-gradient(180deg, #fde047, #f97316 55%, #dc2626);
+      border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+      animation: instructivo-flame 1.1s ease-in-out infinite;
+      transform-origin: bottom center;
+    }
+    .card-terreno-demo {
+      border: 2px solid #dc2626 !important;
+      background: linear-gradient(135deg, #fca5a5 0%, #fecaca 38%, #fee2e2 72%, #fdba74 100%) !important;
+    }
+    .section-terreno-header {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .55rem .75rem;
+      border-radius: 10px;
+      border: 1px solid #fecaca;
+      background: linear-gradient(90deg, #fef2f2, #fff7ed);
+      color: #b91c1c;
+      font-size: .82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      margin: 1rem 0;
+    }
 
     /* ── Color legend ── */
     .swatch {
@@ -365,8 +417,10 @@
     <div class="toc-inner">
       <a href="#inicio">Inicio</a>
       <a href="#bandejas">Bandejas</a>
+      <a href="#colores">Colores</a>
       <a href="#pantalla">Pantalla Leads</a>
       <a href="#promotor">Promotor</a>
+      <a href="#sin-cita">Sin cita</a>
       <a href="#supervisor">Supervisor</a>
       <a href="#comparar">Comparar</a>
       <a href="#rutina">Rutina diaria</a>
@@ -408,6 +462,10 @@
       <li><strong>Usuario y contraseña</strong> — los mismos que te dio administración.</li>
       <li><strong>Ingresar</strong> — entrás directo a la pestaña Leads.</li>
     </ol>
+    <div class="tip">
+      <span class="tip-icon">📖</span>
+      <div>En la pantalla de login hay un botón <strong>«Ver instructivo de uso»</strong> que abre esta guía en una pestaña nueva (<code>/leads/instructivo.html</code>). Podés consultarla sin iniciar sesión.</div>
+    </div>
 
     <div class="tip">
       <span class="tip-icon">🔔</span>
@@ -451,15 +509,49 @@
       </div>
     </div>
 
-    <h3>Colores de las tarjetas</h3>
+  </section>
+
+  <!-- COLORES Y DISEÑO -->
+  <section id="colores">
+    <h2>Colores, badges y diseño visual</h2>
+    <p class="lead">Cada tarjeta usa un color según su estado. Así identificás de un vistazo qué hacer con cada lead.</p>
+
     <div class="grid-2">
-      <div class="swatch"><span class="swatch-dot" style="background:#f0fdfa;border-color:#5eead4"></span> Verde agua — lead nuevo</div>
-      <div class="swatch"><span class="swatch-dot" style="background:#fffbeb;border-color:#fcd34d"></span> Ámbar — contactado</div>
-      <div class="swatch"><span class="swatch-dot" style="background:#fff7ed;border-color:#fb923c"></span> Naranja — post-entrevista sin compra</div>
-      <div class="swatch"><span class="swatch-dot" style="background:#fdf2f3;border-color:#fca5a5"></span> Bordó claro — reagenda</div>
-      <div class="swatch"><span class="swatch-dot" style="background:#ecfdf5;border-color:#34d399"></span> Verde — cierre / venta</div>
-      <div class="swatch"><span class="swatch-dot" style="background:#eef2ff;border-color:#a5b4fc"></span> Índigo — solo lectura</div>
+      <div class="swatch"><span class="swatch-dot" style="background:#f0fdfa;border-color:#5eead4"></span> <strong>Verde agua</strong> — encuesta nueva, sin contactar</div>
+      <div class="swatch"><span class="swatch-dot" style="background:#fffbeb;border-color:#fcd34d"></span> <strong>Ámbar</strong> — contactado (hubo canal o gestión)</div>
+      <div class="swatch"><span class="swatch-dot" style="background:linear-gradient(135deg,#fca5a5,#fee2e2,#fdba74);border-color:#dc2626"></span> <strong>Rojo / fuego</strong> — <span class="flame-badge"><span class="flame-icon" aria-hidden="true"></span> Interés terreno</span></div>
+      <div class="swatch"><span class="swatch-dot" style="background:#fdf2f3;border-color:#fca5a5"></span> <strong>Bordó claro</strong> — en seguimiento (reagenda)</div>
+      <div class="swatch"><span class="swatch-dot" style="background:#fff7ed;border-color:#fb923c"></span> <strong>Naranja</strong> — post-entrevista sin compra / sin interés</div>
+      <div class="swatch"><span class="swatch-dot" style="background:#ecfdf5;border-color:#34d399"></span> <strong>Verde</strong> — cierre / venta registrada</div>
+      <div class="swatch"><span class="swatch-dot" style="background:#eef2ff;border-color:#a5b4fc"></span> <strong>Índigo</strong> — solo lectura (otro rol gestionó el lead)</div>
+      <div class="swatch"><span class="swatch-dot" style="background:#18181b;border-color:#ef4444"></span> <strong>Negro + borde rojo</strong> — no compró (archivo)</div>
     </div>
+
+    <h3>Interés terreno — destacado en rojo</h3>
+    <p style="font-size:.9rem;color:var(--muted)">Cuando un promotor deriva interés en terreno, el lead aparece con diseño especial para que el supervisor lo priorice:</p>
+    <div class="section-terreno-header">
+      <span class="flame-icon" aria-hidden="true"></span>
+      Interés terreno — derivado por promotor
+    </div>
+    <div class="card card-terreno-demo" style="margin-bottom:1rem">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:.75rem">
+        <div>
+          <strong>Ejemplo: cliente derivado</strong>
+          <p style="margin:.35rem 0 0;font-size:.85rem;color:#7f1d1d">Tarjeta con borde rojo, fondo degradado y brillo suave animado.</p>
+        </div>
+        <span class="flame-badge"><span class="flame-icon" aria-hidden="true"></span> Interés terreno</span>
+      </div>
+    </div>
+    <p style="font-size:.88rem;color:var(--muted)">En el formulario, la opción <strong>«Derivar con supervisor — interés terreno»</strong> también usa borde y fondo rojos. El supervisor ve el caso en <strong>Prioridad</strong>, grupo 1.</p>
+
+    <h3>Badges en la tarjeta</h3>
+    <ul style="color:var(--muted);font-size:.9rem;line-height:1.7">
+      <li><strong>SORTEO 01</strong> (violeta) — campaña del lead</li>
+      <li><strong>Referido</strong> (verde) — vino de otro cliente</li>
+      <li><strong>Seguimiento PIJ</strong> (índigo) — reagenda del promotor tras no comprar PIJ</li>
+      <li><strong>Entrevista agendada por supervisor/promotor</strong> (índigo) — el otro rol agendó; vos solo consultás</li>
+      <li><span class="flame-badge"><span class="flame-icon" aria-hidden="true"></span> Interés terreno</span> — derivación a supervisor</li>
+    </ul>
   </section>
 
   <!-- PANTALLA LEADS -->
@@ -485,11 +577,13 @@
     <h3>La tarjeta del lead</h3>
     <p>Tocá cualquier tarjeta para abrir el <strong>formulario de seguimiento</strong> (panel desde abajo).</p>
     <ul style="color:var(--muted);font-size:.9rem;line-height:1.7">
-      <li>Nombre, teléfono, domicilio</li>
+      <li>Nombre, teléfono, domicilio, promotor y supervisor</li>
       <li>Badge del sorteo y si es <strong>Referido</strong></li>
-      <li>Fecha de entrevista (si hay cita)</li>
-      <li>Historial de los últimos movimientos</li>
-      <li>Botón <strong>Modificar teléfono</strong> solo en cargas manuales</li>
+      <li>Estado visual por color (ver sección <a href="#colores">Colores</a>)</li>
+      <li>Badge <span class="flame-badge"><span class="flame-icon" aria-hidden="true"></span> Interés terreno</span> si fue derivado</li>
+      <li>Fecha de entrevista o próximo contacto (si hay cita / reagenda)</li>
+      <li>Historial de los últimos movimientos (quién hizo qué y cuándo)</li>
+      <li>WhatsApp rápido y <strong>Modificar teléfono</strong> en cargas manuales</li>
     </ul>
 
     <h3>Links para redes</h3>
@@ -508,22 +602,27 @@
 
     <h3>Orden en Prioridad (de arriba hacia abajo)</h3>
     <div class="grid-3">
-      <div class="card"><h4>1. Terreno derivado</h4><p>Derivaste al supervisor — él lo gestiona.</p></div>
-      <div class="card"><h4>2. Entrevista pendiente</h4><p>Tienen cita agendada. <strong>Prioridad del día.</strong></p></div>
-      <div class="card"><h4>3. Sin contactar</h4><p>Encuestas nuevas del sorteo.</p></div>
+      <div class="card card-terreno-demo"><h4>1. Interés terreno</h4><p>Derivaste al supervisor. Tarjeta <strong>roja con llamita</strong>. Él lo gestiona.</p></div>
+      <div class="card"><h4>2. Entrevista pendiente</h4><p>Tienen cita agendada (encuesta o reagenda). <strong>Prioridad del día.</strong></p></div>
+      <div class="card"><h4>3. Sin contactar</h4><p>Encuestas nuevas del sorteo (verde agua).</p></div>
     </div>
 
-    <h3>Formulario de seguimiento (visita en calle)</h3>
-    <p style="font-size:.9rem;color:var(--muted);margin:-.5rem 0 1rem">Tocá la tarjeta del lead para abrir el formulario y registrar contacto, entrevista o cierre.</p>
+    <h3>Formulario — lead con cita previa (visita en calle)</h3>
+    <p style="font-size:.9rem;color:var(--muted);margin:-.5rem 0 1rem">Si el lead ya tenía día y hora de entrevista (encuesta o carga manual), el formulario va directo a la visita:</p>
     <div class="decision-tree">
       <div class="decision-node dn-q">¿Hubo entrevista?</div>
       <div class="decision-node dn-no"><strong>No</strong> → Sin interés (Contactado) · Reagendar (En seguimiento)</div>
       <div class="decision-node dn-yes"><strong>Sí</strong> → Elegí resultado:</div>
-      <div class="decision-node dn-result"><strong>No compró</strong> → Podés reagendar para ofrecer PIJ otra vez</div>
+      <div class="decision-node dn-result"><strong>No compró</strong> → Podés reagendar para ofrecer PIJ otra vez (seguimiento PIJ)</div>
       <div class="decision-node dn-result"><strong>Compró</strong> → Solo Plan Inv. Joven ($33.000 + recibo) → Cierres</div>
-      <div class="decision-node dn-result"><strong>Derivar terreno</strong> → El supervisor lo ve en Prioridad</div>
+      <div class="decision-node dn-result" style="border-left-color:#dc2626;background:#fef2f2"><strong>Derivar terreno</strong> (opción en rojo) → Supervisor · Prioridad · tarjeta roja</div>
     </div>
     <p style="font-size:.88rem;color:var(--muted)">Si cerró: podés cargar <strong>referidos</strong> (nombre + teléfono) y se crean leads nuevos automáticamente.</p>
+
+    <div class="tip">
+      <span class="tip-icon">📅</span>
+      <div><strong>Lead sin cita previa:</strong> si la encuesta no traía entrevista agendada, el flujo es distinto (contacto → canal → agendar). Ver sección <a href="#sin-cita">Sin cita previa</a>.</div>
+    </div>
 
     <h3>Cargar lead manual</h3>
     <ol class="steps">
@@ -546,7 +645,46 @@
 
     <div class="tip warn">
       <span class="tip-icon">🔒</span>
-      <div>Si el <strong>supervisor</strong> registró un cierre (terreno), la tarjeta queda en <strong>solo lectura</strong> para vos: podés ver, no editar.</div>
+      <div><strong>Solo lectura:</strong> si el supervisor cerró un terreno, o si <strong>él agendó</strong> la entrevista y vos no, la tarjeta queda en índigo — podés ver, no editar. Lo mismo al revés si vos agendaste y el supervisor abre el lead.</div>
+    </div>
+  </section>
+
+  <!-- SIN CITA PREVIA -->
+  <section id="sin-cita">
+    <span class="section-role sr-both">Promotor y supervisor</span>
+    <h2>Lead sin cita previa — contacto y agenda</h2>
+    <p class="lead">Muchas encuestas llegan <strong>sin día ni hora</strong> de entrevista. El formulario guía un flujo de 4 pasos antes de la visita.</p>
+
+    <h3>Primera gestión (promotor o supervisor)</h3>
+    <ol class="steps">
+      <li><strong>¿Se contactó con el cliente?</strong> Sí / No</li>
+      <li><strong>Canal</strong> — Llamada o Mensaje (solo si hubo contacto)</li>
+      <li><strong>¿Agendó una entrevista?</strong> Sí / No</li>
+      <li><strong>Sí</strong> → elegís fecha y hora en el calendario → el lead pasa a <strong>En seguimiento</strong> y aparece en el calendario.<br />
+          <strong>No</strong> → sin interés → pasa a <strong>Contactado</strong>.</li>
+    </ol>
+
+    <div class="decision-tree">
+      <div class="decision-node dn-q">¿Se contactó?</div>
+      <div class="decision-node dn-yes"><strong>Sí</strong> → Canal (llamada / mensaje)</div>
+      <div class="decision-node dn-q" style="margin-left:1rem">¿Agendó entrevista?</div>
+      <div class="decision-node dn-yes" style="margin-left:2rem"><strong>Sí</strong> → Calendario → <strong>En seguimiento</strong></div>
+      <div class="decision-node dn-no" style="margin-left:2rem"><strong>No</strong> → <strong>Contactado</strong> (sin interés)</div>
+      <div class="decision-node dn-no"><strong>No contactó</strong> → queda pendiente en Prioridad</div>
+    </div>
+
+    <h3>Cuando volvés desde En seguimiento</h3>
+    <p style="font-size:.9rem;color:var(--muted)">Llegada la fecha agendada, abrís el lead desde <strong>En seguimiento</strong> o el calendario. El formulario debe mostrar:</p>
+    <ul style="color:var(--muted);font-size:.9rem;line-height:1.7">
+      <li>Bloque <strong>Entrevista agendada</strong> con la fecha/hora que guardaste</li>
+      <li><strong>¿Hubo entrevista?</strong> Sí / No</li>
+      <li><strong>Resultado</strong> — No compró · Compró (PIJ) · Derivar terreno (promotor) · Sin interés / Reagendar si no hubo entrevista</li>
+    </ul>
+    <p style="font-size:.88rem;color:var(--muted)">No tenés que volver a cargar contacto ni canal si ya agendaste: el paso siguiente es registrar el resultado de la visita.</p>
+
+    <div class="tip">
+      <span class="tip-icon">🤝</span>
+      <div>Si <strong>vos agendaste</strong>, el otro rol (supervisor o promotor) ve el lead en <strong>solo lectura</strong> hasta que pase a otra bandeja. Así no se pisan las gestiones.</div>
     </div>
   </section>
 
@@ -590,11 +728,16 @@
     </div>
 
     <h3>Prioridad — tu orden de atención</h3>
+    <div class="section-terreno-header" style="margin-bottom:.75rem">
+      <span class="flame-icon" aria-hidden="true"></span>
+      1. Interés terreno — derivado por promotor
+    </div>
     <ol class="steps">
-      <li><strong>Derivados a terreno</strong> — el promotor te derivó el cliente.</li>
-      <li><strong>Entrevistas pendientes</strong> — citas del equipo.</li>
-      <li><strong>Sin contactar</strong> — encuestas nuevas.</li>
+      <li><strong>Derivados a terreno</strong> — encabezado y tarjetas en <strong>rojo con llamita</strong>. Gestioná primero.</li>
+      <li><strong>Entrevistas pendientes</strong> — citas del equipo (encuesta o reagendas).</li>
+      <li><strong>Sin contactar</strong> — encuestas nuevas sin gestión.</li>
     </ol>
+    <p style="font-size:.88rem;color:var(--muted)">También podés usar el mismo flujo <a href="#sin-cita">sin cita previa</a> para contactar y agendar por teléfono.</p>
 
     <h3>Pestaña Promotores</h3>
     <p style="font-size:.9rem;color:var(--muted)">Revisala semanalmente: entrevistas vs compras por promotor, conversión total, canales de captación e historial de actividad.</p>
@@ -617,6 +760,9 @@
           <tr><td>Derivar interés terreno</td><td class="yes">✓</td><td class="no">—</td></tr>
           <tr><td>Gestionar derivación terreno</td><td class="no">—</td><td class="yes">✓</td></tr>
           <tr><td>Reagendar seguimiento PIJ</td><td class="yes">✓</td><td class="no">solo lectura</td></tr>
+          <tr><td>Agendar sin cita previa (contacto → canal → fecha)</td><td class="yes">✓</td><td class="yes">✓</td></tr>
+          <tr><td>Editar lead agendado por el otro rol</td><td class="no">solo lectura</td><td class="no">solo lectura</td></tr>
+          <tr><td>Ver instructivo desde el login</td><td class="yes">✓</td><td class="yes">✓</td></tr>
           <tr><td>Referidos en cierre</td><td class="yes">✓</td><td class="yes">✓</td></tr>
           <tr><td>Calendario</td><td class="yes">✓</td><td class="yes">✓</td></tr>
           <tr><td>Métricas propias</td><td class="yes">✓</td><td class="no">—</td></tr>
@@ -666,6 +812,10 @@
         <p>Lo cargó el supervisor. Consultá con él si hay que corregir.</p>
       </div>
       <div class="card">
+        <h4>Tarjeta índigo — no puedo editar</h4>
+        <p>El otro rol agendó la entrevista o cerró el caso. Solo consulta hasta que cambie de bandeja.</p>
+      </div>
+      <div class="card">
         <h4>Error al cargar datos</h4>
         <p>Revisá internet. Si persiste, avisá a soporte técnico.</p>
       </div>
@@ -675,7 +825,7 @@
 </div>
 
 <footer>
-  Mi Primer Casa S.A. · Seguimiento de Leads · Instructivo junio 2026<br />
+  Mi Primer Casa S.A. · Seguimiento de Leads · Instructivo junio 2026 (actualizado: colores terreno, flujo sin cita, solo lectura cruzada)<br />
   También disponible: <code>INSTRUCTIVO_USO_APLICACION.md</code> · <code>.docx</code>
 </footer>
 

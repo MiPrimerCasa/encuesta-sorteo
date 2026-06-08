@@ -3,6 +3,7 @@ import {
   getHorarioEntrevistaLead,
   getPromotorNombre,
   leadCompro,
+  leadDerivaSupervisorTerreno,
   leadEnEntrevistaPendiente,
   leadReagendaEntrevista,
 } from '../../domain/leads';
@@ -36,6 +37,23 @@ function eventoDesdeLead(l: Lead, promotores: Promotor[]): CalendarEvent | null 
       date: l.seguimiento.fechaReagenda,
       lead: l,
     };
+  }
+
+  if (leadDerivaSupervisorTerreno(l)) {
+    const horarioDerivar =
+      l.seguimiento?.horarioEntrevistaPropuesto?.trim() || l.horarioEntrevista?.trim();
+    if (horarioDerivar) {
+      return {
+        id: `${l.id}-derivar`,
+        leadId: l.id,
+        leadName: l.nombre,
+        leadPhone: l.telefono,
+        promotor,
+        type: 'seguimiento',
+        date: horarioDerivar,
+        lead: l,
+      };
+    }
   }
 
   const horario = getHorarioEntrevistaLead(l);

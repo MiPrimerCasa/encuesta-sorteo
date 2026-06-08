@@ -66,15 +66,21 @@ function tabIdListaLead(lead) {
   if (leadCompro(lead)) return 'compro';
   if (esCerradoNegativoLead(lead)) return 'contacto';
   if (leadReagendaEntrevista(lead)) return 'seguimiento';
-  if (lead.seguimiento?.resultadoEntrevista === 'derivar_terreno') return 'entrevista';
+  if (lead.seguimiento?.resultadoEntrevista === 'derivar_terreno') return 'seguimiento';
   if (leadEnEntrevistaPendiente(lead)) return 'entrevista';
   if (lead.seguimiento?.canal != null || lead.seguimiento?.huboEntrevista != null) return 'contacto';
   return 'entrevista';
 }
 
 function prioridadTabInicial(lead) {
-  if (leadCompro(lead) || leadReagendaEntrevista(lead) || esCerradoNegativoLead(lead)) return null;
-  if (lead.seguimiento?.resultadoEntrevista === 'derivar_terreno') return 0;
+  if (
+    leadCompro(lead) ||
+    leadReagendaEntrevista(lead) ||
+    lead.seguimiento?.resultadoEntrevista === 'derivar_terreno' ||
+    esCerradoNegativoLead(lead)
+  ) {
+    return null;
+  }
   if (leadEnEntrevistaPendiente(lead)) return 1;
   const contactado = Boolean(lead.seguimiento?.canal || lead.seguimiento?.huboEntrevista != null);
   if (!contactado) return 2;

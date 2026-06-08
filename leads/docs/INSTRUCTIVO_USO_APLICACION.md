@@ -33,6 +33,8 @@ Los datos se guardan en el servidor y quedan disponibles para el resto del equip
 2. Ingresá tu **usuario** (correo o login del operador) y **contraseña**.
 3. Tocá **Ingresar**.
 
+En la pantalla de login también está el botón **«Ver instructivo de uso»**, que abre esta guía en `/leads/instructivo.html` sin necesidad de iniciar sesión.
+
 El sistema valida las credenciales contra SQL Server (`operadorAccesoCategoria`). Si son incorrectas, verás un mensaje de error.
 
 ### 2.2 Rol y pantalla inicial
@@ -88,10 +90,14 @@ Un lead puede moverse entre **cuatro bandejas** (pestañas dentro de Leads):
 |-------|-------------|
 | Verde agua | Lead nuevo / encuesta sin contactar |
 | Ámbar | Contactado |
-| Naranja | Post-entrevista sin compra (prioridad en Contactado) |
+| **Rojo / fuego** | **Interés terreno** — derivado al supervisor (borde rojo, badge con llamita animada) |
 | Bordó claro | En seguimiento (reagenda) |
+| Naranja | Post-entrevista sin compra (prioridad en Contactado) |
 | Verde oscuro | Cierre / venta |
-| Índigo | Solo lectura (no podés editar) |
+| Índigo | Solo lectura (otro rol gestionó o cerró el caso) |
+| Negro + borde rojo | No compró (archivo) |
+
+En **Prioridad**, el grupo «Interés terreno — derivado por promotor» tiene encabezado rojo con icono de llamita. La opción **Derivar terreno** en el formulario también usa estilo rojo.
 
 ---
 
@@ -184,7 +190,19 @@ Si el cierre lo cargó el **supervisor** (terreno o flujo de confirmación telef
 
 Abrí el lead tocando la tarjeta. El formulario es un panel deslizable desde abajo.
 
-#### Paso 1 — Visita en calle
+#### A) Lead **sin cita previa** (encuesta sin día/hora)
+
+1. **¿Se contactó con el cliente?** Sí / No  
+2. **Canal** — Llamada o Mensaje  
+3. **¿Agendó una entrevista?** Sí / No  
+4. **Sí** → calendario → guardar → **En seguimiento** + calendario  
+5. **No** → sin interés → **Contactado**
+
+**Cuando volvés desde En seguimiento** (llegó la fecha): el formulario muestra la cita agendada, **¿Hubo entrevista?** y el **resultado** (no compró / compró PIJ / derivar terreno). No repetís contacto ni canal.
+
+Si **vos agendaste**, el supervisor ve el lead en **solo lectura** (índigo) y viceversa.
+
+#### B) Lead **con cita previa** — visita en calle
 
 **¿Hubo entrevista?** Sí / No
 
@@ -199,7 +217,7 @@ Abrí el lead tocando la tarjeta. El formulario es un panel deslizable desde aba
 |--------|----------|
 | **No compró** | Podés ofrecer reagendar para PIJ → si aceptás, nueva fecha → **En seguimiento** |
 | **Compró** | Solo podés cerrar **Plan Inversión Joven** (entrega $33.000 + número de recibo) → **Cierres** |
-| **Derivar terreno** | Indicá si el cliente propuso fecha → el lead queda para el **supervisor** en Prioridad |
+| **Derivar terreno** (opción en rojo) | Indicá si el cliente propuso fecha → el **supervisor** lo ve en Prioridad con tarjeta roja y badge de llamita |
 
 #### Referidos (si hubo cierre o resultado con venta)
 

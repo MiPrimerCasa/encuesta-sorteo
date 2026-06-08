@@ -22,14 +22,13 @@ export function pestanaDesdeSeguimiento(seguimiento, lead = {}) {
   const r = seguimiento?.resultadoEntrevista;
   if (r === 'compro') return 'compro';
   if (r === 'no_compro' || r === 'sin_interes') return 'contacto';
-  if (r === 'reagenda') return 'seguimiento';
-  if (r === 'derivar_terreno') return 'entrevista';
+  if (r === 'reagenda' || r === 'derivar_terreno') return 'seguimiento';
   const lista = lead.lista;
   const horario = lead.horarioEntrevista || lead.fechaAlta;
   const placeholder = horario && /T09:00:00$/.test(String(horario));
   const entrevistaPendiente =
     lista === 'entrevista' && r !== 'reagenda' && r !== 'compro' && horario && !placeholder;
-  if (r === 'derivar_terreno' || entrevistaPendiente) return 'entrevista';
+  if (entrevistaPendiente) return 'entrevista';
   if (seguimiento?.canal != null || seguimiento?.huboEntrevista != null) return 'contacto';
   return 'entrevista';
 }

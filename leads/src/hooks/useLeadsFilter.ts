@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
 import {
   leadCompro,
-  leadReagendaEntrevista,
+  leadEnSeguimientoActivo,
   sortLeadsContactados,
   sortLeadsPorVentaReciente,
+  sortLeadsSeguimiento,
 } from '../domain/leads';
 import {
   fueContactadoLead,
@@ -21,15 +22,6 @@ function fifoSort(leads: Lead[]) {
   });
 }
 
-/** En seguimiento: orden por próxima fecha de reagenda (más cercana primero). */
-function sortSeguimientoPorFechaReagenda(leads: Lead[]) {
-  return [...leads].sort((a, b) => {
-    const fa = a.seguimiento?.fechaReagenda ?? a.fechaAlta ?? `${a.fechaObtencion}T00:00:00`;
-    const fb = b.seguimiento?.fechaReagenda ?? b.fechaAlta ?? `${b.fechaObtencion}T00:00:00`;
-    return fa.localeCompare(fb);
-  });
-}
-
 function esCerradoNegativo(l: Lead) {
   return (
     l.seguimiento?.resultadoEntrevista === 'no_compro' ||
@@ -39,7 +31,7 @@ function esCerradoNegativo(l: Lead) {
 
 /**
  * Listas excluyentes. La pestaña inicial agrupa por prioridad de negocio
- * (terreno derivado → entrevista pendiente → encuesta sin contactar), no por sorteo.
+ * (entrevista pendiente → encuesta sin contactar). Derivados a terreno van a En seguimiento.
  */
 export function useLeadsFilter(leads: Lead[]) {
   return useMemo(() => {
@@ -48,10 +40,10 @@ export function useLeadsFilter(leads: Lead[]) {
     const noCompraron = fifoSort(leads.filter(esCerradoNegativo));
     const cerrados = new Set(compraron.map((l) => l.id));
 
-    const seguimiento = sortSeguimientoPorFechaReagenda(
-      leads.filter((l) => !cerrados.has(l.id) && leadReagendaEntrevista(l)),
+    const seguimiento = sortLeadsSeguimiento(
+      leads.filter((l) => !cerrados.has(l.id) && leadEnSeguimientoActivo(l)),
     );
-    const activos = leads.filter((l) => !cerrados.has(l.id) && !leadReagendaEntrevista(l));
+    const activos = leads.filter((l) => !cerrados.has(l.id) && !leadEnSeguimientoActivo(l));
 
     const entrevistaPendiente = ordenarPorPrioridadTabInicial(
       activos.filter((l) => perteneceTabInicial(l)),

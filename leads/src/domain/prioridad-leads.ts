@@ -26,13 +26,17 @@ export function fueContactadoLead(lead: Lead) {
 }
 
 export function leadActivoNoCerrado(lead: Lead) {
-  return !leadCompro(lead) && !leadReagendaEntrevista(lead) && !esCerradoNegativoLead(lead);
+  return (
+    !leadCompro(lead) &&
+    !leadReagendaEntrevista(lead) &&
+    !leadDerivaSupervisorTerreno(lead) &&
+    !esCerradoNegativoLead(lead)
+  );
 }
 
 /** null = no va en la pestaña inicial (va a Contactado, Seguimiento o Cierres). */
 export function prioridadTabInicial(lead: Lead): PrioridadTabInicial | null {
   if (!leadActivoNoCerrado(lead)) return null;
-  if (leadDerivaSupervisorTerreno(lead)) return 0;
   if (leadEnEntrevistaPendiente(lead)) return 1;
   if (!fueContactadoLead(lead)) return 2;
   return null;

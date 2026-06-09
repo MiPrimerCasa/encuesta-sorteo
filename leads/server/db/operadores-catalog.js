@@ -186,6 +186,22 @@ function pickEncuestaField(row, ...candidates) {
  * Promotor: el SP a veces devuelve todo el equipo (mismo @idVendedor del supervisor)
  * sin columna idVendedor en filas. Filtra por código QR (@usuario) y nombre Promotor.
  */
+/** El login trae código de supervisor (…00) pero el nombre es de un promotor del equipo. */
+export function usuarioNombreEsPromotorEnFilasEquipo(rows, usuarioSesion) {
+  const nombre = String(usuarioSesion?.nombre ?? '').trim();
+  if (!nombre || !rows?.length) return false;
+
+  let coincidePromotor = false;
+  let coincideSupervisor = false;
+  for (const row of rows) {
+    const prom = pickEncuestaField(row, 'Promotor', 'promotor');
+    const sup = pickEncuestaField(row, 'supervisor', 'Supervisor');
+    if (prom && nombresCoinciden(nombre, String(prom))) coincidePromotor = true;
+    if (sup && nombresCoinciden(nombre, String(sup))) coincideSupervisor = true;
+  }
+  return coincidePromotor && !coincideSupervisor;
+}
+
 export function filterEncuestaRowsParaPromotor(rows, usuarioSesion) {
   if (!rows?.length || usuarioSesion?.rol !== 'promotor') return rows ?? [];
 
@@ -412,6 +428,21 @@ export function enriquecerUsuarioConCodigoCarga(usuario, encuestaRows = []) {
     const { codigoCarga: _omit, ...sinCodigo } = usuario;
     return sinCodigo;
   }
+  const codigoSesion = normalizeCodigoCatalog(usuario.codigoCarga);
+  const codigoEsSupervisorEquipo =
+    esCodigoUsuarioCargaValido(codigoSesion) &&
+    /00$/i.test(codigoSesion) &&
+    !/P\d{2}$/i.test(codigoSesion);
+
+  const codigoPromotorPorNombre = resolveCodigoCargaPromotorStrict(
+    { ...usuario, rol: 'promotor' },
+    encuestaRows,
+  );
+
+  if (codigoEsSupervisorEquipo && esCodigoUsuarioCargaValido(codigoPromotorPorNombre)) {
+    return { ...usuario, codigoCarga: codigoPromotorPorNombre };
+  }
+
   if (esCodigoUsuarioCargaValido(usuario.codigoCarga)) return usuario;
   const codigo = resolveCodigoCargaOperador(usuario, encuestaRows);
   if (!codigo) return usuario;

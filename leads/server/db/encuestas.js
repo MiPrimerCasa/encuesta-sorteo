@@ -339,12 +339,15 @@ export async function fetchEncuestaRowsParaUsuario(usuario) {
   const { filterEncuestaRowsParaPromotor, enriquecerUsuarioConCodigoCarga } = await import(
     './operadores-catalog.js',
   );
-  const usuarioEf = enriquecerUsuarioConCodigoCarga(usuario, []);
+  let rows = await fetchEncuestasMuestraRaw(usuario);
+  const usuarioEf = enriquecerUsuarioConCodigoCarga(usuario, rows);
+
+  const { usuarioNombreEsPromotorEnFilasEquipo } = await import('./operadores-catalog.js');
   const debeFiltrar =
     usuarioDebeVerSoloSusLeadsPromotor(usuarioEf) ||
-    usuarioDebeVerSoloSusLeadsPromotor(usuario);
-
-  let rows = await fetchEncuestasMuestraRaw(usuarioEf);
+    usuarioDebeVerSoloSusLeadsPromotor(usuario) ||
+    (encuestaRowsTienenVariosPromotores(rows) &&
+      usuarioNombreEsPromotorEnFilasEquipo(rows, usuarioEf));
 
   if (!debeFiltrar) {
     return rows;

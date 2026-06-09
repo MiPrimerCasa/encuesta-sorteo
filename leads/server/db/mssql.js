@@ -97,8 +97,8 @@ export function mapOperadorVendedorToRol(idOperador, idVendedor) {
 /** Categoria del SP operadorAccesoCategoria (valores acordados con DBA). */
 export function mapCategoriaToRol(categoria) {
   const raw = normalizeCategoria(categoria);
-  if (raw === 'PROMOTOR') return 'promotor';
-  if (raw === 'SUPERVISOR') return 'supervisor';
+  if (raw.includes('PROMOTOR')) return 'promotor';
+  if (raw.includes('SUPERVISOR')) return 'supervisor';
   return null;
 }
 

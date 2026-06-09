@@ -290,6 +290,32 @@ export function supervisorFetchIdDesdeCodigoPromotor(codigoRaw) {
   return defaults[equipo] ?? null;
 }
 
+function esCodigoPromotorIndividual(codigoRaw) {
+  const c = compactarCodigoSorteo(codigoRaw);
+  return esCodigoUsuarioCargaValido(c) && /P\d{2}$/i.test(c);
+}
+
+/** Varios promotores en el mismo listado del SP (equipo S01, etc.). */
+export function encuestaRowsTienenVariosPromotores(rows) {
+  const codigos = new Set();
+  for (const row of rows ?? []) {
+    const c = compactarCodigoSorteo(extraerCodigoPromotorDesdeFilaEncuesta(row));
+    if (esCodigoPromotorIndividual(c)) codigos.add(c);
+  }
+  return codigos.size > 1;
+}
+
+/** True si la bandeja debe filtrarse a un solo promotor (aunque el rol venga mal como supervisor). */
+export function usuarioDebeVerSoloSusLeadsPromotor(usuario) {
+  if (!usuario) return false;
+  if (usuario.rol === 'promotor') return true;
+  if (esCodigoPromotorIndividual(usuario.codigoCarga)) return true;
+  if (mapCategoriaToRol(usuario.categoria) === 'promotor') return true;
+  const op = parseIdEntero(usuario.idOperador ?? usuario.id);
+  const sup = parseIdEntero(usuario.idSupervisor);
+  return op != null && sup != null && op !== sup;
+}
+
 async function fetchFilasSupervisorEquipo(usuario, supervisorId) {
   if (!supervisorId) return [];
   const idOp = String(usuario?.id ?? usuario?.idOperador ?? '').trim();
@@ -310,17 +336,22 @@ async function fetchFilasSupervisorEquipo(usuario, supervisorId) {
  * Promotor: filtra por código QR / nombre; si el SP no devuelve filas propias, reintenta con idSupervisor.
  */
 export async function fetchEncuestaRowsParaUsuario(usuario) {
-  if (usuario?.rol !== 'promotor') {
-    return fetchEncuestasMuestraRaw(usuario);
-  }
-
   const { filterEncuestaRowsParaPromotor, enriquecerUsuarioConCodigoCarga } = await import(
     './operadores-catalog.js',
   );
   const usuarioEf = enriquecerUsuarioConCodigoCarga(usuario, []);
+  const debeFiltrar =
+    usuarioDebeVerSoloSusLeadsPromotor(usuarioEf) ||
+    usuarioDebeVerSoloSusLeadsPromotor(usuario);
 
   let rows = await fetchEncuestasMuestraRaw(usuarioEf);
-  let filtradas = filterEncuestaRowsParaPromotor(rows, usuarioEf);
+
+  if (!debeFiltrar) {
+    return rows;
+  }
+
+  const usuarioFiltro = { ...usuarioEf, rol: 'promotor' };
+  let filtradas = filterEncuestaRowsParaPromotor(rows, usuarioFiltro);
 
   const idSupSesion = String(usuarioEf.idSupervisor ?? '').trim();
   const idSupCodigo = supervisorFetchIdDesdeCodigoPromotor(usuarioEf.codigoCarga);
@@ -330,7 +361,7 @@ export async function fetchEncuestaRowsParaUsuario(usuario) {
     for (const idSup of candidatosSup) {
       const supRows = await fetchFilasSupervisorEquipo(usuarioEf, idSup);
       if (!supRows.length) continue;
-      filtradas = filterEncuestaRowsParaPromotor(supRows, usuarioEf);
+      filtradas = filterEncuestaRowsParaPromotor(supRows, usuarioFiltro);
       if (filtradas.length > 0) break;
     }
   }

@@ -63,6 +63,8 @@ function usuarioDesdeRequest(req) {
   const loginId = String(req.headers['x-usuario-login-id'] || '').trim();
   const codigoCarga = String(req.headers['x-usuario-codigo-carga'] || '').trim();
   const idVendedorHdr = String(req.headers['x-usuario-id-vendedor'] || '').trim();
+  const idSupervisorHdr = String(req.headers['x-usuario-id-supervisor'] || '').trim();
+  const idOperadorHdr = String(req.headers['x-usuario-id-operador'] || '').trim();
   if (rol !== 'promotor' && rol !== 'supervisor' && rol !== 'superadmin') return null;
   if (!nombre || !id) return null;
   return {
@@ -71,8 +73,9 @@ function usuarioDesdeRequest(req) {
     rol,
     loginId: loginId || undefined,
     codigoCarga: codigoCarga || undefined,
-    idOperador: id,
+    idOperador: idOperadorHdr || id,
     idVendedor: idVendedorHdr || id,
+    idSupervisor: idSupervisorHdr || undefined,
   };
 }
 
@@ -133,6 +136,13 @@ function registerApiRoutes(api) {
             loginId: user.loginId,
           });
           user = enriquecerUsuarioConCodigoCarga(user, rowsLogin);
+          if (user.rol === 'promotor' && !user.idSupervisor && user.codigoCarga) {
+            const { supervisorFetchIdDesdeCodigoPromotor } = await import(
+              './db/encuestas.js'
+            );
+            const supId = supervisorFetchIdDesdeCodigoPromotor(user.codigoCarga);
+            if (supId) user = { ...user, idSupervisor: supId };
+          }
         } catch (err) {
           console.warn(
             'codigoCarga desde encuestas no disponible en login:',

@@ -1,8 +1,10 @@
 import sql from 'mssql';
 import {
+  esCodigoUsuarioCargaValido,
   extraerCodigoPromotorDesdeFilaEncuesta,
   normalizarEncuestaCargaId,
 } from './codigo-promotor.js';
+import { compactarCodigoSorteo } from './whatsapp-link-text.js';
 import {
   getSqlPoolEncuestas,
   isSqlServerConfigured,
@@ -258,28 +260,78 @@ export async function fetchEncuestasMuestraRaw(usuario) {
   return result.recordset ?? result.recordsets?.[0] ?? [];
 }
 
+/** idOperador del supervisor para @idVendedor cuando el promotor comparte equipo (ej. S01 → Norma id 138). */
+export function supervisorFetchIdDesdeCodigoPromotor(codigoRaw) {
+  const norm = compactarCodigoSorteo(codigoRaw);
+  if (!esCodigoUsuarioCargaValido(norm)) return null;
+  const m = norm.match(/^SORTEO\d{2}(S\d{2})/i);
+  if (!m) return null;
+  const equipo = m[1].toUpperCase();
+
+  const raw = process.env.PROMOTOR_EQUIPO_SUPERVISOR_IDS?.trim();
+  if (raw) {
+    try {
+      const map = JSON.parse(raw);
+      const hit = map[equipo] ?? map[equipo.toLowerCase()];
+      if (hit != null && String(hit).trim()) return String(hit).trim();
+    } catch {
+      /* JSON inválido */
+    }
+  }
+
+  const defaults = {
+    S01: '138',
+    S03: '137',
+    S05: '123',
+    S06: '130',
+    S07: '101',
+    S21: '132',
+  };
+  return defaults[equipo] ?? null;
+}
+
+async function fetchFilasSupervisorEquipo(usuario, supervisorId) {
+  if (!supervisorId) return [];
+  const idOp = String(usuario?.id ?? usuario?.idOperador ?? '').trim();
+  if (supervisorId === idOp) return [];
+  try {
+    return await fetchEncuestasMuestraRaw({
+      id: supervisorId,
+      nombre: usuario.nombre,
+      rol: usuario.rol,
+    });
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Filas de encuesta para el usuario logueado.
  * Promotor: filtra por código QR / nombre; si el SP no devuelve filas propias, reintenta con idSupervisor.
  */
 export async function fetchEncuestaRowsParaUsuario(usuario) {
-  let rows = await fetchEncuestasMuestraRaw(usuario);
-  if (usuario?.rol !== 'promotor') return rows;
+  if (usuario?.rol !== 'promotor') {
+    return fetchEncuestasMuestraRaw(usuario);
+  }
 
-  const { filterEncuestaRowsParaPromotor } = await import('./operadores-catalog.js');
-  let filtradas = filterEncuestaRowsParaPromotor(rows, usuario);
+  const { filterEncuestaRowsParaPromotor, enriquecerUsuarioConCodigoCarga } = await import(
+    './operadores-catalog.js',
+  );
+  const usuarioEf = enriquecerUsuarioConCodigoCarga(usuario, []);
 
-  const idSup = String(usuario.idSupervisor ?? '').trim();
-  if (filtradas.length === 0 && idSup && idSup !== String(usuario.id ?? '').trim()) {
-    try {
-      const supRows = await fetchEncuestasMuestraRaw({
-        id: idSup,
-        nombre: usuario.nombre,
-        rol: usuario.rol,
-      });
-      filtradas = filterEncuestaRowsParaPromotor(supRows, usuario);
-    } catch {
-      /* sin fallback */
+  let rows = await fetchEncuestasMuestraRaw(usuarioEf);
+  let filtradas = filterEncuestaRowsParaPromotor(rows, usuarioEf);
+
+  const idSupSesion = String(usuarioEf.idSupervisor ?? '').trim();
+  const idSupCodigo = supervisorFetchIdDesdeCodigoPromotor(usuarioEf.codigoCarga);
+  const candidatosSup = [...new Set([idSupSesion, idSupCodigo].filter(Boolean))];
+
+  if (filtradas.length === 0) {
+    for (const idSup of candidatosSup) {
+      const supRows = await fetchFilasSupervisorEquipo(usuarioEf, idSup);
+      if (!supRows.length) continue;
+      filtradas = filterEncuestaRowsParaPromotor(supRows, usuarioEf);
+      if (filtradas.length > 0) break;
     }
   }
 

@@ -98,6 +98,12 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (session.usuario.idVendedor) {
       headers['x-usuario-id-vendedor'] = session.usuario.idVendedor;
     }
+    if (session.usuario.idSupervisor) {
+      headers['x-usuario-id-supervisor'] = session.usuario.idSupervisor;
+    }
+    if (session.usuario.idOperador) {
+      headers['x-usuario-id-operador'] = session.usuario.idOperador;
+    }
   }
 
   const url = apiUrl(path);

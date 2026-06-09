@@ -258,6 +258,34 @@ export async function fetchEncuestasMuestraRaw(usuario) {
   return result.recordset ?? result.recordsets?.[0] ?? [];
 }
 
+/**
+ * Filas de encuesta para el usuario logueado.
+ * Promotor: filtra por código QR / nombre; si el SP no devuelve filas propias, reintenta con idSupervisor.
+ */
+export async function fetchEncuestaRowsParaUsuario(usuario) {
+  let rows = await fetchEncuestasMuestraRaw(usuario);
+  if (usuario?.rol !== 'promotor') return rows;
+
+  const { filterEncuestaRowsParaPromotor } = await import('./operadores-catalog.js');
+  let filtradas = filterEncuestaRowsParaPromotor(rows, usuario);
+
+  const idSup = String(usuario.idSupervisor ?? '').trim();
+  if (filtradas.length === 0 && idSup && idSup !== String(usuario.id ?? '').trim()) {
+    try {
+      const supRows = await fetchEncuestasMuestraRaw({
+        id: idSup,
+        nombre: usuario.nombre,
+        rol: usuario.rol,
+      });
+      filtradas = filterEncuestaRowsParaPromotor(supRows, usuario);
+    } catch {
+      /* sin fallback */
+    }
+  }
+
+  return filtradas;
+}
+
 /** exec [dbo].[encuestasMuestra] — todas las encuestas (superadmin). */
 export async function fetchEncuestasMuestraGlobalRaw() {
   const pool = await getSqlPoolEncuestas();
@@ -756,7 +784,7 @@ async function mapEncuestaRowsToLeads(rows, idOperador = null, operadorIdsBatch 
 }
 
 export async function listLeadsFromEncuestas(usuario) {
-  const rows = await fetchEncuestasMuestraRaw(usuario);
+  const rows = await fetchEncuestaRowsParaUsuario(usuario);
   const idOperador = parseInt(String(usuario?.id ?? usuario?.idOperador ?? ''), 10);
   const leads = await mapEncuestaRowsToLeads(
     rows,
@@ -797,7 +825,7 @@ export function useEncuestasFromSql() {
 }
 
 export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario, usuarioId) {
-  const rows = await fetchEncuestasMuestraRaw(usuario);
+  const rows = await fetchEncuestaRowsParaUsuario(usuario);
   const row = rows.find((r) => {
     const pk = pickField(r, 'id', 'Id', 'ID');
     const usuario = pickField(r, 'usuario', 'Usuario');

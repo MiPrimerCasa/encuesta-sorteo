@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
   buildPromotoresFromLeads,
   enrichOperadorRolDesdeEncuestas,
+  fetchEncuestaRowsParaUsuario,
   fetchEncuestasMuestraRaw,
   listLeadsFromEncuestas,
   promotorTieneFilasEnMuestra,
@@ -122,10 +123,14 @@ function registerApiRoutes(api) {
         user = await enrichOperadorRolDesdeEncuestas(user);
         try {
           await loadOperadoresCatalogAsync();
-          const rowsLogin = await fetchEncuestasMuestraRaw({
+          const rowsLogin = await fetchEncuestaRowsParaUsuario({
             id: user.id,
             nombre: user.nombre,
             rol: user.rol,
+            idSupervisor: user.idSupervisor,
+            idVendedor: user.idVendedor,
+            codigoCarga: user.codigoCarga,
+            loginId: user.loginId,
           });
           user = enriquecerUsuarioConCodigoCarga(user, rowsLogin);
         } catch (err) {
@@ -169,7 +174,7 @@ function registerApiRoutes(api) {
 
     try {
       getDb();
-      const rowsEncuesta = await fetchEncuestasMuestraRaw(usuario);
+      const rowsEncuesta = await fetchEncuestaRowsParaUsuario(usuario);
       const leads = await listLeadsFromEncuestas(usuario);
       const direccionOficinasSupervisor = resolveDireccionOficinasSupervisor(rowsEncuesta);
       const conTelefono = leads.filter((l) => l.telefono).length;
@@ -261,10 +266,9 @@ function registerApiRoutes(api) {
 
     try {
       await loadOperadoresCatalogAsync();
-      const rows = await fetchEncuestasMuestraRaw(usuario);
+      const rows = await fetchEncuestaRowsParaUsuario(usuario);
       const idV = idVendedorOperador(usuario);
-      const rowsEfectivas =
-        usuario.rol === 'promotor' && !promotorTieneFilasEnMuestra(rows, idV) ? [] : rows;
+      const rowsEfectivas = rows;
       const usuarioConCodigo = enriquecerUsuarioConCodigoCarga(usuario, rowsEfectivas);
       const links = await resolveLinksRedesParaUsuario(usuarioConCodigo, rowsEfectivas);
       const catalog = await loadOperadoresCatalogAsync();

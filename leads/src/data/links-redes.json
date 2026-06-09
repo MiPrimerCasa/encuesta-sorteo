@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-06-08",
+  "updatedAt": "2026-06-09",
   "source": "Planilla operadores (C:/CARRERA_LIC/SEGUIMIENTO_LEADS/data/planilla/operadores-codigos.csv)",
   "byCodigo": {
     "SORTEO01ROTATIVO": {
@@ -241,9 +241,29 @@
       "vendedor": "Norma M",
       "rol": "supervisor"
     },
+    "zalazar rl": {
+      "codigo": "SORTEO01S01P01",
+      "vendedor": "Zalazar RL",
+      "rol": "promotor"
+    },
+    "zalazar leonor": {
+      "codigo": "SORTEO01S01P01",
+      "vendedor": "Zalazar RL",
+      "rol": "promotor"
+    },
     "promotor s1p1": {
       "codigo": "SORTEO01S01P01",
       "vendedor": "PROMOTOR S1P1",
+      "rol": "promotor"
+    },
+    "aguirre cl": {
+      "codigo": "SORTEO01S01P02",
+      "vendedor": "Aguirre CL",
+      "rol": "promotor"
+    },
+    "aguirre carolina": {
+      "codigo": "SORTEO01S01P02",
+      "vendedor": "Aguirre CL",
       "rol": "promotor"
     },
     "promotor s1p2": {

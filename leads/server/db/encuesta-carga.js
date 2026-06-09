@@ -1,5 +1,6 @@
 import sql from 'mssql';
 import {
+  fetchEncuestaRowsParaUsuario,
   fetchEncuestasMuestraRaw,
   listLeadsFromEncuestas,
   normalizeNombre,
@@ -261,7 +262,7 @@ export function resolveUsuarioSpCarga(usuarioSesion, context, payload) {
 
 export async function resolveCargaEncuestaContext(usuarioSesion) {
   await loadOperadoresCatalogAsync();
-  const rows = await fetchEncuestasMuestraRaw(usuarioSesion);
+  const rows = await fetchEncuestaRowsParaUsuario(usuarioSesion);
   const supervisorNombre =
     usuarioSesion.rol === 'promotor'
       ? pickField(rows[0], 'supervisor', 'Supervisor')

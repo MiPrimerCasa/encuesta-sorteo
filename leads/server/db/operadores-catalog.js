@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { esCodigoUsuarioCargaValido } from './codigo-promotor.js';
+import {
+  esCodigoUsuarioCargaValido,
+  extraerCodigoPromotorDesdeFilaEncuesta,
+} from './codigo-promotor.js';
 import {
   buildCodigoPromotorIndex,
   normalizeNombre,
@@ -167,6 +170,56 @@ function codigoDesdeEntrada(entry) {
 
 export function idVendedorOperador(usuarioSesion) {
   return usuarioSesion?.idVendedor ?? usuarioSesion?.idOperador ?? usuarioSesion?.id ?? null;
+}
+
+function pickEncuestaField(row, ...candidates) {
+  if (!row) return null;
+  const keys = Object.keys(row);
+  for (const name of candidates) {
+    const key = keys.find((k) => k.toLowerCase() === String(name).toLowerCase());
+    if (key != null && row[key] != null && row[key] !== '') return row[key];
+  }
+  return null;
+}
+
+/**
+ * Promotor: el SP a veces devuelve todo el equipo (mismo @idVendedor del supervisor)
+ * sin columna idVendedor en filas. Filtra por código QR (@usuario) y nombre Promotor.
+ */
+export function filterEncuestaRowsParaPromotor(rows, usuarioSesion) {
+  if (!rows?.length || usuarioSesion?.rol !== 'promotor') return rows ?? [];
+
+  const idV = String(idVendedorOperador(usuarioSesion) ?? '').trim();
+  const nombre = String(usuarioSesion.nombre ?? '').trim();
+  let codigoObjetivo = normalizeCodigoCatalog(usuarioSesion.codigoCarga);
+  if (!esCodigoUsuarioCargaValido(codigoObjetivo)) {
+    codigoObjetivo = normalizeCodigoCatalog(
+      resolveCodigoCargaPromotorStrict(usuarioSesion, rows),
+    );
+  }
+
+  const filasConIdV = rows.filter((row) => {
+    const rv = pickEncuestaField(row, 'idVendedor', 'IdVendedor');
+    return rv != null && String(rv).trim() !== '';
+  });
+  if (filasConIdV.length > 0) {
+    const porId = rows.filter(
+      (row) => String(pickEncuestaField(row, 'idVendedor', 'IdVendedor') ?? '').trim() === idV,
+    );
+    if (porId.length > 0) return porId;
+  }
+
+  const filtradas = rows.filter((row) => {
+    const rowCodigo = normalizeCodigoCatalog(extraerCodigoPromotorDesdeFilaEncuesta(row));
+    if (esCodigoUsuarioCargaValido(codigoObjetivo) && rowCodigo && rowCodigo === codigoObjetivo) {
+      return true;
+    }
+    const rowProm = pickEncuestaField(row, 'Promotor', 'promotor');
+    if (nombre && rowProm && nombresCoinciden(nombre, String(rowProm))) return true;
+    return false;
+  });
+
+  return filtradas;
 }
 
 /** El código de filas propias coincide con el vendedor de la planilla o con el login. */

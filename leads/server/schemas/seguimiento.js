@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const loginSchema = z.object({
   usuario: z.string().trim().min(2).max(80),
-  password: z.string().min(1).max(120),
+  password: z.string().trim().min(1).max(120),
 });
 
 const referidoSchema = z.object({

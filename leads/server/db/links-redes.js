@@ -1,10 +1,5 @@
-import { esCodigoUsuarioCargaValido } from './codigo-promotor.js';
-import {
-  loadOperadoresCatalogAsync,
-  normalizeCodigoCatalog,
-  normalizeLoginId,
-  resolveCodigoCargaOperador,
-} from './operadores-catalog.js';
+import { codigoSorteoLinksDesdeSesion } from './codigo-promotor.js';
+import { loadOperadoresCatalogAsync, normalizeCodigoCatalog } from './operadores-catalog.js';
 import { isLinksAcortadorEnabled } from './links-acortador.js';
 import { getAcortadoParaCodigo } from './links-acortados-store.js';
 import { buildWaMeUrl } from './whatsapp-link-text.js';
@@ -51,43 +46,23 @@ export async function resolveLinksRedesPorCodigo(codigoRaw) {
   return byCodigo[codigo] ?? null;
 }
 
-export function resolveCodigoCargaUsuario(usuarioSesion, encuestaRows = []) {
-  return resolveCodigoCargaOperador(usuarioSesion, encuestaRows);
-}
-
 /**
- * Para links de redes: el catálogo SP está indexado por código (ej. SORTEO01S1100).
- * Si la sesión ya trae ese código y existe en byCodigo, se usa directo — sin validar nombre.
+ * Código para links: sesión (operadorAccesoCategoria) cruzado con catálogo SP (byCodigo).
+ * No usa nombre ni filas de encuesta.
  */
-async function resolveCodigoParaLinksRedes(usuarioSesion, encuestaRows = []) {
-  const catalog = await loadOperadoresCatalogAsync();
-  const idOp = String(usuarioSesion?.idOperador ?? usuarioSesion?.id ?? '').trim();
-  const login = normalizeLoginId(usuarioSesion?.loginId);
+export async function resolveCodigoParaLinksRedes(usuarioSesion) {
+  const codigoSesion = codigoSorteoLinksDesdeSesion(usuarioSesion);
+  if (!codigoSesion) return null;
 
-  const candidatos = [
-    usuarioSesion?.codigoCarga,
-    usuarioSesion?.loginId,
-    idOp ? catalog.byIdOperador?.[idOp]?.codigo : null,
-    login ? catalog.byLoginId?.[login]?.codigo : null,
-  ];
+  const { byCodigo } = await loadOperadoresCatalogAsync();
+  if (byCodigo[codigoSesion]) return codigoSesion;
 
-  for (const candidato of candidatos) {
-    const codigo = normalizeCodigoCatalog(candidato);
-    if (esCodigoUsuarioCargaValido(codigo) && catalog.byCodigo?.[codigo]) {
-      return codigo;
-    }
-  }
-
-  const codigoResuelto = resolveCodigoCargaOperador(usuarioSesion, encuestaRows);
-  const norm = normalizeCodigoCatalog(codigoResuelto);
-  if (esCodigoUsuarioCargaValido(norm) && catalog.byCodigo?.[norm]) {
-    return norm;
-  }
-  return codigoResuelto;
+  // Código válido en login pero sin fila en rptLinkQRenRedesSociales
+  return codigoSesion;
 }
 
-export async function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows = []) {
-  const codigo = await resolveCodigoParaLinksRedes(usuarioSesion, encuestaRows);
+export async function resolveLinksRedesParaUsuario(usuarioSesion, _encuestaRows = []) {
+  const codigo = await resolveCodigoParaLinksRedes(usuarioSesion);
   if (!codigo) {
     return {
       codigo: null,
@@ -97,9 +72,10 @@ export async function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows =
       whatsapp: null,
       tiktok: null,
       mensaje:
-        'No se encontró tu código de promotor (ej. SORTEO01S21P02). Volvé a iniciar sesión o contactá soporte.',
+        'No se encontró tu código SORTEO en la sesión. Cerrá sesión, recargá la página (Ctrl+F5) y volvé a entrar.',
     };
   }
+
   const entry = await resolveLinksRedesPorCodigo(codigo);
   if (!entry) {
     return {
@@ -109,9 +85,10 @@ export async function resolveLinksRedesParaUsuario(usuarioSesion, encuestaRows =
       facebook: null,
       whatsapp: null,
       tiktok: null,
-      mensaje: `No hay links de redes cargados para el código ${codigo}. Pedí a administración que actualice la planilla.`,
+      mensaje: `No hay links de redes cargados para el código ${codigo}. Pedí a administración que actualice el SP de links.`,
     };
   }
+
   const acortado =
     isLinksAcortadorEnabled() ? getAcortadoParaCodigo(entry.codigo, 'instagram') : null;
   return {

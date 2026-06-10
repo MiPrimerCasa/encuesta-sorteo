@@ -161,7 +161,9 @@ export function mapOperadorRow(row) {
   const categoriaRaw = pickField(row, 'Categoria', 'categoria');
   const categoria = categoriaRaw != null ? String(categoriaRaw).trim() : null;
 
-  if (!idOperador && !loginId) return null;
+  const idOpValido = parseIdEntero(idOperador);
+  // SP: credenciales inválidas → idOperador=0 y resto vacío (misma fila para cualquier email malo).
+  if (idOpValido == null && !loginId) return null;
 
   const { rol, rolOrigen } = resolveRolDesdeLoginRow({
     idOperador,
@@ -199,9 +201,13 @@ export async function fetchLoginOperadorRaw(loginId, password) {
   const paramUser = process.env.SP_LOGIN_PARAM_USER || 'LoginID';
   const paramPass = process.env.SP_LOGIN_PARAM_PASS || 'PasID';
 
+  const loginNorm = String(loginId ?? '').trim();
+  const passNorm = String(password ?? '').trim();
+  const loginParaSp = loginNorm.includes('@') ? loginNorm.toLowerCase() : loginNorm;
+
   const request = dbPool.request();
-  request.input(paramUser, sql.NVarChar, loginId);
-  request.input(paramPass, sql.NVarChar, password);
+  request.input(paramUser, sql.NVarChar, loginParaSp);
+  request.input(paramPass, sql.NVarChar, passNorm);
 
   const result = await request.execute(proc);
   const rows = result.recordset ?? result.recordsets?.[0] ?? [];
@@ -218,7 +224,16 @@ export async function fetchLoginOperadorRaw(loginId, password) {
 /** Solo el usuario mapeado (uso en API). */
 export async function verifyLoginSqlServer(loginId, password) {
   const data = await fetchLoginOperadorRaw(loginId, password);
-  if (!data?.mapped) return null;
+  if (!data?.mapped) {
+    const idSp = data?.raw?.idOperador;
+    if (data?.raw && (idSp === 0 || idSp === '0')) {
+      console.warn(
+        'Login SP rechazó credenciales (idOperador=0):',
+        String(loginId ?? '').trim().toLowerCase(),
+      );
+    }
+    return null;
+  }
   return enriquecerUsuarioConCodigoCarga(data.mapped);
 }
 

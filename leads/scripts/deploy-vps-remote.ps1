@@ -34,8 +34,10 @@ if (Test-Path $sshKey) {
   $sshArgs += @('-i', $sshKey)
 }
 
+$remoteScript = $remoteScript -replace "`r`n", "`n" -replace "`r", "`n"
+
 Write-Host "Conectando a ${VpsUser}@${VpsHost} (clave: $sshKey) ..."
-ssh @sshArgs "${VpsUser}@${VpsHost}" $remoteScript
+$remoteScript | ssh @sshArgs "${VpsUser}@${VpsHost}" "bash -s"
 if ($LASTEXITCODE -ne 0) {
   Write-Error "Deploy falló. Si GitHub Actions también falla, revisá VPS_SSH_KEY en encuesta-sorteo → Settings → Secrets."
   exit $LASTEXITCODE

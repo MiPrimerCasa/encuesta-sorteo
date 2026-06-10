@@ -62,6 +62,8 @@ function usuarioDesdeRequest(req) {
   const id = String(req.headers['x-usuario-id'] || '').trim();
   const loginId = String(req.headers['x-usuario-login-id'] || '').trim();
   const codigoCarga = String(req.headers['x-usuario-codigo-carga'] || '').trim();
+  const codigoPromotor = String(req.headers['x-usuario-codigo-promotor'] || '').trim();
+  const codigoSupervisor = String(req.headers['x-usuario-codigo-supervisor'] || '').trim();
   const idVendedorHdr = String(req.headers['x-usuario-id-vendedor'] || '').trim();
   const idSupervisorHdr = String(req.headers['x-usuario-id-supervisor'] || '').trim();
   const idOperadorHdr = String(req.headers['x-usuario-id-operador'] || '').trim();
@@ -73,6 +75,8 @@ function usuarioDesdeRequest(req) {
     rol,
     loginId: loginId || undefined,
     codigoCarga: codigoCarga || undefined,
+    codigoPromotor: codigoPromotor || undefined,
+    codigoSupervisor: codigoSupervisor || undefined,
     idOperador: idOperadorHdr || id,
     idVendedor: idVendedorHdr || id,
     idSupervisor: idSupervisorHdr || undefined,
@@ -271,11 +275,7 @@ function registerApiRoutes(api) {
 
     try {
       await loadOperadoresCatalogAsync();
-      const rows = await fetchEncuestaRowsParaUsuario(usuario);
-      const idV = idVendedorOperador(usuario);
-      const rowsEfectivas = rows;
-      const usuarioConCodigo = enriquecerUsuarioConCodigoCarga(usuario, rowsEfectivas);
-      const links = await resolveLinksRedesParaUsuario(usuarioConCodigo, rowsEfectivas);
+      const links = await resolveLinksRedesParaUsuario(usuario);
       const catalog = await loadOperadoresCatalogAsync();
       const source =
         catalog.catalogSource === 'sql'

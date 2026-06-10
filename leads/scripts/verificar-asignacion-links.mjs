@@ -10,10 +10,7 @@ import {
   invalidateOperadoresCatalogCache,
   loadOperadoresCatalogAsync,
   resolveCodigoCargaPromotorStrict,
-  resolveCodigoCargaOperador,
-  nombresCoinciden,
   codigoPerteneceAVendedor,
-  enriquecerUsuarioConCodigoCarga,
 } from '../server/db/operadores-catalog.js';
 import { resolveLinksRedesParaUsuario } from '../server/db/links-redes.js';
 
@@ -41,13 +38,13 @@ try {
   const catalog = buildCatalogFromSpRows(rows);
   await loadOperadoresCatalogAsync();
 
-  const jose = catalog.byCodigo.SORTEO01S21P02;
   const leonel = catalog.byCodigo.SORTEO01S21P01;
+  const cristian = catalog.byCodigo.SORTEO01S1100;
 
   console.log('=== SP STRSYSTEM (rptLinkQRenRedesSociales) ===');
   console.log(`Filas: ${rows.length}`);
-  check(Boolean(jose), `Jose G en SP → ${jose?.codigo} (${jose?.vendedor})`);
   check(Boolean(leonel), `Leonel C en SP → ${leonel?.codigo} (${leonel?.vendedor})`);
+  check(Boolean(cristian), `Christian R en SP → ${cristian?.codigo} (${cristian?.vendedor})`);
 
   const filasMal = [{ Promotor: 'Osvaldo S', usuario: 'SORTEO01S21P01', idVendedor: 999 }];
   const filasJose = [{ Promotor: 'Osvaldo S', usuario: 'SORTEO01S21P02', idVendedor: 999 }];
@@ -71,39 +68,43 @@ try {
     check(codigo === 'SORTEO01S21P02', `${nombre} → ${codigo ?? 'null'} (esperado SORTEO01S21P02)`);
   }
 
-  console.log('\n=== Validación cruzada catálogo ===');
+  console.log('\n=== Validación cruzada catálogo (carga manual; links usan solo código) ===');
   check(!codigoPerteneceAVendedor('SORTEO01S21P01', 'Jose G', catalog), 'S21P01 NO es de Jose G');
-  check(!codigoPerteneceAVendedor('SORTEO01S21P02', 'Jose G', catalog), 'S21P02 planilla dice «Osvaldo S», no «Jose G» (nombre distinto)');
-  check(codigoPerteneceAVendedor('SORTEO01S21P02', 'SOSA OSVALDO', catalog), 'S21P02 SÍ coincide con login «SOSA OSVALDO»');
   check(codigoPerteneceAVendedor('SORTEO01S21P01', 'LEONEL CAJAL', catalog), 'S21P01 SÍ es de Leonel');
 
-  console.log('\n=== Links completos para Jose G ===');
-  const joseUser = { id: '999', nombre: 'Jose G', rol: 'promotor', idVendedor: '999' };
-  const enriquecido = enriquecerUsuarioConCodigoCarga(joseUser, filasJose);
-  const links = await resolveLinksRedesParaUsuario(enriquecido, filasJose);
-  check(links.codigo === 'SORTEO01S21P02', `codigo resuelto: ${links.codigo ?? 'null'}`);
+  console.log('\n=== Links por código de sesión (sin nombre) ===');
+  const leonelUser = {
+    id: '999',
+    nombre: 'Leonel C',
+    rol: 'promotor',
+    codigoPromotor: 'SORTEO01S21P01',
+    codigoCarga: 'SORTEO01S21P01',
+  };
+  const links = await resolveLinksRedesParaUsuario(leonelUser);
+  check(links.codigo === 'SORTEO01S21P01', `codigo resuelto: ${links.codigo ?? 'null'}`);
   check(!links.mensaje, `sin error: ${links.mensaje ?? 'ninguno'}`);
   check(Boolean(links.instagram), 'instagram presente');
   check(Boolean(links.facebook), 'facebook presente');
   check(Boolean(links.whatsapp), 'whatsapp presente');
   check(Boolean(links.tiktok), 'tiktok presente');
-  check(links.whatsapp?.includes('SORTEO01S21P02'), 'whatsapp usa código S21P02');
+  check(links.whatsapp?.includes('SORTEO01S21P01'), 'whatsapp usa código S21P01');
 
-  console.log('\n=== Christian R / Cristian Rocdan (supervisor S1100) ===');
-  const cristian = resolveCodigoCargaOperador(
-    { id: '1', nombre: 'Cristian Rocdan', rol: 'supervisor', idVendedor: '1' },
+  console.log('\n=== Links supervisor por codigoSupervisor (S1100) ===');
+  const linksCristian = await resolveLinksRedesParaUsuario({
+    id: '11',
+    nombre: 'Cristian Rocdan',
+    rol: 'supervisor',
+    codigoSupervisor: 'SORTEO01S1100',
+    codigoCarga: 'SORTEO01S1100',
+  });
+  check(linksCristian.codigo === 'SORTEO01S1100', `links Cristian → ${linksCristian.codigo ?? 'null'}`);
+  check(Boolean(linksCristian.instagram), 'instagram Cristian presente');
+
+  console.log('\n=== Sin leads: carga manual por nombre (links NO usan este camino) ===');
+  const joseSinLeads = resolveCodigoCargaPromotorStrict(
+    { id: '999', nombre: 'Jose G', rol: 'promotor', idVendedor: '999' },
     [],
   );
-  check(cristian === 'SORTEO01S1100', `Cristian Rocdan → ${cristian ?? 'null'} (esperado SORTEO01S1100)`);
-  check(nombresCoinciden('Cristian Rocdan', 'Christian R'), 'Cristian Rocdan coincide con Christian R en planilla');
-
-  console.log('\n=== Sin leads: solo por nombre de login ===');
-  check(
-    resolveCodigoCargaPromotorStrict({ id: '999', nombre: 'SOSA OSVALDO', rol: 'promotor', idVendedor: '999' }, []) ===
-      'SORTEO01S21P02',
-    'SOSA OSVALDO sin leads → SORTEO01S21P02',
-  );
-  const joseSinLeads = resolveCodigoCargaPromotorStrict(joseUser, []);
   check(
     joseSinLeads === null,
     `Jose G sin leads → ${joseSinLeads ?? 'null'} (esperado null: planilla tiene «Osvaldo S»)`,

@@ -165,6 +165,7 @@ def main():
     root = Path(__file__).resolve().parents[1]
     targets = [
         ("docs/INSTRUCTIVO_USO_APLICACION.md", "docs/INSTRUCTIVO_USO_APLICACION.docx"),
+        ("docs/GUION_CAPACITACION_PROMOTORES_SUPERVISORES.md", "docs/GUION_CAPACITACION_PROMOTORES_SUPERVISORES.docx"),
         ("docs/DOCUMENTACION_SISTEMA.md", "docs/DOCUMENTACION_SISTEMA.docx"),
     ]
     if len(sys.argv) > 1:

@@ -96,6 +96,27 @@ export function extraerCodigosSorteoDesdeFilaLogin(row) {
 /**
  * Código de carga según rol: promotor → codigoPromotor (Pxx); supervisor → codigoSupervisor (…00).
  */
+/**
+ * Código SORTEO para links de redes: solo desde login (operadorAccesoCategoria).
+ * Promotor → codigoPromotor; supervisor → codigoSupervisor; respaldo codigoCarga.
+ */
+export function codigoSorteoLinksDesdeSesion(usuario) {
+  if (!usuario) return null;
+  const rol = usuario.rol;
+  const candidatos =
+    rol === 'promotor'
+      ? [usuario.codigoPromotor, usuario.codigoCarga]
+      : rol === 'supervisor'
+        ? [usuario.codigoSupervisor, usuario.codigoCarga]
+        : [usuario.codigoCarga, usuario.codigoPromotor, usuario.codigoSupervisor];
+
+  for (const c of candidatos) {
+    const norm = extraerCodigoSorteoDeTexto(c);
+    if (esCodigoUsuarioCargaValido(norm)) return norm;
+  }
+  return null;
+}
+
 export function resolverCodigoCargaDesdeFilaLogin(row, rol) {
   const { codigoPromotor, codigoSupervisor } = extraerCodigosSorteoDesdeFilaLogin(row);
   if (rol === 'promotor' && esCodigoUsuarioCargaValido(codigoPromotor)) {

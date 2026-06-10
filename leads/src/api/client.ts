@@ -95,6 +95,12 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (session.usuario.codigoCarga) {
       headers['x-usuario-codigo-carga'] = session.usuario.codigoCarga;
     }
+    if (session.usuario.codigoPromotor) {
+      headers['x-usuario-codigo-promotor'] = session.usuario.codigoPromotor;
+    }
+    if (session.usuario.codigoSupervisor) {
+      headers['x-usuario-codigo-supervisor'] = session.usuario.codigoSupervisor;
+    }
     if (session.usuario.idVendedor) {
       headers['x-usuario-id-vendedor'] = session.usuario.idVendedor;
     }

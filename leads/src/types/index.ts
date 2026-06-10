@@ -248,6 +248,10 @@ export interface UsuarioSesion {
   categoria?: string;
   loginId?: string;
   codigoCarga?: string;
+  /** Desde operadorAccesoCategoria (SP Pablo): SORTEO01S01P01, etc. */
+  codigoPromotor?: string;
+  /** Desde operadorAccesoCategoria: SORTEO01S0100, etc. */
+  codigoSupervisor?: string;
   idOperador?: string;
   idSupervisor?: string;
   idVendedor?: string;

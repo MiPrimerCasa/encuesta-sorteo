@@ -71,16 +71,55 @@ export function extraerCodigoPromotorDesdeFilaEncuesta(row) {
   return null;
 }
 
+/** Códigos SORTEO que devuelve operadorAccesoCategoria (jun. 2026 — columnas Pablo). */
+export function extraerCodigosSorteoDesdeFilaLogin(row) {
+  if (!row) return { codigoPromotor: null, codigoSupervisor: null };
+  const codigoPromotor = extraerCodigoSorteoDeTexto(
+    pickField(
+      row,
+      process.env.SP_LOGIN_COL_CODIGO_PROMOTOR,
+      'codigoPromotor',
+      'CodigoPromotor',
+    ),
+  );
+  const codigoSupervisor = extraerCodigoSorteoDeTexto(
+    pickField(
+      row,
+      process.env.SP_LOGIN_COL_CODIGO_SUPERVISOR,
+      'codigoSupervisor',
+      'CodigoSupervisor',
+    ),
+  );
+  return { codigoPromotor, codigoSupervisor };
+}
+
+/**
+ * Código de carga según rol: promotor → codigoPromotor (Pxx); supervisor → codigoSupervisor (…00).
+ */
+export function resolverCodigoCargaDesdeFilaLogin(row, rol) {
+  const { codigoPromotor, codigoSupervisor } = extraerCodigosSorteoDesdeFilaLogin(row);
+  if (rol === 'promotor' && esCodigoUsuarioCargaValido(codigoPromotor)) {
+    return codigoPromotor;
+  }
+  if (rol === 'supervisor' && esCodigoUsuarioCargaValido(codigoSupervisor)) {
+    return codigoSupervisor;
+  }
+  if (esCodigoUsuarioCargaValido(codigoPromotor)) return codigoPromotor;
+  if (esCodigoUsuarioCargaValido(codigoSupervisor)) return codigoSupervisor;
+  return extraerCodigoPromotorDesdeFilaLogin(row);
+}
+
 export function extraerCodigoPromotorDesdeFilaLogin(row) {
   if (!row) return null;
+  const { codigoPromotor } = extraerCodigosSorteoDesdeFilaLogin(row);
+  if (esCodigoUsuarioCargaValido(codigoPromotor)) return codigoPromotor;
+
   const envCol = process.env.SP_LOGIN_COL_CODIGO;
   const direct = pickField(
     row,
     envCol,
     'codigo',
     'Codigo',
-    'codigoPromotor',
-    'CodigoPromotor',
     'codigoVendedor',
     'CodigoVendedor',
     'operadorCodigoSorteo',
@@ -89,7 +128,6 @@ export function extraerCodigoPromotorDesdeFilaLogin(row) {
   const desdeDirecto = extraerCodigoSorteoDeTexto(direct);
   if (desdeDirecto) return desdeDirecto;
 
-  // Supervisores/promotores: operadorCodigo suele ser SORTEO01S1100, SORTEO01S21P01, etc.
   const operadorCodigo = pickField(row, 'operadorCodigo', 'OperadorCodigo');
   const desdeOperadorCodigo = extraerCodigoSorteoDeTexto(operadorCodigo);
   if (desdeOperadorCodigo) return desdeOperadorCodigo;

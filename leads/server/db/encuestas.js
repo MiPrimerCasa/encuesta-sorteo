@@ -356,9 +356,12 @@ export async function fetchEncuestaRowsParaUsuario(usuario) {
   const usuarioFiltro = { ...usuarioEf, rol: 'promotor' };
   let filtradas = filterEncuestaRowsParaPromotor(rows, usuarioFiltro);
 
+  const idOp = String(usuarioEf.idOperador ?? usuarioEf.id ?? '').trim();
   const idSupSesion = String(usuarioEf.idSupervisor ?? '').trim();
   const idSupCodigo = supervisorFetchIdDesdeCodigoPromotor(usuarioEf.codigoCarga);
-  const candidatosSup = [...new Set([idSupSesion, idSupCodigo].filter(Boolean))];
+  const candidatosSup = [...new Set([idSupSesion, idSupCodigo].filter(Boolean))].filter(
+    (id) => id && id !== idOp,
+  );
 
   if (filtradas.length === 0) {
     for (const idSup of candidatosSup) {

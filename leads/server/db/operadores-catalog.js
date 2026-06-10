@@ -412,9 +412,19 @@ export function resolveCodigoCargaOperador(usuarioSesion, encuestaRows = []) {
   return null;
 }
 
+function esCodigoPromotorIndividual(codigoRaw) {
+  const c = normalizeCodigoCatalog(codigoRaw);
+  return esCodigoUsuarioCargaValido(c) && /P\d{2}$/i.test(c);
+}
+
 export function enriquecerUsuarioConCodigoCarga(usuario, encuestaRows = []) {
   if (!usuario) return usuario;
   if (usuario.rol === 'promotor') {
+    const codigoLogin =
+      usuario.codigoPromotor?.trim() || usuario.codigoCarga?.trim() || '';
+    if (esCodigoPromotorIndividual(codigoLogin)) {
+      return { ...usuario, codigoCarga: normalizeCodigoCatalog(codigoLogin) };
+    }
     const idV = idVendedorOperador(usuario);
     const rowsEfectivas = promotorTieneFilasEnMuestra(encuestaRows, idV) ? encuestaRows : [];
     const codigo = resolveCodigoCargaPromotorStrict(usuario, rowsEfectivas);

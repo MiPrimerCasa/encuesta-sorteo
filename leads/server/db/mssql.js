@@ -1,6 +1,9 @@
 import sql from 'mssql';
 import { enriquecerUsuarioConCodigoCarga } from './operadores-catalog.js';
-import { extraerCodigoPromotorDesdeFilaLogin } from './codigo-promotor.js';
+import {
+  extraerCodigosSorteoDesdeFilaLogin,
+  resolverCodigoCargaDesdeFilaLogin,
+} from './codigo-promotor.js';
 
 let pool;
 let poolEncuestas;
@@ -153,7 +156,6 @@ export function mapOperadorRow(row) {
   );
   const loginIdRaw = pickField(row, 'operadorCodigo', 'OperadorCodigo');
   const loginId = loginIdRaw != null ? String(loginIdRaw).trim() : null;
-  const codigoCarga = extraerCodigoPromotorDesdeFilaLogin(row);
   const nombreRaw = pickField(row, 'operadorDescripcion', 'OperadorDescripcion');
   const nombre = (nombreRaw != null ? String(nombreRaw).trim() : null) || loginId || String(idOperador ?? 'Operador');
   const categoriaRaw = pickField(row, 'Categoria', 'categoria');
@@ -168,6 +170,9 @@ export function mapOperadorRow(row) {
     categoria,
   });
 
+  const { codigoPromotor, codigoSupervisor } = extraerCodigosSorteoDesdeFilaLogin(row);
+  const codigoCarga = resolverCodigoCargaDesdeFilaLogin(row, rol);
+
   return {
     id: String(idOperador ?? loginId),
     nombre: String(nombre).trim(),
@@ -176,6 +181,8 @@ export function mapOperadorRow(row) {
     categoria: categoria ? String(categoria).trim() : undefined,
     loginId: loginId ? String(loginId).trim() : undefined,
     codigoCarga,
+    codigoPromotor: codigoPromotor ?? undefined,
+    codigoSupervisor: codigoSupervisor ?? undefined,
     idOperador: idOperador != null ? String(idOperador) : undefined,
     idSupervisor: idSupervisor != null ? String(idSupervisor) : undefined,
     idVendedor: idVendedor != null ? String(idVendedor) : undefined,

@@ -136,13 +136,6 @@ function registerApiRoutes(api) {
             loginId: user.loginId,
           });
           user = enriquecerUsuarioConCodigoCarga(user, rowsLogin);
-          if (user.rol === 'promotor' && !user.idSupervisor && user.codigoCarga) {
-            const { supervisorFetchIdDesdeCodigoPromotor } = await import(
-              './db/encuestas.js'
-            );
-            const supId = supervisorFetchIdDesdeCodigoPromotor(user.codigoCarga);
-            if (supId) user = { ...user, idSupervisor: supId };
-          }
         } catch (err) {
           console.warn(
             'codigoCarga desde encuestas no disponible en login:',
@@ -159,6 +152,8 @@ function registerApiRoutes(api) {
           categoria: user.categoria,
           loginId: user.loginId,
           codigoCarga: user.codigoCarga,
+          codigoPromotor: user.codigoPromotor,
+          codigoSupervisor: user.codigoSupervisor,
           idOperador: user.idOperador,
           idSupervisor: user.idSupervisor,
           idVendedor: user.idVendedor,

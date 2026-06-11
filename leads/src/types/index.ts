@@ -146,6 +146,8 @@ export interface SeguimientoLead {
   /** Si resultado = derivar_terreno y el cliente propuso fecha (supervisor / calendario). */
   horarioEntrevistaPropuesto?: string | null;
   fechaReagenda?: string | null;
+  /** Fecha y hora en la que se realizó el cierre (resultadoEntrevista = compro). */
+  fechaCierre?: string | null;
   /** Promotor reagendó tras «No compró» para volver a ofrecer PIJ (supervisor solo lectura). */
   seguimientoPijPromotor?: boolean | null;
   /** Quién agendó la entrevista en seguimiento (sin cita previa); el otro rol queda solo lectura. */

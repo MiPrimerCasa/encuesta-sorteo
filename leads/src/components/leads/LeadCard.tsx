@@ -276,6 +276,24 @@ export function LeadCard({
                 {lead.seguimiento.numeroRecibo}
               </span>
             )}
+            {lead.seguimiento?.fechaCierre && (
+              <span className="ml-1 text-zinc-400">
+                · Cierre:{' '}
+                {(() => {
+                  try {
+                    const d = new Date(lead.seguimiento.fechaCierre);
+                    if (isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const hours = String(d.getHours()).padStart(2, '0');
+                    const minutes = String(d.getMinutes()).padStart(2, '0');
+                    return `${day}/${month} ${hours}:${minutes}`;
+                  } catch {
+                    return lead.seguimiento.fechaCierre;
+                  }
+                })()}
+              </span>
+            )}
           </div>
         )}
 

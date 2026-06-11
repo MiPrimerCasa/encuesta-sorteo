@@ -443,6 +443,7 @@ export function LeadModalForm({
         huboEntrevista: false,
         resultadoEntrevista: esAgendo ? 'reagenda' : 'sin_interes',
         fechaReagenda: esAgendo ? form.fechaReagenda || null : null,
+        fechaCierre: null,
         seguimientoPijPromotor: false,
         seguimientoAgendaOperadorRol: esAgendo ? rol : null,
         horarioEntrevistaPropuesto: null,
@@ -567,6 +568,10 @@ export function LeadModalForm({
               ? 'reagenda'
               : form.resultadoEntrevista,
       fechaReagenda: esReagenda ? form.fechaReagenda || null : null,
+      fechaCierre:
+        form.resultadoEntrevista === 'compro'
+          ? lead.seguimiento?.fechaCierre || new Date().toISOString()
+          : null,
       seguimientoPijPromotor: esReagendaPij,
       seguimientoAgendaOperadorRol: null,
       horarioEntrevistaPropuesto:
@@ -1228,11 +1233,53 @@ export function LeadModalForm({
                           </p>
                         </div>
                       )}
+                      {lead.seguimiento?.fechaCierre && (
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                            Fecha de cierre
+                          </p>
+                          <p className="mt-1 text-[15px] font-medium text-zinc-900">
+                            {(() => {
+                              try {
+                                const d = new Date(lead.seguimiento.fechaCierre);
+                                if (isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
+                                const day = String(d.getDate()).padStart(2, '0');
+                                const month = String(d.getMonth() + 1).padStart(2, '0');
+                                const year = d.getFullYear();
+                                const hours = String(d.getHours()).padStart(2, '0');
+                                const minutes = String(d.getMinutes()).padStart(2, '0');
+                                return `${day}/${month}/${year} ${hours}:${minutes}`;
+                              } catch {
+                                return lead.seguimiento.fechaCierre;
+                              }
+                            })()}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {showCompro && !soloLectura && (
                     <div className="space-y-5 rounded-xl border border-brand-100 bg-brand-50 p-4">
+                      {lead.seguimiento?.fechaCierre && (
+                        <div className="text-[13px] font-semibold text-brand-800">
+                          Cierre registrado el:{' '}
+                          {(() => {
+                            try {
+                              const d = new Date(lead.seguimiento.fechaCierre);
+                              if (isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
+                              const day = String(d.getDate()).padStart(2, '0');
+                              const month = String(d.getMonth() + 1).padStart(2, '0');
+                              const year = d.getFullYear();
+                              const hours = String(d.getHours()).padStart(2, '0');
+                              const minutes = String(d.getMinutes()).padStart(2, '0');
+                              return `${day}/${month}/${year} ${hours}:${minutes}`;
+                            } catch {
+                              return lead.seguimiento.fechaCierre;
+                            }
+                          })()}
+                        </div>
+                      )}
                       {/* Producto */}
                       <div className="space-y-2">
                         <div>

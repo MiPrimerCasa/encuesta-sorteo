@@ -190,6 +190,7 @@ export function mapSqlRowToSeguimiento(row) {
       row.horarioEntrevistaPropuesto ??
       null,
     fechaReagenda: base.fechaReagenda ?? row.fecha_reagenda ?? row.fechaReagenda ?? null,
+    fechaCierre: base.fechaCierre ?? row.fecha_cierre ?? row.fechaCierre ?? null,
     seguimientoPijPromotor:
       base.seguimientoPijPromotor ??
       bitOrNull(row.seguimiento_pij_promotor ?? row.seguimientoPijPromotor),

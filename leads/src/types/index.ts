@@ -138,6 +138,7 @@ export interface SeguimientoHistorialEntry {
 }
 
 export interface SeguimientoLead {
+  operadorId?: string | number | null;
   fuente?: FuenteLead | null;
   confirmoEntrevista?: boolean | null;
   canal?: CanalContacto | null;

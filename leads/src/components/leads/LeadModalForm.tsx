@@ -270,18 +270,31 @@ export function LeadModalForm({
         ...resetCamposVenta(),
       });
     } else {
-      patch({
-        seContactoCliente: false,
-        confirmoEntrevista: rol !== 'promotor' ? false : form.confirmoEntrevista,
+      const seguimientoSinContacto: SeguimientoLead = {
+        fuente: lead?.seguimiento?.fuente,
+        confirmoEntrevista: false,
         canal: null,
-        agendoEntrevista: null,
         huboEntrevista: null,
         resultadoEntrevista: null,
-        reagendarEntrevista: false,
-        fechaReagenda: '',
-        reagendaTrasNoComproEnPersona: null,
-        ...resetCamposVenta(),
-      });
+        fechaReagenda: null,
+        fechaCierre: null,
+        seguimientoPijPromotor: false,
+        seguimientoAgendaOperadorRol: null,
+        horarioEntrevistaPropuesto: null,
+        idProducto: null,
+        estadoPago: null,
+        idBarrio: null,
+        numeroRecibo: null,
+        brindoReferidos: false,
+        referidos: [],
+        observaciones: form.observaciones.trim(),
+      };
+      void (async () => {
+        if (lead) {
+          await onSave(lead.id, seguimientoSinContacto);
+        }
+        onClose();
+      })();
     }
   };
 
@@ -805,16 +818,20 @@ export function LeadModalForm({
             </button>
           </div>
 
-          {soloLectura && (
+          {soloLectura && lead && (
             <div className="mx-4 mb-3 shrink-0 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5">
               <p className="text-[13px] font-medium text-indigo-900">
                 {leadSeguimientoPijPromotor(lead)
                   ? ETIQUETA_SEGUIMIENTO_PIJ
                   : etiquetaSeguimientoAgendaOtroRol(lead, rol) ??
-                    ETIQUETA_CIERRE_SUPERVISOR}
+                    (lead.seguimiento?.operadorNombre
+                      ? `Último seguimiento por ${lead.seguimiento.operadorNombre}`
+                      : ETIQUETA_CIERRE_SUPERVISOR)}
               </p>
               <p className="mt-0.5 text-[12px] leading-snug text-indigo-800/90">
-                Podés consultar este seguimiento, pero no modificarlo desde tu cuenta.
+                {lead.seguimiento?.operadorNombre
+                  ? `Solo el último operador que modificó este lead (${lead.seguimiento.operadorNombre}) puede volver a cambiar su estado.`
+                  : `Podés consultar este seguimiento, pero no modificarlo desde tu cuenta.`}
               </p>
             </div>
           )}

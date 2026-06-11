@@ -391,3 +391,17 @@ export function puedeVenderProducto(productos: Producto[], rol: RolUsuario, idPr
   const prod = productos.find((p) => p.id === idProducto);
   return Boolean(prod?.rolesPermitidos.includes(rolFiltro));
 }
+
+/** Solo el último operador que modificó el lead puede volver a cambiar su estado. */
+export function leadSoloLecturaUltimoModificador(
+  lead: Lead | null | undefined,
+  currentUserId: string | number | undefined | null,
+): boolean {
+  if (!lead?.seguimiento?.operadorId) {
+    // Si no tiene operadorId de seguimiento previo, cualquiera puede gestionarlo.
+    return false;
+  }
+  if (!currentUserId) return false;
+  return String(lead.seguimiento.operadorId) !== String(currentUserId);
+}
+

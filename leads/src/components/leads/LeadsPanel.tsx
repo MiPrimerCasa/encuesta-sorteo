@@ -6,6 +6,7 @@ import {
   leadReagendaEntrevista,
   leadSoloLecturaSupervisor,
   leadSoloLecturaPromotor,
+  leadSoloLecturaUltimoModificador,
   sortLeadsContactadosPromotor,
   sortLeadsPorVentaReciente,
   tabIdListaLead,
@@ -530,12 +531,13 @@ export function LeadsPanel({
         barrios={barrios}
         soloLectura={
           leadSeleccionado != null &&
-          (esPromotor
-            ? leadSoloLecturaPromotor(
-                leadSeleccionado,
-                historialPorLead[leadSeleccionado.id] ?? [],
-              )
-            : leadSoloLecturaSupervisor(leadSeleccionado))
+          (leadSoloLecturaUltimoModificador(leadSeleccionado, usuario?.idOperador ?? usuario?.id) ||
+            (esPromotor
+              ? leadSoloLecturaPromotor(
+                  leadSeleccionado,
+                  historialPorLead[leadSeleccionado.id] ?? [],
+                )
+              : leadSoloLecturaSupervisor(leadSeleccionado)))
         }
         onClose={cerrarModal}
         onSave={async (leadId, seg) => {

@@ -208,6 +208,7 @@ export function mapSqlRowToSeguimiento(row) {
     referidos: Array.isArray(referidos) ? referidos : undefined,
     observaciones: base.observaciones ?? row.observaciones ?? undefined,
     fuente: base.fuente ?? row.fuente ?? undefined,
+    operadorId: row.operador_id != null ? String(row.operador_id) : (base.operadorId ?? null),
     operadorRol: row.operador_rol ?? row.operadorRol ?? base.operadorRol ?? null,
     operadorNombre:
       row.operador_nombre ?? row.operadorNombre ?? base.operadorNombre ?? null,
@@ -321,7 +322,14 @@ export async function execRegistrarSeguimientoLead(lead, merged, usuario) {
     sql.NVarChar(200),
     String(usuario?.nombre ?? 'Operador').slice(0, 200),
   );
-  request.input('seguimiento_json', sql.NVarChar(sql.MAX), JSON.stringify(merged));
+
+  const payloadToStore = {
+    ...merged,
+    operadorId: operadorId != null ? String(operadorId) : undefined,
+    operadorRol: usuario?.rol ?? undefined,
+    operadorNombre: usuario?.nombre ?? undefined,
+  };
+  request.input('seguimiento_json', sql.NVarChar(sql.MAX), JSON.stringify(payloadToStore));
 
   const result = await request.execute(proc);
   const fila = result.recordset?.[0];

@@ -57,7 +57,7 @@ export function etiquetaEstadoSeguimiento(seguimiento, lead = {}) {
     const canalTexto = CANAL_LABEL[seguimiento.canal] || seguimiento.canal;
     partes.push(`Contacto por ${canalTexto}`);
   } else if (seguimiento?.confirmoEntrevista === false) {
-    partes.push('No confirmó entrevista');
+    partes.push(seguimiento.operadorRol === 'promotor' ? 'No contactó' : 'No confirmó entrevista');
   } else if (seguimiento?.confirmoEntrevista === true) {
     partes.push('Confirmó entrevista');
   } else {

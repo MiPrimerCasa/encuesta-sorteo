@@ -17,7 +17,7 @@ export const seguimientoSchema = z
   .object({
     confirmoEntrevista: z.boolean().nullable().optional(),
     fuente: z.enum(['qr', 'app', 'facebook', 'instagram', 'whatsapp', 'tiktok']).nullable().optional(),
-    canal: z.enum(['llamada', 'mensaje']).nullable().optional(),
+    canal: z.enum(['llamada', 'mensaje', 'en_persona']).nullable().optional(),
     huboEntrevista: z.boolean().nullable().optional(),
     resultadoEntrevista: z
       .enum(['sin_interes', 'reagenda', 'no_compro', 'compro', 'derivar_terreno'])

@@ -193,7 +193,7 @@ Abrí el lead tocando la tarjeta. El formulario es un panel deslizable desde aba
 #### A) Lead **sin cita previa** (encuesta sin día/hora)
 
 1. **¿Se contactó con el cliente?** Sí / No  
-2. **Canal** — Llamada o Mensaje  
+2. **Canal** — Llamada, Mensaje o En persona  
 3. **¿Agendó una entrevista?** Sí / No  
 4. **Sí** → calendario → guardar → **En seguimiento** + calendario  
 5. **No** → sin interés → **Contactado**
@@ -307,7 +307,7 @@ Igual que el promotor, con estas diferencias:
 
 | Respuesta | Siguiente paso |
 |-----------|----------------|
-| **Sí** | Canal (Llamada / Mensaje) → si hay cita previa se muestra → **¿Hubo entrevista?** |
+| **Sí** | Canal (Llamada / Mensaje / En persona) → si hay cita previa se muestra → **¿Hubo entrevista?** |
 | **No** | ¿Quiere reagendar o no estaba interesado? → si reagenda: fecha + canal |
 
 #### Si confirmó pero no tenía cita previa

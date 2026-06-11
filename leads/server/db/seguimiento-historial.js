@@ -33,6 +33,12 @@ export function pestanaDesdeSeguimiento(seguimiento, lead = {}) {
   return 'entrevista';
 }
 
+const CANAL_LABEL = {
+  llamada: 'llamada',
+  mensaje: 'mensaje',
+  en_persona: 'visita presencial',
+};
+
 export function etiquetaEstadoSeguimiento(seguimiento, lead = {}) {
   const partes = [];
   const r = seguimiento?.resultadoEntrevista;
@@ -48,7 +54,8 @@ export function etiquetaEstadoSeguimiento(seguimiento, lead = {}) {
   } else if (seguimiento?.huboEntrevista === false) {
     partes.push('Sin entrevista');
   } else if (seguimiento?.canal) {
-    partes.push(`Contacto por ${seguimiento.canal}`);
+    const canalTexto = CANAL_LABEL[seguimiento.canal] || seguimiento.canal;
+    partes.push(`Contacto por ${canalTexto}`);
   } else if (seguimiento?.confirmoEntrevista === false) {
     partes.push('No confirmó entrevista');
   } else if (seguimiento?.confirmoEntrevista === true) {

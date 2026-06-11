@@ -260,18 +260,16 @@ export function buildAdminProductividad(leads, historialRows = [], ahora = new D
       }))
       .sort((a, b) => (b.tasaCierrePct ?? 0) - (a.tasaCierrePct ?? 0)),
     resultadosEntrevista: { ...resultados },
-    canales: fuenteOrder
-      .filter((f) => (canalMap.get(f)?.leads ?? 0) > 0)
-      .map((f) => {
-        const c = canalMap.get(f);
-        return {
-          fuente: f,
-          label: f === 'otros' ? 'Otros' : FUENTE_LABEL[f],
-          leads: c.leads,
-          cierres: c.cierres,
-          tasaCierrePct: pct(c.cierres, c.leads),
-        };
-      }),
+    canales: fuenteOrder.map((f) => {
+      const c = canalMap.get(f) ?? { leads: 0, cierres: 0 };
+      return {
+        fuente: f,
+        label: f === 'otros' ? 'Otros' : (FUENTE_LABEL[f] ?? f),
+        leads: c.leads,
+        cierres: c.cierres,
+        tasaCierrePct: pct(c.cierres, c.leads),
+      };
+    }),
     backlog,
     tiempoPrimeraEntrevista: {
       promedioDias,

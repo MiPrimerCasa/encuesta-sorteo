@@ -325,18 +325,16 @@ export function buildAdminProductividad(
       derivar_terreno: resultados.derivar_terreno,
       pendiente: resultados.pendiente,
     },
-    canales: fuenteOrder
-      .filter((f) => (canalMap.get(f)?.leads ?? 0) > 0)
-      .map((f) => {
-        const c = canalMap.get(f)!;
-        return {
-          fuente: f,
-          label: f === 'otros' ? 'Otros' : FUENTE_LABEL[f],
-          leads: c.leads,
-          cierres: c.cierres,
-          tasaCierrePct: pct(c.cierres, c.leads),
-        };
-      }),
+    canales: fuenteOrder.map((f) => {
+      const c = canalMap.get(f) ?? { leads: 0, cierres: 0 };
+      return {
+        fuente: f,
+        label: f === 'otros' ? 'Otros' : FUENTE_LABEL[f],
+        leads: c.leads,
+        cierres: c.cierres,
+        tasaCierrePct: pct(c.cierres, c.leads),
+      };
+    }),
     backlog,
     tiempoPrimeraEntrevista: {
       promedioDias,

@@ -87,7 +87,7 @@ BEGIN
     s.operador_rol,
     s.operador_nombre,
     s.seguimiento_json,
-    s.creado_en
+    s.fechaAlta AS creado_en
   FROM dbo.registrarSeguimientoLead s
   WHERE s.lead_id = @lead_id
   ORDER BY s.id DESC;
@@ -145,7 +145,7 @@ BEGIN
     operador_rol,
     operador_nombre,
     seguimiento_json,
-    creado_en
+    fechaAlta AS creado_en
   FROM ranked
   WHERE rn = 1
   ORDER BY lead_id;

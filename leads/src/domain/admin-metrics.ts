@@ -174,32 +174,6 @@ export function buildAdminChartEvents(
         supervisorNombre: item.supervisorNombre,
       });
     }
-
-    const { lead, supervisorNombre } = item;
-    const esCierre = lead.seguimiento?.resultadoEntrevista === 'compro';
-    if (esCierre) {
-      const fechaCierre = parseFecha(lead.seguimiento?.creadoEn ?? lead.seguimiento?.fechaCierre);
-      if (fechaCierre) {
-        eventos.push({
-          fecha: fechaCierre.toISOString(),
-          tipo: 'cierre',
-          supervisorNombre,
-        });
-        if (lead.seguimiento?.idProducto === ID_PRODUCTO_TERRENO) {
-          eventos.push({
-            fecha: fechaCierre.toISOString(),
-            tipo: 'terreno',
-            supervisorNombre,
-          });
-        } else if (lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ) {
-          eventos.push({
-            fecha: fechaCierre.toISOString(),
-            tipo: 'pij',
-            supervisorNombre,
-          });
-        }
-      }
-    }
   }
 
   for (const raw of historialRows) {
@@ -217,6 +191,15 @@ export function buildAdminChartEvents(
         entrevistasVistas.add(key);
         eventos.push({ fecha: fecha.toISOString(), tipo: 'entrevista', supervisorNombre: supNombre });
       }
+    }
+    if (filaIndicaCierre(row)) {
+      eventos.push({ fecha: fecha.toISOString(), tipo: 'cierre', supervisorNombre: supNombre });
+    }
+    if (esVentaTerreno(row)) {
+      eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno', supervisorNombre: supNombre });
+    }
+    if (esVentaPij(row)) {
+      eventos.push({ fecha: fecha.toISOString(), tipo: 'pij', supervisorNombre: supNombre });
     }
   }
 

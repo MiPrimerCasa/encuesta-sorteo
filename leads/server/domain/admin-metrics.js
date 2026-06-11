@@ -130,7 +130,6 @@ function rankingDesdePromotores(promotores, campo, limite = 5) {
     }));
 }
 
-/** Eventos para gráficos temporales (leads + historial). */
 export function buildAdminChartEvents(leadsConSupervisor, historialRows = []) {
   const eventos = [];
   const leadPorId = new Map();
@@ -145,32 +144,6 @@ export function buildAdminChartEvents(leadsConSupervisor, historialRows = []) {
         tipo: 'lead',
         supervisorNombre: item.supervisorNombre,
       });
-    }
-
-    const { lead, supervisorNombre } = item;
-    const esCierre = lead.seguimiento?.resultadoEntrevista === 'compro';
-    if (esCierre) {
-      const fechaCierre = parseFecha(lead.seguimiento?.creadoEn ?? lead.seguimiento?.fechaCierre ?? lead.seguimiento?.creado_en);
-      if (fechaCierre) {
-        eventos.push({
-          fecha: fechaCierre.toISOString(),
-          tipo: 'cierre',
-          supervisorNombre,
-        });
-        if (lead.seguimiento?.idProducto === ID_PRODUCTO_TERRENO) {
-          eventos.push({
-            fecha: fechaCierre.toISOString(),
-            tipo: 'terreno',
-            supervisorNombre,
-          });
-        } else if (lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ) {
-          eventos.push({
-            fecha: fechaCierre.toISOString(),
-            tipo: 'pij',
-            supervisorNombre,
-          });
-        }
-      }
     }
   }
 
@@ -188,6 +161,15 @@ export function buildAdminChartEvents(leadsConSupervisor, historialRows = []) {
         entrevistasVistas.add(key);
         eventos.push({ fecha: fecha.toISOString(), tipo: 'entrevista', supervisorNombre: supNombre });
       }
+    }
+    if (filaIndicaCierre(row)) {
+      eventos.push({ fecha: fecha.toISOString(), tipo: 'cierre', supervisorNombre: supNombre });
+    }
+    if (esVentaTerreno(row)) {
+      eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno', supervisorNombre: supNombre });
+    }
+    if (esVentaPij(row)) {
+      eventos.push({ fecha: fecha.toISOString(), tipo: 'pij', supervisorNombre: supNombre });
     }
   }
 

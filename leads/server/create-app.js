@@ -67,6 +67,7 @@ function usuarioDesdeRequest(req) {
   const idVendedorHdr = String(req.headers['x-usuario-id-vendedor'] || '').trim();
   const idSupervisorHdr = String(req.headers['x-usuario-id-supervisor'] || '').trim();
   const idOperadorHdr = String(req.headers['x-usuario-id-operador'] || '').trim();
+  const sucursalHdr = String(req.headers['x-usuario-sucursal'] || '').trim();
   if (rol !== 'promotor' && rol !== 'supervisor' && rol !== 'superadmin') return null;
   if (!nombre || !id) return null;
   return {
@@ -80,6 +81,7 @@ function usuarioDesdeRequest(req) {
     idOperador: idOperadorHdr || id,
     idVendedor: idVendedorHdr || id,
     idSupervisor: idSupervisorHdr || undefined,
+    sucursal: sucursalHdr || undefined,
   };
 }
 
@@ -162,6 +164,7 @@ function registerApiRoutes(api) {
           idSupervisor: user.idSupervisor,
           idVendedor: user.idVendedor,
           rolOrigen: user.rolOrigen,
+          sucursal: user.sucursal,
         },
       });
     } catch (error) {

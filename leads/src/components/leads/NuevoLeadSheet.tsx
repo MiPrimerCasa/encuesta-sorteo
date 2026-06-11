@@ -99,9 +99,11 @@ export function NuevoLeadSheet({
     }
   }, [open, usuario]);
 
-  const direccionSucursalActiva = esSupervisor
-    ? direccionOficinas
-    : promotores.find((p) => p.id === promotorId)?.direccionSucursal || direccionOficinas;
+  const direccionSucursalActiva =
+    usuario?.sucursal?.trim() ||
+    (esSupervisor
+      ? direccionOficinas
+      : promotores.find((p) => p.id === promotorId)?.direccionSucursal || direccionOficinas);
 
   useEffect(() => {
     if (lugarEntrevista === 'sucursal' && direccionSucursalActiva?.trim()) {

@@ -261,6 +261,7 @@ export interface UsuarioSesion {
   idSupervisor?: string;
   idVendedor?: string;
   rolOrigen?: 'encuestas' | 'categoria' | 'env_superadmin';
+  sucursal?: string;
 }
 
 export interface PromotorMetricasAdmin {

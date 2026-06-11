@@ -161,6 +161,9 @@ export function mapOperadorRow(row) {
   const categoriaRaw = pickField(row, 'Categoria', 'categoria');
   const categoria = categoriaRaw != null ? String(categoriaRaw).trim() : null;
 
+  const sucursalRaw = pickField(row, 'sucursal', 'Sucursal');
+  const sucursal = sucursalRaw != null ? String(sucursalRaw).trim() : undefined;
+
   const idOpValido = parseIdEntero(idOperador);
   // SP: credenciales inválidas → idOperador=0 y resto vacío (misma fila para cualquier email malo).
   if (idOpValido == null && !loginId) return null;
@@ -188,6 +191,7 @@ export function mapOperadorRow(row) {
     idOperador: idOperador != null ? String(idOperador) : undefined,
     idSupervisor: idSupervisor != null ? String(idSupervisor) : undefined,
     idVendedor: idVendedor != null ? String(idVendedor) : undefined,
+    sucursal,
   };
 }
 

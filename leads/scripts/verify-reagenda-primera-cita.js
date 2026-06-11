@@ -59,11 +59,17 @@ function esCerradoNegativoLead(lead) {
 }
 
 function leadEnEntrevistaPendiente(lead) {
-  return lead.lista === 'entrevista' && !leadReagendaEntrevista(lead) && !leadCompro(lead);
+  return (
+    lead.lista === 'entrevista' &&
+    !leadReagendaEntrevista(lead) &&
+    !leadCompro(lead) &&
+    lead.seguimiento?.confirmoEntrevista !== true
+  );
 }
 
 function tabIdListaLead(lead) {
   if (leadCompro(lead)) return 'compro';
+  if (lead.seguimiento?.confirmoEntrevista === true) return 'seguimiento';
   if (esCerradoNegativoLead(lead)) return 'contacto';
   if (leadReagendaEntrevista(lead)) return 'seguimiento';
   if (lead.seguimiento?.resultadoEntrevista === 'derivar_terreno') return 'seguimiento';
@@ -77,7 +83,8 @@ function prioridadTabInicial(lead) {
     leadCompro(lead) ||
     leadReagendaEntrevista(lead) ||
     lead.seguimiento?.resultadoEntrevista === 'derivar_terreno' ||
-    esCerradoNegativoLead(lead)
+    esCerradoNegativoLead(lead) ||
+    lead.seguimiento?.confirmoEntrevista === true
   ) {
     return null;
   }
@@ -184,7 +191,7 @@ const sinInteres = {
     seguimientoAgendaOperadorRol: null,
   },
 };
-assert(tabIdListaLead(sinInteres) === 'contacto', 'sin interés → pestaña contacto');
+assert(tabIdListaLead(sinInteres) === 'seguimiento', 'sin interés + confirmada → pestaña seguimiento');
 
 console.log('\n8. Solo lectura cruzada por rol que agendó');
 function soloLecturaSupervisor(lead) {

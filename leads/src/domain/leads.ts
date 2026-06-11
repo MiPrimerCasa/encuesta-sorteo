@@ -169,9 +169,13 @@ export function leadEsInteresTerreno(lead: Lead) {
   return !leadCompro(lead) && !leadReagendaEntrevista(lead) && !esCerradoNegativoLead(lead);
 }
 
-/** En seguimiento: reagenda o derivación a terreno (supervisor toma el caso). */
+/** En seguimiento: reagenda, derivación a terreno o entrevista confirmada. */
 export function leadEnSeguimientoActivo(lead: Lead) {
-  return leadReagendaEntrevista(lead) || leadDerivaSupervisorTerreno(lead);
+  return (
+    leadReagendaEntrevista(lead) ||
+    leadDerivaSupervisorTerreno(lead) ||
+    lead.seguimiento?.confirmoEntrevista === true
+  );
 }
 
 /** Fecha de referencia para ordenar la bandeja En seguimiento. */
@@ -183,6 +187,12 @@ export function fechaSeguimientoLead(lead: Lead): string {
     const h =
       lead.seguimiento?.horarioEntrevistaPropuesto?.trim() ||
       lead.horarioEntrevista?.trim();
+    if (h) return h;
+  }
+  if (lead.seguimiento?.confirmoEntrevista === true) {
+    const h =
+      lead.horarioEntrevista?.trim() ||
+      lead.seguimiento?.horarioEntrevistaPropuesto?.trim();
     if (h) return h;
   }
   return lead.fechaAlta ?? `${lead.fechaObtencion}T00:00:00`;
@@ -279,9 +289,9 @@ export function sortLeadsContactadosPromotor(
 /** Pestaña de Leads donde corresponde listar el lead. */
 export function tabIdListaLead(lead: Lead): 'entrevista' | 'contacto' | 'seguimiento' | 'compro' {
   if (leadCompro(lead)) return 'compro';
+  if (leadEnSeguimientoActivo(lead)) return 'seguimiento';
   // Resultados negativos (no compró / sin interés) → Contactado.
   if (esCerradoNegativoLead(lead)) return 'contacto';
-  if (leadEnSeguimientoActivo(lead)) return 'seguimiento';
   // Entrevistas pendientes van a Prioridad, no a Contactado.
   if (leadEnEntrevistaPendiente(lead)) return 'entrevista';
   if (lead.seguimiento?.canal != null || lead.seguimiento?.huboEntrevista != null) return 'contacto';
@@ -362,7 +372,12 @@ export function getLugarEntrevistaLead(lead: Lead): LugarEntrevista | null {
 }
 
 export function leadEnEntrevistaPendiente(lead: Lead) {
-  return lead.lista === 'entrevista' && !leadReagendaEntrevista(lead) && !leadCompro(lead);
+  return (
+    lead.lista === 'entrevista' &&
+    !leadReagendaEntrevista(lead) &&
+    !leadCompro(lead) &&
+    lead.seguimiento?.confirmoEntrevista !== true
+  );
 }
 
 export function getPromotorNombre(

@@ -30,7 +30,8 @@ export function leadActivoNoCerrado(lead: Lead) {
     !leadCompro(lead) &&
     !leadReagendaEntrevista(lead) &&
     !leadDerivaSupervisorTerreno(lead) &&
-    !esCerradoNegativoLead(lead)
+    !esCerradoNegativoLead(lead) &&
+    lead.seguimiento?.confirmoEntrevista !== true
   );
 }
 

@@ -21,6 +21,7 @@ const PESTANA_LABEL = {
 export function pestanaDesdeSeguimiento(seguimiento, lead = {}) {
   const r = seguimiento?.resultadoEntrevista;
   if (r === 'compro') return 'compro';
+  if (seguimiento?.confirmoEntrevista === true) return 'seguimiento';
   if (r === 'no_compro' || r === 'sin_interes') return 'contacto';
   if (r === 'reagenda' || r === 'derivar_terreno') return 'seguimiento';
   const lista = lead.lista;

@@ -542,7 +542,11 @@ export function LeadsPanel({
         onClose={cerrarModal}
         onSave={async (leadId, seg) => {
           await guardarSeguimientoLead(leadId, seg);
-          if (seg.resultadoEntrevista === 'reagenda') {
+          if (seg.resultadoEntrevista === 'compro') {
+            setTabActivo('compro');
+          } else if (seg.confirmoEntrevista === true) {
+            setTabActivo('seguimiento');
+          } else if (seg.resultadoEntrevista === 'reagenda') {
             setTabActivo('seguimiento');
           } else if (seg.resultadoEntrevista === 'sin_interes') {
             setTabActivo('contacto');

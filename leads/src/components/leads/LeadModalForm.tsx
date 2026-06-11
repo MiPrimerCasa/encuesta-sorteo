@@ -549,37 +549,23 @@ export function LeadModalForm({
     const seguimiento: SeguimientoLead = {
       fuente: lead.seguimiento?.fuente,
       confirmoEntrevista: entrevistaMomentoSinCitaGuardar
-        ? rol === 'supervisor'
-          ? true
-          : null
-        : esFlujoCampo
-          ? null
-          : form.confirmoEntrevista,
-      canal: entrevistaMomentoSinCitaGuardar || !esFlujoCampo ? form.canal : null,
+        ? true
+        : form.confirmoEntrevista,
+      canal: (entrevistaMomentoSinCitaGuardar || form.canal) ? form.canal : null,
       huboEntrevista: entrevistaMomentoSinCitaGuardar
         ? true
-        : esFlujoCampo
-          ? esReagendaPij
-            ? true
-            : esReagenda
-              ? false
-              : form.huboEntrevista
-          : confirmoNo
-              ? false
-              : esReagenda
-                ? false
-                : form.huboEntrevista,
-      resultadoEntrevista: esFlujoCampo
-        ? esReagenda
+        : esReagendaPij
+          ? true
+          : (confirmoNo || esReagenda)
+            ? false
+            : form.huboEntrevista,
+      resultadoEntrevista: confirmoNo
+        ? esReagendaNoConfirmo
           ? 'reagenda'
           : form.resultadoEntrevista
-        : confirmoNo
-            ? esReagendaNoConfirmo
-              ? 'reagenda'
-              : form.resultadoEntrevista
-            : esReagenda
-              ? 'reagenda'
-              : form.resultadoEntrevista,
+        : esReagenda
+          ? 'reagenda'
+          : form.resultadoEntrevista,
       fechaReagenda: esReagenda ? form.fechaReagenda || null : null,
       fechaCierre:
         form.resultadoEntrevista === 'compro'
@@ -627,15 +613,13 @@ export function LeadModalForm({
       : esCanalEnPersona
         ? 5
         : 4
-    : esFlujoCampo
-      ? 4
-      : 5;
+    : 5;
   const tituloObservaciones = esFlujoCampo ? 'Observaciones del promotor' : 'Observaciones';
   const placeholderObservaciones = esFlujoCampo
     ? 'Notas de la visita, entrevista o cierre…'
     : 'Notas del supervisor…';
-  const confirmoSi = !esFlujoCampo && !flujoSinCita && form.confirmoEntrevista === true;
-  const confirmoNo = !esFlujoCampo && !flujoSinCita && form.confirmoEntrevista === false;
+  const confirmoSi = !flujoSinCita && form.confirmoEntrevista === true;
+  const confirmoNo = !flujoSinCita && form.confirmoEntrevista === false;
 
   const showContactoSinCita = flujoSinCita;
   const showCanalSinCita = flujoSinCita && form.seContactoCliente === true;
@@ -928,8 +912,8 @@ export function LeadModalForm({
               </p>
             )}
 
-            {/* Supervisor con cita previa: confirmación de entrevista agendada */}
-            {!esFlujoCampo && !flujoSinCita && (
+            {/* Con cita previa: confirmación de entrevista agendada */}
+            {!flujoSinCita && (
               <FormSection title="¿Confirmó entrevista?" step={1} totalSteps={totalPasos}>
                 <ButtonGroup
                   name="confirmoEntrevista"
@@ -975,7 +959,7 @@ export function LeadModalForm({
             {showHuboEntrevista && (
               <FormSection
                 title={esFlujoCampo ? 'Visita en calle' : 'Entrevista'}
-                step={esFlujoCampo ? 1 : showCitaExistente ? 4 : 3}
+                step={flujoSinCita ? 1 : showCitaExistente ? 4 : 3}
                 totalSteps={totalPasos}
               >
                 <ButtonGroup
@@ -997,7 +981,7 @@ export function LeadModalForm({
             )}
 
             {showSinEntrevistaResultado && (
-              <FormSection title="Resultado" step={esFlujoCampo ? 2 : undefined} totalSteps={totalPasos}>
+              <FormSection title="Resultado" step={flujoSinCita ? (esFlujoCampo ? 2 : undefined) : undefined} totalSteps={totalPasos}>
                 <RadioOption
                   name="sinEntrevista"
                   value="sin_interes"
@@ -1520,7 +1504,7 @@ export function LeadModalForm({
             {showReferidosObs && (
             <FormSection
               title="Referidos"
-              step={esFlujoCampo ? 3 : 4}
+              step={flujoSinCita ? (esFlujoCampo ? 3 : 4) : 4}
               totalSteps={totalPasos}
             >
               <ButtonGroup
@@ -1588,7 +1572,7 @@ export function LeadModalForm({
             {showReferidosObs && (
             <FormSection
               title={tituloObservaciones}
-              step={esFlujoCampo ? 4 : 5}
+              step={flujoSinCita ? (esFlujoCampo ? 4 : 5) : 5}
               totalSteps={totalPasos}
             >
               <textarea

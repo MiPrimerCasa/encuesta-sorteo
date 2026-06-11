@@ -531,7 +531,7 @@ export function LeadsPanel({
         barrios={barrios}
         soloLectura={
           leadSeleccionado != null &&
-          (leadSoloLecturaUltimoModificador(leadSeleccionado, usuario?.idOperador ?? usuario?.id) ||
+          (leadSoloLecturaUltimoModificador(leadSeleccionado, usuario?.idOperador ?? usuario?.id, rolUsuario) ||
             (esPromotor
               ? leadSoloLecturaPromotor(
                   leadSeleccionado,

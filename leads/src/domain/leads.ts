@@ -396,9 +396,17 @@ export function puedeVenderProducto(productos: Producto[], rol: RolUsuario, idPr
 export function leadSoloLecturaUltimoModificador(
   lead: Lead | null | undefined,
   currentUserId: string | number | undefined | null,
+  userRole?: string | null,
 ): boolean {
   if (!lead?.seguimiento?.operadorId) {
     // Si no tiene operadorId de seguimiento previo, cualquiera puede gestionarlo.
+    return false;
+  }
+  // Si está derivado a terreno por el promotor, el supervisor lo puede tratar sin importar quién lo modificó último
+  if (
+    lead.seguimiento?.resultadoEntrevista === 'derivar_terreno' &&
+    (userRole === 'supervisor' || userRole === 'superadmin')
+  ) {
     return false;
   }
   if (!currentUserId) return false;

@@ -212,6 +212,13 @@ export function mapSqlRowToSeguimiento(row) {
     operadorRol: row.operador_rol ?? row.operadorRol ?? base.operadorRol ?? null,
     operadorNombre:
       row.operador_nombre ?? row.operadorNombre ?? base.operadorNombre ?? null,
+    creadoEn:
+      row.creado_en ??
+      row.creadoEn ??
+      row.fechaAlta ??
+      row.fecha_alta ??
+      base.creadoEn ??
+      null,
   };
 }
 

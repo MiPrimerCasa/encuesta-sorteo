@@ -146,6 +146,32 @@ export function buildAdminChartEvents(leadsConSupervisor, historialRows = []) {
         supervisorNombre: item.supervisorNombre,
       });
     }
+
+    const { lead, supervisorNombre } = item;
+    const esCierre = lead.seguimiento?.resultadoEntrevista === 'compro';
+    if (esCierre) {
+      const fechaCierre = parseFecha(lead.seguimiento?.creadoEn ?? lead.seguimiento?.fechaCierre ?? lead.seguimiento?.creado_en);
+      if (fechaCierre) {
+        eventos.push({
+          fecha: fechaCierre.toISOString(),
+          tipo: 'cierre',
+          supervisorNombre,
+        });
+        if (lead.seguimiento?.idProducto === ID_PRODUCTO_TERRENO) {
+          eventos.push({
+            fecha: fechaCierre.toISOString(),
+            tipo: 'terreno',
+            supervisorNombre,
+          });
+        } else if (lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ) {
+          eventos.push({
+            fecha: fechaCierre.toISOString(),
+            tipo: 'pij',
+            supervisorNombre,
+          });
+        }
+      }
+    }
   }
 
   for (const row of historialRows) {
@@ -162,15 +188,6 @@ export function buildAdminChartEvents(leadsConSupervisor, historialRows = []) {
         entrevistasVistas.add(key);
         eventos.push({ fecha: fecha.toISOString(), tipo: 'entrevista', supervisorNombre: supNombre });
       }
-    }
-    if (filaIndicaCierre(row)) {
-      eventos.push({ fecha: fecha.toISOString(), tipo: 'cierre', supervisorNombre: supNombre });
-    }
-    if (esVentaTerreno(row)) {
-      eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno', supervisorNombre: supNombre });
-    }
-    if (esVentaPij(row)) {
-      eventos.push({ fecha: fecha.toISOString(), tipo: 'pij', supervisorNombre: supNombre });
     }
   }
 
@@ -233,12 +250,38 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
     if (alta && enRango(alta, desde, hasta)) {
       bucket.leadsSemana += 1;
     }
+
+    // Calcular cierres y ventas directo del estado actual (ultimo seguimiento)
+    const esCierre = lead.seguimiento?.resultadoEntrevista === 'compro';
+    if (esCierre) {
+      const fechaCierre = parseFecha(lead.seguimiento?.creadoEn ?? lead.seguimiento?.fechaCierre ?? lead.seguimiento?.creado_en);
+      if (fechaCierre) {
+        const cierreEnSemana = enRango(fechaCierre, desde, hasta);
+        const cierreEsHoy = esMismoDia(fechaCierre, hoy);
+
+        if (cierreEnSemana) {
+          bucket.cierresSemana += 1;
+          if (lead.seguimiento?.idProducto === ID_PRODUCTO_TERRENO) {
+            bucket.ventasTerrenoSemana += 1;
+          } else if (lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ) {
+            bucket.ventasPijSemana += 1;
+          }
+        }
+
+        if (cierreEsHoy) {
+          bucket.cierresHoy += 1;
+          if (lead.seguimiento?.idProducto === ID_PRODUCTO_TERRENO) {
+            bucket.ventasTerrenoHoy += 1;
+          } else if (lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ) {
+            bucket.ventasPijHoy += 1;
+          }
+        }
+      }
+    }
   }
 
   const entrevistasPorLeadSemana = new Set();
   const entrevistasPorLeadHoy = new Set();
-  const cierresPorLeadSemana = new Set();
-  const cierresPorLeadHoy = new Set();
 
   for (const row of historialRows) {
     const leadId = String(row.lead_id ?? row.leadId ?? '');
@@ -268,25 +311,6 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
       if (esHoy && !entrevistasPorLeadHoy.has(leadId)) {
         entrevistasPorLeadHoy.add(leadId);
         bucket.entrevistasHoy += 1;
-      }
-    }
-
-    if (filaIndicaCierre(row)) {
-      if (enSemana && !cierresPorLeadSemana.has(leadId)) {
-        cierresPorLeadSemana.add(leadId);
-        bucket.cierresSemana += 1;
-      }
-      if (esHoy && !cierresPorLeadHoy.has(leadId)) {
-        cierresPorLeadHoy.add(leadId);
-        bucket.cierresHoy += 1;
-      }
-      if (esVentaTerreno(row)) {
-        if (enSemana) bucket.ventasTerrenoSemana += 1;
-        if (esHoy) bucket.ventasTerrenoHoy += 1;
-      }
-      if (esVentaPij(row)) {
-        if (enSemana) bucket.ventasPijSemana += 1;
-        if (esHoy) bucket.ventasPijHoy += 1;
       }
     }
   }

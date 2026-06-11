@@ -165,6 +165,8 @@ export interface SeguimientoLead {
   /** Rol del operador que registró este estado (última fila SQL). */
   operadorRol?: RolUsuario | null;
   operadorNombre?: string | null;
+  /** Timestamp de creación del seguimiento en la base de datos. */
+  creadoEn?: string | null;
 }
 
 export interface Lead {

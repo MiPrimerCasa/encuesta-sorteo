@@ -21,7 +21,7 @@ export function ButtonGroup<T>({ label, options, value, onChange, name }: Button
       )}
       <div
         className="grid gap-2"
-        style={{ gridTemplateColumns: `repeat(${Math.min(options.length, 2)}, 1fr)` }}
+        style={{ gridTemplateColumns: `repeat(${options.length}, 1fr)` }}
       >
         {options.map((opt) => {
           const selected = value === opt.value;

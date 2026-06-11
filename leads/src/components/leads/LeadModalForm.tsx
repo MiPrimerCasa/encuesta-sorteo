@@ -33,6 +33,7 @@ import {
 } from '../../domain/venta';
 import type {
   Barrio,
+  CanalContacto,
   Lead,
   Producto,
   Referido,
@@ -68,6 +69,17 @@ interface FormState {
   /** Promotor — derivar terreno: ¿el cliente propuso fecha? */
   proponeFechaDerivacion: boolean | null;
   horarioDerivacion: string;
+  /** Sin cita + canal en persona + entrevista en el momento + no compró. */
+  reagendaTrasNoComproEnPersona: boolean | null;
+}
+
+const OPCIONES_CANAL_BASE: { value: CanalContacto; label: string }[] = [
+  { value: 'llamada', label: 'Llamada' },
+  { value: 'mensaje', label: 'Mensaje' },
+];
+
+function opcionesCanalContacto(): { value: CanalContacto; label: string }[] {
+  return [...OPCIONES_CANAL_BASE, { value: 'en_persona', label: 'En persona' }];
 }
 
 function buildInitialForm(lead: Lead | null): FormState {
@@ -90,9 +102,16 @@ function buildInitialForm(lead: Lead | null): FormState {
     s.huboEntrevista != null ||
     s.resultadoEntrevista != null;
   let agendoEntrevista: boolean | null = null;
+  let reagendaTrasNoComproEnPersona: boolean | null = null;
   if (sinCita && contactoHecho) {
-    if (reagenda && !seguimientoPij) agendoEntrevista = true;
-    else if (s.resultadoEntrevista === 'sin_interes') agendoEntrevista = false;
+    if (reagenda && !seguimientoPij && s.huboEntrevista !== true) agendoEntrevista = true;
+    else if (s.resultadoEntrevista === 'sin_interes' && s.huboEntrevista !== true) {
+      agendoEntrevista = false;
+    } else if (s.canal === 'en_persona' && s.huboEntrevista === true) {
+      agendoEntrevista = false;
+      if (s.resultadoEntrevista === 'reagenda') reagendaTrasNoComproEnPersona = true;
+      else if (s.resultadoEntrevista === 'sin_interes') reagendaTrasNoComproEnPersona = false;
+    }
   }
 
   return {
@@ -120,6 +139,7 @@ function buildInitialForm(lead: Lead | null): FormState {
     observaciones: s.observaciones ?? '',
     proponeFechaDerivacion: derivar ? (horarioDeriv ? true : false) : null,
     horarioDerivacion: horarioDeriv,
+    reagendaTrasNoComproEnPersona,
   };
 }
 
@@ -220,7 +240,20 @@ export function LeadModalForm({
 
   const patch = (partial: Partial<FormState>) => setForm((f) => ({ ...f, ...partial }));
 
-  const handleCanal = (canal: NonNullable<SeguimientoLead['canal']>) => patch({ canal });
+  const handleCanal = (canal: NonNullable<SeguimientoLead['canal']>) =>
+    patch({
+      canal,
+      agendoEntrevista: null,
+      huboEntrevista: null,
+      resultadoEntrevista: null,
+      reagendarEntrevista: false,
+      fechaReagenda: '',
+      reagendaPijTrasNoCompro: null,
+      reagendaTrasNoComproEnPersona: null,
+      proponeFechaDerivacion: null,
+      horarioDerivacion: '',
+      ...resetCamposVenta(),
+    });
 
   const handleSeContactoCliente = (contacto: boolean) => {
     if (contacto) {
@@ -233,6 +266,7 @@ export function LeadModalForm({
         resultadoEntrevista: null,
         reagendarEntrevista: false,
         fechaReagenda: '',
+        reagendaTrasNoComproEnPersona: null,
         ...resetCamposVenta(),
       });
     } else {
@@ -245,6 +279,7 @@ export function LeadModalForm({
         resultadoEntrevista: null,
         reagendarEntrevista: false,
         fechaReagenda: '',
+        reagendaTrasNoComproEnPersona: null,
         ...resetCamposVenta(),
       });
     }
@@ -252,7 +287,25 @@ export function LeadModalForm({
 
   const handleAgendoEntrevista = (agendo: boolean) => {
     if (agendo) {
-      patch({ agendoEntrevista: true, ...activarReagenda() });
+      patch({
+        agendoEntrevista: true,
+        huboEntrevista: null,
+        reagendaTrasNoComproEnPersona: null,
+        ...activarReagenda(),
+      });
+    } else if (form.canal === 'en_persona') {
+      patch({
+        agendoEntrevista: false,
+        huboEntrevista: null,
+        resultadoEntrevista: null,
+        reagendarEntrevista: false,
+        fechaReagenda: '',
+        reagendaPijTrasNoCompro: null,
+        reagendaTrasNoComproEnPersona: null,
+        proponeFechaDerivacion: null,
+        horarioDerivacion: '',
+        ...resetCamposVenta(),
+      });
     } else {
       patch({
         agendoEntrevista: false,
@@ -260,6 +313,34 @@ export function LeadModalForm({
         reagendarEntrevista: false,
         fechaReagenda: '',
         huboEntrevista: false,
+        reagendaTrasNoComproEnPersona: null,
+        ...resetCamposVenta(),
+      });
+    }
+  };
+
+  const handleAgendoNoEnPersona = (opcion: 'sin_interes' | 'entrevista_momento') => {
+    if (opcion === 'sin_interes') {
+      patch({
+        agendoEntrevista: false,
+        huboEntrevista: false,
+        resultadoEntrevista: 'sin_interes',
+        reagendarEntrevista: false,
+        fechaReagenda: '',
+        reagendaTrasNoComproEnPersona: null,
+        ...resetCamposVenta(),
+      });
+    } else {
+      patch({
+        agendoEntrevista: false,
+        huboEntrevista: true,
+        resultadoEntrevista: null,
+        reagendarEntrevista: false,
+        fechaReagenda: '',
+        reagendaPijTrasNoCompro: null,
+        reagendaTrasNoComproEnPersona: null,
+        proponeFechaDerivacion: null,
+        horarioDerivacion: '',
         ...resetCamposVenta(),
       });
     }
@@ -335,12 +416,24 @@ export function LeadModalForm({
     e.preventDefault();
 
     const flujoSinCitaGuardar = !leadTieneCitaPrevia(lead);
+    const entrevistaMomentoSinCitaGuardar =
+      flujoSinCitaGuardar &&
+      form.canal === 'en_persona' &&
+      form.agendoEntrevista === false &&
+      form.huboEntrevista === true;
 
-    if (flujoSinCitaGuardar) {
+    if (flujoSinCitaGuardar && !entrevistaMomentoSinCitaGuardar) {
       if (form.seContactoCliente !== true) return;
       if (form.canal == null) return;
       if (form.agendoEntrevista == null) return;
       if (form.agendoEntrevista === true && !form.fechaReagenda.trim()) return;
+      if (
+        form.canal === 'en_persona' &&
+        form.agendoEntrevista === false &&
+        form.huboEntrevista == null
+      ) {
+        return;
+      }
 
       const esAgendo = form.agendoEntrevista === true;
       const seguimientoSinCita: SeguimientoLead = {
@@ -375,11 +468,24 @@ export function LeadModalForm({
     const esReagendaPijGuardar =
       esFlujoCampoGuardar &&
       form.resultadoEntrevista === 'no_compro' &&
-      form.reagendaPijTrasNoCompro === true;
+      form.reagendaPijTrasNoCompro === true &&
+      !entrevistaMomentoSinCitaGuardar;
+    const esReagendaTrasNoComproEnPersonaGuardar =
+      entrevistaMomentoSinCitaGuardar &&
+      form.resultadoEntrevista === 'no_compro' &&
+      form.reagendaTrasNoComproEnPersona === true;
+    if (
+      entrevistaMomentoSinCitaGuardar &&
+      form.resultadoEntrevista === 'no_compro' &&
+      form.reagendaTrasNoComproEnPersona == null
+    ) {
+      return;
+    }
     const esReagenda =
       form.reagendarEntrevista ||
       form.resultadoEntrevista === 'reagenda' ||
-      esReagendaPijGuardar;
+      esReagendaPijGuardar ||
+      esReagendaTrasNoComproEnPersonaGuardar;
     if (esReagenda && !form.fechaReagenda) return;
 
     if (form.resultadoEntrevista === 'derivar_terreno') {
@@ -423,23 +529,32 @@ export function LeadModalForm({
     const esReagendaPij =
       esFlujoCampo &&
       form.resultadoEntrevista === 'no_compro' &&
-      form.reagendaPijTrasNoCompro === true;
+      form.reagendaPijTrasNoCompro === true &&
+      !entrevistaMomentoSinCitaGuardar;
 
     const seguimiento: SeguimientoLead = {
       fuente: lead.seguimiento?.fuente,
-      confirmoEntrevista: esFlujoCampo ? null : form.confirmoEntrevista,
-      canal: esFlujoCampo ? null : form.canal,
-      huboEntrevista: esFlujoCampo
-        ? esReagendaPij
+      confirmoEntrevista: entrevistaMomentoSinCitaGuardar
+        ? rol === 'supervisor'
           ? true
-          : esReagenda
-            ? false
-            : form.huboEntrevista
-        : confirmoNo
-            ? false
+          : null
+        : esFlujoCampo
+          ? null
+          : form.confirmoEntrevista,
+      canal: entrevistaMomentoSinCitaGuardar || !esFlujoCampo ? form.canal : null,
+      huboEntrevista: entrevistaMomentoSinCitaGuardar
+        ? true
+        : esFlujoCampo
+          ? esReagendaPij
+            ? true
             : esReagenda
               ? false
-              : form.huboEntrevista,
+              : form.huboEntrevista
+          : confirmoNo
+              ? false
+              : esReagenda
+                ? false
+                : form.huboEntrevista,
       resultadoEntrevista: esFlujoCampo
         ? esReagenda
           ? 'reagenda'
@@ -485,7 +600,18 @@ export function LeadModalForm({
   const esFlujoCampo = rol === 'promotor';
   const sinCitaPrevia = !leadTieneCitaPrevia(lead);
   const flujoSinCita = sinCitaPrevia;
-  const totalPasos = flujoSinCita ? 4 : esFlujoCampo ? 4 : 5;
+  const esCanalEnPersona = form.canal === 'en_persona';
+  const entrevistaEnElMomento =
+    flujoSinCita && esCanalEnPersona && form.agendoEntrevista === false && form.huboEntrevista === true;
+  const totalPasos = flujoSinCita
+    ? entrevistaEnElMomento
+      ? 7
+      : esCanalEnPersona
+        ? 5
+        : 4
+    : esFlujoCampo
+      ? 4
+      : 5;
   const tituloObservaciones = esFlujoCampo ? 'Observaciones del promotor' : 'Observaciones';
   const placeholderObservaciones = esFlujoCampo
     ? 'Notas de la visita, entrevista o cierre…'
@@ -498,7 +624,19 @@ export function LeadModalForm({
   const showAgendoPregunta =
     flujoSinCita && form.seContactoCliente === true && form.canal != null;
   const showAgendoCalendario = showAgendoPregunta && form.agendoEntrevista === true;
-  const showSinInteresSinCita = showAgendoPregunta && form.agendoEntrevista === false;
+  const showSinInteresSinCita =
+    showAgendoPregunta && form.agendoEntrevista === false && !esCanalEnPersona;
+  const showAgendoNoEnPersonaOpciones =
+    showAgendoPregunta &&
+    form.agendoEntrevista === false &&
+    esCanalEnPersona &&
+    form.huboEntrevista == null;
+  const showSinInteresSinCitaEnPersona =
+    showAgendoPregunta &&
+    form.agendoEntrevista === false &&
+    esCanalEnPersona &&
+    form.huboEntrevista === false &&
+    form.resultadoEntrevista === 'sin_interes';
 
   const showCanalSiConfirmo = confirmoSi;
   const horarioCitaLead = getHorarioEntrevistaLead(lead);
@@ -510,7 +648,8 @@ export function LeadModalForm({
   const showHuboEntrevista =
     (esFlujoCampo && !flujoSinCita) ||
     (confirmoSi && form.canal != null && !flujoSinCita);
-  const showEntrevistaDetalle = showHuboEntrevista && form.huboEntrevista === true;
+  const showEntrevistaDetalle =
+    (showHuboEntrevista && form.huboEntrevista === true) || entrevistaEnElMomento;
   const showSinEntrevistaResultado = showHuboEntrevista && form.huboEntrevista === false;
   const showReagendaSinEntrevistaCampo =
     esFlujoCampo &&
@@ -529,7 +668,11 @@ export function LeadModalForm({
 
   const showCompro = form.resultadoEntrevista === 'compro';
   const showReagendaPijTrasNoCompro =
-    esFlujoCampo && form.resultadoEntrevista === 'no_compro';
+    esFlujoCampo && form.resultadoEntrevista === 'no_compro' && !entrevistaEnElMomento;
+  const showReagendaTrasNoComproSinCita =
+    entrevistaEnElMomento && form.resultadoEntrevista === 'no_compro';
+  const showFechaReagendaTrasNoComproSinCita =
+    showReagendaTrasNoComproSinCita && form.reagendaTrasNoComproEnPersona === true;
   const showFechaReagendaPij =
     showReagendaPijTrasNoCompro && form.reagendaPijTrasNoCompro === true;
   const showDerivarTerreno =
@@ -550,19 +693,43 @@ export function LeadModalForm({
             (form.reagendaPijTrasNoCompro === false || Boolean(form.fechaReagenda.trim()))
           : form.resultadoEntrevista != null);
 
+  const flujoSinCitaEnPersonaEntrevistaCompleto =
+    entrevistaEnElMomento &&
+    form.resultadoEntrevista != null &&
+    (form.resultadoEntrevista === 'compro'
+      ? Boolean(form.idProducto && form.estadoPago) &&
+        (!esTerreno(form.idProducto) || Boolean(form.idBarrio)) &&
+        (!requiereNumeroRecibo(form.idProducto, form.estadoPago) ||
+          Boolean(form.numeroRecibo.trim()))
+      : form.resultadoEntrevista === 'no_compro'
+        ? form.reagendaTrasNoComproEnPersona !== null &&
+          (form.reagendaTrasNoComproEnPersona === false ||
+            Boolean(form.fechaReagenda.trim()))
+        : form.resultadoEntrevista === 'derivar_terreno'
+          ? form.proponeFechaDerivacion !== null &&
+            (form.proponeFechaDerivacion === false ||
+              Boolean(form.horarioDerivacion.trim()))
+          : true);
+
   const flujoSinCitaCompleto =
     flujoSinCita &&
     form.seContactoCliente === true &&
     form.canal != null &&
     form.agendoEntrevista !== null &&
-    (form.agendoEntrevista === false || Boolean(form.fechaReagenda.trim()));
+    ((form.agendoEntrevista === true && Boolean(form.fechaReagenda.trim())) ||
+      (form.agendoEntrevista === false &&
+        !esCanalEnPersona &&
+        form.resultadoEntrevista === 'sin_interes') ||
+      showSinInteresSinCitaEnPersona ||
+      flujoSinCitaEnPersonaEntrevistaCompleto);
 
   const flujoReagendaConFecha =
     Boolean(form.fechaReagenda.trim()) &&
     (showAgendoCalendario ||
       showReagendaNoConfirmo ||
       showReagendaSinEntrevistaCampo ||
-      showFechaReagendaPij);
+      showFechaReagendaPij ||
+      showFechaReagendaTrasNoComproSinCita);
 
   const showReferidosObs =
     flujoCampoCompleto ||
@@ -672,10 +839,7 @@ export function LeadModalForm({
               <FormSection title="Canal de contacto" step={2} totalSteps={totalPasos}>
                 <ButtonGroup
                   name="canalSinCita"
-                  options={[
-                    { value: 'llamada', label: 'Llamada' },
-                    { value: 'mensaje', label: 'Mensaje' },
-                  ]}
+                  options={opcionesCanalContacto()}
                   value={form.canal}
                   onChange={handleCanal}
                 />
@@ -709,9 +873,35 @@ export function LeadModalForm({
               </FormSection>
             )}
 
+            {showAgendoNoEnPersonaOpciones && (
+              <FormSection title="¿Qué pasó?" step={4} totalSteps={totalPasos}>
+                <RadioOption
+                  name="agendoNoEnPersona"
+                  value="sin_interes"
+                  label="No muestra interés"
+                  checked={form.resultadoEntrevista === 'sin_interes'}
+                  onChange={() => handleAgendoNoEnPersona('sin_interes')}
+                />
+                <RadioOption
+                  name="agendoNoEnPersona"
+                  value="entrevista_momento"
+                  label="La entrevista fue en el momento"
+                  checked={form.huboEntrevista === true}
+                  onChange={() => handleAgendoNoEnPersona('entrevista_momento')}
+                />
+              </FormSection>
+            )}
+
             {showSinInteresSinCita && (
               <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-[13px] text-zinc-700">
                 El cliente <span className="font-medium">no estaba interesado</span>. Al guardar pasa
+                a Contactado.
+              </p>
+            )}
+
+            {showSinInteresSinCitaEnPersona && (
+              <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-[13px] text-zinc-700">
+                El cliente <span className="font-medium">no muestra interés</span>. Al guardar pasa
                 a Contactado.
               </p>
             )}
@@ -735,10 +925,7 @@ export function LeadModalForm({
               <FormSection title="Canal de contacto" step={2} totalSteps={totalPasos}>
                 <ButtonGroup
                   name="canal"
-                  options={[
-                    { value: 'llamada', label: 'Llamada' },
-                    { value: 'mensaje', label: 'Mensaje' },
-                  ]}
+                  options={opcionesCanalContacto()}
                   value={form.canal}
                   onChange={handleCanal}
                 />
@@ -826,7 +1013,9 @@ export function LeadModalForm({
             {showEntrevistaDetalle && (
               <FormSection
                 title="Resultado de la entrevista"
-                step={esFlujoCampo ? 2 : 4}
+                step={
+                  entrevistaEnElMomento ? 5 : esFlujoCampo ? 2 : 4
+                }
                 totalSteps={totalPasos}
               >
                 <div className="mt-2 space-y-2">
@@ -839,6 +1028,7 @@ export function LeadModalForm({
                       patch({
                         resultadoEntrevista: 'no_compro',
                         reagendaPijTrasNoCompro: null,
+                        reagendaTrasNoComproEnPersona: null,
                         reagendarEntrevista: false,
                         fechaReagenda: '',
                         proponeFechaDerivacion: null,
@@ -847,6 +1037,39 @@ export function LeadModalForm({
                       })
                     }
                   />
+                  {showReagendaTrasNoComproSinCita && (
+                    <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50 p-4">
+                      <ButtonGroup
+                        name="reagendaTrasNoComproEnPersona"
+                        label="¿Qué hacemos ahora?"
+                        options={[
+                          { value: true, label: 'Reagendar' },
+                          { value: false, label: 'No muestra interés' },
+                        ]}
+                        value={form.reagendaTrasNoComproEnPersona}
+                        onChange={(v) =>
+                          patch({
+                            reagendaTrasNoComproEnPersona: v,
+                            reagendarEntrevista: v,
+                            resultadoEntrevista: v ? 'reagenda' : 'sin_interes',
+                            fechaReagenda: v ? form.fechaReagenda : '',
+                          })
+                        }
+                      />
+                      {showFechaReagendaTrasNoComproSinCita && (
+                        <CampoFechaReagenda
+                          value={form.fechaReagenda}
+                          onChange={(v) => patchFechaReagenda(v, patch)}
+                        />
+                      )}
+                      {showFechaReagendaTrasNoComproSinCita && (
+                        <p className="text-[12px] leading-relaxed text-brand-800">
+                          Al guardar, el lead pasa a{' '}
+                          <span className="font-semibold">En seguimiento</span> con la nueva fecha.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {showReagendaPijTrasNoCompro && (
                     <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50 p-4">
                       <ButtonGroup
@@ -1213,10 +1436,7 @@ export function LeadModalForm({
               <FormSection title="Canal de contacto" step={3} totalSteps={totalPasos}>
                 <ButtonGroup
                   name="canalNoConfirmo"
-                  options={[
-                    { value: 'llamada', label: 'Llamada' },
-                    { value: 'mensaje', label: 'Mensaje' },
-                  ]}
+                  options={opcionesCanalContacto()}
                   value={form.canal}
                   onChange={handleCanal}
                 />
@@ -1225,7 +1445,8 @@ export function LeadModalForm({
 
             {(showReagendaNoConfirmo && form.canal) ||
             (showReagendaSinEntrevistaCampo && form.fechaReagenda) ||
-            (showAgendoCalendario && form.fechaReagenda) ? (
+            (showAgendoCalendario && form.fechaReagenda) ||
+            (showFechaReagendaTrasNoComproSinCita && form.fechaReagenda) ? (
               <p className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-[13px] text-brand-700">
                 Al guardar, el lead pasa a{' '}
                 <span className="font-medium">En seguimiento</span> con la nueva fecha.

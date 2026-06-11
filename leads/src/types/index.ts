@@ -5,7 +5,7 @@ export type ListaLead = 'entrevista' | 'contacto';
 export type LugarEntrevista = 'sucursal' | 'domicilio';
 export type OrigenLead = 'encuesta' | 'sorteo' | 'manual' | 'redes';
 export type FuenteLead = 'qr' | 'app' | 'facebook' | 'instagram' | 'whatsapp' | 'tiktok';
-export type CanalContacto = 'llamada' | 'mensaje';
+export type CanalContacto = 'llamada' | 'mensaje' | 'en_persona';
 export type ResultadoEntrevista =
   | 'sin_interes'
   | 'reagenda'

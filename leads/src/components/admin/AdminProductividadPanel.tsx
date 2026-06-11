@@ -257,7 +257,8 @@ export function AdminProductividadPanel({ data }: AdminProductividadPanelProps) 
                       contentStyle={{ borderRadius: 8, border: '1px solid #E4E4E7', fontSize: 13 }}
                       formatter={(value, name) => {
                         if (name === 'tasaCierrePct') return [fmtPct(value as number), 'Tasa cierre'];
-                        return [value, name === 'leads' ? 'Leads' : 'Cierres'];
+                        const displayName = String(name).toLowerCase() === 'leads' ? 'Leads' : 'Cierres';
+                        return [value, displayName];
                       }}
                     />
                     <Legend wrapperStyle={{ fontSize: 11 }} iconSize={8} />

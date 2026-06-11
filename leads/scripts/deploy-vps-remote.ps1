@@ -34,7 +34,7 @@ if (Test-Path $sshKey) {
   $sshArgs += @('-i', $sshKey)
 }
 
-$remoteScript = $remoteScript -replace "`r`n", "`n" -replace "`r", "`n"
+$remoteScript = ($remoteScript -replace "^\uFEFF", "").Trim() -replace "`r`n", "`n" -replace "`r", "`n"
 
 Write-Host "Conectando a ${VpsUser}@${VpsHost} (clave: $sshKey) ..."
 $remoteScript | ssh @sshArgs "${VpsUser}@${VpsHost}" "bash -s"

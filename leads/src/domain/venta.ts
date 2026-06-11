@@ -90,19 +90,19 @@ export function tituloEstadoCompra(_rol?: RolUsuario) {
   return 'Estado de compra';
 }
 
-/** Supervisor: recibo; promotor: comprobante (mismo campo `numeroRecibo` en API). */
-export function etiquetaNumeroDocumentoVenta(rol: RolUsuario): string {
-  return rol === 'supervisor' ? 'Número de recibo' : 'Número de comprobante';
+/** Plan Inversión Joven: anexo; Terreno: recibo (mismo campo `numeroRecibo` en API). */
+export function etiquetaNumeroDocumentoVenta(idProducto: string | null | undefined): string {
+  return esPlanInversion(idProducto) ? 'Número de anexo' : 'Número de recibo';
 }
 
-export function etiquetaCortaNumeroDocumentoVenta(rol: RolUsuario): string {
-  return rol === 'supervisor' ? 'Recibo' : 'Comprobante';
+export function etiquetaCortaNumeroDocumentoVenta(idProducto: string | null | undefined): string {
+  return esPlanInversion(idProducto) ? 'Anexo' : 'Recibo';
 }
 
-export function mensajeErrorNumeroDocumentoVenta(rol: RolUsuario): string {
-  return rol === 'supervisor'
-    ? 'Ingresá el número de recibo.'
-    : 'Ingresá el número de comprobante.';
+export function mensajeErrorNumeroDocumentoVenta(idProducto: string | null | undefined): string {
+  return esPlanInversion(idProducto)
+    ? 'Ingresá el número de anexo.'
+    : 'Ingresá el número de recibo.';
 }
 
 export function requiereNumeroRecibo(

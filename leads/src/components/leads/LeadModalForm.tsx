@@ -516,7 +516,7 @@ export function LeadModalForm({
         return;
       }
       if (requiereNumeroRecibo(form.idProducto, form.estadoPago) && !form.numeroRecibo.trim()) {
-        setErrorVenta(mensajeErrorNumeroDocumentoVenta(rol));
+        setErrorVenta(mensajeErrorNumeroDocumentoVenta(form.idProducto));
         return;
       }
     }
@@ -1226,7 +1226,7 @@ export function LeadModalForm({
                       {numeroReciboCierre.trim() && (
                         <div>
                           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                            {etiquetaCortaNumeroDocumentoVenta('supervisor')}
+                            {etiquetaCortaNumeroDocumentoVenta(idProductoCierre)}
                           </p>
                           <p className="mt-1 text-[15px] font-medium tabular-nums text-zinc-900">
                             {numeroReciboCierre}
@@ -1427,7 +1427,7 @@ export function LeadModalForm({
                       {muestraRecibo && (
                         <div className="space-y-1.5">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                            {etiquetaNumeroDocumentoVenta(rol)}
+                            {etiquetaNumeroDocumentoVenta(form.idProducto)}
                           </p>
                           <input
                             type="text"

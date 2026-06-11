@@ -272,7 +272,7 @@ export function LeadCard({
             {detallePago && <span className="ml-1 text-zinc-400">· {detallePago}</span>}
             {lead.seguimiento?.numeroRecibo && (
               <span className="ml-1 text-zinc-400">
-                · {etiquetaCortaNumeroDocumentoVenta(rolUsuario)}:{' '}
+                · {etiquetaCortaNumeroDocumentoVenta(lead.seguimiento?.idProducto)}:{' '}
                 {lead.seguimiento.numeroRecibo}
               </span>
             )}

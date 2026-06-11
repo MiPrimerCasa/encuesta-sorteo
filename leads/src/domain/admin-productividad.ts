@@ -64,15 +64,8 @@ function indexHistorial(rows: HistorialRow[]) {
   return map;
 }
 
-function leadCerro(lead: Lead, historial: HistorialRow[]): boolean {
-  if (lead.seguimiento?.resultadoEntrevista === 'compro') return true;
-  for (const row of historial) {
-    const r = row as Record<string, unknown>;
-    if (String(r.resultado_entrevista ?? r.resultadoEntrevista ?? '').trim() === 'compro') {
-      return true;
-    }
-  }
-  return false;
+function leadCerro(lead: Lead, _historial: HistorialRow[]): boolean {
+  return lead.seguimiento?.resultadoEntrevista === 'compro';
 }
 
 function leadTuvoEntrevista(lead: Lead, historial: HistorialRow[]): boolean {

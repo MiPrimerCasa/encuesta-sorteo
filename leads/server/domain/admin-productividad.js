@@ -53,13 +53,7 @@ function indexHistorial(rows) {
 }
 
 function leadCerro(lead, historial) {
-  if (lead.seguimiento?.resultadoEntrevista === 'compro') return true;
-  for (const row of historial) {
-    if (String(row.resultado_entrevista ?? row.resultadoEntrevista ?? '').trim() === 'compro') {
-      return true;
-    }
-  }
-  return false;
+  return lead.seguimiento?.resultadoEntrevista === 'compro';
 }
 
 function leadTuvoEntrevista(lead, historial) {

@@ -44,6 +44,12 @@ export function etiquetaEstadoSeguimiento(seguimiento, lead = {}) {
   const partes = [];
   const r = seguimiento?.resultadoEntrevista;
 
+  if (seguimiento?.confirmoEntrevista === false) {
+    partes.push(seguimiento.operadorRol === 'promotor' ? 'No contactó' : 'No confirmó entrevista');
+  } else if (seguimiento?.confirmoEntrevista === true) {
+    partes.push('Confirmó entrevista');
+  }
+
   if (r) {
     let texto = RESULTADO_LABEL[r] || r;
     if (r === 'reagenda' && seguimiento.seguimientoPijPromotor) {
@@ -57,11 +63,9 @@ export function etiquetaEstadoSeguimiento(seguimiento, lead = {}) {
   } else if (seguimiento?.canal) {
     const canalTexto = CANAL_LABEL[seguimiento.canal] || seguimiento.canal;
     partes.push(`Contacto por ${canalTexto}`);
-  } else if (seguimiento?.confirmoEntrevista === false) {
-    partes.push(seguimiento.operadorRol === 'promotor' ? 'No contactó' : 'No confirmó entrevista');
-  } else if (seguimiento?.confirmoEntrevista === true) {
-    partes.push('Confirmó entrevista');
-  } else {
+  }
+
+  if (partes.length === 0) {
     partes.push('Actualización');
   }
 

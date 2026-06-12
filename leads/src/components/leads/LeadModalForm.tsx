@@ -537,7 +537,7 @@ export function LeadModalForm({
     setErrorVenta('');
 
     const esFlujoCampo = rol === 'promotor';
-    const confirmoNo = !esFlujoCampo && form.confirmoEntrevista === false;
+    const confirmoNo = form.confirmoEntrevista === false;
     const esReagendaNoConfirmo =
       confirmoNo && (form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda');
     const esReagendaPij =

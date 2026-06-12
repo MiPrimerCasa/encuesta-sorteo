@@ -15,6 +15,7 @@ import {
   leadSeguimientoPijPromotor,
   leadSoloLecturaPromotor,
   leadSoloLecturaSupervisor,
+  esCerradoNegativoLead,
 } from '../../domain/leads';
 import { prioridadTabInicial } from '../../domain/prioridad-leads';
 import { etiquetaCortaNumeroDocumentoVenta, etiquetaPagoProducto } from '../../domain/venta';
@@ -74,8 +75,19 @@ export function LeadCard({
     !esNoCompro && (variante === 'seguimiento' || (variante !== 'compro' && reagenda && !esArchivo));
   const esPostEntrevistaNegativo =
     !esArchivo && !esSeguimiento && !esNoCompro && leadPostEntrevistaSinCompra(lead);
+  const esNoConfirmoNegativo =
+    !esArchivo &&
+    !esSeguimiento &&
+    !esNoCompro &&
+    lead.seguimiento?.confirmoEntrevista === false &&
+    esCerradoNegativoLead(lead);
   const esContactado =
-    !esArchivo && !esSeguimiento && !esNoCompro && tieneSeguimiento && !esPostEntrevistaNegativo;
+    !esArchivo &&
+    !esSeguimiento &&
+    !esNoCompro &&
+    tieneSeguimiento &&
+    !esPostEntrevistaNegativo &&
+    !esNoConfirmoNegativo;
   const esNuevo =
     !esArchivo && !esSeguimiento && !esNoCompro && !tieneSeguimiento;
   const esInteresTerreno =
@@ -118,9 +130,9 @@ export function LeadCard({
             ? 'border-zinc-300 bg-zinc-200 active:bg-zinc-300 active:border-zinc-400 [&:not(:active)]:hover:border-zinc-400 [&:not(:active)]:hover:shadow-sm'
             : esSeguimiento
               ? 'border-brand-100 bg-brand-50 active:bg-brand-100 active:border-brand-300 [&:not(:active)]:hover:border-brand-200 [&:not(:active)]:hover:shadow-sm'
-              : esPostEntrevistaNegativo
-                ? 'border-orange-200 bg-orange-50 active:bg-orange-100 active:border-orange-300 [&:not(:active)]:hover:border-orange-300 [&:not(:active)]:hover:shadow-sm'
-                : esContactado
+               : (esPostEntrevistaNegativo || esNoConfirmoNegativo)
+                 ? 'border-orange-200 bg-orange-50 active:bg-orange-100 active:border-orange-300 [&:not(:active)]:hover:border-orange-300 [&:not(:active)]:hover:shadow-sm'
+                 : esContactado
                   ? 'border-amber-200 bg-amber-50 active:bg-amber-100 active:border-amber-300 [&:not(:active)]:hover:border-amber-300 [&:not(:active)]:hover:shadow-sm'
                   : esNuevo
                   ? 'border-[#99F6E4] bg-[#F0FDFA] active:bg-[#CCFBF1] active:border-[#5EEAD4] [&:not(:active)]:hover:border-[#5EEAD4] [&:not(:active)]:hover:shadow-sm'
@@ -203,13 +215,17 @@ export function LeadCard({
             {esSeguimiento && !esArchivo && (
               <StatusPill variant="reagendado" dot>En seguimiento</StatusPill>
             )}
-            {esPostEntrevistaNegativo && (
-              <StatusPill variant="post-entrevista" dot>
-                {lead.seguimiento?.resultadoEntrevista === 'sin_interes'
-                  ? 'Sin interés'
-                  : 'No compró'}
-              </StatusPill>
-            )}
+             {(esPostEntrevistaNegativo || esNoConfirmoNegativo) && (
+               <StatusPill variant="post-entrevista" dot>
+                 {esNoConfirmoNegativo
+                   ? lead.seguimiento?.resultadoEntrevista === 'sin_interes'
+                     ? 'No confirmó — sin interés'
+                     : 'No confirmó — no compró'
+                   : lead.seguimiento?.resultadoEntrevista === 'sin_interes'
+                   ? 'Sin interés'
+                   : 'No compró'}
+               </StatusPill>
+             )}
             {esInteresTerreno && (
               <StatusPill variant="terreno" dot>Interés terreno</StatusPill>
             )}

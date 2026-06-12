@@ -127,6 +127,60 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
         </div>
       </section>
 
+      {/* Control de Anexos - Plan Inversión Joven */}
+      <section className="space-y-4">
+        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
+          Control de Anexos · Plan Inversión Joven
+        </h3>
+        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+          <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
+            <h4 className="text-[14px] font-semibold text-zinc-900">Historial de Anexos Cargados por Operador</h4>
+            <p className="text-[12px] text-zinc-500">
+              Hacé clic en un operador para ver los anexos que cargó en el sistema.
+            </p>
+          </div>
+          {(!data.pijCierresPorPersona || data.pijCierresPorPersona.length === 0) ? (
+            <p className="px-4 py-6 text-center text-[13px] text-zinc-500">
+              No hay cierres de Plan Inversión Joven registrados.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-zinc-100">
+                <thead>
+                  <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                    <th className="py-2.5 px-4 text-left font-semibold">Operador</th>
+                    <th className="py-2.5 px-4 text-right font-semibold">Anexos Cargados</th>
+                    <th className="py-2.5 px-4 text-center font-semibold">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {data.pijCierresPorPersona.map((person) => (
+                    <tr
+                      key={person.operadorNombre}
+                      onClick={() => setSelectedPerson(person)}
+                      className="cursor-pointer text-[13px] text-zinc-700 hover:bg-zinc-50 transition-colors"
+                    >
+                      <td className="py-3 px-4 font-medium text-zinc-900">{person.operadorNombre}</td>
+                      <td className="py-3 px-4 text-right font-semibold tabular-nums text-brand-700">
+                        {person.cantidad}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          type="button"
+                          className="text-[12px] font-medium text-brand-600 hover:text-brand-800 hover:underline"
+                        >
+                          Ver anexos
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
       {(data.eventos?.length ?? 0) > 0 && (
         <AdminMetricsChart
           eventos={data.eventos ?? []}
@@ -224,59 +278,6 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
         )}
       </section>
 
-      {/* Control de Anexos - Plan Inversión Joven */}
-      <section className="space-y-4">
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-          Control de Anexos · Plan Inversión Joven
-        </h3>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-          <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
-            <h4 className="text-[14px] font-semibold text-zinc-900">Historial de Anexos Cargados por Operador</h4>
-            <p className="text-[12px] text-zinc-500">
-              Hacé clic en un operador para ver los anexos que cargó en el sistema.
-            </p>
-          </div>
-          {(!data.pijCierresPorPersona || data.pijCierresPorPersona.length === 0) ? (
-            <p className="px-4 py-6 text-center text-[13px] text-zinc-500">
-              No hay cierres de Plan Inversión Joven registrados.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-zinc-100">
-                <thead>
-                  <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-                    <th className="py-2.5 px-4 text-left font-semibold">Operador</th>
-                    <th className="py-2.5 px-4 text-right font-semibold">Anexos Cargados</th>
-                    <th className="py-2.5 px-4 text-center font-semibold">Acción</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
-                  {data.pijCierresPorPersona.map((person) => (
-                    <tr
-                      key={person.operadorNombre}
-                      onClick={() => setSelectedPerson(person)}
-                      className="cursor-pointer text-[13px] text-zinc-700 hover:bg-zinc-50 transition-colors"
-                    >
-                      <td className="py-3 px-4 font-medium text-zinc-900">{person.operadorNombre}</td>
-                      <td className="py-3 px-4 text-right font-semibold tabular-nums text-brand-700">
-                        {person.cantidad}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
-                          className="text-[12px] font-medium text-brand-600 hover:text-brand-800 hover:underline"
-                        >
-                          Ver anexos
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
 
       {/* Modal de Detalle de Anexos */}
       {selectedPerson && (

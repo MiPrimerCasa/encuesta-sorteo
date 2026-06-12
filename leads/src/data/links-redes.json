@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-06-09",
+  "updatedAt": "2026-06-12",
   "source": "Planilla operadores (C:/CARRERA_LIC/SEGUIMIENTO_LEADS/data/planilla/operadores-codigos.csv)",
   "byCodigo": {
     "SORTEO01ROTATIVO": {
@@ -93,6 +93,13 @@
       "rol": "promotor",
       "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S06P01&type=phone_number&app_absent=0",
       "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S06P01&type=phone_number&app_absent=0"
+    },
+    "SORTEO01S06P02": {
+      "vendedor": "Sara FP",
+      "codigo": "SORTEO01S06P02",
+      "rol": "promotor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S06P02&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S06P02&type=phone_number&app_absent=0"
     },
     "SORTEO01S0700": {
       "vendedor": "Cecilia Fernandez",
@@ -213,6 +220,13 @@
       "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S21P01&type=phone_number&app_absent=0",
       "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S21P01&type=phone_number&app_absent=0"
     },
+    "SORTEO01S21P02": {
+      "vendedor": "Ortellado Jhonnatan",
+      "codigo": "SORTEO01S21P02",
+      "rol": "promotor",
+      "instagram": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_INSTAGRAM_y_PARTICIPE_GRATIS_del:_SORTEO01S21P02&type=phone_number&app_absent=0",
+      "facebook": "https://wa.me/5493705229067?text=Gracias_por_su_atencion!!.ENVIE_este_codigo_FACEBOOK_y_PARTICIPE_GRATIS_del:_SORTEO01S21P02&type=phone_number&app_absent=0"
+    },
     "SORTEO01S2200": {
       "vendedor": "Martiniano S",
       "codigo": "SORTEO01S2200",
@@ -316,6 +330,11 @@
       "vendedor": "PROMOTOR 06P01",
       "rol": "promotor"
     },
+    "sara fp": {
+      "codigo": "SORTEO01S06P02",
+      "vendedor": "Sara FP",
+      "rol": "promotor"
+    },
     "cecilia fernandez": {
       "codigo": "SORTEO01S0700",
       "vendedor": "Cecilia Fernandez",
@@ -404,6 +423,11 @@
     "leonel c": {
       "codigo": "SORTEO01S21P01",
       "vendedor": "Leonel C",
+      "rol": "promotor"
+    },
+    "ortellado jhonnatan": {
+      "codigo": "SORTEO01S21P02",
+      "vendedor": "Ortellado Jhonnatan",
       "rol": "promotor"
     },
     "martiniano s": {

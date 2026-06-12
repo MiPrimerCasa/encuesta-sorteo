@@ -39,14 +39,25 @@ try {
   console.log('Sesión SQL:', sesion.recordset[0]);
   console.log('');
 
+  console.log('--- 0) Obtener leads iniciales ---');
+  const leads = await listLeadsFromEncuestas(usuario);
+  const lead = leads[0];
+  if (lead) {
+    console.log('OK. Leads disponibles:', leads.length, `| Lead prueba: [${lead.id}] ${lead.nombre}`);
+  } else {
+    console.log('ADVERTENCIA: No se encontraron leads en la base de datos para el operador 132.');
+  }
+  console.log('');
+
   console.log('--- 1) SP lectura (SP_UltimoSeguimientoOperador) ---');
   try {
     const ult = await pool
       .request()
       .input('id_operador', sql.Int, 132)
       .execute('SP_UltimoSeguimientoOperador');
-    console.log('OK EXEC ultimos. Filas:', ult.recordset.length);
-    if (ult.recordset[0]) console.log('  muestra:', ult.recordset[0].lead_id, ult.recordset[0].resultado_entrevista);
+    const ultRows = ult.recordset ?? [];
+    console.log('OK EXEC ultimos. Filas:', ultRows.length);
+    if (ultRows[0]) console.log('  muestra:', ultRows[0].lead_id, ultRows[0].resultado_entrevista);
   } catch (e) {
     console.log('ERROR SP ultimos:', e.message);
     if (e.originalError?.message) console.log('  originalError:', e.originalError.message);
@@ -55,13 +66,15 @@ try {
 
   console.log('--- 2) SP historial (SP_HistorialSeguimientoLead) ---');
   try {
+    const testLeadId = lead ? parseInt(lead.id, 10) : 206;
     const hist = await pool
       .request()
-      .input('lead_id', sql.Int, 206)
+      .input('lead_id', sql.Int, testLeadId)
       .input('id_operador', sql.Int, 132)
       .input('lim', sql.Int, 5)
       .execute('SP_HistorialSeguimientoLead');
-    console.log('OK EXEC historial. Filas:', hist.recordset.length);
+    const histRows = hist.recordset ?? [];
+    console.log(`OK EXEC historial para lead ${testLeadId}. Filas:`, histRows.length);
   } catch (e) {
     console.log('ERROR SP historial:', e.message);
     if (e.originalError?.message) console.log('  originalError:', e.originalError.message);
@@ -69,8 +82,6 @@ try {
   console.log('');
 
   console.log('--- 3) Guardar vía updateLeadSeguimientoEncuesta (SP) ---');
-  const leads = await listLeadsFromEncuestas(usuario);
-  const lead = leads[0];
   if (!lead) {
     console.log('Sin leads para probar guardado.');
   } else {

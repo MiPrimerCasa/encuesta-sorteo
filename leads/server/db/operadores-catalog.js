@@ -101,7 +101,7 @@ function mergeCatalogIndexes(fromSp, fromJson) {
   return {
     ...fromSp,
     catalogSource: 'sql',
-    byCodigo: fromSp.byCodigo,
+    byCodigo: { ...fromJson.byCodigo, ...fromSp.byCodigo },
     byLoginId: { ...fromJson.byLoginId, ...fromSp.byLoginId },
     byIdOperador: { ...fromJson.byIdOperador, ...fromSp.byIdOperador },
     byNombre: { ...fromJson.byNombre, ...fromSp.byNombre },

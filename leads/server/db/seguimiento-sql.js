@@ -501,6 +501,17 @@ export async function batchLatestSeguimientoSql(
   const map = {};
 
   try {
+    if (idOperador == null) {
+      const globalRows = await queryUltimosGlobalRows();
+      if (globalRows != null) {
+        for (const row of globalRows) {
+          const key = String(row.lead_id ?? row.leadId);
+          if (idSet.has(key)) map[key] = mapSqlRowToSeguimiento(row);
+        }
+        return map;
+      }
+    }
+
     if (idOperador == null && idOperadoresExtra.length) {
       const ultimosRows = await fetchUltimosSeguimientoPorOperadores(idOperadoresExtra);
       for (const row of ultimosRows) {
@@ -519,17 +530,6 @@ export async function batchLatestSeguimientoSql(
         }
       }
       return map;
-    }
-
-    if (idOperador == null) {
-      const globalRows = await queryUltimosGlobalRows();
-      if (globalRows != null) {
-        for (const row of globalRows) {
-          const key = String(row.lead_id ?? row.leadId);
-          if (idSet.has(key)) map[key] = mapSqlRowToSeguimiento(row);
-        }
-        return map;
-      }
     }
 
     if (seguimientoSoloSp()) return map;

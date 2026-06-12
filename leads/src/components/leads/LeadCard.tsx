@@ -17,6 +17,7 @@ import {
   leadSoloLecturaPromotor,
   leadSoloLecturaSupervisor,
   esCerradoNegativoLead,
+  leadCierreRegistradoSupervisor,
 } from '../../domain/leads';
 import { prioridadTabInicial } from '../../domain/prioridad-leads';
 import { etiquetaCortaNumeroDocumentoVenta, etiquetaPagoProducto } from '../../domain/venta';
@@ -228,7 +229,7 @@ export function LeadCard({
                 )}
               </div>
             )}
-            {cierreSupervisor && (
+            {leadCierreRegistradoSupervisor(lead, historial) && (
               <div className="mt-2">
                 <span className="inline-flex items-center rounded-md border border-zinc-300 bg-zinc-100 px-2 py-1 text-[11px] font-semibold leading-snug text-zinc-700">
                   {ETIQUETA_CIERRE_SUPERVISOR}

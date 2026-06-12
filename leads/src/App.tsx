@@ -50,6 +50,7 @@ function VistaCargando({ texto = 'Cargando…' }: { texto?: string }) {
 function AppShell() {
   const { usuario, login, logout } = useAuth();
   const esSuperadmin = usuario?.rol === 'superadmin';
+  const tienePanelGlobal = !esSuperadmin && Boolean(usuario?.panelGlobal);
   const [vistaActiva, setVistaActiva] = useState<VistaActiva>(esSuperadmin ? 'admin' : 'leads');
   const [leadIdSeguimiento, setLeadIdSeguimiento] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -85,6 +86,15 @@ function AppShell() {
       setPromotores(prom);
       setProductos(prod);
       setBarrios(barr);
+
+      // Supervisor con acceso al panel global: cargar dashboard en paralelo
+      if (usuario.panelGlobal) {
+        fetchAdminDashboard()
+          .then((dash) => setAdminDashboard(dash))
+          .catch((err) =>
+            console.warn('[panelGlobal] No se pudo cargar dashboard admin:', err),
+          );
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar datos');
     } finally {
@@ -152,6 +162,12 @@ function AppShell() {
       <VistaCargando texto="Cargando datos…" />
     ) : esSuperadmin && adminDashboard ? (
       <SuperadminDashboard data={adminDashboard} />
+    ) : tienePanelGlobal && vistaActiva === 'admin' ? (
+      adminDashboard ? (
+        <SuperadminDashboard data={adminDashboard} />
+      ) : (
+        <VistaCargando texto="Cargando panel global…" />
+      )
     ) : vistaActiva === 'calendario' ? (
       <CalendarioView
         leads={leads}

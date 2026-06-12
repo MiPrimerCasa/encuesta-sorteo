@@ -39,3 +39,21 @@ export function adminSupervisorOperadorIds() {
   }
   return [...ids];
 }
+
+/**
+ * Login IDs de supervisores que además pueden ver el "Panel global" (superadmin dashboard).
+ * Formato: comma-separated login IDs, ej: `federico@gmail.com,norma@gmail.com`
+ */
+export function panelGlobalLoginIds() {
+  return (process.env.PANEL_GLOBAL_LOGIN_IDS || '')
+    .split(',')
+    .map((s) => normalizeLoginId(s))
+    .filter(Boolean);
+}
+
+export function esSupervisorPanelGlobal(loginId) {
+  const id = normalizeLoginId(loginId);
+  if (!id) return false;
+  return panelGlobalLoginIds().includes(id);
+}
+

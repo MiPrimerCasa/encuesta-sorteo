@@ -9,6 +9,13 @@ const TABS_SUPERVISOR = [
   { value: 'calendario' as const, label: 'Calendario' },
 ];
 
+const TABS_SUPERVISOR_GLOBAL = [
+  { value: 'leads' as const, label: 'Leads' },
+  { value: 'promotores' as const, label: 'Promotores' },
+  { value: 'calendario' as const, label: 'Calendario' },
+  { value: 'admin' as const, label: 'Panel global' },
+];
+
 const TABS_PROMOTOR = [
   { value: 'leads' as const, label: 'Leads' },
   { value: 'calendario' as const, label: 'Calendario' },
@@ -41,7 +48,9 @@ export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBa
     usuario.rol === 'superadmin'
       ? TABS_SUPERADMIN
       : usuario.rol === 'supervisor'
-        ? TABS_SUPERVISOR
+        ? usuario.panelGlobal
+          ? TABS_SUPERVISOR_GLOBAL
+          : TABS_SUPERVISOR
         : TABS_PROMOTOR;
 
   return (

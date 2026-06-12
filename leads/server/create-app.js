@@ -37,7 +37,7 @@ import {
   loadOperadoresCatalogAsync,
 } from './db/operadores-catalog.js';
 import { fetchAdminDashboard } from './db/admin-dashboard.js';
-import { aplicarRolSuperadmin, esSuperadminUsuario } from './db/superadmin-auth.js';
+import { aplicarRolSuperadmin, esSuperadminUsuario, esSupervisorPanelGlobal } from './db/superadmin-auth.js';
 import { modificarTelefonoLeadSchema } from './schemas/modificar-telefono-lead.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
@@ -149,6 +149,7 @@ function registerApiRoutes(api) {
           );
         }
       }
+      const panelGlobal = esSupervisorPanelGlobal(user.loginId ?? usuario);
       return res.json({
         token: `sql-${user.id}`,
         usuario: {
@@ -165,6 +166,7 @@ function registerApiRoutes(api) {
           idVendedor: user.idVendedor,
           rolOrigen: user.rolOrigen,
           sucursal: user.sucursal,
+          ...(panelGlobal ? { panelGlobal: true } : {}),
         },
       });
     } catch (error) {
@@ -328,9 +330,12 @@ function registerApiRoutes(api) {
     if (!usuario) {
       return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
     }
-    if (!esSuperadminUsuario(usuario)) {
+    const tieneAcceso =
+      esSuperadminUsuario(usuario) ||
+      esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
       return res.status(403).json({
-        message: 'Panel de administración solo disponible para superadmin.',
+        message: 'Panel de administración solo disponible para superadmin o supervisores con acceso global.',
       });
     }
 

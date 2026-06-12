@@ -262,7 +262,10 @@ export interface UsuarioSesion {
   idVendedor?: string;
   rolOrigen?: 'encuestas' | 'categoria' | 'env_superadmin';
   sucursal?: string;
+  /** Supervisor con acceso al panel global de superadmin (PANEL_GLOBAL_LOGIN_IDS). */
+  panelGlobal?: boolean;
 }
+
 
 export interface PromotorMetricasAdmin {
   promotorId: string;

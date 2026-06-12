@@ -380,7 +380,11 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
   }
 
   const pijCierresPorPersona = [...pijCierresMap.entries()].map(([operadorNombre, cierres]) => {
-    cierres.sort((a, b) => b.fechaCierre.localeCompare(a.fechaCierre));
+    cierres.sort((a, b) => {
+      const dateA = a.fechaCierre ? new Date(a.fechaCierre).getTime() : 0;
+      const dateB = b.fechaCierre ? new Date(b.fechaCierre).getTime() : 0;
+      return dateB - dateA;
+    });
     return {
       operadorNombre,
       cantidad: cierres.length,

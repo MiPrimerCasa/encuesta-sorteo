@@ -1,38 +1,35 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { fetchHistorialSeguimiento } from '../api/client';
 import type { SeguimientoHistorialEntry } from '../types';
 
-export function useHistorialLeads(leadIds: string[]) {
+export function useHistorialLeads() {
   const [historialPorLead, setHistorialPorLead] = useState<
     Record<string, SeguimientoHistorialEntry[]>
   >({});
 
-  const idsKey = [...new Set(leadIds.filter(Boolean))].sort().join(',');
+  const [loadingIds, setLoadingIds] = useState<Record<string, boolean>>({});
 
-  const cargar = useCallback(async (ids: string[]) => {
-    if (!ids.length) {
-      setHistorialPorLead({});
+  const fetchHistorial = useCallback(async (leadId: string) => {
+    if (!leadId) return;
+    // Evitar peticiones redundantes si ya existe en caché o se está cargando
+    if (historialPorLead[leadId] !== undefined || loadingIds[leadId]) {
       return;
     }
-    const pairs = await Promise.all(
-      ids.map(async (id) => {
-        try {
-          const historial = await fetchHistorialSeguimiento(id);
-          return [id, historial] as const;
-        } catch {
-          return [id, []] as const;
-        }
-      }),
-    );
-    setHistorialPorLead(Object.fromEntries(pairs));
-  }, []);
 
-  useEffect(() => {
-    void cargar(idsKey ? idsKey.split(',') : []);
-  }, [idsKey, cargar]);
+    setLoadingIds((prev) => ({ ...prev, [leadId]: true }));
+    try {
+      const historial = await fetchHistorialSeguimiento(leadId);
+      setHistorialPorLead((prev) => ({ ...prev, [leadId]: historial }));
+    } catch {
+      setHistorialPorLead((prev) => ({ ...prev, [leadId]: [] }));
+    } finally {
+      setLoadingIds((prev) => ({ ...prev, [leadId]: false }));
+    }
+  }, [historialPorLead, loadingIds]);
 
   const refrescarHistorial = useCallback(
     async (leadId: string) => {
+      if (!leadId) return;
       try {
         const historial = await fetchHistorialSeguimiento(leadId);
         setHistorialPorLead((prev) => ({ ...prev, [leadId]: historial }));
@@ -43,5 +40,5 @@ export function useHistorialLeads(leadIds: string[]) {
     [],
   );
 
-  return { historialPorLead, refrescarHistorial };
+  return { historialPorLead, fetchHistorial, refrescarHistorial };
 }

@@ -170,8 +170,7 @@ export function LeadsPanel({
     [entrevistaPendiente, paraContactar, seguimiento, compraron],
   );
 
-  const leadIds = useMemo(() => todosLosLeads.map((l) => l.id), [todosLosLeads]);
-  const { historialPorLead, refrescarHistorial } = useHistorialLeads(leadIds);
+  const { historialPorLead, fetchHistorial, refrescarHistorial } = useHistorialLeads();
 
   const resultadosBusqueda = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -216,11 +215,12 @@ export function LeadsPanel({
         onLeadSeguimientoConsumido?.();
         return;
       }
+      fetchHistorial(lead.id);
       setLeadSeleccionado(lead);
       setModalAbierto(true);
     }
     onLeadSeguimientoConsumido?.();
-  }, [leadIdSeguimientoInicial, leads, onLeadSeguimientoConsumido]);
+  }, [leadIdSeguimientoInicial, leads, onLeadSeguimientoConsumido, fetchHistorial]);
 
   const cerrarModal = () => {
     setModalAbierto(false);
@@ -266,6 +266,7 @@ export function LeadsPanel({
         onQuickSave={guardarSeguimientoLead}
         historial={historialPorLead[lead.id] ?? []}
         onModificarTelefono={abrirModificarTelefono}
+        fetchHistorial={fetchHistorial}
       />
     ) : (
       <LeadCard
@@ -281,6 +282,7 @@ export function LeadsPanel({
         rolUsuario={rolUsuario}
         historial={historialPorLead[lead.id] ?? []}
         onModificarTelefono={abrirModificarTelefono}
+        fetchHistorial={fetchHistorial}
       />
     );
 
@@ -391,6 +393,7 @@ export function LeadsPanel({
                     onQuickSave={guardarSeguimientoLead}
                     historial={historialPorLead[lead.id] ?? []}
                     onModificarTelefono={abrirModificarTelefono}
+                    fetchHistorial={fetchHistorial}
                   />
                 ) : (
                   <LeadCard
@@ -406,6 +409,7 @@ export function LeadsPanel({
                     rolUsuario={rolUsuario}
                     historial={historialPorLead[lead.id] ?? []}
                     onModificarTelefono={abrirModificarTelefono}
+                    fetchHistorial={fetchHistorial}
                   />
                 );
               })}

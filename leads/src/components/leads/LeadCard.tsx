@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import {
   ETIQUETA_CIERRE_SUPERVISOR,
   ETIQUETA_REFERIDO,
@@ -40,6 +41,7 @@ interface LeadCardProps {
   rolUsuario?: RolUsuario;
   historial?: SeguimientoHistorialEntry[];
   onModificarTelefono?: (lead: Lead) => void;
+  fetchHistorial?: (leadId: string) => void;
 }
 
 export function LeadCard({
@@ -54,7 +56,31 @@ export function LeadCard({
   rolUsuario = 'supervisor',
   historial = [],
   onModificarTelefono,
+  fetchHistorial,
 }: LeadCardProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!fetchHistorial || !lead.id) return;
+
+    const el = containerRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          fetchHistorial(lead.id);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '150px' }
+    );
+
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+    };
+  }, [lead.id, fetchHistorial]);
   const compro = leadCompro(lead);
   const reagenda = leadReagendaEntrevista(lead);
   const derivaTerreno = leadDerivaSupervisorTerreno(lead);
@@ -327,7 +353,7 @@ export function LeadCard({
   );
 
   return (
-    <div className="relative">
+    <div ref={containerRef} className="relative">
       {soloLectura ? (
         <div
           className={cardClassName}

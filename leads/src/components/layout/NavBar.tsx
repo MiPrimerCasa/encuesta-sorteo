@@ -22,6 +22,13 @@ const TABS_PROMOTOR = [
   { value: 'metricas' as const, label: 'Métricas' },
 ];
 
+const TABS_PROMOTOR_GLOBAL = [
+  { value: 'leads' as const, label: 'Leads' },
+  { value: 'calendario' as const, label: 'Calendario' },
+  { value: 'metricas' as const, label: 'Métricas' },
+  { value: 'admin' as const, label: 'Panel global' },
+];
+
 const TABS_SUPERADMIN = [{ value: 'admin' as const, label: 'Panel global' }];
 
 const ROL_LABEL: Record<RolUsuario, string> = {
@@ -51,7 +58,9 @@ export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBa
         ? usuario.panelGlobal
           ? TABS_SUPERVISOR_GLOBAL
           : TABS_SUPERVISOR
-        : TABS_PROMOTOR;
+        : usuario.panelGlobal
+          ? TABS_PROMOTOR_GLOBAL
+          : TABS_PROMOTOR;
 
   return (
     <header

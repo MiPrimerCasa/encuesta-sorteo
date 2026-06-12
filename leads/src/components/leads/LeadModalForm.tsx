@@ -259,7 +259,7 @@ export function LeadModalForm({
     if (contacto) {
       patch({
         seContactoCliente: true,
-        confirmoEntrevista: rol !== 'promotor' ? true : form.confirmoEntrevista,
+        confirmoEntrevista: null,
         canal: null,
         agendoEntrevista: null,
         huboEntrevista: null,
@@ -451,7 +451,7 @@ export function LeadModalForm({
       const esAgendo = form.agendoEntrevista === true;
       const seguimientoSinCita: SeguimientoLead = {
         fuente: lead.seguimiento?.fuente,
-        confirmoEntrevista: rol === 'supervisor' ? true : null,
+        confirmoEntrevista: null,
         canal: form.canal,
         huboEntrevista: false,
         resultadoEntrevista: esAgendo ? 'reagenda' : 'sin_interes',
@@ -548,9 +548,7 @@ export function LeadModalForm({
 
     const seguimiento: SeguimientoLead = {
       fuente: lead.seguimiento?.fuente,
-      confirmoEntrevista: entrevistaMomentoSinCitaGuardar
-        ? true
-        : form.confirmoEntrevista,
+      confirmoEntrevista: flujoSinCita ? null : form.confirmoEntrevista,
       canal: (entrevistaMomentoSinCitaGuardar || form.canal) ? form.canal : null,
       huboEntrevista: entrevistaMomentoSinCitaGuardar
         ? true

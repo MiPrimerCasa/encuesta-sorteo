@@ -69,7 +69,7 @@ function leadEnEntrevistaPendiente(lead) {
 
 function tabIdListaLead(lead) {
   if (leadCompro(lead)) return 'compro';
-  if (lead.seguimiento?.confirmoEntrevista === true) return 'seguimiento';
+  if (leadTieneCitaPrevia(lead) && lead.seguimiento?.confirmoEntrevista === true) return 'seguimiento';
   if (esCerradoNegativoLead(lead)) return 'contacto';
   if (leadReagendaEntrevista(lead)) return 'seguimiento';
   if (lead.seguimiento?.resultadoEntrevista === 'derivar_terreno') return 'seguimiento';
@@ -84,7 +84,7 @@ function prioridadTabInicial(lead) {
     leadReagendaEntrevista(lead) ||
     lead.seguimiento?.resultadoEntrevista === 'derivar_terreno' ||
     esCerradoNegativoLead(lead) ||
-    lead.seguimiento?.confirmoEntrevista === true
+    (leadTieneCitaPrevia(lead) && lead.seguimiento?.confirmoEntrevista === true)
   ) {
     return null;
   }
@@ -191,7 +191,7 @@ const sinInteres = {
     seguimientoAgendaOperadorRol: null,
   },
 };
-assert(tabIdListaLead(sinInteres) === 'seguimiento', 'sin interés + confirmada → pestaña seguimiento');
+assert(tabIdListaLead(sinInteres) === 'contacto', 'sin interés → pestaña contacto');
 
 console.log('\n8. Solo lectura cruzada por rol que agendó');
 function soloLecturaSupervisor(lead) {

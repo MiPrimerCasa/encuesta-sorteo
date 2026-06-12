@@ -174,7 +174,7 @@ export function leadEnSeguimientoActivo(lead: Lead) {
   return (
     leadReagendaEntrevista(lead) ||
     leadDerivaSupervisorTerreno(lead) ||
-    lead.seguimiento?.confirmoEntrevista === true
+    (leadTieneCitaPrevia(lead) && lead.seguimiento?.confirmoEntrevista === true)
   );
 }
 

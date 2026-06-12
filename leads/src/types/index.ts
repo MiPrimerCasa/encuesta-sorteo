@@ -419,4 +419,20 @@ export interface AdminDashboardData {
   aviso?: string;
   totalLeads?: number;
   totalSupervisores?: number;
+  pijCierresPorPersona?: PersonaPijCierres[];
+}
+
+export interface PijCierreDetalle {
+  leadId: string;
+  leadNombre: string;
+  leadTelefono: string;
+  numeroAnexo: string;
+  fechaCierre: string;
+  estadoPago: string | null;
+}
+
+export interface PersonaPijCierres {
+  operadorNombre: string;
+  cantidad: number;
+  cierres: PijCierreDetalle[];
 }

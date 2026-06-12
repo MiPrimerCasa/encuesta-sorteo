@@ -358,6 +358,36 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
     },
   );
 
+  const pijCierresMap = new Map();
+  for (const item of leadsConSupervisor) {
+    const { lead } = item;
+    const esCierre = lead.seguimiento?.resultadoEntrevista === 'compro';
+    const esPij = lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ;
+    if (esCierre && esPij) {
+      const operadorNombre = (lead.seguimiento?.operadorNombre || lead.promotorNombre || 'Sin asignar').trim();
+      if (!pijCierresMap.has(operadorNombre)) {
+        pijCierresMap.set(operadorNombre, []);
+      }
+      pijCierresMap.get(operadorNombre).push({
+        leadId: String(lead.id),
+        leadNombre: lead.nombre,
+        leadTelefono: lead.telefono || '—',
+        numeroAnexo: lead.seguimiento?.numeroRecibo || '—',
+        fechaCierre: lead.seguimiento?.fechaCierre || lead.seguimiento?.creadoEn || lead.seguimiento?.creado_en || '',
+        estadoPago: lead.seguimiento?.estadoPago || null,
+      });
+    }
+  }
+
+  const pijCierresPorPersona = [...pijCierresMap.entries()].map(([operadorNombre, cierres]) => {
+    cierres.sort((a, b) => b.fechaCierre.localeCompare(a.fechaCierre));
+    return {
+      operadorNombre,
+      cantidad: cierres.length,
+      cierres,
+    };
+  }).sort((a, b) => b.cantidad - a.cantidad || a.operadorNombre.localeCompare(b.operadorNombre, 'es'));
+
   return {
     generadoEn: ahora.toISOString(),
     semanaDesde: desde.toISOString(),
@@ -386,5 +416,6 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
       historialRows,
       ahora,
     ),
+    pijCierresPorPersona,
   };
 }

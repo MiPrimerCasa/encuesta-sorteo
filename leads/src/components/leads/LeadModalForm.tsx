@@ -209,6 +209,7 @@ export function LeadModalForm({
 }: LeadModalFormProps) {
   const [form, setForm] = useState<FormState>(() => buildInitialForm(lead));
   const [errorVenta, setErrorVenta] = useState('');
+  const [errorForm, setErrorForm] = useState('');
   const [barrioPickerOpen, setBarrioPickerOpen] = useState(false);
 
   const rol: RolUsuario = rolUsuario === 'promotor' ? 'promotor' : 'supervisor';
@@ -233,6 +234,7 @@ export function LeadModalForm({
       }
       setForm(initial);
       setErrorVenta('');
+      setErrorForm('');
     }
   }, [open, lead, rol, productos, soloLectura]);
 
@@ -240,20 +242,26 @@ export function LeadModalForm({
 
   const patch = (partial: Partial<FormState>) => setForm((f) => ({ ...f, ...partial }));
 
-  const handleCanal = (canal: NonNullable<SeguimientoLead['canal']>) =>
-    patch({
-      canal,
-      agendoEntrevista: null,
-      huboEntrevista: null,
-      resultadoEntrevista: null,
-      reagendarEntrevista: false,
-      fechaReagenda: '',
-      reagendaPijTrasNoCompro: null,
-      reagendaTrasNoComproEnPersona: null,
-      proponeFechaDerivacion: null,
-      horarioDerivacion: '',
-      ...resetCamposVenta(),
-    });
+  const handleCanal = (canal: NonNullable<SeguimientoLead['canal']>) => {
+    const sinCita = !leadTieneCitaPrevia(lead);
+    if (sinCita) {
+      patch({
+        canal,
+        agendoEntrevista: null,
+        huboEntrevista: null,
+        resultadoEntrevista: null,
+        reagendarEntrevista: false,
+        fechaReagenda: '',
+        reagendaPijTrasNoCompro: null,
+        reagendaTrasNoComproEnPersona: null,
+        proponeFechaDerivacion: null,
+        horarioDerivacion: '',
+        ...resetCamposVenta(),
+      });
+    } else {
+      patch({ canal });
+    }
+  };
 
   const handleSeContactoCliente = (contacto: boolean) => {
     if (contacto) {
@@ -291,9 +299,14 @@ export function LeadModalForm({
       };
       void (async () => {
         if (lead) {
-          await onSave(lead.id, seguimientoSinContacto);
+          try {
+            await onSave(lead.id, seguimientoSinContacto);
+            onClose();
+          } catch (err) {
+            console.error('Error al guardar:', err);
+            setErrorForm(err instanceof Error ? err.message : 'Error al guardar el seguimiento.');
+          }
         }
-        onClose();
       })();
     }
   };
@@ -427,6 +440,7 @@ export function LeadModalForm({
 
   const handleGuardar = (e: FormEvent) => {
     e.preventDefault();
+    setErrorForm('');
 
     const flujoSinCitaGuardar = !leadTieneCitaPrevia(lead);
     const entrevistaMomentoSinCitaGuardar =
@@ -436,15 +450,28 @@ export function LeadModalForm({
       form.huboEntrevista === true;
 
     if (flujoSinCitaGuardar && !entrevistaMomentoSinCitaGuardar) {
-      if (form.seContactoCliente !== true) return;
-      if (form.canal == null) return;
-      if (form.agendoEntrevista == null) return;
-      if (form.agendoEntrevista === true && !form.fechaReagenda.trim()) return;
+      if (form.seContactoCliente !== true) {
+        setErrorForm('Indicá si se contactó con el cliente.');
+        return;
+      }
+      if (form.canal == null) {
+        setErrorForm('Seleccioná el canal de contacto.');
+        return;
+      }
+      if (form.agendoEntrevista == null) {
+        setErrorForm('Indicá si agendó entrevista.');
+        return;
+      }
+      if (form.agendoEntrevista === true && !form.fechaReagenda.trim()) {
+        setErrorForm('Seleccioná la fecha y hora de la entrevista.');
+        return;
+      }
       if (
         form.canal === 'en_persona' &&
         form.agendoEntrevista === false &&
         form.huboEntrevista == null
       ) {
+        setErrorForm('Indicá si la entrevista fue en el momento.');
         return;
       }
 
@@ -472,8 +499,13 @@ export function LeadModalForm({
         observaciones: form.observaciones.trim(),
       };
       void (async () => {
-        await onSave(lead.id, seguimientoSinCita);
-        onClose();
+        try {
+          await onSave(lead.id, seguimientoSinCita);
+          onClose();
+        } catch (err) {
+          console.error('Error al guardar:', err);
+          setErrorForm(err instanceof Error ? err.message : 'Error al guardar el seguimiento.');
+        }
       })();
       return;
     }
@@ -493,6 +525,7 @@ export function LeadModalForm({
       form.resultadoEntrevista === 'no_compro' &&
       form.reagendaTrasNoComproEnPersona == null
     ) {
+      setErrorForm('Indicá si se reagenda tras no comprar en persona.');
       return;
     }
     const esReagenda =
@@ -500,11 +533,20 @@ export function LeadModalForm({
       form.resultadoEntrevista === 'reagenda' ||
       esReagendaPijGuardar ||
       esReagendaTrasNoComproEnPersonaGuardar;
-    if (esReagenda && !form.fechaReagenda) return;
+    if (esReagenda && !form.fechaReagenda) {
+      setErrorForm('Seleccioná la fecha y hora de reagenda.');
+      return;
+    }
 
     if (form.resultadoEntrevista === 'derivar_terreno') {
-      if (form.proponeFechaDerivacion === null) return;
-      if (form.proponeFechaDerivacion && !form.horarioDerivacion.trim()) return;
+      if (form.proponeFechaDerivacion === null) {
+        setErrorForm('Indicá si el cliente propuso fecha.');
+        return;
+      }
+      if (form.proponeFechaDerivacion && !form.horarioDerivacion.trim()) {
+        setErrorForm('Ingresá el horario propuesto para la derivación.');
+        return;
+      }
     }
 
     if (form.resultadoEntrevista === 'compro') {
@@ -594,8 +636,13 @@ export function LeadModalForm({
       observaciones: form.observaciones.trim(),
     };
     void (async () => {
-      await onSave(lead.id, seguimiento);
-      onClose();
+      try {
+        await onSave(lead.id, seguimiento);
+        onClose();
+      } catch (err) {
+        console.error('Error al guardar:', err);
+        setErrorForm(err instanceof Error ? err.message : 'Error al guardar el seguimiento.');
+      }
     })();
   };
 
@@ -652,7 +699,6 @@ export function LeadModalForm({
     (showHuboEntrevista && form.huboEntrevista === true) || entrevistaEnElMomento;
   const showSinEntrevistaResultado = showHuboEntrevista && form.huboEntrevista === false;
   const showReagendaSinEntrevistaCampo =
-    esFlujoCampo &&
     showSinEntrevistaResultado &&
     (form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda');
 
@@ -994,22 +1040,18 @@ export function LeadModalForm({
                     })
                   }
                 />
-                {esFlujoCampo && (
-                  <>
-                    <RadioOption
-                      name="sinEntrevista"
-                      value="reagenda"
-                      label="Quiere reagendar"
-                      checked={form.resultadoEntrevista === 'reagenda'}
-                      onChange={() => patch({ ...activarReagenda(), reagendarEntrevista: true })}
-                    />
-                    {showReagendaSinEntrevistaCampo && (
-                      <CampoFechaReagenda
-                        value={form.fechaReagenda}
-                        onChange={(v) => patchFechaReagenda(v, patch)}
-                      />
-                    )}
-                  </>
+                <RadioOption
+                  name="sinEntrevista"
+                  value="reagenda"
+                  label="Quiere reagendar"
+                  checked={form.resultadoEntrevista === 'reagenda'}
+                  onChange={() => patch({ ...activarReagenda(), reagendarEntrevista: true })}
+                />
+                {showReagendaSinEntrevistaCampo && (
+                  <CampoFechaReagenda
+                    value={form.fechaReagenda}
+                    onChange={(v) => patchFechaReagenda(v, patch)}
+                  />
                 )}
               </FormSection>
             )}
@@ -1584,6 +1626,11 @@ export function LeadModalForm({
             </FormSection>
             )}
 
+            {errorForm && (
+              <p className="rounded-lg bg-red-50 px-3 py-2.5 text-[13px] font-medium text-red-700">
+                {errorForm}
+              </p>
+            )}
             <div className="h-4" aria-hidden="true" />
             </fieldset>
           </form>

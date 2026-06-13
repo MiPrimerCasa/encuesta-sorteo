@@ -110,6 +110,8 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
   const totalPromotoresCierres = todosPromotores.reduce((acc, p) => acc + p.cierresSemana, 0);
   const totalPromotoresEntrevistas = todosPromotores.reduce((acc, p) => acc + p.entrevistasSemana, 0);
   const totalPromotoresLeads = todosPromotores.reduce((acc, p) => acc + p.leadsTotal, 0);
+  const totalPromotoresTerrenos = todosPromotores.reduce((acc, p) => acc + p.ventasTerrenoSemana, 0);
+  const totalPromotoresPij = todosPromotores.reduce((acc, p) => acc + p.ventasPijSemana, 0);
 
 
   const rango = formatRangoSemana(data.semanaDesde, data.semanaHasta);
@@ -280,12 +282,14 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
             <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
               <thead>
                 <tr className="bg-zinc-50/50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-                  <th className="py-2 px-3 text-center w-12">Pos</th>
-                  <th className="py-2 px-3 text-left">Promotor</th>
-                  <th className="py-2 px-3 text-left">Equipo (Supervisor)</th>
-                  <th className="py-2 px-3 text-center">Leads</th>
-                  <th className="py-2 px-3 text-center">Entrevistas</th>
-                  <th className="py-2 px-4 text-center">Cierres</th>
+                  <th className="py-2.5 px-3 text-center w-12">Pos</th>
+                  <th className="py-2.5 px-3 text-left">Promotor</th>
+                  <th className="py-2.5 px-3 text-left">Equipo (Supervisor)</th>
+                  <th className="py-2.5 px-3 text-center">Leads</th>
+                  <th className="py-2.5 px-3 text-center">Entrevistas</th>
+                  <th className="py-2.5 px-3 text-center">Cierres</th>
+                  <th className="py-2.5 px-3 text-center">Terrenos</th>
+                  <th className="py-2.5 px-4 text-center">PIJ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-zinc-700">
@@ -296,7 +300,9 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
                     <td className="py-2.5 px-3 text-zinc-500">{p.supervisorNombre}</td>
                     <td className="py-2.5 px-3 text-center tabular-nums">{p.leadsTotal}</td>
                     <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{p.entrevistasSemana}</td>
-                    <td className="py-2.5 px-4 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
+                    <td className="py-2.5 px-3 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
+                    <td className="py-2.5 px-3 text-center tabular-nums text-amber-700 font-semibold">{p.ventasTerrenoSemana}</td>
+                    <td className="py-2.5 px-4 text-center tabular-nums text-indigo-600 font-semibold">{p.ventasPijSemana}</td>
                   </tr>
                 ))}
               </tbody>
@@ -305,7 +311,9 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
                   <td colSpan={3} className="py-3 px-3 text-left text-zinc-900 font-bold">Total Empresa</td>
                   <td className="py-3 px-3 text-center tabular-nums">{totalPromotoresLeads}</td>
                   <td className="py-3 px-3 text-center tabular-nums text-brand-700">{totalPromotoresEntrevistas}</td>
-                  <td className="py-3 px-4 text-center tabular-nums text-emerald-700 font-extrabold">{totalPromotoresCierres}</td>
+                  <td className="py-3 px-3 text-center tabular-nums text-emerald-700 font-extrabold">{totalPromotoresCierres}</td>
+                  <td className="py-3 px-3 text-center tabular-nums text-amber-700 font-extrabold">{totalPromotoresTerrenos}</td>
+                  <td className="py-3 px-4 text-center tabular-nums text-indigo-600 font-extrabold">{totalPromotoresPij}</td>
                 </tr>
               </tfoot>
             </table>

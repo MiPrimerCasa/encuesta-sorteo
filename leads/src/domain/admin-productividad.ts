@@ -81,11 +81,13 @@ function leadSinGestion(lead: Lead, historial: HistorialRow[]): boolean {
 function resultadoFinalLead(
   lead: Lead,
   historial: HistorialRow[],
-): ResultadoEntrevista | 'pendiente' {
+): ResultadoEntrevista | 'pendiente' | 'sin_tratar' {
   if (leadCerro(lead, historial)) return 'compro';
   const res = lead.seguimiento?.resultadoEntrevista;
   if (res) return res;
-  if (leadTuvoEntrevista(lead, historial)) return 'pendiente';
+  if (lead.seguimiento?.canal == null && lead.seguimiento?.huboEntrevista == null) {
+    return 'sin_tratar';
+  }
   return 'pendiente';
 }
 
@@ -130,13 +132,14 @@ function startOfDay(date: Date) {
   return d;
 }
 
-const RESULTADO_LABEL: Record<ResultadoEntrevista | 'pendiente', string> = {
+const RESULTADO_LABEL: Record<ResultadoEntrevista | 'pendiente' | 'sin_tratar', string> = {
   compro: 'Compró',
   no_compro: 'No compró',
   reagenda: 'Reagenda',
   sin_interes: 'Sin interés',
   derivar_terreno: 'Derivar terreno',
   pendiente: 'Sin resultado',
+  sin_tratar: 'Sin contactar',
 };
 
 export { RESULTADO_LABEL as ADMIN_RESULTADO_ENTREVISTA_LABEL };
@@ -151,13 +154,14 @@ export function buildAdminProductividad(
 
   let conEntrevista = 0;
   let conCierre = 0;
-  const resultados: Record<ResultadoEntrevista | 'pendiente', number> = {
+  const resultados: Record<ResultadoEntrevista | 'pendiente' | 'sin_tratar', number> = {
     compro: 0,
     no_compro: 0,
     reagenda: 0,
     sin_interes: 0,
     derivar_terreno: 0,
     pendiente: 0,
+    sin_tratar: 0,
   };
   const backlog = { sinGestion7: 0, sinGestion14: 0, sinGestion30: 0 };
   const diasHastaEntrevista: number[] = [];
@@ -307,6 +311,7 @@ export function buildAdminProductividad(
       sin_interes: resultados.sin_interes,
       derivar_terreno: resultados.derivar_terreno,
       pendiente: resultados.pendiente,
+      sin_tratar: resultados.sin_tratar,
     },
     canales: fuenteOrder.map((f) => {
       const c = canalMap.get(f) ?? { leads: 0, cierres: 0 };

@@ -70,7 +70,9 @@ function resultadoFinalLead(lead, historial) {
   if (leadCerro(lead, historial)) return 'compro';
   const res = lead.seguimiento?.resultadoEntrevista;
   if (res) return res;
-  if (leadTuvoEntrevista(lead, historial)) return 'pendiente';
+  if (lead.seguimiento?.canal == null && lead.seguimiento?.huboEntrevista == null) {
+    return 'sin_tratar';
+  }
   return 'pendiente';
 }
 
@@ -127,6 +129,7 @@ export function buildAdminProductividad(leads, historialRows = [], ahora = new D
     sin_interes: 0,
     derivar_terreno: 0,
     pendiente: 0,
+    sin_tratar: 0,
   };
   const backlog = { sinGestion7: 0, sinGestion14: 0, sinGestion30: 0 };
   const diasHastaEntrevista = [];

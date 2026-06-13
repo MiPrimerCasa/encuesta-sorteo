@@ -83,6 +83,7 @@ const RESULTADO_COLORS: Record<string, string> = {
   sin_interes: '#D97706',
   derivar_terreno: '#B45309',
   pendiente: '#D4D4D8',
+  sin_tratar: '#CBD5E1',
 };
 
 const CANAL_COLORS: Record<string, string> = {

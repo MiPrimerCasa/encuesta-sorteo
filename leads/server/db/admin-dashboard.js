@@ -88,6 +88,7 @@ function dashboardVacio(aviso) {
         sin_interes: 0,
         derivar_terreno: 0,
         pendiente: 0,
+        sin_tratar: 0,
       },
       canales: [],
       backlog: { sinGestion7: 0, sinGestion14: 0, sinGestion30: 0 },

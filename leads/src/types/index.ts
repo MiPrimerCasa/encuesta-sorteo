@@ -345,6 +345,7 @@ export interface AdminResultadosEntrevista {
   sin_interes: number;
   derivar_terreno: number;
   pendiente: number;
+  sin_tratar: number;
 }
 
 export interface AdminCanalMetrica {

@@ -6,13 +6,7 @@ import type {
   ResultadoEntrevista,
 } from '../types';
 
-const RESULTADOS_ENTREVISTA: ResultadoEntrevista[] = [
-  'compro',
-  'no_compro',
-  'reagenda',
-  'sin_interes',
-  'derivar_terreno',
-];
+
 
 function pct(num: number, den: number): number | null {
   if (den <= 0) return null;
@@ -33,9 +27,7 @@ function emptyBucket() {
 
 /** Lead con entrevista realizada (alineado a admin-productividad / RF-26). */
 export function leadTuvoEntrevistaRealizada(lead: Lead): boolean {
-  if (lead.seguimiento?.huboEntrevista === true) return true;
-  const res = lead.seguimiento?.resultadoEntrevista;
-  return res != null && RESULTADOS_ENTREVISTA.includes(res);
+  return lead.seguimiento?.huboEntrevista === true;
 }
 
 function resultadoEntrevistaLead(lead: Lead): ResultadoEntrevista | 'pendiente' {

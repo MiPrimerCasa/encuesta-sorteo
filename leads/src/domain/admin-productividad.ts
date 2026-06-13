@@ -67,13 +67,6 @@ function leadCerro(lead: Lead, _historial: HistorialRow[]): boolean {
 
 function leadTuvoEntrevista(lead: Lead, historial: HistorialRow[]): boolean {
   if (lead.seguimiento?.huboEntrevista === true) return true;
-  const res = lead.seguimiento?.resultadoEntrevista;
-  if (
-    res &&
-    ['compro', 'no_compro', 'reagenda', 'derivar_terreno', 'sin_interes'].includes(res)
-  ) {
-    return true;
-  }
   return historial.some((row) => filaIndicaEntrevista(row));
 }
 

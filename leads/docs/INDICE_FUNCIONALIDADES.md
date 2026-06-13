@@ -33,7 +33,9 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | Acortador y verificación links redes | [FUNCIONALIDAD_ACORTADOR_LINKS.md](./FUNCIONALIDAD_ACORTADOR_LINKS.md) | Supervisor (cron), ambos (notif.) | `url-shortener.js`, NavBar |
 | Panel superadmin (métricas empresa) | [FUNCIONALIDAD_PANEL_SUPERADMIN.md](./FUNCIONALIDAD_PANEL_SUPERADMIN.md) | Superadmin | `SuperadminDashboard`, `admin-dashboard.js` |
 | Login y rol desde `Categoria` | [LOGIN_SP.md](./LOGIN_SP.md) | Ambos | `mssql.js`, `encuestas.js` |
+| Integración Adhesiones Facturación SP | [PROPUESTA_INTEGRACION_ADHESIONES.md](./PROPUESTA_INTEGRACION_ADHESIONES.md) | Promotor, supervisor, superadmin | `adhesionesPorVendedorGestion` SP |
 | Deploy y monorepo | [MONOREPO.md](./MONOREPO.md), [DEPLOY_VPS.md](./DEPLOY_VPS.md) | — | `deploy/` |
+
 
 ## Documentación transversal
 

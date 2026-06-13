@@ -375,8 +375,10 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
   );
 
   const pijCierresMap = new Map();
+  const leadsSinTratar = [];
+
   for (const item of leadsConSupervisor) {
-    const { lead } = item;
+    const { lead, supervisorNombre } = item;
     const esCierre = lead.seguimiento?.resultadoEntrevista === 'compro';
     const esPij = lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ;
     if (esCierre && esPij) {
@@ -393,7 +395,24 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
         estadoPago: lead.seguimiento?.estadoPago || null,
       });
     }
+
+    // Coleccionar leads sin contactar o tratar (Inactivos)
+    const sinTratar = lead.seguimiento?.canal == null && lead.seguimiento?.huboEntrevista == null;
+    if (sinTratar && !esCierre) {
+      leadsSinTratar.push({
+        id: String(lead.id),
+        nombre: lead.nombre,
+        telefono: lead.telefono || '—',
+        origen: lead.origenEncuesta || '—',
+        fechaAlta: lead.fechaAlta || lead.fechaObtencion || '',
+        promotorNombre: lead.promotorNombre || 'Sin promotor',
+        supervisorNombre: supervisorNombre || 'Sin supervisor',
+      });
+    }
   }
+
+  // Ordenar leads sin tratar por fecha (más antiguos primero)
+  leadsSinTratar.sort((a, b) => a.fechaAlta.localeCompare(b.fechaAlta));
 
   const pijCierresPorPersona = [...pijCierresMap.entries()].map(([operadorNombre, cierres]) => {
     cierres.sort((a, b) => {
@@ -437,5 +456,6 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
       ahora,
     ),
     pijCierresPorPersona,
+    leadsSinTratar,
   };
 }

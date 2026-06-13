@@ -89,6 +89,7 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
   const [filterText, setFilterText] = useState('');
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
   const [rankingSearch, setRankingSearch] = useState('');
+  const [busquedaLeadsInactivos, setBusquedaLeadsInactivos] = useState('');
 
   // ── Resumen General de Productividad (Semana Móvil) ──────────────────────────
   const todosPromotores = data.supervisores.flatMap((s) =>
@@ -474,6 +475,118 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
         )}
       </section>
 
+      {/* Leads sin contactar o tratar (Inactivos) */}
+      <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+        <div className="border-b border-zinc-100 px-5 py-4 flex flex-wrap items-center justify-between gap-4 bg-zinc-50/50">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Seguimiento
+            </p>
+            <h3 className="mt-0.5 text-[17px] font-semibold tracking-[-0.01em] text-zinc-900">
+              Leads sin contactar o tratar (Inactivos)
+            </h3>
+            <p className="mt-0.5 text-[13px] text-zinc-500">
+              Leads que no poseen llamada, contacto ni entrevista registrada
+            </p>
+          </div>
+          <div className="relative w-full max-w-xs sm:w-auto">
+            <input
+              type="text"
+              placeholder="Buscar cliente, teléfono o promotor..."
+              value={busquedaLeadsInactivos}
+              onChange={(e) => setBusquedaLeadsInactivos(e.target.value)}
+              className="h-9 w-full rounded-lg border border-zinc-200 bg-white px-3 pl-8 text-[12px] placeholder-zinc-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15 transition-all"
+            />
+            <svg
+              width="12" height="12" viewBox="0 0 16 16" fill="none"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+              aria-hidden="true"
+            >
+              <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
+          </div>
+        </div>
+
+        {(() => {
+          const list = data.leadsSinTratar || [];
+          const query = busquedaLeadsInactivos.trim().toLowerCase();
+          const filtered = query
+            ? list.filter(
+                (l) =>
+                  l.nombre.toLowerCase().includes(query) ||
+                  l.telefono.includes(query) ||
+                  l.promotorNombre.toLowerCase().includes(query) ||
+                  l.supervisorNombre.toLowerCase().includes(query) ||
+                  l.origen.toLowerCase().includes(query)
+              )
+            : list;
+
+          if (filtered.length === 0) {
+            return (
+              <p className="py-10 text-center text-[13px] text-zinc-400">
+                {query ? 'No se encontraron leads inactivos que coincidan con la búsqueda.' : 'No hay leads sin contactar o tratar.'}
+              </p>
+            );
+          }
+
+          return (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-zinc-100">
+                <thead>
+                  <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400 bg-zinc-50/20">
+                    <th className="py-2.5 px-4 text-left font-semibold">Cliente</th>
+                    <th className="py-2.5 px-4 text-left font-semibold">Teléfono</th>
+                    <th className="py-2.5 px-4 text-center font-semibold">Origen</th>
+                    <th className="py-2.5 px-4 text-left font-semibold">Promotor</th>
+                    <th className="py-2.5 px-4 text-left font-semibold">Supervisor</th>
+                    <th className="py-2.5 px-4 text-right font-semibold">Fecha Alta</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 text-[13px] text-zinc-700">
+                  {filtered.map((lead) => (
+                    <tr key={lead.id} className="hover:bg-zinc-50/50 transition-colors">
+                      <td className="py-3 px-4 font-medium text-zinc-900">{lead.nombre}</td>
+                      <td className="py-3 px-4">
+                        <a
+                          href={`https://wa.me/${lead.telefono.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-brand-600 hover:underline font-mono text-[12px] tabular-nums"
+                        >
+                          {lead.telefono}
+                        </a>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <span className="inline-flex items-center rounded-md bg-zinc-100 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
+                          {lead.origen}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-zinc-600">{lead.promotorNombre}</td>
+                      <td className="py-3 px-4 text-zinc-500">{lead.supervisorNombre}</td>
+                      <td className="py-3 px-4 text-right text-zinc-400 tabular-nums">
+                        {(() => {
+                          try {
+                            const d = new Date(lead.fechaAlta);
+                            if (isNaN(d.getTime())) return lead.fechaAlta;
+                            return d.toLocaleDateString('es-AR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                            });
+                          } catch {
+                            return lead.fechaAlta;
+                          }
+                        })()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
+      </section>
 
       {/* Modal de Detalle de Anexos */}
       {selectedPerson && (

@@ -424,7 +424,19 @@ export interface AdminDashboardData {
   totalLeads?: number;
   totalSupervisores?: number;
   pijCierresPorPersona?: PersonaPijCierres[];
+  leadsSinTratar?: LeadSinTratarDetalle[];
 }
+
+export interface LeadSinTratarDetalle {
+  id: string;
+  nombre: string;
+  telefono: string;
+  origen: string;
+  fechaAlta: string;
+  promotorNombre: string;
+  supervisorNombre: string;
+}
+
 
 export interface PijCierreDetalle {
   leadId: string;

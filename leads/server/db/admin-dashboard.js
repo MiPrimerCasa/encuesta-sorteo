@@ -97,6 +97,8 @@ function dashboardVacio(aviso) {
       pijRecuperacion: { totalSeguimiento: 0, conCierre: 0, tasaRecuperacionPct: null },
       referidos: { cierresConReferidos: 0, totalReferidos: 0 },
     },
+    pijCierresPorPersona: [],
+    leadsSinTratar: [],
     aviso,
   };
 }

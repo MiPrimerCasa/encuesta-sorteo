@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres } from '../../types';
 import { formatRangoSemana } from '../../domain/admin-metrics';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
@@ -88,6 +88,27 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
   const [selectedPerson, setSelectedPerson] = useState<PersonaPijCierres | null>(null);
   const [filterText, setFilterText] = useState('');
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
+  const [fechaSeleccionada, setFechaSeleccionada] = useState<string>(
+    () => (data.leadsPorDia?.[0]?.fecha ?? data.hoy?.slice(0, 10) ?? new Date().toISOString().slice(0, 10))
+  );
+
+  const diaSeleccionado = useMemo(
+    () => data.leadsPorDia?.find((d) => d.fecha === fechaSeleccionada) ?? null,
+    [data.leadsPorDia, fechaSeleccionada]
+  );
+
+  const fechasDisponibles = useMemo(
+    () => new Set((data.leadsPorDia ?? []).map((d) => d.fecha)),
+    [data.leadsPorDia]
+  );
+
+  function navFecha(delta: number) {
+    const sorted = (data.leadsPorDia ?? []).map((d) => d.fecha).sort();
+    const idx = sorted.indexOf(fechaSeleccionada);
+    if (idx === -1) return;
+    const next = sorted[idx + delta];
+    if (next) setFechaSeleccionada(next);
+  }
 
   const rango = formatRangoSemana(data.semanaDesde, data.semanaHasta);
   const hoyLabel = new Date(data.hoy).toLocaleDateString('es-AR', {
@@ -147,6 +168,81 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
           <StatCard label="Plan Inv. Joven" value={data.resumenHoy.ventasPij} />
         </div>
       </section>
+
+      {/* Leads por fecha (calendario) */}
+      {(data.leadsPorDia?.length ?? 0) > 0 && (
+        <section className="space-y-4">
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
+            Leads por fecha
+          </h3>
+
+          {/* Navegador de fecha */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navFecha(-1)}
+              disabled={fechaSeleccionada === [...fechasDisponibles].sort()[0]}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 transition hover:bg-zinc-50 disabled:opacity-30"
+              aria-label="Día anterior"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M10 12L6 8l4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            <input
+              type="date"
+              value={fechaSeleccionada}
+              onChange={(e) => e.target.value && setFechaSeleccionada(e.target.value)}
+              className="h-9 flex-1 rounded-lg border border-zinc-200 bg-white px-3 text-[14px] text-zinc-800 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+            />
+
+            <button
+              type="button"
+              onClick={() => navFecha(1)}
+              disabled={fechaSeleccionada === [...fechasDisponibles].sort().at(-1)}
+              className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-200 bg-white text-zinc-500 transition hover:bg-zinc-50 disabled:opacity-30"
+              aria-label="Día siguiente"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            <span className="ml-2 shrink-0 rounded-full bg-brand-50 px-3 py-1 text-[13px] font-semibold tabular-nums text-brand-700">
+              {diaSeleccionado?.total ?? 0} lead{(diaSeleccionado?.total ?? 0) === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          {/* Tabla por supervisor / promotor */}
+          {!diaSeleccionado || diaSeleccionado.total === 0 ? (
+            <p className="rounded-lg border border-dashed border-zinc-200 py-8 text-center text-[13px] text-zinc-400">
+              Sin leads registrados para esa fecha
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {diaSeleccionado.porSupervisor.map((sup) => (
+                <div key={sup.supervisorNombre} className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
+                  <div className="flex items-center justify-between border-b border-zinc-100 bg-zinc-50 px-4 py-2.5">
+                    <span className="text-[13px] font-semibold text-zinc-900">{sup.supervisorNombre}</span>
+                    <span className="text-[12px] font-semibold tabular-nums text-brand-700">{sup.total} lead{sup.total === 1 ? '' : 's'}</span>
+                  </div>
+                  <table className="min-w-full">
+                    <tbody className="divide-y divide-zinc-50">
+                      {sup.promotores.map((p) => (
+                        <tr key={p.promotorNombre} className="text-[13px]">
+                          <td className="py-2 pl-4 pr-3 text-zinc-700">{p.promotorNombre}</td>
+                          <td className="py-2 pl-3 pr-4 text-right font-semibold tabular-nums text-zinc-900">{p.cantidad}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* Control de Anexos - Plan Inversión Joven */}
       <section className="space-y-4">

@@ -397,6 +397,18 @@ export interface AdminProductividad {
   referidos: AdminReferidosMetrica;
 }
 
+/** Leads agrupados por día: total + desglose por supervisor y promotor. */
+export interface LeadsDiaSupervisor {
+  supervisorNombre: string;
+  total: number;
+  promotores: { promotorNombre: string; cantidad: number }[];
+}
+export interface LeadsPorDia {
+  fecha: string; // YYYY-MM-DD
+  total: number;
+  porSupervisor: LeadsDiaSupervisor[];
+}
+
 export interface AdminDashboardData {
   generadoEn: string;
   semanaDesde: string;
@@ -423,6 +435,8 @@ export interface AdminDashboardData {
   totalLeads?: number;
   totalSupervisores?: number;
   pijCierresPorPersona?: PersonaPijCierres[];
+  /** Leads agrupados por fecha (últimos 90 días), para el selector de calendario. */
+  leadsPorDia?: LeadsPorDia[];
 }
 
 export interface PijCierreDetalle {

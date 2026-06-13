@@ -101,6 +101,58 @@ function dashboardVacio(aviso) {
 }
 
 /**
+ * Agrupa leads por fecha (ú ltimos 90 días) → por supervisor → por promotor.
+ * @param {Array<{lead: import('../domain/admin-metrics.js').LeadConSupervisor, supervisorNombre: string}>} leadsConSupervisor
+ * @param {Date} hoy
+ */
+function buildLeadsPorDia(leadsConSupervisor, hoy) {
+  const DIAS = 90;
+  const cutoff = new Date(hoy);
+  cutoff.setDate(cutoff.getDate() - DIAS);
+
+  /** @type {Map<string, Map<string, Map<string, number>>>} fecha→supervisor→promotor→count */
+  const byDate = new Map();
+
+  for (const { lead, supervisorNombre } of leadsConSupervisor) {
+    const rawFecha = lead.fechaObtencion ?? lead.fechaAlta;
+    if (!rawFecha) continue;
+    const dateKey = String(rawFecha).slice(0, 10);
+    if (dateKey < cutoff.toISOString().slice(0, 10)) continue;
+
+    if (!byDate.has(dateKey)) byDate.set(dateKey, new Map());
+    const bySup = byDate.get(dateKey);
+
+    const supKey = supervisorNombre || 'Sin supervisor';
+    if (!bySup.has(supKey)) bySup.set(supKey, new Map());
+    const byProm = bySup.get(supKey);
+
+    const promNombre = lead.promotorNombre ?? lead.promotorId ?? 'Sin promotor';
+    byProm.set(promNombre, (byProm.get(promNombre) ?? 0) + 1);
+  }
+
+  const result = [];
+  for (const [fecha, bySup] of [...byDate.entries()].sort((a, b) => b[0].localeCompare(a[0]))) {
+    const porSupervisor = [];
+    let total = 0;
+    for (const [supNombre, byProm] of bySup.entries()) {
+      const promotores = [];
+      let supTotal = 0;
+      for (const [promotorNombre, cantidad] of byProm.entries()) {
+        promotores.push({ promotorNombre, cantidad });
+        supTotal += cantidad;
+      }
+      promotores.sort((a, b) => b.cantidad - a.cantidad);
+      porSupervisor.push({ supervisorNombre: supNombre, total: supTotal, promotores });
+      total += supTotal;
+    }
+    porSupervisor.sort((a, b) => b.total - a.total);
+    result.push({ fecha, total, porSupervisor });
+  }
+
+  return result;
+}
+
+/**
  * Dashboard global: exec encuestasMuestra → agrupa por supervisor → métricas semana + hoy.
  */
 export async function fetchAdminDashboard() {
@@ -133,8 +185,12 @@ export async function fetchAdminDashboard() {
 
   const supervisorIds = new Set(leadsConSupervisor.map((item) => item.supervisorId));
 
+  const { desde, hasta, hoy } = rangoSemanaMovil();
+  const leadsPorDia = buildLeadsPorDia(leadsConSupervisor, hoy);
+
   return {
     ...dashboard,
+    leadsPorDia,
     totalLeads: leads.length,
     totalSupervisores: supervisorIds.size,
     source: proc,

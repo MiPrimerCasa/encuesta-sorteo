@@ -255,7 +255,7 @@ const BASE_LEADS: Lead[] = [
     lista: 'entrevista',
     origen: 'redes',
     fechaObtencion: '2026-05-21',
-    seguimiento: { fuente: 'facebook', canal: 'llamada', huboEntrevista: false },
+    seguimiento: { fuente: 'facebook' },
   },
   {
     id: 'lead-03',
@@ -268,7 +268,7 @@ const BASE_LEADS: Lead[] = [
     lista: 'entrevista',
     origen: 'sorteo',
     fechaObtencion: '2026-05-19',
-    seguimiento: { fuente: 'qr', canal: 'mensaje', huboEntrevista: false },
+    seguimiento: { fuente: 'qr' },
   },
   {
     id: 'lead-04',
@@ -349,7 +349,7 @@ const BASE_LEADS: Lead[] = [
     lista: 'entrevista',
     origen: 'redes',
     fechaObtencion: '2026-05-13',
-    seguimiento: { fuente: 'tiktok', canal: 'llamada', huboEntrevista: false },
+    seguimiento: { fuente: 'tiktok' },
   },
   {
     id: 'lead-07',
@@ -597,10 +597,10 @@ const BASE_LEADS: Lead[] = [
   { id: 'lead-19', nombre: 'Camilo Ríos',      telefono: '3512 100001', promotorId: 'prom-1', promotorNombre: 'Martín González', quiereEntrevista: true,  lista: 'entrevista', origen: 'redes',   fechaObtencion: '2026-04-28', seguimiento: { fuente: 'instagram', canal: 'llamada', huboEntrevista: true, resultadoEntrevista: 'compro', idProducto: 'prod-pij', estadoPago: 'sena', brindoReferidos: false } },
   { id: 'lead-20', nombre: 'Pilar Estrada',    telefono: '3516 100002', promotorId: 'prom-2', promotorNombre: 'Ana Rodríguez',   quiereEntrevista: true,  lista: 'entrevista', origen: 'sorteo',  fechaObtencion: '2026-04-25', seguimiento: { fuente: 'qr',        canal: 'llamada', huboEntrevista: true, resultadoEntrevista: 'no_compro' } },
   { id: 'lead-21', nombre: 'Tomás Aguirre',    telefono: '3513 100003', promotorId: 'prom-3', promotorNombre: 'Carlos López',    quiereEntrevista: false, lista: 'contacto',   origen: 'redes',   fechaObtencion: '2026-04-22', seguimiento: { fuente: 'facebook',  canal: 'mensaje', huboEntrevista: true, resultadoEntrevista: 'compro', idProducto: 'prod-pij', estadoPago: 'entrega_33', numeroRecibo: '010101', brindoReferidos: false } },
-  { id: 'lead-22', nombre: 'Carla Medina',     telefono: '3515 100004', promotorId: 'prom-4', promotorNombre: 'Laura Fernández', quiereEntrevista: true,  lista: 'entrevista', origen: 'manual',  fechaObtencion: '2026-04-20', seguimiento: { fuente: 'app',       canal: 'llamada', huboEntrevista: false } },
+  { id: 'lead-22', nombre: 'Carla Medina',     telefono: '3515 100004', promotorId: 'prom-4', promotorNombre: 'Laura Fernández', quiereEntrevista: true,  lista: 'entrevista', origen: 'manual',  fechaObtencion: '2026-04-20', seguimiento: { fuente: 'app' } },
   { id: 'lead-23', nombre: 'Rodrigo Peña',     telefono: '3511 100005', promotorId: 'prom-1', promotorNombre: 'Martín González', quiereEntrevista: true,  lista: 'entrevista', origen: 'redes',   fechaObtencion: '2026-04-18', seguimiento: { fuente: 'instagram', canal: 'llamada', huboEntrevista: true, resultadoEntrevista: 'reagenda', fechaReagenda: '2026-05-05T09:00' } },
   { id: 'lead-24', nombre: 'Florencia Mena',   telefono: '3514 100006', promotorId: 'prom-2', promotorNombre: 'Ana Rodríguez',   quiereEntrevista: false, lista: 'contacto',   origen: 'redes',   fechaObtencion: '2026-04-15', seguimiento: { fuente: 'facebook',  canal: 'llamada', huboEntrevista: true, resultadoEntrevista: 'compro', idProducto: 'prod-terreno', estadoPago: 'sena', idBarrio: 'b3', numeroRecibo: '010202', brindoReferidos: false } },
-  { id: 'lead-25', nombre: 'Emanuel Quiroga',  telefono: '3518 100007', promotorId: 'prom-3', promotorNombre: 'Carlos López',    quiereEntrevista: true,  lista: 'entrevista', origen: 'sorteo',  fechaObtencion: '2026-04-12', seguimiento: { fuente: 'qr',        canal: 'mensaje', huboEntrevista: false } },
+  { id: 'lead-25', nombre: 'Emanuel Quiroga',  telefono: '3518 100007', promotorId: 'prom-3', promotorNombre: 'Carlos López',    quiereEntrevista: true,  lista: 'entrevista', origen: 'sorteo',  fechaObtencion: '2026-04-12', seguimiento: { fuente: 'qr' } },
   { id: 'lead-26', nombre: 'Lucía Ferreyra',   telefono: '3519 100008', promotorId: 'prom-4', promotorNombre: 'Laura Fernández', quiereEntrevista: false, lista: 'contacto',   origen: 'redes',   fechaObtencion: '2026-04-10', seguimiento: { fuente: 'instagram', canal: 'llamada', huboEntrevista: true, resultadoEntrevista: 'sin_interes' } },
 
   // ── Marzo 2026 ────────────────────────────────────────────────────────────
@@ -618,7 +618,7 @@ const BASE_LEADS: Lead[] = [
 
   { id: 'lead-35', nombre: 'Martina Greco',    telefono: '3512 300001', promotorId: 'prom-1', promotorNombre: 'Martín González', quiereEntrevista: true,  lista: 'entrevista', origen: 'redes',   fechaObtencion: '2026-02-24', seguimiento: { fuente: 'facebook',  canal: 'llamada', huboEntrevista: true, resultadoEntrevista: 'no_compro' } },
   { id: 'lead-36', nombre: 'Nicolás Parra',    telefono: '3516 300002', promotorId: 'prom-2', promotorNombre: 'Ana Rodríguez',   quiereEntrevista: false, lista: 'contacto',   origen: 'sorteo',  fechaObtencion: '2026-02-20', seguimiento: { fuente: 'qr',        canal: 'mensaje', huboEntrevista: true, resultadoEntrevista: 'compro', idProducto: 'prod-pij', estadoPago: 'sena', brindoReferidos: false } },
-  { id: 'lead-37', nombre: 'Valeria Ojeda',    telefono: '3513 300003', promotorId: 'prom-3', promotorNombre: 'Carlos López',    quiereEntrevista: true,  lista: 'entrevista', origen: 'redes',   fechaObtencion: '2026-02-18', seguimiento: { fuente: 'instagram', canal: 'llamada', huboEntrevista: false } },
+  { id: 'lead-37', nombre: 'Valeria Ojeda',    telefono: '3513 300003', promotorId: 'prom-3', promotorNombre: 'Carlos López',    quiereEntrevista: true,  lista: 'entrevista', origen: 'redes',   fechaObtencion: '2026-02-18', seguimiento: { fuente: 'instagram' } },
   { id: 'lead-38', nombre: 'Gabriel Flores',   telefono: '3515 300004', promotorId: 'prom-4', promotorNombre: 'Laura Fernández', quiereEntrevista: false, lista: 'contacto',   origen: 'redes',   fechaObtencion: '2026-02-15', seguimiento: { fuente: 'instagram', canal: 'llamada', huboEntrevista: true, resultadoEntrevista: 'compro', idProducto: 'prod-terreno', estadoPago: 'sena', idBarrio: 'b1', numeroRecibo: '030101', brindoReferidos: false } },
   { id: 'lead-39', nombre: 'Mónica Leiva',     telefono: '3511 300005', promotorId: 'prom-2', promotorNombre: 'Ana Rodríguez',   quiereEntrevista: true,  lista: 'entrevista', origen: 'manual',  fechaObtencion: '2026-02-12', seguimiento: { fuente: 'app',       canal: 'llamada', huboEntrevista: true, resultadoEntrevista: 'sin_interes' } },
   { id: 'lead-40', nombre: 'Esteban Noriega',  telefono: '3514 300006', promotorId: 'prom-1', promotorNombre: 'Martín González', quiereEntrevista: false, lista: 'contacto',   origen: 'redes',   fechaObtencion: '2026-02-08', seguimiento: { fuente: 'facebook',  canal: 'mensaje', huboEntrevista: false } },

@@ -1,0 +1,80 @@
+=========================================================
+IMPLEMENTACIÓN PENDIENTE: Leads de promotor (QR/manual/redes)
+→ seguimiento automático + vista purple/read-only para supervisor
+=========================================================
+
+ESTADO: Pendiente — esperando que el DBA agregue columna
+        "cargado_por" (o similar) en la tabla encuestas.
+
+FECHA DE REGISTRO: 2026-06-12
+
+-----------------------------------------------
+CONTEXTO
+-----------------------------------------------
+El usuario quiere que los leads que llegan via QR, carga manual
+o links de redes por parte del PROMOTOR:
+  1. Aparezcan directamente en la sección "Seguimiento" del supervisor
+  2. El supervisor los vea con color morado/indigo (solo lectura)
+  3. El supervisor puede ver los datos pero NO puede interactuar
+
+Ya existe el mecanismo en el sistema:
+- domain/leads.ts → leadSoloLecturaSupervisor(lead) → purple/read-only
+- LeadCard.tsx línea 152 → 'cursor-default border-indigo-200 bg-indigo-50/80'
+- Activado cuando: leadSeguimientoPijPromotor || leadSeguimientoAgendaOtroRol
+
+-----------------------------------------------
+POR QUÉ NO SE IMPLEMENTÓ AÚN
+-----------------------------------------------
+Los supervisores TAMBIÉN pueden crear leads manuales.
+Sin una columna que indique "quién cargó el lead" (promotor vs supervisor),
+no es posible distinguir frontend-only con precisión.
+
+El DBA está agregando una columna a la tabla encuestas.
+Cuando esté disponible, implementar Approach B2 (ver abajo).
+
+-----------------------------------------------
+APPROACH B2 — RECOMENDADO (sin cambio de schema adicional)
+-----------------------------------------------
+Cuando POST /api/leads/nuevo es llamado por un PROMOTOR
+con origen = 'manual', 'redes', o 'qr':
+  - Automáticamente insertar un seguimiento inicial con:
+      seguimientoAgendaOperadorRol = 'promotor'
+      canal = null (sin contacto aún)
+  - Esto activa el mecanismo existente de leadSoloLecturaSupervisor
+
+ARCHIVOS A MODIFICAR:
+  - server/create-app.js → endpoint POST /api/leads/nuevo
+      → detectar si usuario.rol === 'promotor' y origen es manual/redes/qr
+      → después de crear el lead, insertar seguimiento inicial vía SP
+  - server/db/seguimiento-sql.js → agregar función insertarSeguimientoInicial()
+  - src/domain/leads.ts (opcional) → extender leadEnSeguimientoActivo()
+      para incluir leads con ese seguimiento inicial
+
+ARCHIVOS SIN CAMBIOS NECESARIOS (el mecanismo ya existe):
+  - src/components/leads/LeadCard.tsx
+  - src/domain/leads.ts → leadSoloLecturaSupervisor (ya cubre el caso)
+
+-----------------------------------------------
+APPROACH A — ALTERNATIVO (si supervisores NO crean manuales)
+-----------------------------------------------
+Solo frontend. Agregar en domain/leads.ts:
+
+  export function leadEsOrigenPromotorExterno(lead: Lead): boolean {
+    return lead.origen === 'manual' || lead.origen === 'redes';
+  }
+
+  Extender leadSoloLecturaSupervisor():
+    return ... || leadEsOrigenPromotorExterno(lead);
+
+  Extender leadEnSeguimientoActivo():
+    return ... || leadEsOrigenPromotorExterno(lead);
+
+-----------------------------------------------
+COLUMNA SQL PENDIENTE (DBA)
+-----------------------------------------------
+Tabla: encuestas (o la tabla principal de leads)
+Columna sugerida: cargado_por_rol VARCHAR(20) -- 'promotor' | 'supervisor'
+                  o: cargado_por_id INT (FK a operadores)
+
+Una vez disponible, mapear en server/db/mssql.js → mapOperadorRow()
+y agregar campo cargadoPorRol al tipo Lead en src/types/index.ts.

@@ -87,6 +87,7 @@ function PromotorRow({
 export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
   const [selectedPerson, setSelectedPerson] = useState<PersonaPijCierres | null>(null);
   const [filterText, setFilterText] = useState('');
+  const [busquedaGlobal, setBusquedaGlobal] = useState('');
 
   const rango = formatRangoSemana(data.semanaDesde, data.semanaHasta);
   const hoyLabel = new Date(data.hoy).toLocaleDateString('es-AR', {
@@ -94,6 +95,26 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
     day: 'numeric',
     month: 'long',
   });
+
+  const q = busquedaGlobal.trim().toLowerCase();
+  const supervisoresFiltrados = q
+    ? data.supervisores
+        .map((sup) => ({
+          ...sup,
+          promotores: sup.promotores.filter((p) =>
+            p.promotorNombre.toLowerCase().includes(q)
+          ),
+        }))
+        .filter(
+          (sup) =>
+            sup.supervisorNombre.toLowerCase().includes(q) || sup.promotores.length > 0
+        )
+    : data.supervisores;
+
+  const totalPromotoresFiltrados = supervisoresFiltrados.reduce(
+    (acc, s) => acc + s.promotores.length,
+    0
+  );
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 pb-12 sm:px-6">
@@ -221,14 +242,58 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
       </section>
 
       <section className="space-y-6">
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-          Supervisores y equipos
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
+            Supervisores y equipos
+          </h3>
+          {q && (
+            <span className="text-[12px] text-zinc-500 tabular-nums">
+              {totalPromotoresFiltrados} promotor{totalPromotoresFiltrados === 1 ? '' : 'es'} encontrado{totalPromotoresFiltrados === 1 ? '' : 's'}
+            </span>
+          )}
+        </div>
 
-        {data.supervisores.length === 0 ? (
+        {/* Buscador global */}
+        <div className="relative">
+          <svg
+            width="16" height="16" viewBox="0 0 16 16" fill="none"
+            className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400"
+            aria-hidden="true"
+          >
+            <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+            <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+          <input
+            id="busqueda-panel-global"
+            type="search"
+            value={busquedaGlobal}
+            onChange={(e) => setBusquedaGlobal(e.target.value)}
+            placeholder="Buscar supervisor o promotor…"
+            className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-10 pr-10 text-[14px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-300 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          />
+          {busquedaGlobal && (
+            <button
+              type="button"
+              onClick={() => setBusquedaGlobal('')}
+              style={{ touchAction: 'manipulation' }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 active:text-zinc-700"
+              aria-label="Limpiar búsqueda"
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          )}
+        </div>
+
+        {supervisoresFiltrados.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-zinc-200 py-10 text-center text-[13px] text-zinc-400">
+            Sin resultados para &ldquo;{busquedaGlobal.trim()}&rdquo;
+          </p>
+        ) : data.supervisores.length === 0 ? (
           <p className="text-[13px] text-zinc-500">No hay datos de supervisores para mostrar.</p>
         ) : (
-          data.supervisores.map((sup) => (
+          supervisoresFiltrados.map((sup) => (
             <article
               key={sup.supervisorId}
               className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm"

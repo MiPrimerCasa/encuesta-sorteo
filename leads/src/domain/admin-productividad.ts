@@ -22,10 +22,7 @@ function bitTrue(val: unknown) {
 
 function filaIndicaEntrevista(row: HistorialRow) {
   const r = row as Record<string, unknown>;
-  if (bitTrue(r.hubo_entrevista ?? r.huboEntrevista)) return true;
-  if (bitTrue(r.confirmo_entrevista ?? r.confirmoEntrevista)) return true;
-  const res = String(r.resultado_entrevista ?? r.resultadoEntrevista ?? '').trim();
-  return ['compro', 'no_compro', 'reagenda', 'derivar_terreno', 'sin_interes'].includes(res);
+  return bitTrue(r.hubo_entrevista ?? r.huboEntrevista);
 }
 
 function fechaHistorial(row: HistorialRow) {

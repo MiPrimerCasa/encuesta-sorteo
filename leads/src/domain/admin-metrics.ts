@@ -55,10 +55,7 @@ function bitTrue(val: unknown) {
 }
 
 function filaIndicaEntrevista(row: Record<string, unknown>) {
-  if (bitTrue(row.hubo_entrevista ?? row.huboEntrevista)) return true;
-  if (bitTrue(row.confirmo_entrevista ?? row.confirmoEntrevista)) return true;
-  const res = String(row.resultado_entrevista ?? row.resultadoEntrevista ?? '').trim();
-  return ['compro', 'no_compro', 'reagenda', 'derivar_terreno', 'sin_interes'].includes(res);
+  return bitTrue(row.hubo_entrevista ?? row.huboEntrevista);
 }
 
 function filaIndicaCierre(row: Record<string, unknown>) {

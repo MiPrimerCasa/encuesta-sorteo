@@ -10,12 +10,7 @@ import App from './App';
 // /demo/superadmin            → panel global demo
 if (window.location.pathname.startsWith('/demo')) {
   const path = window.location.pathname.replace(/\/$/, '');
-  const rol =
-    path === '/demo/promotor'
-      ? 'promotor'
-      : path === '/demo/superadmin'
-        ? 'superadmin'
-        : 'supervisor';
+  const rol = path === '/demo/promotor' ? 'promotor' : 'supervisor';
   enableDemoMode(rol);
 }
 

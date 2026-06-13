@@ -370,6 +370,48 @@ export function buildAdminDashboardFromLeads(
     { entrevistas: 0, cierres: 0, ventasTerreno: 0, ventasPij: 0 },
   );
 
+  const pijCierresMap = new Map<string, Array<{
+    leadId: string;
+    leadNombre: string;
+    leadTelefono: string;
+    numeroAnexo: string;
+    fechaCierre: string;
+    estadoPago: string | null;
+  }>>();
+
+  for (const item of leadsConSupervisor) {
+    const { lead } = item;
+    const esCierre = lead.seguimiento?.resultadoEntrevista === 'compro';
+    const esPij = lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ;
+    if (esCierre && esPij) {
+      const operadorNombre = (lead.seguimiento?.operadorNombre || lead.promotorNombre || 'Sin asignar').trim();
+      if (!pijCierresMap.has(operadorNombre)) {
+        pijCierresMap.set(operadorNombre, []);
+      }
+      pijCierresMap.get(operadorNombre)!.push({
+        leadId: String(lead.id),
+        leadNombre: lead.nombre,
+        leadTelefono: lead.telefono || '—',
+        numeroAnexo: lead.seguimiento?.numeroRecibo || '—',
+        fechaCierre: lead.seguimiento?.fechaCierre || lead.seguimiento?.creadoEn || '',
+        estadoPago: lead.seguimiento?.estadoPago || null,
+      });
+    }
+  }
+
+  const pijCierresPorPersona = [...pijCierresMap.entries()].map(([operadorNombre, cierres]) => {
+    cierres.sort((a, b) => {
+      const dateA = a.fechaCierre ? new Date(a.fechaCierre).getTime() : 0;
+      const dateB = b.fechaCierre ? new Date(b.fechaCierre).getTime() : 0;
+      return dateB - dateA;
+    });
+    return {
+      operadorNombre,
+      cantidad: cierres.length,
+      cierres,
+    };
+  }).sort((a, b) => b.cantidad - a.cantidad || a.operadorNombre.localeCompare(b.operadorNombre, 'es'));
+
   return {
     generadoEn: ahora.toISOString(),
     semanaDesde: desde.toISOString(),
@@ -392,6 +434,7 @@ export function buildAdminDashboardFromLeads(
     productividad: buildAdminProductividad(leads, historialRows, ahora),
     totalLeads: leads.length,
     totalSupervisores: supervisores.length,
+    pijCierresPorPersona,
   };
 }
 

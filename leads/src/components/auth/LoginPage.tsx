@@ -61,7 +61,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     }
   };
 
-  const enterDemo = async (rol: '__demo_supervisor__' | '__demo_promotor__' | '__demo_superadmin__') => {
+  const enterDemo = async (rol: '__demo_supervisor__' | '__demo_promotor__') => {
     setCargando(rol);
     setError('');
     try {
@@ -137,26 +137,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 </p>
               </div>
               {cargando === '__demo_promotor__' && (
-                <span className="ml-auto text-[12px] text-zinc-400">Cargando…</span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              disabled={cargando !== null}
-              onClick={() => enterDemo('__demo_superadmin__')}
-              className="flex w-full items-center gap-4 rounded-2xl border-2 border-violet-200 bg-violet-50/50 px-5 py-4 text-left transition-all hover:border-violet-300 hover:shadow-sm active:scale-[0.99] disabled:opacity-60"
-            >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-violet-100 text-[22px]">
-                📊
-              </div>
-              <div className="min-w-0">
-                <p className="text-[15px] font-bold text-zinc-900">Demo Superadmin</p>
-                <p className="mt-0.5 text-[12px] text-zinc-500">
-                  Todos los supervisores, equipos y rankings
-                </p>
-              </div>
-              {cargando === '__demo_superadmin__' && (
                 <span className="ml-auto text-[12px] text-zinc-400">Cargando…</span>
               )}
             </button>

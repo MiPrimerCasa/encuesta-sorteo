@@ -29,6 +29,7 @@ export const DEMO_USUARIO: UsuarioSesion = {
   rol: 'supervisor',
   idOperador: 'demo-sup',
   codigoCarga: 'SORTEO01S21P01',
+  panelGlobal: true,
 };
 
 export const DEMO_USUARIO_PROMOTOR: UsuarioSesion = {
@@ -38,6 +39,7 @@ export const DEMO_USUARIO_PROMOTOR: UsuarioSesion = {
   idVendedor: 'prom-1',
   idOperador: 'prom-1',
   codigoCarga: 'SORTEO01S21P01',
+  panelGlobal: true,
 };
 
 export const DEMO_USUARIO_SUPERADMIN: UsuarioSesion = {

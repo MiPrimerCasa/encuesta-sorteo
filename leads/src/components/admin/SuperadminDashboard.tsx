@@ -88,6 +88,7 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
   const [selectedPerson, setSelectedPerson] = useState<PersonaPijCierres | null>(null);
   const [filterText, setFilterText] = useState('');
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
+  const [rankingSearch, setRankingSearch] = useState('');
 
   // ── Resumen General de Productividad (Semana Móvil) ──────────────────────────
   const todosPromotores = data.supervisores.flatMap((s) =>
@@ -106,6 +107,12 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
     }
     return b.leadsTotal - a.leadsTotal;
   });
+
+  const promotoresFiltradosRanking = rankingSearch.trim()
+    ? promotoresOrdenados.filter((p) =>
+        p.promotorNombre.toLowerCase().includes(rankingSearch.trim().toLowerCase())
+      )
+    : promotoresOrdenados;
 
   const totalPromotoresCierres = todosPromotores.reduce((acc, p) => acc + p.cierresSemana, 0);
   const totalPromotoresEntrevistas = todosPromotores.reduce((acc, p) => acc + p.entrevistasSemana, 0);
@@ -274,9 +281,42 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
           Resumen General de Cierres (Semana Móvil)
         </h3>
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col">
-          <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
-            <h4 className="text-[14px] font-semibold text-zinc-900">Ranking de Cierres</h4>
-            <p className="text-[11px] text-zinc-500">Listado de promotores y operadores ordenados por cantidad de cierres.</p>
+          <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h4 className="text-[14px] font-semibold text-zinc-900">Ranking de Cierres</h4>
+              <p className="text-[11px] text-zinc-500">Listado de promotores y operadores ordenados por cantidad de cierres.</p>
+            </div>
+            <div className="relative w-full sm:w-64 shrink-0">
+              <svg
+                width="14" height="14" viewBox="0 0 16 16" fill="none"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                aria-hidden="true"
+              >
+                <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+              <input
+                id="busqueda-ranking"
+                type="search"
+                value={rankingSearch}
+                onChange={(e) => setRankingSearch(e.target.value)}
+                placeholder="Buscar promotor…"
+                className="w-full rounded-lg border border-zinc-200 bg-white py-1.5 pl-8 pr-8 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100"
+              />
+              {rankingSearch && (
+                <button
+                  type="button"
+                  onClick={() => setRankingSearch('')}
+                  style={{ touchAction: 'manipulation' }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 active:text-zinc-700"
+                  aria-label="Limpiar búsqueda"
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                </button>
+              )}
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
@@ -293,18 +333,29 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 text-zinc-700">
-                {promotoresOrdenados.map((p, index) => (
-                  <tr key={p.promotorId} className="hover:bg-zinc-50/80 transition-colors">
-                    <td className="py-2.5 px-3 text-center font-medium text-zinc-400">{index + 1}</td>
-                    <td className="py-2.5 px-3 font-semibold text-zinc-900">{p.promotorNombre}</td>
-                    <td className="py-2.5 px-3 text-zinc-500">{p.supervisorNombre}</td>
-                    <td className="py-2.5 px-3 text-center tabular-nums">{p.leadsTotal}</td>
-                    <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{p.entrevistasSemana}</td>
-                    <td className="py-2.5 px-3 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
-                    <td className="py-2.5 px-3 text-center tabular-nums text-amber-700 font-semibold">{p.ventasTerrenoSemana}</td>
-                    <td className="py-2.5 px-4 text-center tabular-nums text-indigo-600 font-semibold">{p.ventasPijSemana}</td>
+                {promotoresFiltradosRanking.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-zinc-400 text-[13px]">
+                      No se encontraron resultados para la búsqueda "{rankingSearch}".
+                    </td>
                   </tr>
-                ))}
+                ) : (
+                  promotoresFiltradosRanking.map((p) => {
+                    const originalIndex = promotoresOrdenados.findIndex((x) => x.promotorId === p.promotorId);
+                    return (
+                      <tr key={p.promotorId} className="hover:bg-zinc-50/80 transition-colors">
+                        <td className="py-2.5 px-3 text-center font-medium text-zinc-400">{originalIndex + 1}</td>
+                        <td className="py-2.5 px-3 font-semibold text-zinc-900">{p.promotorNombre}</td>
+                        <td className="py-2.5 px-3 text-zinc-500">{p.supervisorNombre}</td>
+                        <td className="py-2.5 px-3 text-center tabular-nums">{p.leadsTotal}</td>
+                        <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{p.entrevistasSemana}</td>
+                        <td className="py-2.5 px-3 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
+                        <td className="py-2.5 px-3 text-center tabular-nums text-amber-700 font-semibold">{p.ventasTerrenoSemana}</td>
+                        <td className="py-2.5 px-4 text-center tabular-nums text-indigo-600 font-semibold">{p.ventasPijSemana}</td>
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
               <tfoot>
                 <tr className="bg-zinc-50/50 font-bold border-t-2 border-zinc-200">

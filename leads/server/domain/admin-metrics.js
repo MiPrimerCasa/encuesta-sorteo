@@ -134,6 +134,9 @@ export function buildAdminChartEvents(leadsConSupervisor, historialRows = []) {
   const eventos = [];
   const leadPorId = new Map();
   const entrevistasVistas = new Set();
+  const cierresVistas = new Set();
+  const terrenosVistas = new Set();
+  const pijVistas = new Set();
 
   for (const item of leadsConSupervisor) {
     leadPorId.set(String(item.lead.id), item);
@@ -163,13 +166,29 @@ export function buildAdminChartEvents(leadsConSupervisor, historialRows = []) {
       }
     }
     if (filaIndicaCierre(row)) {
-      eventos.push({ fecha: fecha.toISOString(), tipo: 'cierre', supervisorNombre: supNombre });
+      const esCierreActual = item.lead.seguimiento?.resultadoEntrevista === 'compro';
+      if (esCierreActual && !cierresVistas.has(leadId)) {
+        cierresVistas.add(leadId);
+        eventos.push({ fecha: fecha.toISOString(), tipo: 'cierre', supervisorNombre: supNombre });
+      }
     }
     if (esVentaTerreno(row)) {
-      eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno', supervisorNombre: supNombre });
+      const esTerrenoActual =
+        item.lead.seguimiento?.resultadoEntrevista === 'compro' &&
+        item.lead.seguimiento?.idProducto === 'prod-terreno';
+      if (esTerrenoActual && !terrenosVistas.has(leadId)) {
+        terrenosVistas.add(leadId);
+        eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno', supervisorNombre: supNombre });
+      }
     }
     if (esVentaPij(row)) {
-      eventos.push({ fecha: fecha.toISOString(), tipo: 'pij', supervisorNombre: supNombre });
+      const esPijActual =
+        item.lead.seguimiento?.resultadoEntrevista === 'compro' &&
+        item.lead.seguimiento?.idProducto === 'prod-pij';
+      if (esPijActual && !pijVistas.has(leadId)) {
+        pijVistas.add(leadId);
+        eventos.push({ fecha: fecha.toISOString(), tipo: 'pij', supervisorNombre: supNombre });
+      }
     }
   }
 

@@ -111,20 +111,6 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
   const totalPromotoresEntrevistas = todosPromotores.reduce((acc, p) => acc + p.entrevistasSemana, 0);
   const totalPromotoresLeads = todosPromotores.reduce((acc, p) => acc + p.leadsTotal, 0);
 
-  const supervisoresOrdenados = [...data.supervisores].sort((a, b) => {
-    if (b.totales.cierresSemana !== a.totales.cierresSemana) {
-      return b.totales.cierresSemana - a.totales.cierresSemana;
-    }
-    if (b.totales.entrevistasSemana !== a.totales.entrevistasSemana) {
-      return b.totales.entrevistasSemana - a.totales.entrevistasSemana;
-    }
-    return b.totales.leadsTotal - a.totales.leadsTotal;
-  });
-
-  const totalSupervisoresCierres = data.supervisores.reduce((acc, s) => acc + s.totales.cierresSemana, 0);
-  const totalSupervisoresEntrevistas = data.supervisores.reduce((acc, s) => acc + s.totales.entrevistasSemana, 0);
-  const totalSupervisoresLeads = data.supervisores.reduce((acc, s) => acc + s.totales.leadsTotal, 0);
-
 
   const rango = formatRangoSemana(data.semanaDesde, data.semanaHasta);
   const hoyLabel = new Date(data.hoy).toLocaleDateString('es-AR', {
@@ -283,89 +269,46 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
 
       <section className="space-y-4">
         <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-          Resumen General de Rendimiento (Semana Móvil)
+          Resumen General de Cierres (Semana Móvil)
         </h3>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Tabla Promotores */}
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col">
-            <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
-              <h4 className="text-[14px] font-semibold text-zinc-900">Ranking de Promotores</h4>
-              <p className="text-[11px] text-zinc-500">Ordenado por cantidad de cierres semanales.</p>
-            </div>
-            <div className="overflow-x-auto flex-1">
-              <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
-                <thead>
-                  <tr className="bg-zinc-50/50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-                    <th className="py-2 px-3 text-center w-12">Pos</th>
-                    <th className="py-2 px-3 text-left">Promotor</th>
-                    <th className="py-2 px-3 text-left">Supervisor</th>
-                    <th className="py-2 px-3 text-center">Leads</th>
-                    <th className="py-2 px-3 text-center">Entrevistas</th>
-                    <th className="py-2 px-4 text-center">Cierres</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 text-zinc-700">
-                  {promotoresOrdenados.map((p, index) => (
-                    <tr key={p.promotorId} className="hover:bg-zinc-50/80 transition-colors">
-                      <td className="py-2.5 px-3 text-center font-medium text-zinc-400">{index + 1}</td>
-                      <td className="py-2.5 px-3 font-semibold text-zinc-900">{p.promotorNombre}</td>
-                      <td className="py-2.5 px-3 text-zinc-500">{p.supervisorNombre}</td>
-                      <td className="py-2.5 px-3 text-center tabular-nums">{p.leadsTotal}</td>
-                      <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{p.entrevistasSemana}</td>
-                      <td className="py-2.5 px-4 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-zinc-50/50 font-bold border-t-2 border-zinc-200">
-                    <td colSpan={3} className="py-3 px-3 text-left text-zinc-900 font-bold">Total Empresa</td>
-                    <td className="py-3 px-3 text-center tabular-nums">{totalPromotoresLeads}</td>
-                    <td className="py-3 px-3 text-center tabular-nums text-brand-700">{totalPromotoresEntrevistas}</td>
-                    <td className="py-3 px-4 text-center tabular-nums text-emerald-700 font-extrabold">{totalPromotoresCierres}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col">
+          <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
+            <h4 className="text-[14px] font-semibold text-zinc-900">Ranking de Cierres</h4>
+            <p className="text-[11px] text-zinc-500">Listado de promotores y operadores ordenados por cantidad de cierres.</p>
           </div>
-
-          {/* Tabla Supervisores */}
-          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col">
-            <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
-              <h4 className="text-[14px] font-semibold text-zinc-900">Ranking de Supervisores</h4>
-              <p className="text-[11px] text-zinc-500">Ordenado por cierres agregados de su equipo.</p>
-            </div>
-            <div className="overflow-x-auto flex-1">
-              <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
-                <thead>
-                  <tr className="bg-zinc-50/50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-                    <th className="py-2 px-3 text-center w-12">Pos</th>
-                    <th className="py-2 px-3 text-left">Supervisor</th>
-                    <th className="py-2 px-3 text-center">Leads</th>
-                    <th className="py-2 px-3 text-center">Entrevistas</th>
-                    <th className="py-2 px-4 text-center">Cierres</th>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
+              <thead>
+                <tr className="bg-zinc-50/50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                  <th className="py-2 px-3 text-center w-12">Pos</th>
+                  <th className="py-2 px-3 text-left">Promotor</th>
+                  <th className="py-2 px-3 text-left">Equipo (Supervisor)</th>
+                  <th className="py-2 px-3 text-center">Leads</th>
+                  <th className="py-2 px-3 text-center">Entrevistas</th>
+                  <th className="py-2 px-4 text-center">Cierres</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                {promotoresOrdenados.map((p, index) => (
+                  <tr key={p.promotorId} className="hover:bg-zinc-50/80 transition-colors">
+                    <td className="py-2.5 px-3 text-center font-medium text-zinc-400">{index + 1}</td>
+                    <td className="py-2.5 px-3 font-semibold text-zinc-900">{p.promotorNombre}</td>
+                    <td className="py-2.5 px-3 text-zinc-500">{p.supervisorNombre}</td>
+                    <td className="py-2.5 px-3 text-center tabular-nums">{p.leadsTotal}</td>
+                    <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{p.entrevistasSemana}</td>
+                    <td className="py-2.5 px-4 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100 text-zinc-700">
-                  {supervisoresOrdenados.map((s, index) => (
-                    <tr key={s.supervisorId} className="hover:bg-zinc-50/80 transition-colors">
-                      <td className="py-2.5 px-3 text-center font-medium text-zinc-400">{index + 1}</td>
-                      <td className="py-2.5 px-3 font-semibold text-zinc-900">{s.supervisorNombre}</td>
-                      <td className="py-2.5 px-3 text-center tabular-nums">{s.totales.leadsTotal}</td>
-                      <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{s.totales.entrevistasSemana}</td>
-                      <td className="py-2.5 px-4 text-center tabular-nums font-bold text-emerald-700">{s.totales.cierresSemana}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-zinc-50/50 font-bold border-t-2 border-zinc-200">
-                    <td colSpan={2} className="py-3 px-3 text-left text-zinc-900 font-bold">Total Empresa</td>
-                    <td className="py-3 px-3 text-center tabular-nums">{totalSupervisoresLeads}</td>
-                    <td className="py-3 px-3 text-center tabular-nums text-brand-700">{totalSupervisoresEntrevistas}</td>
-                    <td className="py-3 px-4 text-center tabular-nums text-emerald-700 font-extrabold">{totalSupervisoresCierres}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-zinc-50/50 font-bold border-t-2 border-zinc-200">
+                  <td colSpan={3} className="py-3 px-3 text-left text-zinc-900 font-bold">Total Empresa</td>
+                  <td className="py-3 px-3 text-center tabular-nums">{totalPromotoresLeads}</td>
+                  <td className="py-3 px-3 text-center tabular-nums text-brand-700">{totalPromotoresEntrevistas}</td>
+                  <td className="py-3 px-4 text-center tabular-nums text-emerald-700 font-extrabold">{totalPromotoresCierres}</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         </div>
       </section>

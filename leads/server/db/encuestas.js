@@ -15,6 +15,7 @@ import {
 import { cierreRegistradoPorSupervisor } from '../domain/cierre-supervisor.js';
 import { CodigoPromotorCargaError } from './encuesta-carga.js';
 import { getSeguimientoExterno } from './sqlite.js';
+import { nombresCoinciden } from './operadores-catalog.js';
 import {
   batchLatestSeguimientoSql,
   getLatestSeguimientoSql,
@@ -666,6 +667,17 @@ export function resolveCodigoCargaPorPromotor(encuestaRows, promotorNombre, idVe
   if (byKey) return byKey;
   const byNombre = index.get(`|${normalizeNombre(promotorNombre ?? '')}`)?.codigoCarga;
   if (byNombre) return byNombre;
+
+  // Fuzzy search by name using nombresCoinciden!
+  if (promotorNombre) {
+    for (const [k, v] of index.entries()) {
+      const rowName = k.split('|')[1];
+      if (rowName && nombresCoinciden(promotorNombre, rowName)) {
+        return v.codigoCarga;
+      }
+    }
+  }
+
   if (idVendedor != null && String(idVendedor).trim() !== '') {
     const prefix = `${idVendedor}|`;
     for (const [k, v] of index) {

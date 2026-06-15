@@ -151,7 +151,15 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
             ? 'Servidor o base de datos no disponible.'
             : `Error en la solicitud (${res.status})`;
     const detail = typeof data.detail === 'string' ? data.detail : '';
-    throw new Error(detail && !msg.includes(detail) ? `${msg}\n\nDetalle: ${detail}` : msg);
+    const techDetail = typeof data.technicalDetail === 'string' ? data.technicalDetail : '';
+    let errorMsg = msg;
+    if (detail && !errorMsg.includes(detail)) {
+      errorMsg += `\n\nDetalle: ${detail}`;
+    }
+    if (techDetail && !errorMsg.includes(techDetail)) {
+      errorMsg += `\n\nTécnico: ${techDetail}`;
+    }
+    throw new Error(errorMsg);
   }
   return data as T;
 }

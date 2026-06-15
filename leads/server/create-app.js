@@ -429,10 +429,17 @@ function registerApiRoutes(api) {
         });
       }
       if (error instanceof CargaEncuestaSinPersistirError) {
+        console.warn(
+          '[CargaEncuestaSinPersistir] detail:',
+          error.detail,
+          'technical:',
+          error.technicalDetail,
+        );
         return res.status(error.status).json({
           message: error.message,
           code: error.code,
           detail: error.detail,
+          technicalDetail: error.technicalDetail,
         });
       }
       console.error('Error al cargar lead manual:', error);

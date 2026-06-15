@@ -18,6 +18,7 @@ import {
   enriquecerUsuarioConCodigoCarga,
   idVendedorOperador,
   loadOperadoresCatalogAsync,
+  nombresCoinciden,
   resolveCodigoCargaOperador,
   resolveCodigoCargaPromotorStrict,
 } from './operadores-catalog.js';
@@ -64,7 +65,7 @@ export class LeadNoManualError extends Error {
 }
 
 export class CargaEncuestaSinPersistirError extends Error {
-  constructor(detail) {
+  constructor(detail, technicalDetail) {
     super(
       'La carga no quedó registrada en la base. Verificá el teléfono y volvé a cargar; si persiste, contactá soporte.',
     );
@@ -72,6 +73,7 @@ export class CargaEncuestaSinPersistirError extends Error {
     this.code = 'CARGA_SIN_PERSISTIR';
     this.status = 502;
     this.detail = detail;
+    this.technicalDetail = technicalDetail;
   }
 }
 
@@ -154,11 +156,23 @@ function mapLugarEntrevistaSp(lugar) {
   return null;
 }
 
-function digitsTelefono(raw) {
+export function digitsTelefono(raw) {
   return String(raw ?? '').replace(/\D/g, '');
 }
 
-export { digitsTelefono };
+export function telefonosCoinciden(tel1, tel2) {
+  const d1 = digitsTelefono(tel1);
+  const d2 = digitsTelefono(tel2);
+  if (!d1 || !d2) return false;
+  if (d1 === d2) return true;
+  if (d1.length >= 10 && d2.length >= 10) {
+    return d1.slice(-10) === d2.slice(-10);
+  }
+  if (d1.length >= 8 && d2.length >= 8) {
+    return d1.slice(-8) === d2.slice(-8);
+  }
+  return false;
+}
 
 /**
  * Clave única encuesta: @telefono + @encuesta.
@@ -455,14 +469,13 @@ export function buildCargaParamsFromLead(lead, telefonoNuevo, usuarioSp) {
 }
 
 function buscarLeadTrasCarga(leads, payload, encCarga) {
-  const telObjetivo = digitsTelefono(payload.telefono);
   return (
     leads.find(
       (l) =>
-        digitsTelefono(l.telefono) === telObjetivo &&
+        telefonosCoinciden(l.telefono, payload.telefono) &&
         normalizarEncuestaCargaId(l.codigoCampania || encCarga) === encCarga,
     ) ??
-    leads.find((l) => normalizeNombre(l.nombre) === normalizeNombre(payload.nombre))
+    leads.find((l) => nombresCoinciden(l.nombre, payload.nombre))
   );
 }
 
@@ -506,11 +519,10 @@ export async function crearEncuestaManual(payload, usuarioSesion, opciones = {})
 
 /** Duplicado = mismo teléfono en la misma campaña (`encuesta`). */
 export function telefonoYaEnCampania(leads, telefono, encuesta) {
-  const d = digitsTelefono(telefono);
   const enc = normalizarEncuestaCargaId(encuesta);
-  if (!d || !enc) return false;
+  if (!enc) return false;
   return leads.some((l) => {
-    if (digitsTelefono(l.telefono) !== d) return false;
+    if (!telefonosCoinciden(l.telefono, telefono)) return false;
     const encLead = l.codigoCampania
       ? normalizarEncuestaCargaId(l.codigoCampania)
       : normalizarEncuestaCargaId('sorteo01');

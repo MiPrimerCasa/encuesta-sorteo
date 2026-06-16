@@ -871,6 +871,32 @@ export function LeadModalForm({
             className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5"
           >
             <fieldset disabled={soloLectura} className="m-0 space-y-6 border-0 p-0">
+            {/* Información de la encuesta (Conoce MPC / Sabía PIJ) */}
+            {(lead.conoceMpc !== null || lead.sabiaPlanInversionJoven !== null) && (
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-4 space-y-3">
+                <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                  Respuestas de la Encuesta
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  {lead.conoceMpc !== null && (
+                    <div>
+                      <p className="text-[12px] text-zinc-400 font-medium">¿Conocían Mi Primer Casa?</p>
+                      <p className="mt-0.5 text-[14px] font-semibold text-zinc-900">
+                        {lead.conoceMpc ? 'Sí' : 'No'}
+                      </p>
+                    </div>
+                  )}
+                  {lead.sabiaPlanInversionJoven !== null && (
+                    <div>
+                      <p className="text-[12px] text-zinc-400 font-medium">¿Sabían del Plan Inversión Joven?</p>
+                      <p className="mt-0.5 text-[14px] font-semibold text-zinc-900">
+                        {lead.sabiaPlanInversionJoven ? 'Sí' : 'No'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             {showContactoSinCita && (
               <FormSection title="¿Se contactó con el cliente?" step={1} totalSteps={totalPasos}>
                 <ButtonGroup

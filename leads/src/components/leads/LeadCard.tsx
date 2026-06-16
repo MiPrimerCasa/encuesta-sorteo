@@ -308,6 +308,27 @@ export function LeadCard({
           )}
         </dl>
 
+        {(lead.conoceMpc !== null || lead.sabiaPlanInversionJoven !== null) && (
+          <div className={`mt-2.5 rounded-lg border px-3 py-2 text-[12px] space-y-1 ${
+            esNoCompro
+              ? 'border-zinc-700 bg-zinc-800/50 text-zinc-300'
+              : 'border-zinc-200 bg-zinc-50/50 text-zinc-600'
+          }`}>
+            {lead.conoceMpc !== null && (
+              <p>
+                <span className="font-semibold">¿Conocía Mi Primer Casa?:</span>{' '}
+                {lead.conoceMpc ? 'Sí' : 'No'}
+              </p>
+            )}
+            {lead.sabiaPlanInversionJoven !== null && (
+              <p>
+                <span className="font-semibold">¿Sabía del Plan Inversión Joven?:</span>{' '}
+                {lead.sabiaPlanInversionJoven ? 'Sí' : 'No'}
+              </p>
+            )}
+          </div>
+        )}
+
         {esArchivo && productoNombre && (
           <div className="mt-3 text-[13px]">
             <span className="text-zinc-400">Producto: </span>

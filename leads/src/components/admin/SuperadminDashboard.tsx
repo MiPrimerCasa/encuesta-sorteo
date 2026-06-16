@@ -151,6 +151,69 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 pb-12 sm:px-6">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          /* Ocultar elementos de navegación y de control de pantalla */
+          nav, 
+          header,
+          footer,
+          .no-print {
+            display: none !important;
+          }
+          
+          /* Ocultar el resto de elementos del panel global */
+          .mx-auto.max-w-6xl > *:not(.printable-ranking-section),
+          main > p {
+            display: none !important;
+          }
+          
+          /* Ajustar márgenes de página y contenedores */
+          body, html, #root, div[vaul-drawer-wrapper=""], main, .mx-auto.max-w-6xl {
+            background: white !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            box-shadow: none !important;
+          }
+          
+          .printable-ranking-section {
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+          }
+          
+          .printable-ranking-card {
+            border: none !important;
+            box-shadow: none !important;
+          }
+
+          .printable-ranking-table {
+            border: 1px solid #e4e4e7 !important;
+            border-collapse: collapse !important;
+            width: 100% !important;
+          }
+          
+          .printable-ranking-table th, 
+          .printable-ranking-table td {
+            border: 1px solid #e4e4e7 !important;
+            padding: 10px 12px !important;
+          }
+
+          .printable-ranking-table th {
+            background-color: #f4f4f5 !important;
+            color: #18181b !important;
+            font-weight: 700 !important;
+          }
+          
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}} />
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
           Mi Primer Casa S.A. · Superadmin
@@ -277,50 +340,67 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
       </section>
 
 
-      <section className="space-y-4">
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
+      <section className="space-y-4 printable-ranking-section">
+        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400 no-print">
           Resumen General de Cierres (Mes Actual)
         </h3>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col">
+        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col printable-ranking-card">
           <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <h4 className="text-[14px] font-semibold text-zinc-900">Ranking de Cierres</h4>
-              <p className="text-[11px] text-zinc-500">Listado de promotores y operadores ordenados por cantidad de cierres.</p>
+              <p className="text-[11px] text-zinc-500 no-print">Listado de promotores y operadores ordenados por cantidad de cierres.</p>
+              <p className="hidden print:block text-[12px] text-zinc-600 mt-1 font-semibold">
+                Periodo: {rango}
+              </p>
             </div>
-            <div className="relative w-full sm:w-64 shrink-0">
-              <svg
-                width="14" height="14" viewBox="0 0 16 16" fill="none"
-                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
-                aria-hidden="true"
-              >
-                <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
-              <input
-                id="busqueda-ranking"
-                type="search"
-                value={rankingSearch}
-                onChange={(e) => setRankingSearch(e.target.value)}
-                placeholder="Buscar promotor…"
-                className="w-full rounded-lg border border-zinc-200 bg-white py-1.5 pl-8 pr-8 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100"
-              />
-              {rankingSearch && (
-                <button
-                  type="button"
-                  onClick={() => setRankingSearch('')}
-                  style={{ touchAction: 'manipulation' }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 active:text-zinc-700"
-                  aria-label="Limpiar búsqueda"
+            <div className="flex items-center gap-2 w-full sm:w-auto no-print">
+              <div className="relative w-full sm:w-64 shrink-0">
+                <svg
+                  width="14" height="14" viewBox="0 0 16 16" fill="none"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                  aria-hidden="true"
                 >
-                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                    <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                </button>
-              )}
+                  <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <input
+                  id="busqueda-ranking"
+                  type="search"
+                  value={rankingSearch}
+                  onChange={(e) => setRankingSearch(e.target.value)}
+                  placeholder="Buscar promotor…"
+                  className="w-full rounded-lg border border-zinc-200 bg-white py-1.5 pl-8 pr-8 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100"
+                />
+                {rankingSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setRankingSearch('')}
+                    style={{ touchAction: 'manipulation' }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 active:text-zinc-700"
+                    aria-label="Limpiar búsqueda"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[13px] font-medium text-zinc-700 hover:bg-zinc-50 active:scale-[0.98] transition-all cursor-pointer shadow-sm shrink-0"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                  <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                Imprimir
+              </button>
             </div>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
+            <table className="min-w-full divide-y divide-zinc-100 text-[13px] printable-ranking-table">
               <thead>
                 <tr className="bg-zinc-50/50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
                   <th className="py-2.5 px-3 text-center w-12">Pos</th>

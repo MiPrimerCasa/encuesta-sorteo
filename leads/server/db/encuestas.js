@@ -281,12 +281,26 @@ export function supervisorFetchIdDesdeCodigoPromotor(codigoRaw) {
   }
 
   const defaults = {
-    S01: '138',
-    S03: '137',
+    S01: '23',
+    S02: '45',
+    S03: '72',
+    S04: '121',
     S05: '123',
     S06: '130',
     S07: '101',
+    S08: '122',
+    S09: '126',
+    S10: '110',
+    S11: '37',
+    S12: '113',
+    S14: '78',
+    S15: '87',
+    S16: '15',
+    S18: '39',
+    S19: '42',
+    S20: '47',
     S21: '132',
+    S22: '2',
   };
   return defaults[equipo] ?? null;
 }

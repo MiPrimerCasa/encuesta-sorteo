@@ -75,7 +75,7 @@ function PromotorRow({
   return (
     <tr className="border-t border-zinc-100 text-[13px] text-zinc-700">
       <td className="py-2.5 pr-3 font-medium text-zinc-900">{p.promotorNombre}</td>
-      <td className="py-2.5 px-2 text-center tabular-nums">{p.leadsTotal}</td>
+      <td className="py-2.5 px-2 text-center tabular-nums">{p.leadsSemana}</td>
       <td className="py-2.5 px-2 text-center tabular-nums">{p.entrevistasSemana}</td>
       <td className="py-2.5 px-2 text-center tabular-nums text-brand-700">{p.entrevistasHoy}</td>
       <td className="py-2.5 px-2 text-center tabular-nums">{p.cierresSemana}</td>
@@ -119,7 +119,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
 
   const totalPromotoresCierres = todosPromotores.reduce((acc, p) => acc + p.cierresSemana, 0);
   const totalPromotoresEntrevistas = todosPromotores.reduce((acc, p) => acc + p.entrevistasSemana, 0);
-  const totalPromotoresLeads = todosPromotores.reduce((acc, p) => acc + p.leadsTotal, 0);
+  const totalPromotoresLeads = todosPromotores.reduce((acc, p) => acc + p.leadsSemana, 0);
   const totalPromotoresTerrenos = todosPromotores.reduce((acc, p) => acc + p.ventasTerrenoSemana, 0);
   const totalPromotoresPij = todosPromotores.reduce((acc, p) => acc + p.ventasPijSemana, 0);
 
@@ -216,55 +216,16 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
           }
         }
       `}} />
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-            Mi Primer Casa S.A. · Superadmin
-          </p>
-          <h2 className="mt-1 text-[20px] font-semibold tracking-[-0.01em] text-zinc-900">
-            Panel global de equipos
-          </h2>
-          <p className="mt-0.5 text-[13px] text-zinc-500">
-            {periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'} ({rango}) · Resultados de hoy ({hoyLabel})
-          </p>
-        </div>
-        
-        {/* Selector de periodo */}
-        <div className="flex items-center rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/50 self-start sm:self-auto no-print shadow-sm">
-          <button
-            type="button"
-            onClick={() => onCambiarPeriodo('hoy')}
-            className={`rounded-md px-3.5 py-1.5 text-[12.5px] font-semibold transition-all cursor-pointer ${
-              periodo === 'hoy'
-                ? 'bg-white text-zinc-900 shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-800'
-            }`}
-          >
-            Hoy
-          </button>
-          <button
-            type="button"
-            onClick={() => onCambiarPeriodo('semana')}
-            className={`rounded-md px-3.5 py-1.5 text-[12.5px] font-semibold transition-all cursor-pointer ${
-              periodo === 'semana'
-                ? 'bg-white text-zinc-900 shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-800'
-            }`}
-          >
-            Semana
-          </button>
-          <button
-            type="button"
-            onClick={() => onCambiarPeriodo('mes')}
-            className={`rounded-md px-3.5 py-1.5 text-[12.5px] font-semibold transition-all cursor-pointer ${
-              periodo === 'mes'
-                ? 'bg-white text-zinc-900 shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-800'
-            }`}
-          >
-            Mes
-          </button>
-        </div>
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+          Mi Primer Casa S.A. · Superadmin
+        </p>
+        <h2 className="mt-1 text-[20px] font-semibold tracking-[-0.01em] text-zinc-900">
+          Panel global de equipos
+        </h2>
+        <p className="mt-0.5 text-[13px] text-zinc-500">
+          {periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'} ({rango}) · Resultados de hoy ({hoyLabel})
+        </p>
       </div>
 
       {data.aviso && (
@@ -394,8 +355,45 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                 Rango ({periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'}): {rango}
               </p>
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto no-print">
-              <div className="relative w-full sm:w-64 shrink-0">
+            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto no-print">
+              {/* Selector de periodo */}
+              <div className="flex items-center rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/50 shadow-sm shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onCambiarPeriodo('hoy')}
+                  className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+                    periodo === 'hoy'
+                      ? 'bg-white text-zinc-900 shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-800'
+                  }`}
+                >
+                  Hoy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCambiarPeriodo('semana')}
+                  className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+                    periodo === 'semana'
+                      ? 'bg-white text-zinc-900 shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-800'
+                  }`}
+                >
+                  Semana
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onCambiarPeriodo('mes')}
+                  className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+                    periodo === 'mes'
+                      ? 'bg-white text-zinc-900 shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-800'
+                  }`}
+                >
+                  Mes
+                </button>
+              </div>
+
+              <div className="relative w-full sm:w-48 shrink-0">
                 <svg
                   width="14" height="14" viewBox="0 0 16 16" fill="none"
                   className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
@@ -469,7 +467,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                         <td className="py-2.5 px-3 text-center font-medium text-zinc-400">{originalIndex + 1}</td>
                         <td className="py-2.5 px-3 font-semibold text-zinc-900">{p.promotorNombre}</td>
                         <td className="py-2.5 px-3 text-zinc-500">{p.supervisorNombre}</td>
-                        <td className="py-2.5 px-3 text-center tabular-nums">{p.leadsTotal}</td>
+                        <td className="py-2.5 px-3 text-center tabular-nums">{p.leadsSemana}</td>
                         <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{p.entrevistasSemana}</td>
                         <td className="py-2.5 px-3 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
                         <td className="py-2.5 px-3 text-center tabular-nums text-amber-700 font-semibold">{p.ventasTerrenoSemana}</td>

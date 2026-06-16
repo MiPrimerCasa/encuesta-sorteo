@@ -15,8 +15,22 @@ export function endOfDay(date = new Date()) {
   return d;
 }
 
-/** Rango del mes actual: desde el primero del mes hasta el último día del mes. */
-export function rangoMesActual(hoy = new Date()) {
+/** Rango de fechas por periodo: hoy, semana o mes. */
+export function rangoPorPeriodo(periodo, hoy = new Date()) {
+  if (periodo === 'hoy') {
+    return {
+      desde: startOfDay(hoy),
+      hasta: endOfDay(hoy),
+      hoy: startOfDay(hoy),
+    };
+  }
+  if (periodo === 'semana') {
+    const hasta = endOfDay(hoy);
+    const desde = startOfDay(hoy);
+    desde.setDate(desde.getDate() - 6);
+    return { desde, hasta, hoy: startOfDay(hoy) };
+  }
+  // Default 'mes'
   const desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0, 0);
   const hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999);
   return { desde, hasta, hoy: startOfDay(hoy) };
@@ -217,8 +231,8 @@ export function buildConocimientoEncuestaStats(leads) {
  * @param {Array<{ lead: object, supervisorId: string, supervisorNombre: string }>} leadsConSupervisor
  * @param {Array<object>} historialRows
  */
-export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahora = new Date()) {
-  const { desde, hasta, hoy } = rangoMesActual(ahora);
+export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahora = new Date(), periodo = 'mes') {
+  const { desde, hasta, hoy } = rangoPorPeriodo(periodo, ahora);
 
   const leadPorId = new Map();
   for (const item of leadsConSupervisor) {

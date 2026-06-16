@@ -1,4 +1,4 @@
-import { buildAdminDashboard, rangoMesActual, startOfDay } from '../domain/admin-metrics.js';
+import { buildAdminDashboard, rangoPorPeriodo, startOfDay } from '../domain/admin-metrics.js';
 import { listAllLeadsFromEncuestas, normalizeNombre } from './encuestas.js';
 import {
   fetchHistorialAdminDesde,
@@ -49,8 +49,8 @@ function rangoHistorialGraficos(hoy = new Date()) {
   return desde;
 }
 
-function dashboardVacio(aviso) {
-  const { desde, hasta, hoy } = rangoMesActual();
+function dashboardVacio(aviso, periodo = 'mes') {
+  const { desde, hasta, hoy } = rangoPorPeriodo(periodo);
   return {
     generadoEn: new Date().toISOString(),
     semanaDesde: desde.toISOString(),
@@ -107,7 +107,7 @@ function dashboardVacio(aviso) {
 /**
  * Dashboard global: exec encuestasMuestra → agrupa por supervisor → métricas semana + hoy.
  */
-export async function fetchAdminDashboard() {
+export async function fetchAdminDashboard(periodo = 'mes') {
   const proc = getEncuestasAdminProcedureName();
   let leads = [];
 
@@ -118,11 +118,12 @@ export async function fetchAdminDashboard() {
     console.warn(`[admin] ${proc}:`, msg);
     return dashboardVacio(
       `No se pudo ejecutar ${proc}. Verificá GRANT EXECUTE en STRSYSTEM (sql/grants-mpcsp-leads.sql). Detalle: ${msg}`,
+      periodo,
     );
   }
 
   if (!leads.length) {
-    return dashboardVacio(`El SP ${proc} no devolvió encuestas.`);
+    return dashboardVacio(`El SP ${proc} no devolvió encuestas.`, periodo);
   }
 
   const leadsConSupervisor = leads.map((lead) => ({
@@ -133,7 +134,7 @@ export async function fetchAdminDashboard() {
 
   const historialDesde = rangoHistorialGraficos();
   const historialRows = await fetchHistorialDesde(historialDesde);
-  const dashboard = buildAdminDashboard(leadsConSupervisor, historialRows);
+  const dashboard = buildAdminDashboard(leadsConSupervisor, historialRows, new Date(), periodo);
 
   const supervisorIds = new Set(leadsConSupervisor.map((item) => item.supervisorId));
 

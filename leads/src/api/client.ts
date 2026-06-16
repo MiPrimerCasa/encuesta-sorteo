@@ -265,9 +265,10 @@ export async function fetchProductos(rol: RolUsuario) {
   return data.productos;
 }
 
-export async function fetchAdminDashboard(): Promise<AdminDashboardData> {
-  if (_isDemoActive) return getDemoAdminDashboard();
-  return apiFetch<AdminDashboardData>('/api/admin/dashboard');
+export async function fetchAdminDashboard(periodo?: string): Promise<AdminDashboardData> {
+  if (_isDemoActive) return getDemoAdminDashboard(periodo);
+  const url = periodo ? `/api/admin/dashboard?periodo=${periodo}` : '/api/admin/dashboard';
+  return apiFetch<AdminDashboardData>(url);
 }
 
 export async function fetchHistorialSeguimiento(

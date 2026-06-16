@@ -805,7 +805,7 @@ function enrichDemoEncuestaConocimiento<T extends Lead>(lead: T): T {
 }
 
 /** Panel superadmin demo: dos supervisores y historial sintético reciente. */
-export function getDemoAdminDashboard() {
+export function getDemoAdminDashboard(periodo = 'mes') {
   const ahora = new Date();
   const hoyIso = ahora.toISOString();
   const hace3Dias = new Date(ahora);
@@ -854,5 +854,5 @@ export function getDemoAdminDashboard() {
     }
   }
 
-  return buildAdminDashboardFromLeads(leads, historialRows, ahora);
+  return buildAdminDashboardFromLeads(leads, historialRows, ahora, periodo);
 }

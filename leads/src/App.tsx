@@ -55,6 +55,7 @@ function AppShell() {
   const [leadIdSeguimiento, setLeadIdSeguimiento] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [adminDashboard, setAdminDashboard] = useState<AdminDashboardData | null>(null);
+  const [periodo, setPeriodo] = useState<string>('mes');
   const [direccionOficinas, setDireccionOficinas] = useState<string | undefined>();
   const [promotores, setPromotores] = useState<Promotor[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -63,13 +64,13 @@ function AppShell() {
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
 
-  const cargarDatos = useCallback(async () => {
+  const cargarDatos = useCallback(async (p = periodo) => {
     if (!usuario) return;
     setCargando(true);
     setError('');
     try {
       if (usuario.rol === 'superadmin') {
-        const dash = await fetchAdminDashboard();
+        const dash = await fetchAdminDashboard(p);
         setAdminDashboard(dash);
         return;
       }
@@ -89,7 +90,7 @@ function AppShell() {
 
       // Supervisor con acceso al panel global: cargar dashboard en paralelo
       if (usuario.panelGlobal) {
-        fetchAdminDashboard()
+        fetchAdminDashboard(p)
           .then((dash) => setAdminDashboard(dash))
           .catch((err) =>
             console.warn('[panelGlobal] No se pudo cargar dashboard admin:', err),
@@ -100,7 +101,12 @@ function AppShell() {
     } finally {
       setCargando(false);
     }
-  }, [usuario]);
+  }, [usuario, periodo]);
+
+  const cambiarPeriodo = useCallback((nuevoPeriodo: string) => {
+    setPeriodo(nuevoPeriodo);
+    void cargarDatos(nuevoPeriodo);
+  }, [cargarDatos]);
 
   useEffect(() => {
     void cargarDatos();
@@ -161,10 +167,10 @@ function AppShell() {
     cargando && !adminDashboard && leads.length === 0 ? (
       <VistaCargando texto="Cargando datos…" />
     ) : esSuperadmin && adminDashboard ? (
-      <SuperadminDashboard data={adminDashboard} />
+      <SuperadminDashboard data={adminDashboard} periodo={periodo} onCambiarPeriodo={cambiarPeriodo} />
     ) : tienePanelGlobal && vistaActiva === 'admin' ? (
       adminDashboard ? (
-        <SuperadminDashboard data={adminDashboard} />
+        <SuperadminDashboard data={adminDashboard} periodo={periodo} onCambiarPeriodo={cambiarPeriodo} />
       ) : (
         <VistaCargando texto="Cargando panel global…" />
       )

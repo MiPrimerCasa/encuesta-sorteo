@@ -340,7 +340,8 @@ function registerApiRoutes(api) {
     }
 
     try {
-      const dashboard = await fetchAdminDashboard();
+      const periodo = String(req.query.periodo || 'mes').trim().toLowerCase();
+      const dashboard = await fetchAdminDashboard(periodo);
       return res.json(dashboard);
     } catch (error) {
       console.error('Error admin dashboard:', error);

@@ -7,6 +7,8 @@ import { AdminProductividadPanel } from './AdminProductividadPanel';
 
 interface SuperadminDashboardProps {
   data: AdminDashboardData;
+  periodo: string;
+  onCambiarPeriodo: (periodo: string) => void;
 }
 
 function StatCard({
@@ -40,7 +42,7 @@ function RankingList({
     <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
       <h3 className="text-[13px] font-semibold text-zinc-900">{title}</h3>
       {items.length === 0 ? (
-        <p className="mt-3 text-[13px] text-zinc-400">Sin datos en el mes.</p>
+        <p className="mt-3 text-[13px] text-zinc-400">Sin datos en este período.</p>
       ) : (
         <ol className="mt-3 space-y-2">
           {items.map((item, i) => (
@@ -84,7 +86,7 @@ function PromotorRow({
   );
 }
 
-export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
+export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: SuperadminDashboardProps) {
   const [selectedPerson, setSelectedPerson] = useState<PersonaPijCierres | null>(null);
   const [filterText, setFilterText] = useState('');
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
@@ -214,16 +216,55 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
           }
         }
       `}} />
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-          Mi Primer Casa S.A. · Superadmin
-        </p>
-        <h2 className="mt-1 text-[20px] font-semibold tracking-[-0.01em] text-zinc-900">
-          Panel global de equipos
-        </h2>
-        <p className="mt-0.5 text-[13px] text-zinc-500">
-          Mes actual ({rango}) · Resultados de hoy ({hoyLabel})
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+            Mi Primer Casa S.A. · Superadmin
+          </p>
+          <h2 className="mt-1 text-[20px] font-semibold tracking-[-0.01em] text-zinc-900">
+            Panel global de equipos
+          </h2>
+          <p className="mt-0.5 text-[13px] text-zinc-500">
+            {periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'} ({rango}) · Resultados de hoy ({hoyLabel})
+          </p>
+        </div>
+        
+        {/* Selector de periodo */}
+        <div className="flex items-center rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/50 self-start sm:self-auto no-print shadow-sm">
+          <button
+            type="button"
+            onClick={() => onCambiarPeriodo('hoy')}
+            className={`rounded-md px-3.5 py-1.5 text-[12.5px] font-semibold transition-all cursor-pointer ${
+              periodo === 'hoy'
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-800'
+            }`}
+          >
+            Hoy
+          </button>
+          <button
+            type="button"
+            onClick={() => onCambiarPeriodo('semana')}
+            className={`rounded-md px-3.5 py-1.5 text-[12.5px] font-semibold transition-all cursor-pointer ${
+              periodo === 'semana'
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-800'
+            }`}
+          >
+            Semana
+          </button>
+          <button
+            type="button"
+            onClick={() => onCambiarPeriodo('mes')}
+            className={`rounded-md px-3.5 py-1.5 text-[12.5px] font-semibold transition-all cursor-pointer ${
+              periodo === 'mes'
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-800'
+            }`}
+          >
+            Mes
+          </button>
+        </div>
       </div>
 
       {data.aviso && (
@@ -320,7 +361,7 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
 
       <section>
         <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-          Destacados del mes
+          {periodo === 'hoy' ? 'Destacados de hoy' : periodo === 'semana' ? 'Destacados de la semana' : 'Destacados del mes'}
         </h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <RankingList title="Más entrevistas" items={data.rankings.entrevistasSemana} unidad="" />
@@ -342,7 +383,7 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
 
       <section className="space-y-4 printable-ranking-section">
         <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400 no-print">
-          Resumen General de Cierres (Mes Actual)
+          Resumen General de Cierres ({periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana Móvil' : 'Mes Actual'})
         </h3>
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col printable-ranking-card">
           <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -350,7 +391,7 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
               <h4 className="text-[14px] font-semibold text-zinc-900">Ranking de Cierres</h4>
               <p className="text-[11px] text-zinc-500 no-print">Listado de promotores y operadores ordenados por cantidad de cierres.</p>
               <p className="hidden print:block text-[12px] text-zinc-600 mt-1 font-semibold">
-                Periodo: {rango}
+                Rango ({periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'}): {rango}
               </p>
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto no-print">
@@ -519,7 +560,7 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
                 </div>
                 <div className="flex flex-wrap gap-3 text-[12px] text-zinc-600">
                   <span>
-                    Mes: <strong>{sup.totales.entrevistasSemana}</strong> ent. ·{' '}
+                    {periodo === 'hoy' ? 'Hoy' : periodo === 'semana' ? 'Semana' : 'Mes'}: <strong>{sup.totales.entrevistasSemana}</strong> ent. ·{' '}
                     <strong>{sup.totales.cierresSemana}</strong> cierres
                   </span>
                   <span className="text-brand-700">
@@ -535,9 +576,9 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
                     <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
                       <th className="py-2 pr-3 text-left">Promotor</th>
                       <th className="px-2 py-2 text-center">Leads</th>
-                      <th className="px-2 py-2 text-center">Ent. mes</th>
+                      <th className="px-2 py-2 text-center">Ent. {periodo === 'hoy' ? 'hoy' : periodo === 'semana' ? 'sem.' : 'mes'}</th>
                       <th className="px-2 py-2 text-center">Ent. hoy</th>
-                      <th className="px-2 py-2 text-center">Cierres mes</th>
+                      <th className="px-2 py-2 text-center">Cierres {periodo === 'hoy' ? 'hoy' : periodo === 'semana' ? 'sem.' : 'mes'}</th>
                       <th className="px-2 py-2 text-center">Cierres hoy</th>
                       <th className="px-2 py-2 text-center">Terrenos</th>
                       <th className="pl-2 py-2 text-center">PIJ</th>

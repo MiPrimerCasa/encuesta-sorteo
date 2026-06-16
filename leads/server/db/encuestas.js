@@ -575,6 +575,8 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
   const observacionesEncuesta = buildObservacionesEncuesta(row);
   const conoceMpc = parseSiNoTriState(pickConoceMpcRow(row));
   const sabiaPlanInversionJoven = parseSiNoTriState(pickSabiaPlanInversionJovenRow(row));
+  const cargadoPorRolRaw = pickField(row, 'cargado_por_rol', 'cargadoPorRol');
+  const cargadoPorRol = cargadoPorRolRaw ? String(cargadoPorRolRaw).trim().toLowerCase() : undefined;
   
   const observacionesFinal = seguimientoRemoto.observaciones && seguimientoRemoto.observaciones.trim()
     ? seguimientoRemoto.observaciones
@@ -634,6 +636,7 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
     fechaAlta: dbFechaAltaIso ?? horarioIso ?? `${fechaBase}T09:00:00`,
     codigoCampania,
     origenEncuesta: origenRaw != null ? String(origenRaw).trim() : undefined,
+    cargadoPorRol,
     conoceMpc,
     sabiaPlanInversionJoven,
     esReferido: esReferido || undefined,
@@ -943,6 +946,16 @@ export async function listAllLeadsFromEncuestas() {
   }
 }
 
+export function leadTieneCitaPrevia(lead) {
+  if (lead.seguimiento?.resultadoEntrevista === 'reagenda' && lead.seguimiento?.fechaReagenda) {
+    return true;
+  }
+  if (lead.horarioEntrevista) return true;
+  if (lead.lista !== 'entrevista' || !lead.fechaAlta) return false;
+  if (String(lead.fechaAlta).endsWith('T09:00:00')) return false;
+  return true;
+}
+
 /** Leads desde SQL Server (encuestasMuestraOperador filtrado en la DB). */
 export function useEncuestasFromSql() {
   return isSqlServerConfigured();
@@ -968,6 +981,18 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     throw err;
   }
   const base = mapEncuestaRowToLead(row, { [leadId]: prevSeg });
+  if (
+    usuario?.rol === 'supervisor' &&
+    leadTieneCitaPrevia(base) &&
+    base.cargadoPorRol === 'promotor' &&
+    prevSeg?.resultadoEntrevista !== 'derivar_terreno'
+  ) {
+    const err = new Error(
+      'No podés tratar este lead hasta que el promotor lo derive por interesado en terreno.',
+    );
+    err.code = 'ENTREVISTA_PROMOTOR_PENDIENTE_DERIVACION';
+    throw err;
+  }
   let seguimientoParaGuardar = { ...seguimiento };
   let referidosCreados = [];
   let nuevosLeads = [];

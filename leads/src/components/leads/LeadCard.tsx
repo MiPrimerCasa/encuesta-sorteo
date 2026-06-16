@@ -161,10 +161,20 @@ export function LeadCard({
   const nombrePromotor =
     lead.promotorNombre ?? getPromotorNombre(lead.promotorId, promotores);
 
+  const esLeadEncuestaPromotorBloqueado =
+    rolUsuario === 'supervisor' &&
+    leadTieneCitaPrevia(lead) &&
+    lead.cargadoPorRol === 'promotor' &&
+    lead.seguimiento?.resultadoEntrevista !== 'derivar_terreno' &&
+    !compro &&
+    !esCerradoNegativoLead(lead);
+
   const cardClassName = `w-full rounded-xl border p-4 text-left md:p-5 ${
     historial.length > 0 ? 'pb-16 md:pb-16' : 'pb-14 md:pb-14'
   } ${
-    esInteresTerreno
+    esLeadEncuestaPromotorBloqueado
+      ? 'lead-card--promotor-bloqueado cursor-default'
+      : esInteresTerreno
       ? `${soloLectura ? 'cursor-default' : 'transition-[background,border-color,transform] duration-[140ms] ease-out active:scale-[0.995]'} ${terrenoCardClass}`
       : soloLectura
       ? 'cursor-default border-indigo-200 bg-indigo-50/80'
@@ -222,6 +232,16 @@ export function LeadCard({
               >
                 {ETIQUETA_REFERIDO}
               </span>
+            )}
+            {esLeadEncuestaPromotorBloqueado && (
+              <div className="mt-2 space-y-1">
+                <span className="inline-flex items-center rounded-md border border-purple-300 bg-purple-100 px-2 py-1 text-[11px] font-semibold leading-snug text-purple-900">
+                  Interés por Plan Inversión Joven
+                </span>
+                <p className="text-[12px] font-medium text-purple-800/90">
+                  Promotor: {nombrePromotor} (Pendiente derivación)
+                </p>
+              </div>
             )}
             {seguimientoPij && (
               <div className="mt-2 space-y-1">

@@ -600,7 +600,10 @@ function registerApiRoutes(api) {
         nuevosLeads: nuevosLeads ?? [],
       });
     } catch (error) {
-      if (error?.code === 'CIERRE_SUPERVISOR_SOLO_LECTURA') {
+      if (
+        error?.code === 'CIERRE_SUPERVISOR_SOLO_LECTURA' ||
+        error?.code === 'ENTREVISTA_PROMOTOR_PENDIENTE_DERIVACION'
+      ) {
         return res.status(403).json({
           message: error.message,
           code: error.code,

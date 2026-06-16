@@ -380,3 +380,9 @@ body {
   background-color: #FAFAFA;
   color: #18181B;
 }
+
+.lead-card--promotor-bloqueado {
+  border-color: #d8b4fe !important;
+  background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%) !important;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.08);
+}

@@ -105,6 +105,13 @@ export function etiquetaSeguimientoAgendaOtroRol(
 
 export function leadSoloLecturaSupervisor(lead: Lead) {
   if (leadSeguimientoPijPromotor(lead)) return true;
+  if (
+    leadTieneCitaPrevia(lead) &&
+    lead.cargadoPorRol === 'promotor' &&
+    lead.seguimiento?.resultadoEntrevista !== 'derivar_terreno'
+  ) {
+    return true;
+  }
   return leadSeguimientoAgendaOtroRol(lead, 'supervisor');
 }
 

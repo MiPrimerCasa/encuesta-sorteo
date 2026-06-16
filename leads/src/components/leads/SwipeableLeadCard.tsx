@@ -10,6 +10,7 @@ import type {
   SeguimientoLead,
 } from '../../types';
 import { LeadCard } from './LeadCard';
+import { leadSoloLecturaPromotor, leadSoloLecturaSupervisor } from '../../domain/leads';
 
 const REVEAL_WIDTH = 210;
 
@@ -125,8 +126,15 @@ export function SwipeableLeadCard({
   };
 
   const canSave = canal !== null || confirmo !== null;
+  const leadEsSoloLectura =
+    rolUsuario === 'supervisor'
+      ? leadSoloLecturaSupervisor(lead)
+      : rolUsuario === 'promotor'
+      ? leadSoloLecturaPromotor(lead, historial)
+      : false;
+
   /** Promotor en calle: seguimiento completo en el modal, sin canal/confirmó por swipe */
-  const accionesRapidas = !ocultarPromotor;
+  const accionesRapidas = !ocultarPromotor && !leadEsSoloLectura;
 
   /* ── Desktop panel state ── */
   const [desktopOpen, setDesktopOpen] = useState(false);

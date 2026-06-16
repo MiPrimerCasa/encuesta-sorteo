@@ -205,6 +205,7 @@ export interface Lead {
   nivelReferido?: number;
   /** Rol de quien cargó el referido (visibilidad promotor/supervisor). */
   referidoCargadoPorRol?: RolUsuario;
+  cargadoPorRol?: 'supervisor' | 'promotor';
   /** Código @usuario del promotor en el SP (SORTEO01S21P01). */
   codigoPromotorCarga?: string;
   /** Respuesta encuesta «Conoce MPC» (S/N). */

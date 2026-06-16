@@ -1,6 +1,11 @@
 import type { Promotor } from '../../types';
 
-export type MetricaPromotor = Promotor & { totalLeads: number; leadsCompro: number };
+export type MetricaPromotor = Promotor & {
+  totalLeads: number;
+  leadsCompro: number;
+  leadsHoy: number;
+  promedioDiario: number;
+};
 
 interface PromotoresTableProps {
   metricas: MetricaPromotor[];
@@ -34,6 +39,12 @@ export function PromotoresTable({ metricas }: PromotoresTableProps) {
               Promotor
             </th>
             <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Leads Hoy
+            </th>
+            <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+              Promedio/Día
+            </th>
+            <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
               Total leads
             </th>
             <th className="px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
@@ -53,6 +64,12 @@ export function PromotoresTable({ metricas }: PromotoresTableProps) {
                 className="border-b border-zinc-100 last:border-0 transition-colors hover:bg-zinc-50"
               >
                 <td className="px-5 py-4 text-[14px] font-medium text-zinc-900">{p.nombre}</td>
+                <td className="px-5 py-4 text-right text-[14px] font-semibold tabular-nums text-brand-600">
+                  {p.leadsHoy}
+                </td>
+                <td className="px-5 py-4 text-right text-[14px] font-semibold tabular-nums text-zinc-600">
+                  {p.promedioDiario.toFixed(1)}
+                </td>
                 <td className="px-5 py-4 text-right text-[14px] font-semibold tabular-nums text-zinc-900">
                   {p.totalLeads}
                 </td>
@@ -78,7 +95,14 @@ export function PromotoresTable({ metricas }: PromotoresTableProps) {
           const pct = p.totalLeads > 0 ? Math.round((p.leadsCompro / p.totalLeads) * 100) : 0;
           return (
             <div key={p.id} className="flex items-center justify-between px-4 py-4">
-              <p className="text-[14px] font-medium text-zinc-900">{p.nombre}</p>
+              <div className="flex flex-col">
+                <p className="text-[14px] font-semibold text-zinc-900">{p.nombre}</p>
+                <p className="mt-0.5 text-[11px] text-zinc-500">
+                  <span className="font-medium text-brand-600">{p.leadsHoy} hoy</span>
+                  <span className="mx-1 text-zinc-300">·</span>
+                  <span>{p.promedioDiario.toFixed(1)}/día</span>
+                </p>
+              </div>
               <div className="flex items-center gap-5 text-right">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-zinc-400">

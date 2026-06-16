@@ -29,6 +29,23 @@ import { LeadHistorialInline } from './LeadHistorialInline';
 import { StatusPill } from '../ui/StatusPill';
 import { WhatsAppLeadButton } from './WhatsAppLeadButton';
 
+const formatearFechaHora = (fechaStr?: string) => {
+  if (!fechaStr) return '';
+  try {
+    const normalized = fechaStr.includes('T') ? fechaStr : fechaStr.replace(' ', 'T');
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) return fechaStr;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  } catch {
+    return fechaStr;
+  }
+};
+
 interface LeadCardProps {
   lead: Lead;
   onClick: (lead: Lead) => void;
@@ -304,6 +321,14 @@ export function LeadCard({
             <div className="text-[13px]">
               <dt className="inline text-zinc-400">Dir: </dt>
               <dd className={`inline ${esNoCompro ? 'text-zinc-300' : 'text-zinc-600'}`}>{lead.domicilio}</dd>
+            </div>
+          )}
+          {(lead.fechaAlta || lead.fechaObtencion) && (
+            <div className="text-[13px]">
+              <dt className="inline text-zinc-400">Ingreso: </dt>
+              <dd className={`inline ${esNoCompro ? 'text-zinc-300' : 'text-zinc-600'}`}>
+                {formatearFechaHora(lead.fechaAlta || lead.fechaObtencion)}
+              </dd>
             </div>
           )}
         </dl>

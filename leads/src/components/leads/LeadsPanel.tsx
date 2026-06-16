@@ -10,12 +10,9 @@ import {
   sortLeadsContactadosPromotor,
   sortLeadsPorVentaReciente,
   tabIdListaLead,
+  leadEnEntrevistaPendiente,
 } from '../../domain/leads';
-import {
-  ETIQUETA_PRIORIDAD_TAB_INICIAL,
-  agruparPorPrioridadTabInicial,
-  type PrioridadTabInicial,
-} from '../../domain/prioridad-leads';
+
 import { useHistorialLeads } from '../../hooks/useHistorialLeads';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
 import type { Barrio, GuardarSeguimientoResult, Lead, NuevoLeadData, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
@@ -27,7 +24,7 @@ import { NuevoLeadSheet } from './NuevoLeadSheet';
 import { LinksRedesSection } from './LinksRedesSection';
 import { PromotorResumen } from './PromotorResumen';
 import { SwipeableLeadCard } from './SwipeableLeadCard';
-import { TerrenoFlameIcon } from '../ui/TerrenoFlameIcon';
+
 
 type ListaKey = 'entrevistaPendiente' | 'paraContactar' | 'seguimiento' | 'compraron';
 type VarianteCard = 'activo' | 'seguimiento' | 'compro';
@@ -164,6 +161,7 @@ export function LeadsPanel({
   const [agendarAbierto, setAgendarAbierto] = useState(false);
   const [leadModificarTelefono, setLeadModificarTelefono] = useState<Lead | null>(null);
   const [busqueda, setBusqueda] = useState('');
+  const [filtroPrioridad, setFiltroPrioridad] = useState<'prioridad' | 'primeros' | 'recientes' | 'entrevistas'>('prioridad');
 
   const todosLosLeads = useMemo(
     () => [...entrevistaPendiente, ...paraContactar, ...seguimiento, ...compraron],
@@ -236,8 +234,39 @@ export function LeadsPanel({
     if (tabActivo === 'contacto' && rolUsuario === 'promotor') {
       return sortLeadsContactadosPromotor(itemsActivos, historialPorLead);
     }
+    if (tabActivo === 'entrevista') {
+      let result = [...itemsActivos];
+      if (filtroPrioridad === 'entrevistas') {
+        result = result.filter(leadEnEntrevistaPendiente);
+      }
+      if (filtroPrioridad === 'primeros') {
+        result.sort((a, b) => {
+          const fa = a.fechaAlta ?? `${a.fechaObtencion}T00:00:00`;
+          const fb = b.fechaAlta ?? `${b.fechaObtencion}T00:00:00`;
+          return fa.localeCompare(fb);
+        });
+      } else if (filtroPrioridad === 'recientes') {
+        result.sort((a, b) => {
+          const fa = a.fechaAlta ?? `${a.fechaObtencion}T00:00:00`;
+          const fb = b.fechaAlta ?? `${b.fechaObtencion}T00:00:00`;
+          return fb.localeCompare(fa);
+        });
+      } else {
+        // 'prioridad' (default) o 'entrevistas'
+        result.sort((a, b) => {
+          const isAInt = leadEnEntrevistaPendiente(a);
+          const isBInt = leadEnEntrevistaPendiente(b);
+          if (isAInt && !isBInt) return -1;
+          if (!isAInt && isBInt) return 1;
+          const fa = a.fechaAlta ?? `${a.fechaObtencion}T00:00:00`;
+          const fb = b.fechaAlta ?? `${b.fechaObtencion}T00:00:00`;
+          return fa.localeCompare(fb);
+        });
+      }
+      return result;
+    }
     return itemsActivos;
-  }, [tabActivo, itemsActivos, historialPorLead, rolUsuario]);
+  }, [tabActivo, itemsActivos, historialPorLead, rolUsuario, filtroPrioridad]);
   const esPromotor = rolUsuario === 'promotor';
   const esTabPrioridad = tabActivo === 'entrevista';
 
@@ -286,7 +315,7 @@ export function LeadsPanel({
       />
     );
 
-  const ORDEN_PRIORIDAD: PrioridadTabInicial[] = [0, 1, 2];
+
 
   return (
     <div className="mx-auto max-w-2xl px-3 py-4 pb-12 sm:px-6 sm:py-6">
@@ -466,11 +495,62 @@ export function LeadsPanel({
           </button>
 
           {/* Título sección */}
-          <div className="mb-4 flex items-baseline gap-2">
-            <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-              {tabData.tituloLargo}
-            </h2>
-            <span className="text-[13px] tabular-nums text-zinc-400">{itemsVisibles.length}</span>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                {tabData.tituloLargo}
+              </h2>
+              <span className="text-[13px] tabular-nums text-zinc-400">{itemsVisibles.length}</span>
+            </div>
+
+            {esTabPrioridad && (
+              <div className="flex flex-wrap gap-1 rounded-lg border border-zinc-200 bg-zinc-100 p-1">
+                <button
+                  type="button"
+                  onClick={() => setFiltroPrioridad('prioridad')}
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                    filtroPrioridad === 'prioridad'
+                      ? 'bg-white text-zinc-800 shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-700'
+                  }`}
+                >
+                  Prioridad
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroPrioridad('primeros')}
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                    filtroPrioridad === 'primeros'
+                      ? 'bg-white text-zinc-800 shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-700'
+                  }`}
+                >
+                  Los primeros
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroPrioridad('recientes')}
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                    filtroPrioridad === 'recientes'
+                      ? 'bg-white text-zinc-800 shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-700'
+                  }`}
+                >
+                  Más recientes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFiltroPrioridad('entrevistas')}
+                  className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                    filtroPrioridad === 'entrevistas'
+                      ? 'bg-white text-zinc-800 shadow-xs'
+                      : 'text-zinc-500 hover:text-zinc-700'
+                  }`}
+                >
+                  Con entrevista
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Lista */}
@@ -478,45 +558,6 @@ export function LeadsPanel({
             <p className="rounded-lg border border-dashed border-zinc-200 py-10 text-center text-[13px] text-zinc-400">
               {tabData.vacio}
             </p>
-          ) : esTabPrioridad ? (
-            <div className="space-y-6">
-              {ORDEN_PRIORIDAD.map((prioridad) => {
-                const grupo = agruparPorPrioridadTabInicial(itemsVisibles)[prioridad];
-                if (grupo.length === 0) return null;
-                return (
-                  <section key={prioridad}>
-                    <h3
-                      className={`mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${
-                        prioridad === 0
-                          ? 'mpc-terreno-section-header'
-                          : 'items-baseline text-zinc-500'
-                      }`}
-                    >
-                      {prioridad === 0 && (
-                        <span className="flex items-center gap-0.5" aria-hidden="true">
-                          <TerrenoFlameIcon size={16} />
-                          <span className="mpc-terreno-ember h-1 w-1 rounded-full bg-orange-400" />
-                          <span className="mpc-terreno-ember mpc-terreno-ember--delay h-1 w-1 rounded-full bg-red-500" />
-                        </span>
-                      )}
-                      <span className={prioridad === 0 ? 'flex-1' : undefined}>
-                        {ETIQUETA_PRIORIDAD_TAB_INICIAL[prioridad]}
-                      </span>
-                      <span
-                        className={`text-[13px] font-medium tabular-nums ${
-                          prioridad === 0 ? 'text-red-500' : 'text-zinc-400'
-                        }`}
-                      >
-                        {grupo.length}
-                      </span>
-                    </h3>
-                    <div className="space-y-3">
-                      {grupo.map((lead) => renderTarjetaLead(lead, tabData.variante))}
-                    </div>
-                  </section>
-                );
-              })}
-            </div>
           ) : (
             <div className="space-y-3">
               {itemsVisibles.map((lead) => renderTarjetaLead(lead, tabData.variante))}

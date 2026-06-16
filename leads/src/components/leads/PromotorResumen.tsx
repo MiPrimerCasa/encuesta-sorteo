@@ -21,7 +21,18 @@ export function PromotorResumen({ leads }: Props) {
       (l) => !leadCompro(l) && !leadReagendaEntrevista(l) && fueContactado(l),
     ).length;
     const conversion = total > 0 ? Math.round((vendidos / total) * 100) : 0;
-    return { total, vendidos, enSeguimiento, contactados, conversion };
+
+    const hoyStr = new Date().toISOString().slice(0, 10);
+    const leadsHoy = leads.filter(
+      (l) => (l.fechaAlta || l.fechaObtencion || '').slice(0, 10) === hoyStr,
+    ).length;
+
+    const distinctDates = new Set(
+      leads.map((l) => (l.fechaAlta || l.fechaObtencion || '').slice(0, 10)).filter(Boolean),
+    );
+    const promedioDiario = total / (distinctDates.size || 1);
+
+    return { total, vendidos, enSeguimiento, contactados, conversion, leadsHoy, promedioDiario };
   }, [leads]);
 
   return (
@@ -33,6 +44,11 @@ export function PromotorResumen({ leads }: Props) {
         </p>
         <p className="mt-1 text-[28px] font-bold leading-none tabular-nums text-zinc-900 sm:text-[32px]">
           {stats.total}
+        </p>
+        <p className="mt-1.5 text-[11px] text-zinc-500">
+          <span className="font-semibold text-brand-600">{stats.leadsHoy} hoy</span>
+          <span className="mx-1 text-zinc-300">·</span>
+          <span>{stats.promedioDiario.toFixed(1)}/día</span>
         </p>
       </div>
 

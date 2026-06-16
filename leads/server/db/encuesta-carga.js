@@ -24,7 +24,7 @@ import {
 } from './operadores-catalog.js';
 import { getSqlPoolEncuestas } from './mssql.js';
 
-const MSG_CONTACTO_YA_REGISTRADO = 'Este contacto ya está registrado.';
+const MSG_CONTACTO_YA_REGISTRADO = 'Este número ya se encuentra registrado en el sistema.';
 
 export class ContactoYaRegistradoError extends Error {
   constructor() {
@@ -172,6 +172,43 @@ export function telefonosCoinciden(tel1, tel2) {
     return d1.slice(-8) === d2.slice(-8);
   }
   return false;
+}
+
+export function normalizarTelefonoCarga(telefono) {
+  let d = digitsTelefono(telefono);
+  if (!d) return '';
+
+  // 1. Remove Argentine mobile prefix '15' if it's there
+  if (d.length === 12 && d.includes('15')) {
+    const idx = d.indexOf('15');
+    if (idx >= 2 && idx <= 4) {
+      d = d.slice(0, idx) + d.slice(idx + 2);
+    }
+  } else if (d.length === 11 && d.startsWith('15')) {
+    d = d.slice(2);
+  }
+
+  // 2. If it starts with 549, keep it
+  if (d.startsWith('549') && d.length === 13) {
+    return d;
+  }
+
+  // 3. If it starts with 54 but is missing the '9'
+  if (d.startsWith('54') && d.length === 12) {
+    return '549' + d.slice(2);
+  }
+
+  // 4. If it has 10 digits
+  if (d.length === 10) {
+    return '549' + d;
+  }
+
+  // 5. If it starts with 0 and has 11 digits
+  if (d.startsWith('0') && d.length === 11) {
+    return '549' + d.slice(1);
+  }
+
+  return d;
 }
 
 /**
@@ -480,22 +517,29 @@ function buscarLeadTrasCarga(leads, payload, encCarga) {
 }
 
 export async function crearEncuestaManual(payload, usuarioSesion, opciones = {}) {
+  const telefonoNormalizado = normalizarTelefonoCarga(payload.telefono);
+  const payloadNormalizado = { ...payload, telefono: telefonoNormalizado };
+
   const context = await resolveCargaEncuestaContext(usuarioSesion);
   const usuario = enriquecerUsuarioConCodigoCarga(usuarioSesion, context.rows);
-  const cargaParams = buildCargaParamsFromPayload(payload, usuario, context);
+  const cargaParams = buildCargaParamsFromPayload(payloadNormalizado, usuario, context);
   const idListado = idVendedorOperador(usuario);
 
   const leadsPrevios = await listLeadsFromEncuestas(usuario);
   const yaExistia = telefonoYaEnCampania(
     leadsPrevios,
-    payload.telefono,
+    payloadNormalizado.telefono,
     cargaParams.encuesta,
   );
+
+  if (yaExistia) {
+    throw new ContactoYaRegistradoError();
+  }
 
   await execEncuestaCargaSorteo01(cargaParams);
 
   const leads = await listLeadsFromEncuestas(usuario);
-  const lead = buscarLeadTrasCarga(leads, payload, cargaParams.encuesta);
+  const lead = buscarLeadTrasCarga(leads, payloadNormalizado, cargaParams.encuesta);
   if (lead) {
     return { lead, actualizado: yaExistia };
   }

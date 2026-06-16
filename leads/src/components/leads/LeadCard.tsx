@@ -433,6 +433,7 @@ export function LeadCard({
           telefono={lead.telefono}
           nombre={lead.nombre}
           nombreUsuario={nombreUsuario}
+          confirmoEntrevista={lead.seguimiento?.confirmoEntrevista}
         />
       </div>
     </div>

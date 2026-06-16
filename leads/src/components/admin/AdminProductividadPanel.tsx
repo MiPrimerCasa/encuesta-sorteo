@@ -3,6 +3,7 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  LabelList,
   Legend,
   ResponsiveContainer,
   Tooltip,
@@ -141,6 +142,13 @@ export function AdminProductividadPanel({ data }: AdminProductividadPanelProps) 
               color="#71717A"
             />
             <FunnelBar
+              label="Sin tratamiento"
+              count={data.resultadosEntrevista.sin_tratar}
+              total={e.leads}
+              pctLabel={fmtPct(e.leads > 0 ? (data.resultadosEntrevista.sin_tratar / e.leads) * 100 : 0)}
+              color="#CBD5E1"
+            />
+            <FunnelBar
               label="Con entrevista"
               count={e.conEntrevista}
               total={e.leads}
@@ -208,7 +216,7 @@ export function AdminProductividadPanel({ data }: AdminProductividadPanelProps) 
             ) : (
               <div className="h-56 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={resultadosChart} layout="vertical" margin={{ left: 4, right: 16 }}>
+                  <BarChart data={resultadosChart} layout="vertical" margin={{ left: 4, right: 60 }}>
                     <CartesianGrid stroke="#F4F4F5" horizontal={false} />
                     <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#71717A' }} />
                     <YAxis
@@ -219,11 +227,25 @@ export function AdminProductividadPanel({ data }: AdminProductividadPanelProps) 
                     />
                     <Tooltip
                       contentStyle={{ borderRadius: 8, border: '1px solid #E4E4E7', fontSize: 13 }}
+                      formatter={(value) => {
+                        const cant = Number(value);
+                        const pctVal = e.leads > 0 ? (cant / e.leads) * 100 : 0;
+                        return [`${cant} (${pctVal.toFixed(1)}%)`, 'Cantidad'];
+                      }}
                     />
                     <Bar dataKey="cantidad" radius={[0, 4, 4, 0]} maxBarSize={22}>
                       {resultadosChart.map((entry) => (
                         <Cell key={entry.key} fill={RESULTADO_COLORS[entry.key] ?? '#71717A'} />
                       ))}
+                      <LabelList
+                        dataKey="cantidad"
+                        position="right"
+                        formatter={(val: number) => {
+                          const pctVal = e.leads > 0 ? (val / e.leads) * 100 : 0;
+                          return `${val} (${pctVal.toFixed(1)}%)`;
+                        }}
+                        style={{ fontSize: 10, fill: '#52525b', fontWeight: 600 }}
+                      />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>

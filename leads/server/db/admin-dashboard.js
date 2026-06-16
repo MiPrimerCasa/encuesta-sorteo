@@ -1,4 +1,4 @@
-import { buildAdminDashboard, rangoSemanaMovil, startOfDay } from '../domain/admin-metrics.js';
+import { buildAdminDashboard, rangoMesActual, startOfDay } from '../domain/admin-metrics.js';
 import { listAllLeadsFromEncuestas, normalizeNombre } from './encuestas.js';
 import {
   fetchHistorialAdminDesde,
@@ -50,7 +50,7 @@ function rangoHistorialGraficos(hoy = new Date()) {
 }
 
 function dashboardVacio(aviso) {
-  const { desde, hasta, hoy } = rangoSemanaMovil();
+  const { desde, hasta, hoy } = rangoMesActual();
   return {
     generadoEn: new Date().toISOString(),
     semanaDesde: desde.toISOString(),

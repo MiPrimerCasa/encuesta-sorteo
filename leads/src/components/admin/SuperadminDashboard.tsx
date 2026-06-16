@@ -40,7 +40,7 @@ function RankingList({
     <div className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm">
       <h3 className="text-[13px] font-semibold text-zinc-900">{title}</h3>
       {items.length === 0 ? (
-        <p className="mt-3 text-[13px] text-zinc-400">Sin datos en la semana.</p>
+        <p className="mt-3 text-[13px] text-zinc-400">Sin datos en el mes.</p>
       ) : (
         <ol className="mt-3 space-y-2">
           {items.map((item, i) => (
@@ -159,7 +159,7 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
           Panel global de equipos
         </h2>
         <p className="mt-0.5 text-[13px] text-zinc-500">
-          Semana móvil ({rango}) · Resultados de hoy ({hoyLabel})
+          Mes actual ({rango}) · Resultados de hoy ({hoyLabel})
         </p>
       </div>
 
@@ -257,7 +257,7 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
 
       <section>
         <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-          Destacados de la semana
+          Destacados del mes
         </h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <RankingList title="Más entrevistas" items={data.rankings.entrevistasSemana} unidad="" />
@@ -279,7 +279,7 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
 
       <section className="space-y-4">
         <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-          Resumen General de Cierres (Semana Móvil)
+          Resumen General de Cierres (Mes Actual)
         </h3>
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col">
           <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -439,7 +439,7 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
                 </div>
                 <div className="flex flex-wrap gap-3 text-[12px] text-zinc-600">
                   <span>
-                    Semana: <strong>{sup.totales.entrevistasSemana}</strong> ent. ·{' '}
+                    Mes: <strong>{sup.totales.entrevistasSemana}</strong> ent. ·{' '}
                     <strong>{sup.totales.cierresSemana}</strong> cierres
                   </span>
                   <span className="text-brand-700">
@@ -455,9 +455,9 @@ export function SuperadminDashboard({ data }: SuperadminDashboardProps) {
                     <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
                       <th className="py-2 pr-3 text-left">Promotor</th>
                       <th className="px-2 py-2 text-center">Leads</th>
-                      <th className="px-2 py-2 text-center">Ent. sem.</th>
+                      <th className="px-2 py-2 text-center">Ent. mes</th>
                       <th className="px-2 py-2 text-center">Ent. hoy</th>
-                      <th className="px-2 py-2 text-center">Cierres sem.</th>
+                      <th className="px-2 py-2 text-center">Cierres mes</th>
                       <th className="px-2 py-2 text-center">Cierres hoy</th>
                       <th className="px-2 py-2 text-center">Terrenos</th>
                       <th className="pl-2 py-2 text-center">PIJ</th>

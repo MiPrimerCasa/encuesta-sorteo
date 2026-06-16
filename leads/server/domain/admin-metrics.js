@@ -15,11 +15,10 @@ export function endOfDay(date = new Date()) {
   return d;
 }
 
-/** Semana móvil: hoy y los 6 días anteriores (7 días). */
-export function rangoSemanaMovil(hoy = new Date()) {
-  const hasta = endOfDay(hoy);
-  const desde = startOfDay(hoy);
-  desde.setDate(desde.getDate() - 6);
+/** Rango del mes actual: desde el primero del mes hasta el último día del mes. */
+export function rangoMesActual(hoy = new Date()) {
+  const desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0, 0);
+  const hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999);
   return { desde, hasta, hoy: startOfDay(hoy) };
 }
 
@@ -219,7 +218,7 @@ export function buildConocimientoEncuestaStats(leads) {
  * @param {Array<object>} historialRows
  */
 export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahora = new Date()) {
-  const { desde, hasta, hoy } = rangoSemanaMovil(ahora);
+  const { desde, hasta, hoy } = rangoMesActual(ahora);
 
   const leadPorId = new Map();
   for (const item of leadsConSupervisor) {

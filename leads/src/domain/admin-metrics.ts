@@ -17,16 +17,16 @@ function startOfDay(date = new Date()) {
   return d;
 }
 
-function endOfDay(date = new Date()) {
+export function endOfDay(date = new Date()) {
   const d = new Date(date);
   d.setHours(23, 59, 59, 999);
   return d;
 }
 
-export function rangoSemanaMovil(hoy = new Date()) {
-  const hasta = endOfDay(hoy);
-  const desde = startOfDay(hoy);
-  desde.setDate(desde.getDate() - 6);
+/** Rango del mes actual: desde el primero del mes hasta el último día del mes. */
+export function rangoMesActual(hoy = new Date()) {
+  const desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0, 0);
+  const hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999);
   return { desde, hasta, hoy: startOfDay(hoy) };
 }
 
@@ -250,7 +250,7 @@ export function buildAdminDashboardFromLeads(
   historialRows: Array<SeguimientoHistorialEntry | Record<string, unknown>> = [],
   ahora = new Date(),
 ): AdminDashboardData {
-  const { desde, hasta, hoy } = rangoSemanaMovil(ahora);
+  const { desde, hasta, hoy } = rangoMesActual(ahora);
 
   const leadsConSupervisor = leads.map((lead) => ({
     lead,

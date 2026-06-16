@@ -18,6 +18,7 @@ import {
   leadSoloLecturaSupervisor,
   esCerradoNegativoLead,
   leadCierreRegistradoSupervisor,
+  leadTieneCitaPrevia,
 } from '../../domain/leads';
 import { prioridadTabInicial } from '../../domain/prioridad-leads';
 import { etiquetaCortaNumeroDocumentoVenta, etiquetaPagoProducto } from '../../domain/venta';
@@ -433,7 +434,7 @@ export function LeadCard({
           telefono={lead.telefono}
           nombre={lead.nombre}
           nombreUsuario={nombreUsuario}
-          confirmoEntrevista={lead.seguimiento?.confirmoEntrevista}
+          tieneCitaPrevia={leadTieneCitaPrevia(lead)}
         />
       </div>
     </div>

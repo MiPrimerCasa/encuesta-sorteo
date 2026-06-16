@@ -44,12 +44,12 @@ function normalizeNombreSimple(valor: string): string {
 export function mensajeWhatsAppLead(
   nombreLead: string,
   nombreUsuario?: string,
-  confirmoEntrevista?: boolean | null,
+  tieneCitaPrevia?: boolean,
 ) {
   const nombre = nombreLead.trim() || 'cliente';
   const usuario = nombreUsuario?.trim();
 
-  if (confirmoEntrevista !== true) {
+  if (!tieneCitaPrevia) {
     if (usuario) {
       const primerNombre = normalizeNombreSimple(usuario).split(' ')[0] || '';
       const esFemenino = /a$|belen|catherine|giselle/i.test(primerNombre);

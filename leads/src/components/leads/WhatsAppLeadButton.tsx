@@ -8,7 +8,7 @@ interface WhatsAppLeadButtonProps {
   telefono?: string;
   nombre?: string;
   nombreUsuario?: string;
-  confirmoEntrevista?: boolean | null;
+  tieneCitaPrevia?: boolean;
   className?: string;
 }
 
@@ -31,10 +31,10 @@ export function WhatsAppLeadButton({
   telefono,
   nombre = '',
   nombreUsuario,
-  confirmoEntrevista,
+  tieneCitaPrevia,
   className = '',
 }: WhatsAppLeadButtonProps) {
-  const mensaje = mensajeWhatsAppLead(nombre, nombreUsuario, confirmoEntrevista);
+  const mensaje = mensajeWhatsAppLead(nombre, nombreUsuario, tieneCitaPrevia);
   const numeroOk = Boolean(telefonoParaWhatsApp(telefono));
   const titulo = numeroOk
     ? `Chatear por WhatsApp con ${nombre || 'el cliente'}`

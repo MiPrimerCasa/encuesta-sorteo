@@ -494,16 +494,7 @@ export function analyzeEncuestasIdColumns(rows) {
 }
 
 function buildObservacionesEncuesta(row) {
-  const partes = [];
-  const domicilio = pickField(row, 'Domicilio', 'domicilio');
-  const conoce = pickConoceMpcRow(row);
-  const sabias = pickSabiaPlanInversionJovenRow(row);
-  const lugar = pickField(row, 'Domicilio de encuest...', 'Domicilio de encuesta');
-  if (domicilio) partes.push(`Domicilio encuesta: ${domicilio}`);
-  if (conoce) partes.push(`Conoce MPC: ${conoce}`);
-  if (sabias) partes.push(`Sabía vivienda propia: ${sabias}`);
-  if (lugar) partes.push(`Lugar encuesta: ${lugar}`);
-  return partes.join(' · ');
+  return 'realiza las observaciones necesarias';
 }
 
 export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
@@ -570,13 +561,16 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
   const observacionesEncuesta = buildObservacionesEncuesta(row);
   const conoceMpc = parseSiNoTriState(pickConoceMpcRow(row));
   const sabiaPlanInversionJoven = parseSiNoTriState(pickSabiaPlanInversionJovenRow(row));
+  
+  const observacionesFinal = seguimientoRemoto.observaciones && seguimientoRemoto.observaciones.trim()
+    ? seguimientoRemoto.observaciones
+    : (observacionesEncuesta || undefined);
+
   const seguimiento = {
     ...seguimientoRemoto,
     // Origen desde encuesta; el caché local solo pisa si el usuario guardó fuente explícita.
     fuente: seguimientoRemoto.fuente ?? fuenteDB ?? null,
-    observaciones:
-      [seguimientoRemoto.observaciones, observacionesEncuesta].filter(Boolean).join('\n') ||
-      undefined,
+    observaciones: observacionesFinal,
   };
 
   const encuestaRaw = pickField(row, 'encuesta', 'Encuesta', 'ENCUESTA');

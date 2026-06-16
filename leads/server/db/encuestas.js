@@ -538,7 +538,22 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
   const origenRaw = extractOrigenRawFromRow(row);
   const fuenteDB = parseFuente(origenRaw);
 
-  const fechaBase = horarioIso ? horarioIso.slice(0, 10) : new Date().toISOString().slice(0, 10);
+  const dbFechaAltaVal = pickField(row, 'fechaAlta', 'fecha_alta');
+  let dbFechaAltaIso = null;
+  if (dbFechaAltaVal) {
+    if (dbFechaAltaVal instanceof Date && !isNaN(dbFechaAltaVal.getTime())) {
+      dbFechaAltaIso = dbFechaAltaVal.toISOString().slice(0, 19);
+    } else if (typeof dbFechaAltaVal === 'string' || typeof dbFechaAltaVal === 'number') {
+      const str = String(dbFechaAltaVal).trim();
+      if (str) {
+        dbFechaAltaIso = str.replace(' ', 'T').slice(0, 19);
+      }
+    }
+  }
+
+  const fechaBase = dbFechaAltaIso
+    ? dbFechaAltaIso.slice(0, 10)
+    : (horarioIso ? horarioIso.slice(0, 10) : new Date().toISOString().slice(0, 10));
   const lista = horarioIso || quiereAsesoramiento ? 'entrevista' : 'contacto';
 
   const pkEncuesta = pickField(row, 'id', 'Id', 'ID');
@@ -608,7 +623,7 @@ export function mapEncuestaRowToLead(row, seguimientoLocal = {}) {
     domicilioEntrevista: domicilioEntrevista ? String(domicilioEntrevista).trim() : undefined,
     lista,
     fechaObtencion: fechaBase,
-    fechaAlta: horarioIso ?? `${fechaBase}T09:00:00`,
+    fechaAlta: dbFechaAltaIso ?? horarioIso ?? `${fechaBase}T09:00:00`,
     codigoCampania,
     origenEncuesta: origenRaw != null ? String(origenRaw).trim() : undefined,
     conoceMpc,

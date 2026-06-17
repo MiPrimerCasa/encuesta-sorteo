@@ -60,17 +60,65 @@ export function nombresCoinciden(nombreOperador, nombrePlanilla) {
   const tokensB = b.split(/\s+/).filter(Boolean);
   if (!tokensA.length || !tokensB.length) return false;
 
-  for (const tb of tokensB) {
-    if (tb.length >= 3 && tokensA.includes(tb)) return true;
-  }
-  for (const ta of tokensA) {
-    if (ta.length >= 3 && tokensB.includes(ta)) return true;
+  // 1. Check if they share at least one word of length >= 3 and that the rest is compatible
+  const commonWords = tokensA.filter(ta => ta.length >= 3 && tokensB.includes(ta));
+  if (commonWords.length > 0) {
+    for (const commonWord of commonWords) {
+      const otherA = tokensA.filter(t => t !== commonWord);
+      const otherB = tokensB.filter(t => t !== commonWord);
+      
+      if (otherA.length === 0 || otherB.length === 0) {
+        return true;
+      }
+      
+      let compatible = true;
+      
+      const initialsA = otherA.filter(t => t.length === 1);
+      const initialsB = otherB.filter(t => t.length === 1);
+      const longA = otherA.filter(t => t.length >= 3);
+      const longB = otherB.filter(t => t.length >= 3);
+      
+      if (longA.length > 0 && longB.length > 0) {
+        const hasFuzzyMatch = longA.some(la => longB.some(lb => primerNombreEquivalente(la, lb)));
+        if (!hasFuzzyMatch) {
+          compatible = false;
+        }
+      }
+      
+      for (const initA of initialsA) {
+        if (!otherB.some(t => t.startsWith(initA))) {
+          compatible = false;
+        }
+      }
+      
+      for (const initB of initialsB) {
+        if (!otherA.some(t => t.startsWith(initB))) {
+          compatible = false;
+        }
+      }
+      
+      if (compatible) {
+        return true;
+      }
+    }
   }
 
   const inicialB = tokensB[tokensB.length - 1];
   if (inicialB.length === 1 && tokensA.some((t) => t.startsWith(inicialB))) {
     const primeroB = tokensB[0];
-    if (tokensA.includes(primeroB) || primerNombreEquivalente(tokensA[0], primeroB)) return true;
+    if (tokensA.includes(primeroB) || primerNombreEquivalente(tokensA[0], primeroB)) {
+      const idxA_primero = tokensA.indexOf(primeroB);
+      const idxA_inicial = tokensA.findIndex(t => t.startsWith(inicialB));
+      const idxB_primero = 0;
+      const idxB_inicial = tokensB.length - 1;
+      
+      const orderA = idxA_primero < idxA_inicial;
+      const orderB = idxB_primero < idxB_inicial;
+      if (orderA !== orderB) {
+        return false;
+      }
+      return true;
+    }
   }
 
   if (tokensA.length >= 2 && tokensB.length >= 2) {
@@ -417,6 +465,11 @@ function esCodigoPromotorIndividual(codigoRaw) {
   return esCodigoUsuarioCargaValido(c) && /P\d{2}$/i.test(c);
 }
 
+function extraerPrefixEquipo(codigo) {
+  const m = String(codigo || '').match(/^(SORTEO\d+S\d{2})/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
 export function enriquecerUsuarioConCodigoCarga(usuario, encuestaRows = []) {
   if (!usuario) return usuario;
   if (usuario.rol === 'promotor') {
@@ -428,7 +481,13 @@ export function enriquecerUsuarioConCodigoCarga(usuario, encuestaRows = []) {
     const idV = idVendedorOperador(usuario);
     const rowsEfectivas = promotorTieneFilasEnMuestra(encuestaRows, idV) ? encuestaRows : [];
     const codigo = resolveCodigoCargaPromotorStrict(usuario, rowsEfectivas);
-    if (codigo) return { ...usuario, codigoCarga: codigo };
+    if (codigo) {
+      const prefixLogin = extraerPrefixEquipo(codigoLogin);
+      const prefixResolved = extraerPrefixEquipo(codigo);
+      if (!prefixLogin || !prefixResolved || prefixLogin === prefixResolved) {
+        return { ...usuario, codigoCarga: codigo };
+      }
+    }
     if (
       esCodigoUsuarioCargaValido(usuario.codigoCarga) &&
       codigoEnFilasDelPromotor(usuario.codigoCarga, rowsEfectivas, idV)
@@ -444,13 +503,27 @@ export function enriquecerUsuarioConCodigoCarga(usuario, encuestaRows = []) {
     /00$/i.test(codigoSesion) &&
     !/P\d{2}$/i.test(codigoSesion);
 
+  // 1. Si el nombre coincide con el del supervisor del código de sesión, mantenerlo
+  if (codigoEsSupervisorEquipo) {
+    const catalog = loadOperadoresCatalog();
+    const entrySesion = catalog.byCodigo?.[codigoSesion];
+    if (entrySesion?.vendedor && nombresCoinciden(usuario.nombre, entrySesion.vendedor)) {
+      return usuario;
+    }
+  }
+
   const codigoPromotorPorNombre = resolveCodigoCargaPromotorStrict(
     { ...usuario, rol: 'promotor' },
     encuestaRows,
   );
 
   if (codigoEsSupervisorEquipo && esCodigoUsuarioCargaValido(codigoPromotorPorNombre)) {
-    return { ...usuario, codigoCarga: codigoPromotorPorNombre };
+    // 2. Solo sobrescribir si el promotor pertenece al mismo equipo que el supervisor
+    const prefixSupervisor = extraerPrefixEquipo(codigoSesion);
+    const prefixPromotor = extraerPrefixEquipo(codigoPromotorPorNombre);
+    if (prefixSupervisor && prefixPromotor && prefixSupervisor === prefixPromotor) {
+      return { ...usuario, codigoCarga: codigoPromotorPorNombre };
+    }
   }
 
   if (esCodigoUsuarioCargaValido(usuario.codigoCarga)) return usuario;

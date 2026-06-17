@@ -44,7 +44,7 @@ function BranchFooter({ desbloqueado }: Props) {
 
   return (
     <footer className="footer">
-      {desbloqueado ? <SorteosHistorial /> : null}
+      <SorteosHistorial />
 
       {/* ---- Redes (debajo del historial de sorteos cuando aplica) ---- */}
       <section className="footer__seccion">

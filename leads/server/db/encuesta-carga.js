@@ -550,13 +550,13 @@ export async function crearEncuestaManual(payload, usuarioSesion, opciones = {})
     throw new CargaEncuestaSinPersistirError(
       yaExistia
         ? 'El contacto se actualizó en el sorteo pero no aparece en tu bandeja. Probable código promotor incorrecto — tu supervisor puede verlo.'
-        : 'La encuesta se guardó pero no aparece en tu bandeja. Verificá con soporte que tu código promotor (QR) sea el correcto.',
+        : 'El contacto ya se encuentra registrado por otro operador/equipo, o no tenés permisos para visualizarlo (verificá que tu código de promotor sea el correcto).',
       detalle,
     );
   }
 
   throw new CargaEncuestaSinPersistirError(
-    'SP ejecutado pero el contacto no aparece en encuestasMuestraOperador (teléfono o permisos).',
+    'El contacto ya se encuentra registrado por otro operador o equipo (no tenés permisos para visualizarlo en tu bandeja).',
     detalle,
   );
 }

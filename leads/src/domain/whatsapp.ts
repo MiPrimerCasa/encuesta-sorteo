@@ -38,26 +38,34 @@ export function mensajeWhatsAppLead(
   nombreUsuario?: string,
   tieneCitaPrevia?: boolean,
 ) {
-  const nombre = nombreLead.trim() || 'cliente';
-  const usuario = nombreUsuario?.trim();
+  const formatName = (str?: string | null) => {
+    if (!str) return '';
+    return str
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
+  };
+
+  const nombre = formatName(nombreLead) || 'Cliente';
+  const usuario = formatName(nombreUsuario);
 
   if (!tieneCitaPrevia) {
     if (usuario) {
       return `Hola ${nombre} 😊¿cómo estás? 
 Te habla ${usuario} de Mi Primer Casa S.A.
-
-Antes que nada, ¡felicitaciones! 🎉 Ya estás participando del sorteo del terreno y las motos.
-
-Te quiero hacer una pregunta: si hoy tuvieras la oportunidad de asegurar un terreno con una cuota de solo $55.000 mensuales,
- ¿lo elegirías para construir tu casa 🏠 o como una inversión 💲?`;
+Antes que nada, ¡felicitaciones! 🎉 Ya estás participando del sorteo del terreno y las motos. 
+Te quiero hacer una pregunta: si hoy tuvieras la oportunidad de asegurar un terreno con una cuota de $55.000 por mes.  ¿ Para que Lo Usarías?
+Para construir tu casa 🏠?
+ o como una inversión 💲?`;
     }
     return `Hola ${nombre} 😊¿cómo estás? 
 Te hablo de Mi Primer Casa S.A.
-
-Antes que nada, ¡felicitaciones! 🎉 Ya estás participando del sorteo del terreno y las motos.
-
-Te quiero hacer una pregunta: si hoy tuvieras la oportunidad de asegurar un terreno con una cuota de solo $55.000 mensuales,
- ¿lo elegirías para construir tu casa 🏠 o como una inversión 💲?`;
+Antes que nada, ¡felicitaciones! 🎉 Ya estás participando del sorteo del terreno y las motos. 
+Te quiero hacer una pregunta: si hoy tuvieras la oportunidad de asegurar un terreno con una cuota de $55.000 por mes.  ¿ Para que Lo Usarías?
+Para construir tu casa 🏠?
+ o como una inversión 💲?`;
   }
 
   if (usuario) {

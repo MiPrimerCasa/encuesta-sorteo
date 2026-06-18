@@ -33,14 +33,6 @@ export function abrirChatWhatsApp(
   return true;
 }
 
-function normalizeNombreSimple(valor: string): string {
-  return String(valor ?? '')
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '');
-}
-
 export function mensajeWhatsAppLead(
   nombreLead: string,
   nombreUsuario?: string,
@@ -51,20 +43,21 @@ export function mensajeWhatsAppLead(
 
   if (!tieneCitaPrevia) {
     if (usuario) {
-      const primerNombre = normalizeNombreSimple(usuario).split(' ')[0] || '';
-      const esFemenino = /a$|belen|catherine|giselle/i.test(primerNombre);
-      const profesion = esFemenino ? 'asesora' : 'asesor';
-      return `Hola ${nombre}! Mi nombre es ${usuario} y soy ${profesion} de ventas de Mi Primer Casa.
-FELICITACIONES!!!!🥳
-Ya estás participando del sorteo GRATIS del terreno y las motos. EXITOS! 🍀 
-Además, aprovecho para comentarte que tenemos una excelente promoción del 40% de descuento en nuestros productos. 
-Te invito a que me agendes para que veas las promociones en mis estados, y si te interesa recibir mas información , estoy para asesorarte.`;
+      return `Hola ${nombre} 😊¿cómo estás? 
+Te habla ${usuario} de Mi Primer Casa S.A.
+
+Antes que nada, ¡felicitaciones! 🎉 Ya estás participando del sorteo del terreno y las motos.
+
+Te quiero hacer una pregunta: si hoy tuvieras la oportunidad de asegurar un terreno con una cuota de solo $55.000 mensuales,
+ ¿lo elegirías para construir tu casa 🏠 o como una inversión 💲?`;
     }
-    return `Hola ${nombre}! Mi nombre es asesor/a de ventas de Mi Primer Casa.
-FELICITACIONES!!!!🥳
-Ya estás participando del sorteo GRATIS del terreno y las motos. EXITOS! 🍀 
-Además, aprovecho para comentarte que tenemos una excelente promoción del 40% de descuento en nuestros productos. 
-Te invito a que me agendes para que veas las promociones en mis estados, y si te interesa recibir mas información , estoy para asesorarte.`;
+    return `Hola ${nombre} 😊¿cómo estás? 
+Te hablo de Mi Primer Casa S.A.
+
+Antes que nada, ¡felicitaciones! 🎉 Ya estás participando del sorteo del terreno y las motos.
+
+Te quiero hacer una pregunta: si hoy tuvieras la oportunidad de asegurar un terreno con una cuota de solo $55.000 mensuales,
+ ¿lo elegirías para construir tu casa 🏠 o como una inversión 💲?`;
   }
 
   if (usuario) {

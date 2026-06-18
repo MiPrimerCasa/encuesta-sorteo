@@ -895,8 +895,10 @@ export function reassignDemoLead(leadId: string, nuevoUsuarioCarga: string): Lea
     promotorNombre,
     supervisorNombre,
     promotorId,
+    seguimiento: {},
   };
 
+  demoHistorialPorLead.delete(leadId);
   demoLeads = demoLeads.map((l) => (l.id === leadId ? updated : l));
   return { ...updated };
 }

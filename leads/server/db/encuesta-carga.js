@@ -24,6 +24,7 @@ import {
   resolveCodigoCargaPromotorStrict,
 } from './operadores-catalog.js';
 import { getSqlPoolEncuestas } from './mssql.js';
+import { resetearSeguimientoLead } from './seguimiento-sql.js';
 
 const MSG_CONTACTO_YA_REGISTRADO = 'Este número ya se encuentra registrado en el sistema.';
 
@@ -690,6 +691,8 @@ export async function reasignarLeadManual(leadId, nuevoUsuarioCarga, usuarioSesi
     ...cargaParams,
     idEncuesta,
   });
+
+  await resetearSeguimientoLead(leadId);
 
   const leadsPost = await listAllLeadsFromEncuestas();
   const porId = leadsPost.find((l) => String(l.id) === String(leadId));

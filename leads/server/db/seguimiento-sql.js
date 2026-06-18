@@ -7,7 +7,7 @@ import {
   pestanaDesdeSeguimiento,
 } from './seguimiento-historial.js';
 import { getSqlPoolEncuestas, isSqlServerConfigured } from './mssql.js';
-import { getSeguimientoExterno, listSeguimientoHistorial, upsertSeguimientoExterno } from './sqlite.js';
+import { getDb, getSeguimientoExterno, listSeguimientoHistorial, upsertSeguimientoExterno } from './sqlite.js';
 
 export class SeguimientoRegistroError extends Error {
   constructor(message, code = 'SEGUIMIENTO_SQL') {
@@ -622,4 +622,23 @@ export async function persistirSeguimientoLead(leadId, patch, usuario, leadConte
     saved: true,
     entradaHistorial: buildEntradaHistorial(leadId, mergedLocal, usuario, leadContext, Date.now()),
   };
+}
+
+export async function resetearSeguimientoLead(leadId) {
+  const dbi = getDb();
+  const leadIdStr = String(leadId);
+  dbi.prepare('DELETE FROM lead_seguimiento_externo WHERE lead_id = ?').run(leadIdStr);
+  dbi.prepare('DELETE FROM lead_seguimiento_historial WHERE lead_id = ?').run(leadIdStr);
+  dbi.prepare('DELETE FROM seguimiento_eventos WHERE lead_id = ?').run(leadIdStr);
+
+  if (useSeguimientoSql()) {
+    const pool = await getSqlPoolEncuestas();
+    const table = getSeguimientoTableName();
+    const leadIdNum = parseInt(leadIdStr, 10);
+    if (Number.isFinite(leadIdNum)) {
+      await pool.request()
+        .input('leadId', sql.Int, leadIdNum)
+        .query(`DELETE FROM dbo.[${table}] WHERE lead_id = @leadId`);
+    }
+  }
 }

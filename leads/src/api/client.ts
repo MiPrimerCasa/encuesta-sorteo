@@ -271,6 +271,14 @@ export async function fetchAdminDashboard(periodo?: string): Promise<AdminDashbo
   return apiFetch<AdminDashboardData>(url);
 }
 
+export async function fetchAdminLeads(): Promise<Lead[]> {
+  if (_isDemoActive) {
+    return getDemoLeads();
+  }
+  const data = await apiFetch<{ leads: Lead[] }>('/api/admin/leads');
+  return data.leads ?? [];
+}
+
 export async function fetchHistorialSeguimiento(
   leadId: string,
 ): Promise<SeguimientoHistorialEntry[]> {

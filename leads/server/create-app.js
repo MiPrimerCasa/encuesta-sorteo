@@ -13,6 +13,7 @@ import {
   promotorTieneFilasEnMuestra,
   resolveDireccionOficinasSupervisor,
   updateLeadSeguimientoEncuesta,
+  listAllLeadsFromEncuestas,
 } from './db/encuestas.js';
 import {
   CargaEncuestaSinPersistirError,
@@ -345,6 +346,32 @@ function registerApiRoutes(api) {
       return res.json(dashboard);
     } catch (error) {
       console.error('Error admin dashboard:', error);
+      const err = formatSqlError(error);
+      return res.status(500).json(err);
+    }
+  });
+
+  api.get('/admin/leads', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso =
+      esSuperadminUsuario(usuario) ||
+      esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message: 'Panel de administración solo disponible para superadmin o supervisores con acceso global.',
+      });
+    }
+
+    try {
+      const leads = await listAllLeadsFromEncuestas();
+      return res.json({ leads });
+    } catch (error) {
+      console.error('Error admin leads list:', error);
       const err = formatSqlError(error);
       return res.status(500).json(err);
     }

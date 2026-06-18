@@ -1,9 +1,10 @@
-import { useState } from 'react';
-import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres } from '../../types';
+import { useState, useEffect } from 'react';
+import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres, Lead } from '../../types';
 import { formatRangoSemana } from '../../domain/admin-metrics';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
+import { fetchAdminLeads } from '../../api/client';
 
 interface SuperadminDashboardProps {
   data: AdminDashboardData;
@@ -91,6 +92,91 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const [filterText, setFilterText] = useState('');
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
   const [rankingSearch, setRankingSearch] = useState('');
+
+  const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador'>('metricas');
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [cargandoLeads, setCargandoLeads] = useState(false);
+  const [busquedaLeads, setBusquedaLeads] = useState('');
+  const [paginaActual, setPaginaActual] = useState(1);
+  const leadsPorPagina = 50;
+
+  useEffect(() => {
+    if (tabActivo === 'buscador' && leads.length === 0) {
+      setCargandoLeads(true);
+      fetchAdminLeads()
+        .then((data) => {
+          setLeads(data);
+          setCargandoLeads(false);
+        })
+        .catch((err) => {
+          console.error('Error al cargar leads global:', err);
+          setCargandoLeads(false);
+        });
+    }
+  }, [tabActivo, leads.length]);
+
+  const queryLeads = busquedaLeads.trim().toLowerCase();
+  const leadsFiltrados = queryLeads
+    ? leads.filter((l) => {
+        const nombreMatch = l.nombre?.toLowerCase().includes(queryLeads);
+        const telefonoMatch = l.telefono?.includes(queryLeads);
+        return nombreMatch || telefonoMatch;
+      })
+    : leads;
+
+  useEffect(() => {
+    setPaginaActual(1);
+  }, [busquedaLeads]);
+
+  const indexUltimoLead = paginaActual * leadsPorPagina;
+  const indexPrimerLead = indexUltimoLead - leadsPorPagina;
+  const leadsPaginados = leadsFiltrados.slice(indexPrimerLead, indexUltimoLead);
+  const totalPaginas = Math.ceil(leadsFiltrados.length / leadsPorPagina);
+
+  const formatearFecha = (fechaStr?: string) => {
+    if (!fechaStr) return '-';
+    try {
+      const normalized = fechaStr.includes('T') ? fechaStr : fechaStr.replace(' ', 'T');
+      const d = new Date(normalized);
+      if (isNaN(d.getTime())) return fechaStr;
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      return `${day}/${month}/${year}`;
+    } catch {
+      return fechaStr;
+    }
+  };
+
+  const renderEstadoBadge = (lista?: string) => {
+    switch (lista) {
+      case 'compro':
+        return (
+          <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-700">
+            Cierre / Venta
+          </span>
+        );
+      case 'seguimiento':
+        return (
+          <span className="inline-flex items-center rounded-md bg-blue-50 border border-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+            Seguimiento
+          </span>
+        );
+      case 'contacto':
+        return (
+          <span className="inline-flex items-center rounded-md bg-amber-50 border border-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-700">
+            Contactado
+          </span>
+        );
+      case 'entrevista':
+      default:
+        return (
+          <span className="inline-flex items-center rounded-md bg-purple-50 border border-purple-100 px-2 py-0.5 text-[11px] font-bold text-purple-700">
+            Prioridad
+          </span>
+        );
+    }
+  };
 
 
   // ── Resumen General de Productividad (Semana Móvil) ──────────────────────────
@@ -228,16 +314,44 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         </p>
       </div>
 
+      {/* Selector de pestañas */}
+      <div className="flex items-center rounded-xl bg-zinc-100 p-1 border border-zinc-200/50 shadow-sm self-start max-w-xs no-print">
+        <button
+          type="button"
+          onClick={() => setTabActivo('metricas')}
+          className={`flex-1 rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center ${
+            tabActivo === 'metricas'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800'
+          }`}
+        >
+          Métricas
+        </button>
+        <button
+          type="button"
+          onClick={() => setTabActivo('buscador')}
+          className={`flex-1 rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center ${
+            tabActivo === 'buscador'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800'
+          }`}
+        >
+          Buscador Leads
+        </button>
+      </div>
+
       {data.aviso && (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-900">
           {data.aviso}
         </p>
       )}
 
-      <section>
-        <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-          Hoy
-        </h3>
+      {tabActivo === 'metricas' && (
+        <>
+          <section>
+            <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
+              Hoy
+            </h3>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Entrevistas" value={data.resumenHoy.entrevistas} />
           <StatCard label="Cierres" value={data.resumenHoy.cierres} />
@@ -593,6 +707,137 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
           ))
         )}
       </section>
+        </>
+      )}
+
+      {tabActivo === 'buscador' && (
+        <section className="space-y-4">
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col">
+            <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h4 className="text-[14px] font-semibold text-zinc-900">Buscador de Leads</h4>
+                <p className="text-[11px] text-zinc-500">
+                  Buscá leads en toda la base de datos por nombre o número de teléfono.
+                </p>
+              </div>
+              <div className="relative w-full sm:w-72 shrink-0">
+                <svg
+                  width="14" height="14" viewBox="0 0 16 16" fill="none"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                  aria-hidden="true"
+                >
+                  <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <input
+                  id="busqueda-leads-global"
+                  type="search"
+                  value={busquedaLeads}
+                  onChange={(e) => setBusquedaLeads(e.target.value)}
+                  placeholder="Nombre o teléfono..."
+                  className="w-full rounded-lg border border-zinc-200 bg-white py-1.5 pl-8 pr-8 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100"
+                />
+                {busquedaLeads && (
+                  <button
+                    type="button"
+                    onClick={() => setBusquedaLeads('')}
+                    style={{ touchAction: 'manipulation' }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 active:text-zinc-700"
+                    aria-label="Limpiar búsqueda"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {cargandoLeads ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-2">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-brand-600"></div>
+                <p className="text-[13px] text-zinc-500 font-medium animate-pulse">Cargando base de datos completa...</p>
+              </div>
+            ) : leads.length === 0 ? (
+              <p className="py-8 text-center text-[13px] text-zinc-400">
+                No se pudieron cargar los leads o la base está vacía.
+              </p>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
+                    <thead>
+                      <tr className="bg-zinc-50/50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                        <th className="py-2.5 px-4 text-left">Cliente</th>
+                        <th className="py-2.5 px-4 text-left">Promotor Asignado</th>
+                        <th className="py-2.5 px-4 text-left">Equipo (Supervisor)</th>
+                        <th className="py-2.5 px-4 text-center">Fecha Ingreso</th>
+                        <th className="py-2.5 px-4 text-center">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                      {leadsPaginados.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-zinc-400">
+                            No se encontraron leads para la búsqueda "{busquedaLeads}".
+                          </td>
+                        </tr>
+                      ) : (
+                        leadsPaginados.map((l) => (
+                          <tr key={l.id} className="hover:bg-zinc-50/80 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="font-semibold text-zinc-900">{l.nombre}</div>
+                              <div className="text-[11px] font-mono text-zinc-400">{l.telefono || 'Sin teléfono'}</div>
+                            </td>
+                            <td className="py-3 px-4 font-medium text-zinc-800">
+                              {l.promotorNombre || 'Sin promotor'}
+                            </td>
+                            <td className="py-3 px-4 text-zinc-500">
+                              {l.supervisorNombre || 'Sin supervisor'}
+                            </td>
+                            <td className="py-3 px-4 text-center text-zinc-500 tabular-nums">
+                              {formatearFecha(l.fechaAlta || l.fechaObtencion)}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              {renderEstadoBadge(l.lista)}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {totalPaginas > 1 && (
+                  <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50/50 px-4 py-3">
+                    <p className="text-[12px] text-zinc-500">
+                      Mostrando <span className="font-semibold">{indexPrimerLead + 1}</span> a <span className="font-semibold">{Math.min(indexUltimoLead, leadsFiltrados.length)}</span> de <span className="font-semibold">{leadsFiltrados.length}</span> leads
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setPaginaActual((p) => Math.max(1, p - 1))}
+                        disabled={paginaActual === 1}
+                        className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white transition-all cursor-pointer"
+                      >
+                        Anterior
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaginaActual((p) => Math.min(totalPaginas, p + 1))}
+                        disabled={paginaActual === totalPaginas}
+                        className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white transition-all cursor-pointer"
+                      >
+                        Siguiente
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </section>
+      )}
 
 
 

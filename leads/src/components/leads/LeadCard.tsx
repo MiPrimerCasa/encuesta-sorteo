@@ -61,6 +61,8 @@ interface LeadCardProps {
   historial?: SeguimientoHistorialEntry[];
   onModificarTelefono?: (lead: Lead) => void;
   fetchHistorial?: (leadId: string) => void;
+  /** Se invoca al presionar WhatsApp para registrar contacto automático. */
+  onWhatsAppAutoContacto?: (lead: Lead) => void;
 }
 
 export function LeadCard({
@@ -76,6 +78,7 @@ export function LeadCard({
   historial = [],
   onModificarTelefono,
   fetchHistorial,
+  onWhatsAppAutoContacto,
 }: LeadCardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -455,6 +458,7 @@ export function LeadCard({
           nombre={lead.nombre}
           nombreUsuario={nombreUsuario}
           tieneCitaPrevia={leadTieneCitaPrevia(lead)}
+          onAutoContacto={onWhatsAppAutoContacto ? () => onWhatsAppAutoContacto(lead) : undefined}
         />
       </div>
     </div>

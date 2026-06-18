@@ -12,6 +12,7 @@ import {
   tabIdListaLead,
   leadEnEntrevistaPendiente,
 } from '../../domain/leads';
+import { prioridadTabInicial } from '../../domain/prioridad-leads';
 
 import { useHistorialLeads } from '../../hooks/useHistorialLeads';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
@@ -275,6 +276,16 @@ export function LeadsPanel({
     await refrescarHistorial(leadId);
   };
 
+  const handleWhatsAppAutoContacto = async (lead: Lead) => {
+    if (prioridadTabInicial(lead) === 2) {
+      const seg: SeguimientoLead = {
+        canal: 'mensaje',
+        huboEntrevista: false,
+      };
+      await guardarSeguimientoLead(lead.id, seg);
+    }
+  };
+
   const abrirModificarTelefono = onModificarTelefonoLead
     ? (lead: Lead) => setLeadModificarTelefono(lead)
     : undefined;
@@ -296,6 +307,7 @@ export function LeadsPanel({
         historial={historialPorLead[lead.id] ?? []}
         onModificarTelefono={abrirModificarTelefono}
         fetchHistorial={fetchHistorial}
+        onWhatsAppAutoContacto={handleWhatsAppAutoContacto}
       />
     ) : (
       <LeadCard
@@ -312,6 +324,7 @@ export function LeadsPanel({
         historial={historialPorLead[lead.id] ?? []}
         onModificarTelefono={abrirModificarTelefono}
         fetchHistorial={fetchHistorial}
+        onWhatsAppAutoContacto={handleWhatsAppAutoContacto}
       />
     );
 

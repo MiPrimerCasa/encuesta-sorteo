@@ -28,6 +28,7 @@ interface Props {
   historial?: SeguimientoHistorialEntry[];
   onModificarTelefono?: (lead: Lead) => void;
   fetchHistorial?: (leadId: string) => void;
+  onWhatsAppAutoContacto?: (lead: Lead) => void;
 }
 
 export function SwipeableLeadCard({
@@ -44,6 +45,7 @@ export function SwipeableLeadCard({
   historial = [],
   onModificarTelefono,
   fetchHistorial,
+  onWhatsAppAutoContacto,
 }: Props) {
   const [offset, setOffset] = useState(0);
   const [revealed, setRevealed] = useState(false);
@@ -299,6 +301,7 @@ export function SwipeableLeadCard({
             historial={historial}
             onModificarTelefono={onModificarTelefono}
             fetchHistorial={fetchHistorial}
+            onWhatsAppAutoContacto={onWhatsAppAutoContacto}
           />
         </div>
       </div>

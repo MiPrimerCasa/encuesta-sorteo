@@ -10,6 +10,8 @@ interface WhatsAppLeadButtonProps {
   nombreUsuario?: string;
   tieneCitaPrevia?: boolean;
   className?: string;
+  /** Callback opcional: se invoca tras abrir WhatsApp (para registrar contacto automático). */
+  onAutoContacto?: () => void;
 }
 
 function IconoWhatsApp() {
@@ -33,6 +35,7 @@ export function WhatsAppLeadButton({
   nombreUsuario,
   tieneCitaPrevia,
   className = '',
+  onAutoContacto,
 }: WhatsAppLeadButtonProps) {
   const mensaje = mensajeWhatsAppLead(nombre, nombreUsuario, tieneCitaPrevia);
   const numeroOk = Boolean(telefonoParaWhatsApp(telefono));
@@ -60,6 +63,7 @@ export function WhatsAppLeadButton({
       onClick={(e) => {
         e.stopPropagation();
         abrirChatWhatsApp(telefono, mensaje);
+        onAutoContacto?.();
       }}
       style={{ touchAction: 'manipulation' }}
       className={`flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition-transform duration-[120ms] active:scale-90 ${className}`}

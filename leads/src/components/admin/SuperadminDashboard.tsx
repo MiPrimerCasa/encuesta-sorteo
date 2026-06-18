@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres, Lead } from '../../types';
 import { formatRangoSemana } from '../../domain/admin-metrics';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
@@ -93,7 +93,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
   const [rankingSearch, setRankingSearch] = useState('');
 
-  const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador'>('metricas');
+  const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador' | 'sin_tratar'>('metricas');
+  const [selectedOperatorUntreated, setSelectedOperatorUntreated] = useState<{ name: string; role: 'supervisor' | 'promotor'; team: string; count: number; leads: any[] } | null>(null);
+  const [busquedaSinTratar, setBusquedaSinTratar] = useState('');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [cargandoLeads, setCargandoLeads] = useState(false);
   const [busquedaLeads, setBusquedaLeads] = useState('');
@@ -237,6 +239,54 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
     0
   );
 
+  const untreatedStats = useMemo(() => {
+    const untreatedLeads = data.leadsSinTratar ?? [];
+
+    const supervisors = new Map<string, { id: string; name: string; count: number; leads: typeof untreatedLeads }>();
+    const promotores = new Map<string, { id: string; name: string; supervisorName: string; count: number; leads: typeof untreatedLeads }>();
+
+    for (const lead of untreatedLeads) {
+      const supKey = lead.supervisorNombre.trim().toLowerCase();
+      if (!supervisors.has(supKey)) {
+        supervisors.set(supKey, { id: supKey, name: lead.supervisorNombre, count: 0, leads: [] });
+      }
+      const supItem = supervisors.get(supKey)!;
+      supItem.count += 1;
+      supItem.leads.push(lead);
+
+      const promKey = `${lead.promotorNombre.trim().toLowerCase()}|${lead.supervisorNombre.trim().toLowerCase()}`;
+      if (!promotores.has(promKey)) {
+        promotores.set(promKey, { id: promKey, name: lead.promotorNombre, supervisorName: lead.supervisorNombre, count: 0, leads: [] });
+      }
+      const promItem = promotores.get(promKey)!;
+      promItem.count += 1;
+      promItem.leads.push(lead);
+    }
+
+    const supervisorList = [...supervisors.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
+    const promotorList = [...promotores.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
+
+    const unifiedList = [
+      ...supervisorList.map(s => ({ id: `sup-${s.id}`, name: s.name, role: 'supervisor' as const, team: 'Todo el Equipo', count: s.count, leads: s.leads })),
+      ...promotorList.map(p => ({ id: `prom-${p.id}`, name: p.name, role: 'promotor' as const, team: p.supervisorName, count: p.count, leads: p.leads }))
+    ].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
+
+    return {
+      total: untreatedLeads.length,
+      supervisors: supervisorList,
+      promotores: promotorList,
+      unifiedList,
+    };
+  }, [data.leadsSinTratar]);
+
+  const querySinTratar = busquedaSinTratar.trim().toLowerCase();
+  const listadoSinTratarFiltrado = querySinTratar
+    ? untreatedStats.unifiedList.filter(item =>
+        item.name.toLowerCase().includes(querySinTratar) ||
+        (item.role === 'promotor' && item.team.toLowerCase().includes(querySinTratar))
+      )
+    : untreatedStats.unifiedList;
+
   return (
     <div className="mx-auto max-w-6xl space-y-8 px-4 py-6 pb-12 sm:px-6">
       <style dangerouslySetInnerHTML={{ __html: `
@@ -315,11 +365,11 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
       </div>
 
       {/* Selector de pestañas */}
-      <div className="flex items-center rounded-xl bg-zinc-100 p-1 border border-zinc-200/50 shadow-sm self-start max-w-xs no-print">
+      <div className="flex items-center rounded-xl bg-zinc-100 p-1 border border-zinc-200/50 shadow-sm self-start max-w-sm no-print">
         <button
           type="button"
           onClick={() => setTabActivo('metricas')}
-          className={`flex-1 rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center ${
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center ${
             tabActivo === 'metricas'
               ? 'bg-white text-zinc-900 shadow-sm'
               : 'text-zinc-500 hover:text-zinc-800'
@@ -330,13 +380,24 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         <button
           type="button"
           onClick={() => setTabActivo('buscador')}
-          className={`flex-1 rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center ${
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center ${
             tabActivo === 'buscador'
               ? 'bg-white text-zinc-900 shadow-sm'
               : 'text-zinc-500 hover:text-zinc-800'
           }`}
         >
           Buscador Leads
+        </button>
+        <button
+          type="button"
+          onClick={() => setTabActivo('sin_tratar')}
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center ${
+            tabActivo === 'sin_tratar'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800'
+          }`}
+        >
+          Leads sin Tratar
         </button>
       </div>
 
@@ -839,6 +900,105 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         </section>
       )}
 
+      {tabActivo === 'sin_tratar' && (
+        <section className="space-y-4">
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col">
+            <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h4 className="text-[14px] font-semibold text-zinc-900">Leads sin Tratar por Operador</h4>
+                <p className="text-[11px] text-zinc-500">
+                  Total de leads sin ningún tipo de tratamiento en la empresa: <strong className="text-red-600 font-bold tabular-nums">{untreatedStats.total}</strong>
+                </p>
+              </div>
+              <div className="relative w-full sm:w-72 shrink-0">
+                <svg
+                  width="14" height="14" viewBox="0 0 16 16" fill="none"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                  aria-hidden="true"
+                >
+                  <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <input
+                  id="busqueda-sin-tratar"
+                  type="search"
+                  value={busquedaSinTratar}
+                  onChange={(e) => setBusquedaSinTratar(e.target.value)}
+                  placeholder="Buscar supervisor o promotor..."
+                  className="w-full rounded-lg border border-zinc-200 bg-white py-1.5 pl-8 pr-8 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100"
+                />
+                {busquedaSinTratar && (
+                  <button
+                    type="button"
+                    onClick={() => setBusquedaSinTratar('')}
+                    style={{ touchAction: 'manipulation' }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 active:text-zinc-700"
+                    aria-label="Limpiar búsqueda"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
+                <thead>
+                  <tr className="bg-zinc-50/50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                    <th className="py-2.5 px-4 text-left">Operador</th>
+                    <th className="py-2.5 px-4 text-center">Rol</th>
+                    <th className="py-2.5 px-4 text-left">Equipo (Supervisor)</th>
+                    <th className="py-2.5 px-4 text-right">Leads sin Tratar</th>
+                    <th className="py-2.5 px-4 text-center">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                  {listadoSinTratarFiltrado.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-zinc-400">
+                        No se encontraron resultados para la búsqueda "{busquedaSinTratar}".
+                      </td>
+                    </tr>
+                  ) : (
+                    listadoSinTratarFiltrado.map((item) => (
+                      <tr key={item.id} className="hover:bg-zinc-50/80 transition-colors">
+                        <td className="py-3 px-4 font-semibold text-zinc-900">{item.name}</td>
+                        <td className="py-3 px-4 text-center">
+                          {item.role === 'supervisor' ? (
+                            <span className="inline-flex items-center rounded-md bg-blue-50 border border-blue-100 px-2 py-0.5 text-[11px] font-bold text-blue-700">
+                              Supervisor
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-md bg-zinc-100 border border-zinc-200 px-2 py-0.5 text-[11px] font-medium text-zinc-700">
+                              Promotor
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 px-4 text-zinc-500">{item.team}</td>
+                        <td className="py-3 px-4 text-right font-bold tabular-nums text-red-600">
+                          {item.count}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedOperatorUntreated(item)}
+                            className="text-[12px] font-semibold text-brand-600 hover:text-brand-800 hover:underline cursor-pointer"
+                          >
+                            Ver leads
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
 
 
       {/* Modal de Detalle de Anexos */}
@@ -969,6 +1129,131 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                   setFilterText('');
                 }}
                 className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-all active:scale-[0.98]"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalle de Leads Sin Tratar */}
+      {selectedOperatorUntreated && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm transition-opacity"
+            onClick={() => {
+              setSelectedOperatorUntreated(null);
+              setFilterText('');
+            }}
+          />
+
+          {/* Modal Content */}
+          <div className="relative z-50 flex h-full max-h-[80vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl transition-all duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-zinc-900">
+                  Leads sin Tratar de {selectedOperatorUntreated.name}
+                </h3>
+                <p className="text-[12px] text-zinc-500">
+                  {selectedOperatorUntreated.count} lead{selectedOperatorUntreated.count === 1 ? '' : 's'} sin contactar ni agendar
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedOperatorUntreated(null);
+                  setFilterText('');
+                }}
+                className="flex h-8 w-8 items-center justify-center text-[20px] rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors cursor-pointer"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Search filter inside modal */}
+            <div className="border-b border-zinc-100 px-6 py-3 bg-zinc-50/50">
+              <input
+                type="text"
+                placeholder="Buscar por cliente o teléfono..."
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[13px] placeholder-zinc-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15 transition-all"
+              />
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {(() => {
+                const filteredLeads = selectedOperatorUntreated.leads.filter(c =>
+                  c.nombre.toLowerCase().includes(filterText.toLowerCase()) ||
+                  c.telefono.includes(filterText)
+                );
+
+                if (filteredLeads.length === 0) {
+                  return (
+                    <p className="py-8 text-center text-[13px] text-zinc-500">
+                      {filterText ? 'No se encontraron resultados para la búsqueda.' : 'No hay leads registrados.'}
+                    </p>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
+                      <thead>
+                        <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                          <th className="pb-2 text-left font-semibold">Cliente</th>
+                          <th className="pb-2 text-left font-semibold">Teléfono</th>
+                          <th className="pb-2 text-center font-semibold">Origen</th>
+                          <th className="pb-2 text-right font-semibold">Fecha de Alta</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                        {filteredLeads.map((c) => (
+                          <tr key={c.id} className="hover:bg-zinc-50/50 transition-colors">
+                            <td className="py-3 font-semibold text-zinc-900">{c.nombre}</td>
+                            <td className="py-3">
+                              <a
+                                href={`tel:${c.telefono}`}
+                                className="text-brand-600 hover:underline inline-flex items-center gap-1 font-mono text-[12px] tabular-nums"
+                              >
+                                {c.telefono}
+                              </a>
+                            </td>
+                            <td className="py-3 text-center">
+                              <span className="inline-flex items-center rounded-md bg-zinc-100 border border-zinc-200 px-2 py-0.5 text-[11px] font-medium text-zinc-600">
+                                {c.origen === '1' || c.origen === 'qr' ? 'QR' : 
+                                 c.origen === '3' || c.origen === 'instagram' ? 'Instagram' : 
+                                 c.origen === '4' || c.origen === 'facebook' ? 'Facebook' : 
+                                 c.origen === '5' || c.origen === 'whatsapp' ? 'WhatsApp' : 
+                                 c.origen === '2' || c.origen === 'manual' ? 'Manual' : c.origen}
+                              </span>
+                            </td>
+                            <td className="py-3 text-right text-zinc-500 tabular-nums">
+                              {formatearFecha(c.fechaAlta)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="flex shrink-0 items-center justify-end border-t border-zinc-100 px-6 py-3.5 bg-zinc-50/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedOperatorUntreated(null);
+                  setFilterText('');
+                }}
+                className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-all active:scale-[0.98] cursor-pointer"
               >
                 Cerrar
               </button>

@@ -87,12 +87,13 @@ export function parseFuente(raw) {
   if (raw == null || raw === '') return null;
   const v = String(raw).toLowerCase().trim();
   if (v === '1' || v.includes('qr')) return 'qr';
-  if (v.includes('face') || v.includes('fb') || v === 'facebook') return 'facebook';
-  if (v.includes('insta') || v.includes('ig') || v === 'instagram') return 'instagram';
-  if (v.includes('whats') || v.includes('wapp') || v === 'whatsapp') return 'whatsapp';
+  if (v === '4' || v.includes('face') || v.includes('fb') || v === 'facebook') return 'facebook';
+  if (v === '3' || v.includes('insta') || v.includes('ig') || v === 'instagram') return 'instagram';
+  if (v === '5' || v.includes('whats') || v.includes('wapp') || v === 'whatsapp') return 'whatsapp';
   if (v.includes('tik') || v === 'tiktok') return 'tiktok';
   if (
     v.includes('manual') ||
+    v === '2' ||
     v === 'app' ||
     v === 'apps' ||
     v.includes('aplicacion') ||

@@ -15,7 +15,7 @@ const SP_INTERVIEW =
   process.env.SP_INTERVIEW_NAME || "dbo.encuestaActualizaEntrevistaSorteo01";
 const ENCUESTA_TABLE = process.env.ENCUESTA_TABLE_NAME || "encuesta";
 
-// Canal de origen (1=QR, 2=Manual, 3=Instagram, 4=Facebook).
+// Canal de origen (1=QR, 2=Manual, 3=Instagram, 4=Facebook, 5=WhatsApp).
 // Mantener en `false` hasta que el SP `dbo.encuestaCargaSorteo01` declare el parámetro;
 // si se manda un parámetro que el SP no define, SQL Server tira error y rompe la carga.
 const SP_INCLUDE_ORIGEN = process.env.SP_INCLUDE_ORIGEN === "true";
@@ -72,9 +72,9 @@ const encuestaSchema = z.object({
   codigoQr: z.string().trim().max(80).optional().default(""),
   mensajeWhatsapp: z.string().trim().max(100).optional().default(""),
   origen: z.string().trim().max(80).optional().default("whatsapp-encuesta-directa"),
-  /** Canal de origen (1=QR, 2=Manual, 3=Instagram, 4=Facebook). null si no vino en la URL. */
+  /** Canal de origen (1=QR, 2=Manual, 3=Instagram, 4=Facebook, 5=WhatsApp). null si no vino en la URL. */
   canalOrigen: z
-    .union([z.number().int().min(1).max(4), z.null()])
+    .union([z.number().int().min(1).max(5), z.null()])
     .optional()
     .nullable()
     .default(null),

@@ -90,7 +90,7 @@ function obtenerParametro(params: URLSearchParams, claves: string[]): string {
   return encontrado;
 }
 
-/** Códigos del canal de origen acordados con el SP: 1=QR, 2=Manual, 3=Instagram, 4=Facebook. */
+/** Códigos del canal de origen acordados con el SP: 1=QR, 2=Manual, 3=Instagram, 4=Facebook, 5=WhatsApp. */
 const CODIGO_CANAL_ORIGEN: Record<string, number> = {
   qr: 1,
   manual: 2,
@@ -98,15 +98,17 @@ const CODIGO_CANAL_ORIGEN: Record<string, number> = {
   ig: 3,
   facebook: 4,
   fb: 4,
+  whatsapp: 5,
+  wa: 5,
 };
 
 function textoDeCanalOrigen(codigo: number | null): string {
   if (codigo === null) return "";
-  return ({ 1: "qr", 2: "manual", 3: "instagram", 4: "facebook" } as Record<number, string>)[codigo] ?? "";
+  return ({ 1: "qr", 2: "manual", 3: "instagram", 4: "facebook", 5: "whatsapp" } as Record<number, string>)[codigo] ?? "";
 }
 
 /**
- * Lee el canal de origen desde la query (?origen=1|2|3|4 o ?origen=qr|manual|instagram|facebook).
+ * Lee el canal de origen desde la query (?origen=1|2|3|4|5 o ?origen=qr|manual|instagram|facebook|whatsapp).
  * Devuelve `null` si no viene o si es un valor desconocido (el SP decide qué hacer con null).
  */
 function obtenerCanalOrigen(params: URLSearchParams): { codigo: number | null; texto: string } {
@@ -114,7 +116,7 @@ function obtenerCanalOrigen(params: URLSearchParams): { codigo: number | null; t
   if (!raw) return { codigo: null, texto: "" };
   const limpio = raw.trim().toLowerCase();
   const n = Number(limpio);
-  if (Number.isInteger(n) && n >= 1 && n <= 4) {
+  if (Number.isInteger(n) && n >= 1 && n <= 5) {
     return { codigo: n, texto: textoDeCanalOrigen(n) };
   }
   const codigo = CODIGO_CANAL_ORIGEN[limpio] ?? null;

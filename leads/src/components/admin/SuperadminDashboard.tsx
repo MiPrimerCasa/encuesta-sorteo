@@ -242,42 +242,45 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const untreatedStats = useMemo(() => {
     const untreatedLeads = data.leadsSinTratar ?? [];
 
-    const supervisors = new Map<string, { id: string; name: string; count: number; leads: typeof untreatedLeads }>();
-    const promotores = new Map<string, { id: string; name: string; supervisorName: string; count: number; leads: typeof untreatedLeads }>();
+    const supervisorNames = new Set(
+      data.supervisores.map((s) => s.supervisorNombre.trim().toLowerCase())
+    );
+
+    const operators = new Map<string, { id: string; name: string; supervisorName: string; count: number; leads: typeof untreatedLeads }>();
 
     for (const lead of untreatedLeads) {
-      const supKey = lead.supervisorNombre.trim().toLowerCase();
-      if (!supervisors.has(supKey)) {
-        supervisors.set(supKey, { id: supKey, name: lead.supervisorNombre, count: 0, leads: [] });
-      }
-      const supItem = supervisors.get(supKey)!;
-      supItem.count += 1;
-      supItem.leads.push(lead);
-
       const promKey = `${lead.promotorNombre.trim().toLowerCase()}|${lead.supervisorNombre.trim().toLowerCase()}`;
-      if (!promotores.has(promKey)) {
-        promotores.set(promKey, { id: promKey, name: lead.promotorNombre, supervisorName: lead.supervisorNombre, count: 0, leads: [] });
+      if (!operators.has(promKey)) {
+        operators.set(promKey, {
+          id: promKey,
+          name: lead.promotorNombre,
+          supervisorName: lead.supervisorNombre,
+          count: 0,
+          leads: [],
+        });
       }
-      const promItem = promotores.get(promKey)!;
-      promItem.count += 1;
-      promItem.leads.push(lead);
+      const opItem = operators.get(promKey)!;
+      opItem.count += 1;
+      opItem.leads.push(lead);
     }
 
-    const supervisorList = [...supervisors.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
-    const promotorList = [...promotores.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
-
-    const unifiedList = [
-      ...supervisorList.map(s => ({ id: `sup-${s.id}`, name: s.name, role: 'supervisor' as const, team: 'Todo el Equipo', count: s.count, leads: s.leads })),
-      ...promotorList.map(p => ({ id: `prom-${p.id}`, name: p.name, role: 'promotor' as const, team: p.supervisorName, count: p.count, leads: p.leads }))
-    ].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
+    const unifiedList = [...operators.values()].map((op) => {
+      const isSup = supervisorNames.has(op.name.trim().toLowerCase());
+      return {
+        id: `op-${op.id}`,
+        name: op.name,
+        role: (isSup ? 'supervisor' : 'promotor') as 'supervisor' | 'promotor',
+        team: isSup ? '—' : op.supervisorName,
+        count: op.count,
+        leads: op.leads,
+      };
+    }).sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'es'));
 
     return {
       total: untreatedLeads.length,
-      supervisors: supervisorList,
-      promotores: promotorList,
       unifiedList,
     };
-  }, [data.leadsSinTratar]);
+  }, [data.leadsSinTratar, data.supervisores]);
 
   const querySinTratar = busquedaSinTratar.trim().toLowerCase();
   const listadoSinTratarFiltrado = querySinTratar

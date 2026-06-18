@@ -47,17 +47,32 @@ function apellidosCoinciden(apellidoLogin, apellidoPlanilla) {
   }
   return diff <= 2;
 }
-
 /** Coincidencia flexible: planilla «Leonel C» ↔ login «LEONEL CAJAL»; «Christian R» ↔ «Cristian Rocdan». */
 export function nombresCoinciden(nombreOperador, nombrePlanilla) {
   const a = normalizeNombre(nombreOperador);
   const b = normalizeNombre(nombrePlanilla);
   if (!a || !b) return false;
-  if (a === b) return true;
-  if (a.includes(b) || b.includes(a)) return true;
 
   const tokensA = a.split(/\s+/).filter(Boolean);
   const tokensB = b.split(/\s+/).filter(Boolean);
+
+  // Exclusión específica para Gamarra Ezequiel ("Gamarra E") vs Estefania Gamarra ("Estefania G" / "Gamarra Estefania")
+  const hasGamarraA = a.includes('gamarra');
+  const hasGamarraB = b.includes('gamarra');
+  if (hasGamarraA && hasGamarraB) {
+    const isEstefaniaA = a.includes('estefania');
+    const isEstefaniaB = b.includes('estefania');
+    const isEzequielA = a.includes('ezequiel') || tokensA.includes('e');
+    const isEzequielB = b.includes('ezequiel') || tokensB.includes('e');
+
+    if ((isEstefaniaA && isEzequielB) || (isEstefaniaB && isEzequielA)) {
+      return false;
+    }
+  }
+
+  if (a === b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+
   if (!tokensA.length || !tokensB.length) return false;
 
   // 1. Check if they share at least one word of length >= 3 and that the rest is compatible

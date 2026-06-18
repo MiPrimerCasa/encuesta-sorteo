@@ -24,6 +24,7 @@ import {
   LeadNoManualError,
   modificarTelefonoLeadManual,
   resolveCargaEncuestaContext,
+  reasignarLeadManual,
 } from './db/encuesta-carga.js';
 import { isLinksAcortadorEnabled } from './db/links-acortador.js';
 import { resolveLinksRedesParaUsuario } from './db/links-redes.js';
@@ -374,6 +375,87 @@ function registerApiRoutes(api) {
       console.error('Error admin leads list:', error);
       const err = formatSqlError(error);
       return res.status(500).json(err);
+    }
+  });
+
+  api.get('/admin/operadores', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso =
+      esSuperadminUsuario(usuario) ||
+      esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message: 'Panel de administración solo disponible para superadmin o supervisores con acceso global.',
+      });
+    }
+
+    try {
+      const catalog = await loadOperadoresCatalogAsync();
+      const operadores = Object.values(catalog.byCodigo ?? {}).map(o => ({
+        nombre: o.vendedor,
+        codigo: o.codigo,
+        rol: o.rol,
+      }));
+      return res.json({ operadores });
+    } catch (error) {
+      console.error('Error al listar operadores:', error);
+      return res.status(500).json({
+        message: 'No se pudieron cargar los operadores del catálogo.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
+  api.post('/admin/leads/:id/reasignar', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso =
+      esSuperadminUsuario(usuario) ||
+      esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message: 'Panel de administración solo disponible para superadmin o supervisores con acceso global.',
+      });
+    }
+
+    const leadId = String(req.params.id || '').trim();
+    const { usuarioCarga } = req.body;
+    if (!leadId) {
+      return res.status(400).json({ message: 'Id de lead inválido.' });
+    }
+    if (!usuarioCarga || !String(usuarioCarga).trim()) {
+      return res.status(400).json({ message: 'Código de reasignación requerido.' });
+    }
+
+    try {
+      getDb();
+      const lead = await reasignarLeadManual(
+        leadId,
+        usuarioCarga,
+        usuario,
+      );
+      return res.json({
+        message: 'Lead reasignado correctamente.',
+        lead,
+      });
+    } catch (error) {
+      if (error instanceof LeadNoEncontradoError) {
+        return res.status(404).json({ message: error.message, code: error.code });
+      }
+      console.error('Error al reasignar lead:', error);
+      return res.status(500).json({
+        message: 'No se pudo reasignar el lead.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
     }
   });
 

@@ -4,7 +4,8 @@ import { formatRangoSemana } from '../../domain/admin-metrics';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
-import { fetchAdminLeads } from '../../api/client';
+import { fetchAdminLeads, fetchAdminOperadores, reasignarLead } from '../../api/client';
+import type { OperadorCatalogo } from '../../api/client';
 
 interface SuperadminDashboardProps {
   data: AdminDashboardData;
@@ -93,7 +94,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
   const [rankingSearch, setRankingSearch] = useState('');
 
-  const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador' | 'sin_tratar'>('metricas');
+  const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador' | 'sin_tratar' | 'reasignacion'>('metricas');
   const [selectedOperatorUntreated, setSelectedOperatorUntreated] = useState<{ name: string; role: 'supervisor' | 'promotor'; team: string; count: number; leads: any[] } | null>(null);
   const [busquedaSinTratar, setBusquedaSinTratar] = useState('');
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -102,8 +103,16 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const [paginaActual, setPaginaActual] = useState(1);
   const leadsPorPagina = 50;
 
+  const [operadores, setOperadores] = useState<OperadorCatalogo[]>([]);
+  const [cargandoOperadores, setCargandoOperadores] = useState(false);
+  const [busquedaReasignar, setBusquedaReasignar] = useState('');
+  const [paginaReasignar, setPaginaReasignar] = useState(1);
+  const [reasignandoLeadId, setReasignandoLeadId] = useState<string | null>(null);
+  const [resultadoReasignacion, setResultadoReasignacion] = useState<{ tipo: 'success' | 'error'; mensaje: string } | null>(null);
+  const [selectedOperatorCodes, setSelectedOperatorCodes] = useState<Record<string, string>>({});
+
   useEffect(() => {
-    if (tabActivo === 'buscador' && leads.length === 0) {
+    if ((tabActivo === 'buscador' || tabActivo === 'reasignacion') && leads.length === 0) {
       setCargandoLeads(true);
       fetchAdminLeads()
         .then((data) => {
@@ -116,6 +125,71 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         });
     }
   }, [tabActivo, leads.length]);
+
+  useEffect(() => {
+    if (tabActivo === 'reasignacion' && operadores.length === 0) {
+      setCargandoOperadores(true);
+      fetchAdminOperadores()
+        .then((data) => {
+          setOperadores(data);
+          setCargandoOperadores(false);
+        })
+        .catch((err) => {
+          console.error('Error al cargar operadores:', err);
+          setCargandoOperadores(false);
+        });
+    }
+  }, [tabActivo, operadores.length]);
+
+  const queryReasignar = busquedaReasignar.trim().toLowerCase();
+  const leadsFiltradosReasignar = useMemo(() => {
+    return queryReasignar
+      ? leads.filter((l) => {
+          const nombreMatch = l.nombre?.toLowerCase().includes(queryReasignar);
+          const telefonoMatch = l.telefono?.includes(queryReasignar);
+          const promotorMatch = l.promotorNombre?.toLowerCase().includes(queryReasignar);
+          const supervisorMatch = l.supervisorNombre?.toLowerCase().includes(queryReasignar);
+          return nombreMatch || telefonoMatch || promotorMatch || supervisorMatch;
+        })
+      : leads;
+  }, [leads, queryReasignar]);
+
+  useEffect(() => {
+    setPaginaReasignar(1);
+  }, [busquedaReasignar]);
+
+  const leadsPaginadosReasignar = useMemo(() => {
+    const indexUltimo = paginaReasignar * leadsPorPagina;
+    const indexPrimer = indexUltimo - leadsPorPagina;
+    return leadsFiltradosReasignar.slice(indexPrimer, indexUltimo);
+  }, [leadsFiltradosReasignar, paginaReasignar]);
+
+  const totalPaginasReasignar = Math.ceil(leadsFiltradosReasignar.length / leadsPorPagina);
+
+  const handleReasignar = async (leadId: string, nuevoCodigo: string) => {
+    if (!nuevoCodigo) return;
+    setReasignandoLeadId(leadId);
+    setResultadoReasignacion(null);
+    try {
+      const leadActualizado = await reasignarLead(leadId, nuevoCodigo);
+      setLeads((prevLeads) =>
+        prevLeads.map((l) => (l.id === leadId ? leadActualizado : l))
+      );
+      setResultadoReasignacion({
+        tipo: 'success',
+        mensaje: `Lead "${leadActualizado.nombre}" reasignado correctamente.`,
+      });
+      setTimeout(() => setResultadoReasignacion(null), 5000);
+    } catch (err) {
+      console.error(err);
+      setResultadoReasignacion({
+        tipo: 'error',
+        mensaje: err instanceof Error ? err.message : 'Error al reasignar el lead.',
+      });
+    } finally {
+      setReasignandoLeadId(null);
+    }
+  };
 
   const queryLeads = busquedaLeads.trim().toLowerCase();
   const leadsFiltrados = queryLeads
@@ -368,11 +442,11 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
       </div>
 
       {/* Selector de pestañas */}
-      <div className="flex items-center rounded-xl bg-zinc-100 p-1 border border-zinc-200/50 shadow-sm self-start max-w-sm no-print">
+      <div className="flex flex-wrap sm:flex-nowrap items-center rounded-xl bg-zinc-100 p-1 border border-zinc-200/50 shadow-sm self-start gap-1 sm:gap-0 no-print">
         <button
           type="button"
           onClick={() => setTabActivo('metricas')}
-          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center ${
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
             tabActivo === 'metricas'
               ? 'bg-white text-zinc-900 shadow-sm'
               : 'text-zinc-500 hover:text-zinc-800'
@@ -383,7 +457,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         <button
           type="button"
           onClick={() => setTabActivo('buscador')}
-          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center ${
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
             tabActivo === 'buscador'
               ? 'bg-white text-zinc-900 shadow-sm'
               : 'text-zinc-500 hover:text-zinc-800'
@@ -394,13 +468,24 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         <button
           type="button"
           onClick={() => setTabActivo('sin_tratar')}
-          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center ${
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
             tabActivo === 'sin_tratar'
               ? 'bg-white text-zinc-900 shadow-sm'
               : 'text-zinc-500 hover:text-zinc-800'
           }`}
         >
           Leads sin Tratar
+        </button>
+        <button
+          type="button"
+          onClick={() => setTabActivo('reasignacion')}
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
+            tabActivo === 'reasignacion'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800'
+          }`}
+        >
+          Reasignación de Leads
         </button>
       </div>
 
@@ -998,6 +1083,221 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                 </tbody>
               </table>
             </div>
+          </div>
+        </section>
+      )}
+
+      {tabActivo === 'reasignacion' && (
+        <section className="space-y-4">
+          {resultadoReasignacion && (
+            <div
+              className={`rounded-lg border px-4 py-3 text-[13px] transition-all duration-300 ${
+                resultadoReasignacion.tipo === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-950 shadow-sm'
+                  : 'border-rose-200 bg-rose-50 text-rose-950 shadow-sm'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                {resultadoReasignacion.tipo === 'success' ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-emerald-600 shrink-0">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-rose-600 shrink-0">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                  </svg>
+                )}
+                <p className="font-medium">{resultadoReasignacion.mensaje}</p>
+              </div>
+            </div>
+          )}
+
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col">
+            <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h4 className="text-[14px] font-semibold text-zinc-900">Reasignación de Leads</h4>
+                <p className="text-[11px] text-zinc-500">
+                  Buscá leads en toda la base y reasignalos a otro promotor o supervisor (actualiza el propietario del lead).
+                </p>
+              </div>
+              <div className="relative w-full sm:w-72 shrink-0">
+                <svg
+                  width="14" height="14" viewBox="0 0 16 16" fill="none"
+                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                  aria-hidden="true"
+                >
+                  <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <input
+                  id="busqueda-reasignar"
+                  type="search"
+                  value={busquedaReasignar}
+                  onChange={(e) => setBusquedaReasignar(e.target.value)}
+                  placeholder="Buscar cliente, promotor, supervisor..."
+                  className="w-full rounded-lg border border-zinc-200 bg-white py-1.5 pl-8 pr-8 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100"
+                />
+                {busquedaReasignar && (
+                  <button
+                    type="button"
+                    onClick={() => setBusquedaReasignar('')}
+                    style={{ touchAction: 'manipulation' }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 active:text-zinc-700"
+                    aria-label="Limpiar búsqueda"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {cargandoLeads || cargandoOperadores ? (
+              <div className="flex flex-col items-center justify-center py-12 space-y-2">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-zinc-200 border-t-brand-600"></div>
+                <p className="text-[13px] text-zinc-500 font-medium animate-pulse">Cargando datos de leads y operadores...</p>
+              </div>
+            ) : leads.length === 0 ? (
+              <p className="py-8 text-center text-[13px] text-zinc-400">
+                No se pudieron cargar los leads.
+              </p>
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
+                    <thead>
+                      <tr className="bg-zinc-50/50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                        <th className="py-2.5 px-4 text-left">Cliente</th>
+                        <th className="py-2.5 px-4 text-left">Promotor Actual</th>
+                        <th className="py-2.5 px-4 text-left">Supervisor Actual</th>
+                        <th className="py-2.5 px-4 text-left">Reasignar A</th>
+                        <th className="py-2.5 px-4 text-center">Acción</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                      {leadsPaginadosReasignar.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="py-8 text-center text-zinc-400">
+                            No se encontraron leads para la búsqueda "{busquedaReasignar}".
+                          </td>
+                        </tr>
+                      ) : (
+                        leadsPaginadosReasignar.map((l) => {
+                          const currentOwnerCode = l.codigoPromotorCarga || l.encuestaUsuario || '';
+                          const selectedCode = selectedOperatorCodes[l.id] ?? currentOwnerCode;
+                          const hasChanged = selectedCode !== currentOwnerCode;
+                          const isPending = reasignandoLeadId === l.id;
+
+                          const supervisoresCatalog = operadores.filter(o => o.rol === 'supervisor');
+                          const promotoresCatalog = operadores.filter(o => o.rol === 'promotor');
+
+                          return (
+                            <tr key={l.id} className="hover:bg-zinc-50/80 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="font-semibold text-zinc-900">{l.nombre}</div>
+                                <div className="text-[11px] font-mono text-zinc-400">{l.telefono || 'Sin teléfono'}</div>
+                              </td>
+                              <td className="py-3 px-4 font-medium text-zinc-800">
+                                {l.promotorNombre || 'Sin promotor'}
+                              </td>
+                              <td className="py-3 px-4 text-zinc-500">
+                                {l.supervisorNombre || 'Sin supervisor'}
+                              </td>
+                              <td className="py-3 px-4">
+                                <select
+                                  value={selectedCode}
+                                  disabled={isPending}
+                                  onChange={(e) => {
+                                    const val = e.target.value;
+                                    setSelectedOperatorCodes(prev => ({ ...prev, [l.id]: val }));
+                                  }}
+                                  className="w-full sm:w-64 rounded-lg border border-zinc-200 bg-white py-1.5 px-2.5 text-[13px] text-zinc-800 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100 disabled:bg-zinc-50 disabled:text-zinc-400"
+                                >
+                                  <option value="">Seleccionar operador...</option>
+                                  {supervisoresCatalog.length > 0 && (
+                                    <optgroup label="Supervisores">
+                                      {supervisoresCatalog.map(o => (
+                                        <option key={o.codigo} value={o.codigo}>
+                                          {o.nombre} ({o.codigo})
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  )}
+                                  {promotoresCatalog.length > 0 && (
+                                    <optgroup label="Promotores">
+                                      {promotoresCatalog.map(o => (
+                                        <option key={o.codigo} value={o.codigo}>
+                                          {o.nombre} ({o.codigo})
+                                        </option>
+                                      ))}
+                                    </optgroup>
+                                  )}
+                                </select>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <button
+                                  type="button"
+                                  disabled={!hasChanged || isPending}
+                                  onClick={() => handleReasignar(l.id, selectedCode)}
+                                  className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-all shadow-sm active:scale-[0.98] ${
+                                    hasChanged && !isPending
+                                      ? 'bg-brand-600 text-white hover:bg-brand-700 cursor-pointer'
+                                      : 'bg-zinc-100 text-zinc-400 border border-zinc-200/50 cursor-not-allowed shadow-none'
+                                  }`}
+                                >
+                                  {isPending ? (
+                                    <>
+                                      <svg className="animate-spin -ml-0.5 mr-0.5 h-3 w-3 text-white" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                      </svg>
+                                      Aplicando...
+                                    </>
+                                  ) : (
+                                    'Aplicar'
+                                  )}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {totalPaginasReasignar > 1 && (
+                  <div className="flex items-center justify-between border-t border-zinc-100 bg-zinc-50/50 px-4 py-3">
+                    <p className="text-[12px] text-zinc-500">
+                      Mostrando <span className="font-semibold">{((paginaReasignar - 1) * leadsPorPagina) + 1}</span> a{' '}
+                      <span className="font-semibold">{Math.min(paginaReasignar * leadsPorPagina, leadsFiltradosReasignar.length)}</span> de{' '}
+                      <span className="font-semibold">{leadsFiltradosReasignar.length}</span> leads
+                    </p>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setPaginaReasignar((p) => Math.max(1, p - 1))}
+                        disabled={paginaReasignar === 1}
+                        className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white transition-all cursor-pointer"
+                      >
+                        Anterior
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaginaReasignar((p) => Math.min(totalPaginasReasignar, p + 1))}
+                        disabled={paginaReasignar === totalPaginasReasignar}
+                        className="rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-zinc-700 hover:bg-zinc-50 disabled:opacity-40 disabled:hover:bg-white transition-all cursor-pointer"
+                      >
+                        Siguiente
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </section>
       )}

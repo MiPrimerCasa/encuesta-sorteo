@@ -856,3 +856,55 @@ export function getDemoAdminDashboard(periodo = 'mes') {
 
   return buildAdminDashboardFromLeads(leads, historialRows, ahora, periodo);
 }
+
+export function reassignDemoLead(leadId: string, nuevoUsuarioCarga: string): Lead {
+  const lead = demoLeads.find((l) => l.id === leadId);
+  if (!lead) throw new Error('Lead no encontrado en demo');
+
+  const catalog = linksCatalog as any;
+  const entry = catalog.byCodigo?.[nuevoUsuarioCarga];
+  if (!entry) {
+    throw new Error(`Código de reasignación no válido: ${nuevoUsuarioCarga}`);
+  }
+
+  let promotorNombre = 'Sin promotor';
+  let supervisorNombre = undefined;
+  let promotorId = 'sin-promotor';
+
+  if (entry.rol === 'supervisor') {
+    supervisorNombre = entry.vendedor;
+  } else {
+    promotorNombre = entry.vendedor;
+    promotorId = `p-${entry.vendedor.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    
+    // Find supervisor of this team
+    const match = nuevoUsuarioCarga.match(/^(SORTEO\d+S\d{2})P\d+/i);
+    if (match) {
+      const supCode = `${match[1]}00`;
+      const supEntry = catalog.byCodigo?.[supCode];
+      if (supEntry) {
+        supervisorNombre = supEntry.vendedor;
+      }
+    }
+  }
+
+  const updated: Lead = {
+    ...lead,
+    encuestaUsuario: nuevoUsuarioCarga,
+    codigoPromotorCarga: nuevoUsuarioCarga,
+    promotorNombre,
+    supervisorNombre,
+    promotorId,
+  };
+
+  demoLeads = demoLeads.map((l) => (l.id === leadId ? updated : l));
+  return { ...updated };
+}
+
+export function getDemoOperadores() {
+  return Object.values((linksCatalog as any).byCodigo).map((o: any) => ({
+    nombre: o.vendedor,
+    codigo: o.codigo,
+    rol: o.rol,
+  }));
+}

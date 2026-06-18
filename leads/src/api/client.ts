@@ -31,6 +31,8 @@ import {
   processDemoReferidos,
   updateDemoLead,
   updateDemoLeadTelefono,
+  reassignDemoLead,
+  getDemoOperadores,
 } from './demoData';
 
 let _isDemoActive = import.meta.env.VITE_DEMO === 'true';
@@ -362,6 +364,34 @@ export async function modificarTelefonoLead(leadId: string, telefono: string): P
     {
       method: 'PATCH',
       body: JSON.stringify({ telefono }),
+    },
+  );
+  return data.lead;
+}
+
+export interface OperadorCatalogo {
+  nombre: string;
+  codigo: string;
+  rol: 'promotor' | 'supervisor';
+}
+
+export async function fetchAdminOperadores(): Promise<OperadorCatalogo[]> {
+  if (_isDemoActive) {
+    return getDemoOperadores();
+  }
+  const data = await apiFetch<{ operadores: OperadorCatalogo[] }>('/api/admin/operadores');
+  return data.operadores ?? [];
+}
+
+export async function reasignarLead(leadId: string, nuevoUsuarioCarga: string): Promise<Lead> {
+  if (_isDemoActive) {
+    return reassignDemoLead(leadId, nuevoUsuarioCarga);
+  }
+  const data = await apiFetch<{ lead: Lead; message?: string }>(
+    `/api/admin/leads/${encodeURIComponent(leadId)}/reasignar`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ usuarioCarga: nuevoUsuarioCarga }),
     },
   );
   return data.lead;

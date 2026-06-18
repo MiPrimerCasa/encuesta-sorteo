@@ -43,8 +43,10 @@ BEGIN
 
   IF EXISTS (SELECT 1 FROM dbo.encuesta WHERE id = @id)
   BEGIN
+    -- 1. Actualizar encuesta principal
     UPDATE dbo.encuesta SET
       telefono    = @telefono,
+      usuario     = @usuario,   -- Modifica propietario/campaña
       campo1Valor = @campo1Valor,
       campo2Valor = @campo2Valor,
       campo3Valor = @campo3Valor,
@@ -55,8 +57,28 @@ BEGIN
       campo8Valor = @campo8Valor
     WHERE id = @id;
 
+    -- 2. Resolver ids de vendedor y supervisor del nuevo propietario
+    DECLARE @id_vendedor INT;
+    DECLARE @id_supervisor INT;
+
+    SELECT
+      @id_vendedor = TRY_CAST(v.idVendedor AS INT),
+      @id_supervisor = TRY_CAST(v.idSupervisor AS INT)
+    FROM mensajeria.dbo.vendedor v
+    WHERE v.codigo = @usuario;
+
+    -- 3. Si es referido, actualizar la asignación comercial en lead_referido
+    IF EXISTS (SELECT 1 FROM dbo.lead_referido WHERE id_encuesta_referido = @id)
+    BEGIN
+      UPDATE dbo.lead_referido SET
+        codigo_promotor = @usuario,
+        id_vendedor = @id_vendedor,
+        id_supervisor = @id_supervisor
+      WHERE id_encuesta_referido = @id;
+    END
+
     SET @gestionCodigo = 1;
-    SET @gestionDescripcion = N'Se ha modificado el lead id :' + STR(@id, 5, 0);
+    SET @gestionDescripcion = N'Se ha modificado/reasignado el lead id :' + STR(@id, 5, 0);
   END
   ELSE
   BEGIN

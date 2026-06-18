@@ -7,6 +7,7 @@ import {
   promotorTieneFilasEnMuestra,
   resolveCodigoCargaPorPromotor,
   resolveDireccionOficinasSupervisor,
+  listAllLeadsFromEncuestas,
 } from './encuestas.js';
 import {
   esCodigoUsuarioCargaValido,
@@ -662,6 +663,43 @@ export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuario
   throw new CargaEncuestaSinPersistirError(
     'El SP ejecutó pero el teléfono no aparece actualizado. Verificá SP_MODIFICAR_ENCUESTA=encuestaSorteo01Update.',
     `SP ok leadId=${leadId}, telAnterior=${cargaParams.telefonoAnterior}, telNuevo=${telefonoNorm}`,
+  );
+}
+
+/**
+ * Reasigna la propiedad (usuario) de un lead vía dbo.encuestaSorteo01Update.
+ */
+export async function reasignarLeadManual(leadId, nuevoUsuarioCarga, usuarioSesion) {
+  const idEncuesta = Number.parseInt(String(leadId), 10);
+  if (!Number.isFinite(idEncuesta) || idEncuesta <= 0) {
+    throw new LeadNoEncontradoError();
+  }
+
+  const leads = await listAllLeadsFromEncuestas();
+  const lead = leads.find((l) => String(l.id) === String(leadId));
+  if (!lead) throw new LeadNoEncontradoError();
+
+  const nuevoUsuarioCargaNorm = String(nuevoUsuarioCarga ?? '').trim().toUpperCase();
+  if (!nuevoUsuarioCargaNorm) {
+    throw new Error('El código de reasignación es requerido.');
+  }
+
+  const cargaParams = buildCargaParamsFromLead(lead, lead.telefono, nuevoUsuarioCargaNorm);
+
+  await execEncuestaSorteo01Update({
+    ...cargaParams,
+    idEncuesta,
+  });
+
+  const leadsPost = await listAllLeadsFromEncuestas();
+  const porId = leadsPost.find((l) => String(l.id) === String(leadId));
+  if (porId && porId.encuestaUsuario === nuevoUsuarioCargaNorm) {
+    return porId;
+  }
+
+  throw new CargaEncuestaSinPersistirError(
+    'El SP se ejecutó pero el lead no aparece reasignado. Verificá que el SP encuestaSorteo01Update en la base de datos de producción tenga la línea "usuario = @usuario" en la sección de UPDATE.',
+    `id=${leadId}, usuarioNuevo=${nuevoUsuarioCargaNorm}`
   );
 }
 

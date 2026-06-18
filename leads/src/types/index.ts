@@ -282,6 +282,9 @@ export interface PromotorMetricasAdmin {
   ventasTerrenoHoy: number;
   ventasPijSemana: number;
   ventasPijHoy: number;
+  tratadosHoy: number;
+  tratadosSemana: number;
+  tratadosMes: number;
 }
 
 export interface SupervisorMetricasAdmin {

@@ -94,7 +94,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
   const [rankingSearch, setRankingSearch] = useState('');
 
-  const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador' | 'sin_tratar' | 'reasignacion'>('metricas');
+  const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador' | 'sin_tratar' | 'reasignacion' | 'informe'>('metricas');
   const [selectedOperatorUntreated, setSelectedOperatorUntreated] = useState<{ name: string; role: 'supervisor' | 'promotor'; team: string; count: number; leads: any[] } | null>(null);
   const [busquedaSinTratar, setBusquedaSinTratar] = useState('');
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -284,6 +284,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const totalPromotoresLeads = todosPromotores.reduce((acc, p) => acc + p.leadsSemana, 0);
   const totalPromotoresTerrenos = todosPromotores.reduce((acc, p) => acc + p.ventasTerrenoSemana, 0);
   const totalPromotoresPij = todosPromotores.reduce((acc, p) => acc + p.ventasPijSemana, 0);
+  const totalPromotoresTratadosHoy = todosPromotores.reduce((acc, p) => acc + (p.tratadosHoy ?? 0), 0);
+  const totalPromotoresTratadosSemana = todosPromotores.reduce((acc, p) => acc + (p.tratadosSemana ?? 0), 0);
+  const totalPromotoresTratadosMes = todosPromotores.reduce((acc, p) => acc + (p.tratadosMes ?? 0), 0);
 
 
   const rango = formatRangoSemana(data.semanaDesde, data.semanaHasta);
@@ -487,6 +490,17 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         >
           Reasignación de Leads
         </button>
+        <button
+          type="button"
+          onClick={() => setTabActivo('informe')}
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
+            tabActivo === 'informe'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800'
+          }`}
+        >
+          Informe de Operaciones
+        </button>
       </div>
 
       {data.aviso && (
@@ -605,155 +619,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
       </section>
 
 
-      <section className="space-y-4 printable-ranking-section">
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400 no-print">
-          Resumen General de Cierres ({periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana Móvil' : 'Mes Actual'})
-        </h3>
-        <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col printable-ranking-card">
-          <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h4 className="text-[14px] font-semibold text-zinc-900">Ranking de Cierres</h4>
-              <p className="text-[11px] text-zinc-500 no-print">Listado de promotores y operadores ordenados por cantidad de cierres.</p>
-              <p className="hidden print:block text-[12px] text-zinc-600 mt-1 font-semibold">
-                Rango ({periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'}): {rango}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto no-print">
-              {/* Selector de periodo */}
-              <div className="flex items-center rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/50 shadow-sm shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onCambiarPeriodo('hoy')}
-                  className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
-                    periodo === 'hoy'
-                      ? 'bg-white text-zinc-900 shadow-sm'
-                      : 'text-zinc-500 hover:text-zinc-800'
-                  }`}
-                >
-                  Hoy
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onCambiarPeriodo('semana')}
-                  className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
-                    periodo === 'semana'
-                      ? 'bg-white text-zinc-900 shadow-sm'
-                      : 'text-zinc-500 hover:text-zinc-800'
-                  }`}
-                >
-                  Semana
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onCambiarPeriodo('mes')}
-                  className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
-                    periodo === 'mes'
-                      ? 'bg-white text-zinc-900 shadow-sm'
-                      : 'text-zinc-500 hover:text-zinc-800'
-                  }`}
-                >
-                  Mes
-                </button>
-              </div>
 
-              <div className="relative w-full sm:w-48 shrink-0">
-                <svg
-                  width="14" height="14" viewBox="0 0 16 16" fill="none"
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
-                  aria-hidden="true"
-                >
-                  <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-                <input
-                  id="busqueda-ranking"
-                  type="search"
-                  value={rankingSearch}
-                  onChange={(e) => setRankingSearch(e.target.value)}
-                  placeholder="Buscar promotor…"
-                  className="w-full rounded-lg border border-zinc-200 bg-white py-1.5 pl-8 pr-8 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100"
-                />
-                {rankingSearch && (
-                  <button
-                    type="button"
-                    onClick={() => setRankingSearch('')}
-                    style={{ touchAction: 'manipulation' }}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 active:text-zinc-700"
-                    aria-label="Limpiar búsqueda"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                      <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[13px] font-medium text-zinc-700 hover:bg-zinc-50 active:scale-[0.98] transition-all cursor-pointer shadow-sm shrink-0"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="6 9 6 2 18 2 18 9"></polyline>
-                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-                  <rect x="6" y="14" width="12" height="8"></rect>
-                </svg>
-                Imprimir
-              </button>
-            </div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-zinc-100 text-[13px] printable-ranking-table">
-              <thead>
-                <tr className="bg-zinc-50/50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
-                  <th className="py-2.5 px-3 text-center w-12">Pos</th>
-                  <th className="py-2.5 px-3 text-left">Promotor</th>
-                  <th className="py-2.5 px-3 text-left">Equipo (Supervisor)</th>
-                  <th className="py-2.5 px-3 text-center">Leads</th>
-                  <th className="py-2.5 px-3 text-center">Entrevistas</th>
-                  <th className="py-2.5 px-3 text-center">Cierres</th>
-                  <th className="py-2.5 px-3 text-center">Terrenos</th>
-                  <th className="py-2.5 px-4 text-center">PIJ</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100 text-zinc-700">
-                {promotoresFiltradosRanking.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-zinc-400 text-[13px]">
-                      No se encontraron resultados para la búsqueda "{rankingSearch}".
-                    </td>
-                  </tr>
-                ) : (
-                  promotoresFiltradosRanking.map((p) => {
-                    const originalIndex = promotoresOrdenados.findIndex((x) => x.promotorId === p.promotorId);
-                    return (
-                      <tr key={p.promotorId} className="hover:bg-zinc-50/80 transition-colors">
-                        <td className="py-2.5 px-3 text-center font-medium text-zinc-400">{originalIndex + 1}</td>
-                        <td className="py-2.5 px-3 font-semibold text-zinc-900">{p.promotorNombre}</td>
-                        <td className="py-2.5 px-3 text-zinc-500">{p.supervisorNombre}</td>
-                        <td className="py-2.5 px-3 text-center tabular-nums">{p.leadsSemana}</td>
-                        <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{p.entrevistasSemana}</td>
-                        <td className="py-2.5 px-3 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
-                        <td className="py-2.5 px-3 text-center tabular-nums text-amber-700 font-semibold">{p.ventasTerrenoSemana}</td>
-                        <td className="py-2.5 px-4 text-center tabular-nums text-indigo-600 font-semibold">{p.ventasPijSemana}</td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-              <tfoot>
-                <tr className="bg-zinc-50/50 font-bold border-t-2 border-zinc-200">
-                  <td colSpan={3} className="py-3 px-3 text-left text-zinc-900 font-bold">Total Empresa</td>
-                  <td className="py-3 px-3 text-center tabular-nums">{totalPromotoresLeads}</td>
-                  <td className="py-3 px-3 text-center tabular-nums text-brand-700">{totalPromotoresEntrevistas}</td>
-                  <td className="py-3 px-3 text-center tabular-nums text-emerald-700 font-extrabold">{totalPromotoresCierres}</td>
-                  <td className="py-3 px-3 text-center tabular-nums text-amber-700 font-extrabold">{totalPromotoresTerrenos}</td>
-                  <td className="py-3 px-4 text-center tabular-nums text-indigo-600 font-extrabold">{totalPromotoresPij}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </div>
-      </section>
 
       <section className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -857,6 +723,173 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         )}
       </section>
         </>
+      )}
+
+      {tabActivo === 'informe' && (
+        <section className="space-y-4 printable-ranking-section">
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400 no-print">
+            INFORME DE OPERACIONES ({periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana Móvil' : 'Mes Actual'})
+          </h3>
+          <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col printable-ranking-card">
+            <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h4 className="text-[14px] font-semibold text-zinc-900">INFORME DE OPERACIONES</h4>
+                <p className="text-[11px] text-zinc-500 no-print">Listado general de promotores y operadores con desglose de gestiones y leads tratados.</p>
+                <p className="hidden print:block text-[12px] text-zinc-600 mt-1 font-semibold">
+                  Rango ({periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'}): {rango}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto no-print">
+                {/* Selector de periodo */}
+                <div className="flex items-center rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/50 shadow-sm shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => onCambiarPeriodo('hoy')}
+                    className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+                      periodo === 'hoy'
+                        ? 'bg-white text-zinc-900 shadow-sm'
+                        : 'text-zinc-500 hover:text-zinc-800'
+                    }`}
+                  >
+                    Hoy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onCambiarPeriodo('semana')}
+                    className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+                      periodo === 'semana'
+                        ? 'bg-white text-zinc-900 shadow-sm'
+                        : 'text-zinc-500 hover:text-zinc-800'
+                    }`}
+                  >
+                    Semana
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onCambiarPeriodo('mes')}
+                    className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+                      periodo === 'mes'
+                        ? 'bg-white text-zinc-900 shadow-sm'
+                        : 'text-zinc-500 hover:text-zinc-800'
+                    }`}
+                  >
+                    Mes
+                  </button>
+                </div>
+
+                <div className="relative w-full sm:w-48 shrink-0">
+                  <svg
+                    width="14" height="14" viewBox="0 0 16 16" fill="none"
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
+                    aria-hidden="true"
+                  >
+                    <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  <input
+                    id="busqueda-ranking"
+                    type="search"
+                    value={rankingSearch}
+                    onChange={(e) => setRankingSearch(e.target.value)}
+                    placeholder="Buscar promotor…"
+                    className="w-full rounded-lg border border-zinc-200 bg-white py-1.5 pl-8 pr-8 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100"
+                  />
+                  {rankingSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setRankingSearch('')}
+                      style={{ touchAction: 'manipulation' }}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 active:text-zinc-700"
+                      aria-label="Limpiar búsqueda"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-3 py-1.5 text-[13px] font-medium text-zinc-700 hover:bg-zinc-50 active:scale-[0.98] transition-all cursor-pointer shadow-sm shrink-0"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                  </svg>
+                  Imprimir
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-zinc-100 text-[13px] printable-ranking-table">
+                <thead>
+                  <tr className="bg-zinc-50/50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                    <th className="py-2.5 px-3 text-center w-12">Pos</th>
+                    <th className="py-2.5 px-3 text-left">Promotor</th>
+                    <th className="py-2.5 px-3 text-left">Equipo (Supervisor)</th>
+                    <th className="py-2.5 px-3 text-center">Leads</th>
+                    <th className="py-2.5 px-3 text-center">Tratados (D/S/M)</th>
+                    <th className="py-2.5 px-3 text-center">Entrevistas</th>
+                    <th className="py-2.5 px-3 text-center">Cierres</th>
+                    <th className="py-2.5 px-3 text-center">Terrenos</th>
+                    <th className="py-2.5 px-4 text-center">PIJ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100 text-zinc-700">
+                  {promotoresFiltradosRanking.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-8 text-center text-zinc-400 text-[13px]">
+                        No se encontraron resultados para la búsqueda "{rankingSearch}".
+                      </td>
+                    </tr>
+                  ) : (
+                    promotoresFiltradosRanking.map((p) => {
+                      const originalIndex = promotoresOrdenados.findIndex((x) => x.promotorId === p.promotorId);
+                      return (
+                        <tr key={p.promotorId} className="hover:bg-zinc-50/80 transition-colors">
+                          <td className="py-2.5 px-3 text-center font-medium text-zinc-400">{originalIndex + 1}</td>
+                          <td className="py-2.5 px-3 font-semibold text-zinc-900">{p.promotorNombre}</td>
+                          <td className="py-2.5 px-3 text-zinc-500">{p.supervisorNombre}</td>
+                          <td className="py-2.5 px-3 text-center tabular-nums">{p.leadsSemana}</td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap tabular-nums">
+                            <span className="font-semibold text-zinc-900">{p.tratadosHoy ?? 0}</span>
+                            <span className="text-zinc-300 mx-1">/</span>
+                            <span className="text-zinc-600">{p.tratadosSemana ?? 0}</span>
+                            <span className="text-zinc-300 mx-1">/</span>
+                            <span className="text-zinc-500">{p.tratadosMes ?? 0}</span>
+                          </td>
+                          <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{p.entrevistasSemana}</td>
+                          <td className="py-2.5 px-3 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
+                          <td className="py-2.5 px-3 text-center tabular-nums text-amber-700 font-semibold">{p.ventasTerrenoSemana}</td>
+                          <td className="py-2.5 px-4 text-center tabular-nums text-indigo-600 font-semibold">{p.ventasPijSemana}</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-zinc-50/50 font-bold border-t-2 border-zinc-200">
+                    <td colSpan={3} className="py-3 px-3 text-left text-zinc-900 font-bold">Total Empresa</td>
+                    <td className="py-3 px-3 text-center tabular-nums">{totalPromotoresLeads}</td>
+                    <td className="py-3 px-3 text-center whitespace-nowrap tabular-nums font-extrabold text-zinc-900">
+                      <span>{totalPromotoresTratadosHoy}</span>
+                      <span className="text-zinc-300 mx-1">/</span>
+                      <span>{totalPromotoresTratadosSemana}</span>
+                      <span className="text-zinc-300 mx-1">/</span>
+                      <span>{totalPromotoresTratadosMes}</span>
+                    </td>
+                    <td className="py-3 px-3 text-center tabular-nums text-brand-700">{totalPromotoresEntrevistas}</td>
+                    <td className="py-3 px-3 text-center tabular-nums text-emerald-700 font-extrabold">{totalPromotoresCierres}</td>
+                    <td className="py-3 px-3 text-center tabular-nums text-amber-700 font-extrabold">{totalPromotoresTerrenos}</td>
+                    <td className="py-3 px-4 text-center tabular-nums text-indigo-600 font-extrabold">{totalPromotoresPij}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </section>
       )}
 
       {tabActivo === 'buscador' && (

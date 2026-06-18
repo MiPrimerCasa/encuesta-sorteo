@@ -123,6 +123,9 @@ function crearBucketPromotor(lead: Lead): PromotorBucket {
     ventasTerrenoHoy: 0,
     ventasPijSemana: 0,
     ventasPijHoy: 0,
+    tratadosHoy: 0,
+    tratadosSemana: 0,
+    tratadosMes: 0,
   };
 }
 
@@ -141,6 +144,9 @@ function sumarBuckets(
     ventasTerrenoHoy: a.ventasTerrenoHoy + b.ventasTerrenoHoy,
     ventasPijSemana: a.ventasPijSemana + b.ventasPijSemana,
     ventasPijHoy: a.ventasPijHoy + b.ventasPijHoy,
+    tratadosHoy: (a.tratadosHoy ?? 0) + b.tratadosHoy,
+    tratadosSemana: (a.tratadosSemana ?? 0) + b.tratadosSemana,
+    tratadosMes: (a.tratadosMes ?? 0) + b.tratadosMes,
   };
 }
 
@@ -266,6 +272,39 @@ export function buildAdminDashboardFromLeads(
   periodo = 'mes',
 ): AdminDashboardData {
   const { desde, hasta, hoy } = rangoPorPeriodo(periodo, ahora);
+  const rangeHoy = rangoPorPeriodo('hoy', ahora);
+  const rangeSemana = rangoPorPeriodo('semana', ahora);
+  const rangeMes = rangoPorPeriodo('mes', ahora);
+
+  const historialPorLeadMap = new Map<string, Date[]>();
+  for (const raw of historialRows) {
+    const row = raw as Record<string, unknown>;
+    const leadId = String(row.lead_id ?? row.leadId ?? '');
+    if (!leadId) continue;
+    const fecha = parseFecha(fechaHistorial(row) ?? (raw as SeguimientoHistorialEntry).creadoEn);
+    if (!fecha) continue;
+    if (!historialPorLeadMap.has(leadId)) {
+      historialPorLeadMap.set(leadId, []);
+    }
+    historialPorLeadMap.get(leadId)!.push(fecha);
+  }
+
+  const leadTieneTratamientoEnRango = (lead: Lead, desdeVal: Date, hastaVal: Date): boolean => {
+    const fechasHistorial = historialPorLeadMap.get(String(lead.id)) ?? [];
+    for (const f of fechasHistorial) {
+      if (f.getTime() >= desdeVal.getTime() && f.getTime() <= hastaVal.getTime()) {
+        return true;
+      }
+    }
+    const seg = lead.seguimiento;
+    if (seg && (seg.canal != null || seg.huboEntrevista != null)) {
+      const fechaSeg = parseFecha(seg.creadoEn ?? seg.fechaCierre) ?? parseFecha(lead.fechaAlta ?? lead.fechaObtencion);
+      if (fechaSeg && fechaSeg.getTime() >= desdeVal.getTime() && fechaSeg.getTime() <= hastaVal.getTime()) {
+        return true;
+      }
+    }
+    return false;
+  };
 
   const leadsConSupervisor = leads.map((lead) => ({
     lead,
@@ -289,6 +328,17 @@ export function buildAdminDashboardFromLeads(
       sup.promotoresMap.set(lead.promotorId, crearBucketPromotor(lead));
     }
     const bucket = sup.promotoresMap.get(lead.promotorId)!;
+    
+    if (leadTieneTratamientoEnRango(lead, rangeHoy.desde, rangeHoy.hasta)) {
+      bucket.tratadosHoy += 1;
+    }
+    if (leadTieneTratamientoEnRango(lead, rangeSemana.desde, rangeSemana.hasta)) {
+      bucket.tratadosSemana += 1;
+    }
+    if (leadTieneTratamientoEnRango(lead, rangeMes.desde, rangeMes.hasta)) {
+      bucket.tratadosMes += 1;
+    }
+
     bucket.leadsTotal += 1;
     const alta = parseFecha(lead.fechaAlta ?? lead.fechaObtencion);
     if (alta && enRango(alta, desde, hasta)) bucket.leadsSemana += 1;
@@ -370,6 +420,9 @@ export function buildAdminDashboardFromLeads(
     ventasTerrenoHoy: 0,
     ventasPijSemana: 0,
     ventasPijHoy: 0,
+    tratadosHoy: 0,
+    tratadosSemana: 0,
+    tratadosMes: 0,
   });
 
   const supervisores = [...supervisoresMap.values()]

@@ -624,21 +624,56 @@ export async function persistirSeguimientoLead(leadId, patch, usuario, leadConte
   };
 }
 
-export async function resetearSeguimientoLead(leadId) {
-  const dbi = getDb();
+export async function resetearSeguimientoLead(leadId, leadContext) {
+  const emptySeg = {
+    canal: null,
+    huboEntrevista: null,
+    resultadoEntrevista: null,
+    horarioEntrevistaPropuesto: null,
+    fechaReagenda: null,
+    fechaCierre: null,
+    seguimientoPijPromotor: null,
+    seguimientoAgendaOperadorRol: null,
+    idProducto: null,
+    estadoPago: null,
+    idBarrio: null,
+    numeroRecibo: null,
+    brindoReferidos: null,
+    referidos: null,
+    observaciones: null,
+    fuente: null,
+  };
+
+  const sysUser = {
+    id: null,
+    rol: null,
+    nombre: 'Sistema',
+  };
+
   const leadIdStr = String(leadId);
-  dbi.prepare('DELETE FROM lead_seguimiento_externo WHERE lead_id = ?').run(leadIdStr);
-  dbi.prepare('DELETE FROM lead_seguimiento_historial WHERE lead_id = ?').run(leadIdStr);
-  dbi.prepare('DELETE FROM seguimiento_eventos WHERE lead_id = ?').run(leadIdStr);
 
   if (useSeguimientoSql()) {
-    const pool = await getSqlPoolEncuestas();
-    const table = getSeguimientoTableName();
-    const leadIdNum = parseInt(leadIdStr, 10);
-    if (Number.isFinite(leadIdNum)) {
-      await pool.request()
-        .input('leadId', sql.Int, leadIdNum)
-        .query(`DELETE FROM dbo.[${table}] WHERE lead_id = @leadId`);
+    try {
+      await execRegistrarSeguimientoLead(leadContext || { id: leadId }, emptySeg, sysUser);
+    } catch (err) {
+      console.error('[resetearSeguimientoLead] Error al registrar seguimiento vacío en SQL Server:', err);
     }
   }
+
+  // Sincronizar en SQLite local
+  const dbi = getDb();
+  dbi.prepare(
+    `INSERT INTO lead_seguimiento_externo (lead_id, seguimiento_json, actualizado_en)
+     VALUES (?, ?, datetime('now'))
+     ON CONFLICT(lead_id) DO UPDATE SET
+       seguimiento_json = excluded.seguimiento_json,
+       actualizado_en = datetime('now')`,
+  ).run(leadIdStr, JSON.stringify({ ...emptySeg, operadorNombre: 'Sistema' }));
+
+  dbi.prepare(
+    `INSERT INTO lead_seguimiento_historial (
+      lead_id, operador_id, operador_rol, operador_nombre,
+      estado_etiqueta, resultado_entrevista, pestana, seguimiento_json
+    ) VALUES (?, NULL, NULL, 'Sistema', 'Reasignado (Sin Tratamiento)', NULL, 'entrevista', ?)`
+  ).run(leadIdStr, JSON.stringify({ ...emptySeg, operadorNombre: 'Sistema' }));
 }

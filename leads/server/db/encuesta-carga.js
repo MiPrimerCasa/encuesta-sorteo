@@ -692,7 +692,7 @@ export async function reasignarLeadManual(leadId, nuevoUsuarioCarga, usuarioSesi
     idEncuesta,
   });
 
-  await resetearSeguimientoLead(leadId);
+  await resetearSeguimientoLead(leadId, lead);
 
   const leadsPost = await listAllLeadsFromEncuestas();
   const porId = leadsPost.find((l) => String(l.id) === String(leadId));

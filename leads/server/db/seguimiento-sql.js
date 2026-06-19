@@ -219,6 +219,7 @@ export function mapSqlRowToSeguimiento(row) {
       row.fecha_alta ??
       base.creadoEn ??
       null,
+    comprasAdicionales: base.comprasAdicionales ?? null,
   };
 }
 
@@ -642,6 +643,7 @@ export async function resetearSeguimientoLead(leadId, leadContext) {
     referidos: null,
     observaciones: null,
     fuente: null,
+    comprasAdicionales: null,
   };
 
   const sysUser = {

@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres, Lead } from '../../types';
+import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres, Lead, Barrio } from '../../types';
 import { formatRangoSemana } from '../../domain/admin-metrics';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
-import { fetchAdminLeads, fetchAdminOperadores, reasignarLead } from '../../api/client';
+import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios } from '../../api/client';
 import type { OperadorCatalogo } from '../../api/client';
+import { getBarrioNombre } from '../../domain/venta';
 
 interface SuperadminDashboardProps {
   data: AdminDashboardData;
@@ -90,9 +91,17 @@ function PromotorRow({
 
 export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: SuperadminDashboardProps) {
   const [selectedPerson, setSelectedPerson] = useState<PersonaPijCierres | null>(null);
+  const [selectedPersonReceipts, setSelectedPersonReceipts] = useState<PersonaPijCierres | null>(null);
   const [filterText, setFilterText] = useState('');
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
   const [rankingSearch, setRankingSearch] = useState('');
+  const [barrios, setBarrios] = useState<Barrio[]>([]);
+
+  useEffect(() => {
+    fetchBarrios()
+      .then((data) => setBarrios(data))
+      .catch((err) => console.error('Error al cargar barrios para dashboard:', err));
+  }, []);
 
   const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador' | 'sin_tratar' | 'reasignacion' | 'informe'>('metricas');
   const [selectedOperatorUntreated, setSelectedOperatorUntreated] = useState<{ name: string; role: 'supervisor' | 'promotor'; team: string; count: number; leads: any[] } | null>(null);
@@ -525,21 +534,21 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
 
 
 
-      {/* Control de Anexos - Plan Inversión Joven */}
+      {/* Control de Anexos y Recibos por Operador */}
       <section className="space-y-4">
         <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-          Control de Anexos · Plan Inversión Joven
+          Control de Anexos y Recibos por Operador
         </h3>
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
           <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
-            <h4 className="text-[14px] font-semibold text-zinc-900">Historial de Anexos Cargados por Operador</h4>
+            <h4 className="text-[14px] font-semibold text-zinc-900">Historial de Anexos y Recibos Cargados por Operador</h4>
             <p className="text-[12px] text-zinc-500">
-              Hacé clic en un operador para ver los anexos que cargó en el sistema.
+              Consultá la cantidad de Planes Vendidos (Anexos) y Terrenos Vendidos (Recibos) registrados por cada operador.
             </p>
           </div>
           {(!data.pijCierresPorPersona || data.pijCierresPorPersona.length === 0) ? (
             <p className="px-4 py-6 text-center text-[13px] text-zinc-500">
-              No hay cierres de Plan Inversión Joven registrados.
+              No hay cierres registrados en el sistema.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -547,7 +556,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                 <thead>
                   <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
                     <th className="py-2.5 px-4 text-left font-semibold">Operador</th>
-                    <th className="py-2.5 px-4 text-right font-semibold">Anexos Cargados</th>
+                    <th className="py-2.5 px-4 text-right font-semibold">Anexos (PIJ)</th>
+                    <th className="py-2.5 px-4 text-center font-semibold">Acción</th>
+                    <th className="py-2.5 px-4 text-right font-semibold">Recibos (Terrenos)</th>
                     <th className="py-2.5 px-4 text-center font-semibold">Acción</th>
                   </tr>
                 </thead>
@@ -555,20 +566,50 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                   {data.pijCierresPorPersona.map((person) => (
                     <tr
                       key={person.operadorNombre}
-                      onClick={() => setSelectedPerson(person)}
-                      className="cursor-pointer text-[13px] text-zinc-700 hover:bg-zinc-50 transition-colors"
+                      className="text-[13px] text-zinc-700 hover:bg-zinc-50/50 transition-colors"
                     >
                       <td className="py-3 px-4 font-medium text-zinc-900">{person.operadorNombre}</td>
+                      
+                      {/* Anexos */}
                       <td className="py-3 px-4 text-right font-semibold tabular-nums text-brand-700">
                         {person.cantidad}
                       </td>
                       <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
-                          className="text-[12px] font-medium text-brand-600 hover:text-brand-800 hover:underline"
-                        >
-                          Ver anexos
-                        </button>
+                        {person.cantidad > 0 ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPerson(person);
+                            }}
+                            className="text-[12px] font-semibold text-brand-600 hover:text-brand-800 hover:underline cursor-pointer"
+                          >
+                            Ver anexos
+                          </button>
+                        ) : (
+                          <span className="text-[12px] text-zinc-300">—</span>
+                        )}
+                      </td>
+
+                      {/* Recibos */}
+                      <td className="py-3 px-4 text-right font-semibold tabular-nums text-amber-700">
+                        {person.cantidadRecibos ?? 0}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {person.cantidadRecibos && person.cantidadRecibos > 0 ? (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPersonReceipts(person);
+                            }}
+                            className="text-[12px] font-semibold text-amber-600 hover:text-amber-800 hover:underline cursor-pointer"
+                          >
+                            Ver recibos
+                          </button>
+                        ) : (
+                          <span className="text-[12px] text-zinc-300">—</span>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1414,8 +1455,8 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-100">
-                        {filteredCierres.map((cierre) => (
-                          <tr key={cierre.leadId} className="text-[13px] text-zinc-700">
+                        {filteredCierres.map((cierre, idx) => (
+                          <tr key={`${cierre.leadId}-${cierre.numeroAnexo}-${idx}`} className="text-[13px] text-zinc-700">
                             <td className="py-3 font-medium text-zinc-900">{cierre.leadNombre}</td>
                             <td className="py-3">
                               <a
@@ -1465,6 +1506,152 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                   setFilterText('');
                 }}
                 className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-all active:scale-[0.98]"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Detalle de Recibos */}
+      {selectedPersonReceipts && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm transition-opacity"
+            onClick={() => {
+              setSelectedPersonReceipts(null);
+              setFilterText('');
+            }}
+          />
+
+          {/* Modal Content */}
+          <div className="relative z-50 flex h-full max-h-[80vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl transition-all duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-zinc-900">
+                  Recibos de {selectedPersonReceipts.operadorNombre}
+                </h3>
+                <p className="text-[12px] text-zinc-500">
+                  {selectedPersonReceipts.cantidadRecibos ?? 0} cierre{selectedPersonReceipts.cantidadRecibos === 1 ? '' : 's'} de Terreno registrados
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPersonReceipts(null);
+                  setFilterText('');
+                }}
+                className="flex h-8 w-8 items-center justify-center text-[20px] rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors cursor-pointer"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Search filter */}
+            <div className="border-b border-zinc-100 px-6 py-3 bg-zinc-50/50">
+              <input
+                type="text"
+                placeholder="Buscar por cliente, teléfono, barrio o número de recibo..."
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[13px] placeholder-zinc-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15 transition-all"
+              />
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {(() => {
+                const recibosList = selectedPersonReceipts.recibos ?? [];
+                const filteredRecibos = recibosList.filter(r => {
+                  const query = filterText.toLowerCase();
+                  const barrioNombre = getBarrioNombre(r.idBarrio, barrios) || '';
+                  return (
+                    r.leadNombre.toLowerCase().includes(query) ||
+                    r.numeroRecibo.toLowerCase().includes(query) ||
+                    r.leadTelefono.includes(filterText) ||
+                    barrioNombre.toLowerCase().includes(query)
+                  );
+                });
+
+                if (filteredRecibos.length === 0) {
+                  return (
+                    <p className="py-8 text-center text-[13px] text-zinc-500">
+                      {filterText ? 'No se encontraron resultados para la búsqueda.' : 'No hay recibos registrados.'}
+                    </p>
+                  );
+                }
+
+                return (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-zinc-100">
+                      <thead>
+                        <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                          <th className="pb-2 text-left font-semibold">Cliente</th>
+                          <th className="pb-2 text-left font-semibold">Teléfono</th>
+                          <th className="pb-2 text-center font-semibold">Barrio</th>
+                          <th className="pb-2 text-center font-semibold">Nro. Recibo</th>
+                          <th className="pb-2 text-right font-semibold">Fecha de Cierre</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {filteredRecibos.map((recibo, idx) => (
+                          <tr key={`${recibo.leadId}-${recibo.numeroRecibo}-${idx}`} className="text-[13px] text-zinc-700">
+                            <td className="py-3 font-medium text-zinc-900">{recibo.leadNombre}</td>
+                            <td className="py-3">
+                              <a
+                                href={`tel:${recibo.leadTelefono}`}
+                                className="text-brand-600 hover:underline inline-flex items-center gap-1 font-mono text-[12px] tabular-nums"
+                              >
+                                {recibo.leadTelefono}
+                              </a>
+                            </td>
+                            <td className="py-3 text-center text-zinc-600">
+                              {getBarrioNombre(recibo.idBarrio, barrios) || 'Sin barrio'}
+                            </td>
+                            <td className="py-3 text-center">
+                              <span className="inline-flex items-center rounded-md bg-amber-50 border border-amber-100 px-2 py-0.5 text-[12px] font-bold text-amber-700">
+                                {recibo.numeroRecibo}
+                              </span>
+                            </td>
+                            <td className="py-3 text-right text-zinc-500 tabular-nums">
+                              {(() => {
+                                try {
+                                  const d = new Date(recibo.fechaCierre);
+                                  if (isNaN(d.getTime())) return recibo.fechaCierre;
+                                  return d.toLocaleDateString('es-AR', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                  });
+                                } catch {
+                                  return recibo.fechaCierre;
+                                }
+                              })()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="flex shrink-0 items-center justify-end border-t border-zinc-100 px-6 py-3.5 bg-zinc-50/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedPersonReceipts(null);
+                  setFilterText('');
+                }}
+                className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-all active:scale-[0.98] cursor-pointer"
               >
                 Cerrar
               </button>

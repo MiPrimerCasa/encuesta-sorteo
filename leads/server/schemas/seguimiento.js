@@ -13,6 +13,59 @@ const referidoSchema = z.object({
 const ID_PIJ = 'prod-pij';
 const ID_TERRENO = 'prod-terreno';
 
+const compraAdicionalSchema = z.object({
+  id: z.string(),
+  idProducto: z.string(),
+  estadoPago: z.enum(['sena', 'cien', 'entrega_33', 'entrega_55']),
+  idBarrio: z.string().nullable().optional(),
+  numeroRecibo: z.string().trim().max(80),
+  fechaCierre: z.string(),
+}).superRefine((data, ctx) => {
+  if (data.idProducto === ID_PIJ) {
+    if (data.estadoPago !== 'entrega_33') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Para Plan Inversión Joven solo se registra Entrega $33.000.',
+        path: ['estadoPago'],
+      });
+    }
+    if (data.estadoPago === 'entrega_33' && !data.numeroRecibo?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Ingresá el número de recibo.',
+        path: ['numeroRecibo'],
+      });
+    }
+  }
+
+  if (data.idProducto === ID_TERRENO) {
+    if (!data.idBarrio?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Seleccioná el barrio.',
+        path: ['idBarrio'],
+      });
+    }
+    if (!['sena', 'cien'].includes(data.estadoPago)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Estado de pago inválido para terreno.',
+        path: ['estadoPago'],
+      });
+    }
+    if (
+      (data.estadoPago === 'sena' || data.estadoPago === 'cien') &&
+      !data.numeroRecibo?.trim()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Ingresá el número de recibo.',
+        path: ['numeroRecibo'],
+      });
+    }
+  }
+});
+
 export const seguimientoSchema = z
   .object({
     confirmoEntrevista: z.boolean().nullable().optional(),
@@ -45,6 +98,7 @@ export const seguimientoSchema = z
       )
       .optional(),
     observaciones: z.string().max(500).optional(),
+    comprasAdicionales: z.array(compraAdicionalSchema).nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.resultadoEntrevista === 'reagenda' && !data.fechaReagenda) {

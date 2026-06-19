@@ -339,6 +339,33 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
         }
       }
     }
+
+    const comprasAdicionales = lead.seguimiento?.comprasAdicionales ?? [];
+    for (const compra of comprasAdicionales) {
+      const fechaC = parseFecha(compra.fechaCierre);
+      if (fechaC) {
+        const cierreEnSemana = enRango(fechaC, desde, hasta);
+        const cierreEsHoy = esMismoDia(fechaC, hoy);
+
+        if (cierreEnSemana) {
+          bucket.cierresSemana += 1;
+          if (compra.idProducto === ID_PRODUCTO_TERRENO) {
+            bucket.ventasTerrenoSemana += 1;
+          } else if (compra.idProducto === ID_PRODUCTO_PIJ) {
+            bucket.ventasPijSemana += 1;
+          }
+        }
+
+        if (cierreEsHoy) {
+          bucket.cierresHoy += 1;
+          if (compra.idProducto === ID_PRODUCTO_TERRENO) {
+            bucket.ventasTerrenoHoy += 1;
+          } else if (compra.idProducto === ID_PRODUCTO_PIJ) {
+            bucket.ventasPijHoy += 1;
+          }
+        }
+      }
+    }
   }
 
   const entrevistasPorLeadSemana = new Set();
@@ -441,14 +468,17 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
   );
 
   const pijCierresMap = new Map();
+  const terrenoCierresMap = new Map();
   const leadsSinTratar = [];
 
   for (const item of leadsConSupervisor) {
     const { lead, supervisorNombre } = item;
     const esCierre = lead.seguimiento?.resultadoEntrevista === 'compro';
     const esPij = lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ;
+    const esTerreno = lead.seguimiento?.idProducto === ID_PRODUCTO_TERRENO;
+    const operadorNombre = (lead.seguimiento?.operadorNombre || lead.promotorNombre || 'Sin asignar').trim();
+
     if (esCierre && esPij) {
-      const operadorNombre = (lead.seguimiento?.operadorNombre || lead.promotorNombre || 'Sin asignar').trim();
       if (!pijCierresMap.has(operadorNombre)) {
         pijCierresMap.set(operadorNombre, []);
       }
@@ -460,6 +490,51 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
         fechaCierre: lead.seguimiento?.fechaCierre || lead.seguimiento?.creadoEn || lead.seguimiento?.creado_en || '',
         estadoPago: lead.seguimiento?.estadoPago || null,
       });
+    }
+
+    if (esCierre && esTerreno) {
+      if (!terrenoCierresMap.has(operadorNombre)) {
+        terrenoCierresMap.set(operadorNombre, []);
+      }
+      terrenoCierresMap.get(operadorNombre).push({
+        leadId: String(lead.id),
+        leadNombre: lead.nombre,
+        leadTelefono: lead.telefono || '—',
+        numeroRecibo: lead.seguimiento?.numeroRecibo || '—',
+        idBarrio: lead.seguimiento?.idBarrio || null,
+        fechaCierre: lead.seguimiento?.fechaCierre || lead.seguimiento?.creadoEn || lead.seguimiento?.creado_en || '',
+        estadoPago: lead.seguimiento?.estadoPago || null,
+      });
+    }
+
+    const comprasAdicionales = lead.seguimiento?.comprasAdicionales ?? [];
+    for (const compra of comprasAdicionales) {
+      if (compra.idProducto === ID_PRODUCTO_PIJ) {
+        if (!pijCierresMap.has(operadorNombre)) {
+          pijCierresMap.set(operadorNombre, []);
+        }
+        pijCierresMap.get(operadorNombre).push({
+          leadId: String(lead.id),
+          leadNombre: `${lead.nombre} (Adic.)`,
+          leadTelefono: lead.telefono || '—',
+          numeroAnexo: compra.numeroRecibo || '—',
+          fechaCierre: compra.fechaCierre || '',
+          estadoPago: compra.estadoPago || null,
+        });
+      } else if (compra.idProducto === ID_PRODUCTO_TERRENO) {
+        if (!terrenoCierresMap.has(operadorNombre)) {
+          terrenoCierresMap.set(operadorNombre, []);
+        }
+        terrenoCierresMap.get(operadorNombre).push({
+          leadId: String(lead.id),
+          leadNombre: `${lead.nombre} (Adic.)`,
+          leadTelefono: lead.telefono || '—',
+          numeroRecibo: compra.numeroRecibo || '—',
+          idBarrio: compra.idBarrio || null,
+          fechaCierre: compra.fechaCierre || '',
+          estadoPago: compra.estadoPago || null,
+        });
+      }
     }
 
     // Coleccionar leads sin contactar o tratar (Inactivos)
@@ -480,18 +555,32 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
   // Ordenar leads sin tratar por fecha (más antiguos primero)
   leadsSinTratar.sort((a, b) => a.fechaAlta.localeCompare(b.fechaAlta));
 
-  const pijCierresPorPersona = [...pijCierresMap.entries()].map(([operadorNombre, cierres]) => {
+  const todosOperadores = new Set([...pijCierresMap.keys(), ...terrenoCierresMap.keys()]);
+
+  const pijCierresPorPersona = [...todosOperadores].map((operadorNombre) => {
+    const cierres = pijCierresMap.get(operadorNombre) ?? [];
+    const recibos = terrenoCierresMap.get(operadorNombre) ?? [];
+
     cierres.sort((a, b) => {
       const dateA = a.fechaCierre ? new Date(a.fechaCierre).getTime() : 0;
       const dateB = b.fechaCierre ? new Date(b.fechaCierre).getTime() : 0;
       return dateB - dateA;
     });
+
+    recibos.sort((a, b) => {
+      const dateA = a.fechaCierre ? new Date(a.fechaCierre).getTime() : 0;
+      const dateB = b.fechaCierre ? new Date(b.fechaCierre).getTime() : 0;
+      return dateB - dateA;
+    });
+
     return {
       operadorNombre,
       cantidad: cierres.length,
       cierres,
+      cantidadRecibos: recibos.length,
+      recibos,
     };
-  }).sort((a, b) => b.cantidad - a.cantidad || a.operadorNombre.localeCompare(b.operadorNombre, 'es'));
+  }).sort((a, b) => (b.cantidad + (b.cantidadRecibos ?? 0)) - (a.cantidad + (a.cantidadRecibos ?? 0)) || a.operadorNombre.localeCompare(b.operadorNombre, 'es'));
 
   return {
     generadoEn: ahora.toISOString(),

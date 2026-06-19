@@ -20,6 +20,7 @@ import {
   etiquetaEstadoPagoVisible,
   etiquetaCortaNumeroDocumentoVenta,
   getBarrioNombre,
+  ID_PRODUCTO_PIJ,
   ID_PRODUCTO_TERRENO,
   etiquetasResultadoEntrevista,
   estadoPagoEditablePlanInversion,
@@ -34,6 +35,8 @@ import {
 import type {
   Barrio,
   CanalContacto,
+  CompraAdicional,
+  EstadoPago,
   Lead,
   Producto,
   Referido,
@@ -71,6 +74,7 @@ interface FormState {
   horarioDerivacion: string;
   /** Sin cita + canal en persona + entrevista en el momento + no compró. */
   reagendaTrasNoComproEnPersona: boolean | null;
+  comprasAdicionales: CompraAdicional[];
 }
 
 const OPCIONES_CANAL_BASE: { value: CanalContacto; label: string }[] = [
@@ -140,6 +144,7 @@ function buildInitialForm(lead: Lead | null): FormState {
     proponeFechaDerivacion: derivar ? (horarioDeriv ? true : false) : null,
     horarioDerivacion: horarioDeriv,
     reagendaTrasNoComproEnPersona,
+    comprasAdicionales: s.comprasAdicionales ?? [],
   };
 }
 
@@ -211,6 +216,18 @@ export function LeadModalForm({
   const [errorVenta, setErrorVenta] = useState('');
   const [errorForm, setErrorForm] = useState('');
   const [barrioPickerOpen, setBarrioPickerOpen] = useState(false);
+  const [showAddAdicional, setShowAddAdicional] = useState<'pij' | 'terreno' | null>(null);
+  const [adicionalForm, setAdicionalForm] = useState<{
+    idProducto: string;
+    estadoPago: SeguimientoLead['estadoPago'];
+    idBarrio: string;
+    numeroRecibo: string;
+  }>({
+    idProducto: '',
+    estadoPago: null,
+    idBarrio: '',
+    numeroRecibo: '',
+  });
 
   const rol: RolUsuario = rolUsuario === 'promotor' ? 'promotor' : 'supervisor';
   const productosDisponibles = useMemo(
@@ -296,6 +313,7 @@ export function LeadModalForm({
         brindoReferidos: false,
         referidos: [],
         observaciones: form.observaciones.trim(),
+        comprasAdicionales: null,
       };
       void (async () => {
         if (lead) {
@@ -497,6 +515,7 @@ export function LeadModalForm({
             ? form.referidos.filter((r) => r.nombre.trim() || r.telefono.trim())
             : [],
         observaciones: form.observaciones.trim(),
+        comprasAdicionales: null,
       };
       void (async () => {
         try {
@@ -634,6 +653,10 @@ export function LeadModalForm({
           ? form.referidos.filter((r) => r.nombre.trim() || r.telefono.trim())
           : [],
       observaciones: form.observaciones.trim(),
+      comprasAdicionales:
+        form.resultadoEntrevista === 'compro'
+          ? form.comprasAdicionales
+          : null,
     };
     void (async () => {
       try {
@@ -1512,6 +1535,232 @@ export function LeadModalForm({
                         <p className="rounded-lg bg-red-50 px-3 py-2.5 text-[13px] font-medium text-red-700">
                           {errorVenta}
                         </p>
+                      )}
+                    </div>
+                  )}
+
+                  {showCompro && (
+                    <div className="space-y-4">
+                      {/* List of additional purchases */}
+                      {form.comprasAdicionales && form.comprasAdicionales.length > 0 && (
+                        <div className="space-y-2 mt-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                            Compras Adicionales
+                          </p>
+                          <div className="space-y-2">
+                            {form.comprasAdicionales.map((compra) => {
+                              const prodNombre = getProductoNombre(compra.idProducto, productos) ?? compra.idProducto;
+                              const pagoLabel = etiquetaEstadoPagoVisible(rol, compra.estadoPago, compra.idProducto);
+                              const barrioNombre = compra.idBarrio ? (getBarrioNombre(compra.idBarrio, barrios) ?? '') : '';
+                              const docLabel = esPlanInversion(compra.idProducto) ? 'Anexo' : 'Recibo';
+                              return (
+                                <div key={compra.id} className="relative flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+                                  <div className="space-y-0.5">
+                                    <div className="text-[14px] font-semibold text-zinc-800">
+                                      {prodNombre}
+                                    </div>
+                                    <div className="text-[12px] text-zinc-500 font-medium">
+                                      {pagoLabel} {barrioNombre ? `· ${barrioNombre}` : ''}
+                                    </div>
+                                    <div className="text-[12px] tabular-nums font-semibold text-brand-600">
+                                      {docLabel}: {compra.numeroRecibo}
+                                    </div>
+                                  </div>
+                                  {!soloLectura && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        patch({
+                                          comprasAdicionales: form.comprasAdicionales?.filter((c) => c.id !== compra.id)
+                                        });
+                                      }}
+                                      className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"
+                                      title="Eliminar compra"
+                                    >
+                                      ✕
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Add buttons and subform if !soloLectura */}
+                      {!soloLectura && (
+                        <>
+                          {!showAddAdicional && (
+                            <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                              {productosDisponibles.some((p) => esPlanInversion(p.id)) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowAddAdicional('pij');
+                                    setAdicionalForm({
+                                      idProducto: ID_PRODUCTO_PIJ,
+                                      estadoPago: 'entrega_33',
+                                      idBarrio: '',
+                                      numeroRecibo: '',
+                                    });
+                                    setErrorVenta('');
+                                  }}
+                                  style={{ touchAction: 'manipulation' }}
+                                  className="flex-1 h-11 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-[13px] font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
+                                >
+                                  <span>+ Compró otro plan</span>
+                                </button>
+                              )}
+                              {productosDisponibles.some((p) => esTerreno(p.id)) && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setShowAddAdicional('terreno');
+                                    setAdicionalForm({
+                                      idProducto: ID_PRODUCTO_TERRENO,
+                                      estadoPago: null,
+                                      idBarrio: '',
+                                      numeroRecibo: '',
+                                    });
+                                    setErrorVenta('');
+                                  }}
+                                  style={{ touchAction: 'manipulation' }}
+                                  className="flex-1 h-11 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-[13px] font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
+                                >
+                                  <span>+ Compró otro terreno</span>
+                                </button>
+                              )}
+                            </div>
+                          )}
+
+                          {showAddAdicional && (
+                            <div className="mt-4 rounded-xl border border-dashed border-brand-200 bg-zinc-50/50 p-4 space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h5 className="text-[12px] font-bold uppercase tracking-wider text-brand-800">
+                                  Nueva Compra Adicional ({showAddAdicional === 'pij' ? 'Plan' : 'Terreno'})
+                                </h5>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowAddAdicional(null)}
+                                  className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-600"
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+
+                              {showAddAdicional === 'terreno' && (
+                                <>
+                                  <div className="space-y-1.5">
+                                    <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                                      Barrio
+                                    </label>
+                                    <select
+                                      value={adicionalForm.idBarrio}
+                                      onChange={(e) => setAdicionalForm(f => ({ ...f, idBarrio: e.target.value }))}
+                                      className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                    >
+                                      <option value="">Seleccionar barrio...</option>
+                                      {barrios.map((b) => (
+                                        <option key={b.id} value={b.id}>{b.nombre}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  <div className="space-y-1.5">
+                                    <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                                      Estado de compra
+                                    </label>
+                                    <div className="flex gap-2">
+                                      {[
+                                        { value: 'sena', label: 'Operaciones en Seña' },
+                                        { value: 'cien', label: 'Cobrado 100%' }
+                                      ].map((op) => {
+                                        const sel = adicionalForm.estadoPago === op.value;
+                                        return (
+                                          <button
+                                            key={op.value}
+                                            type="button"
+                                            onClick={() => setAdicionalForm(f => ({ ...f, estadoPago: op.value as EstadoPago }))}
+                                            className={`h-10 flex-1 rounded-lg border text-[13px] font-medium transition-all ${
+                                              sel
+                                                ? 'border-brand-700 bg-brand-600 text-white'
+                                                : 'border-zinc-200 bg-white text-zinc-700'
+                                            }`}
+                                          >
+                                            {op.label}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                </>
+                              )}
+
+                              <div className="space-y-1.5">
+                                <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                                  {showAddAdicional === 'pij' ? 'Número de anexo' : 'Número de recibo'}
+                                </label>
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={adicionalForm.numeroRecibo}
+                                  onChange={(e) => setAdicionalForm(f => ({ ...f, numeroRecibo: e.target.value }))}
+                                  placeholder={showAddAdicional === 'pij' ? 'Ej. 001234' : 'Ej. 005678'}
+                                  className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                />
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (showAddAdicional === 'terreno') {
+                                    if (!adicionalForm.idBarrio) {
+                                      setErrorVenta('Seleccioná el barrio para el terreno adicional.');
+                                      return;
+                                    }
+                                    if (!adicionalForm.estadoPago) {
+                                      setErrorVenta('Seleccioná el estado de pago para el terreno adicional.');
+                                      return;
+                                    }
+                                  }
+                                  if (!adicionalForm.numeroRecibo.trim()) {
+                                    setErrorVenta(
+                                      showAddAdicional === 'pij'
+                                        ? 'Ingresá el número de anexo adicional.'
+                                        : 'Ingresá el número de recibo adicional.'
+                                    );
+                                    return;
+                                  }
+
+                                  setErrorVenta('');
+                                  const newCompra: CompraAdicional = {
+                                    id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+                                    idProducto: adicionalForm.idProducto,
+                                    estadoPago: adicionalForm.estadoPago as EstadoPago,
+                                    idBarrio: adicionalForm.idBarrio || null,
+                                    numeroRecibo: adicionalForm.numeroRecibo.trim(),
+                                    fechaCierre: new Date().toISOString(),
+                                  };
+
+                                  patch({
+                                    comprasAdicionales: [...(form.comprasAdicionales || []), newCompra]
+                                  });
+
+                                  setShowAddAdicional(null);
+                                  setAdicionalForm({
+                                    idProducto: '',
+                                    estadoPago: null,
+                                    idBarrio: '',
+                                    numeroRecibo: '',
+                                  });
+                                }}
+                                className="h-10 w-full rounded-lg bg-zinc-900 text-[13px] font-semibold text-white shadow-sm hover:bg-zinc-800 active:scale-[0.98] transition-all"
+                              >
+                                Agregar Compra
+                              </button>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

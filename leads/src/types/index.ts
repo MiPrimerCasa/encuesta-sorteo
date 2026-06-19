@@ -137,6 +137,15 @@ export interface SeguimientoHistorialEntry {
   creadoEn: string;
 }
 
+export interface CompraAdicional {
+  id: string;                    // UUID generado en el frontend o backend
+  idProducto: string;
+  estadoPago: EstadoPago;
+  idBarrio?: string | null;
+  numeroRecibo: string;
+  fechaCierre: string;           // ISO timestamp
+}
+
 export interface SeguimientoLead {
   operadorId?: string | number | null;
   fuente?: FuenteLead | null;
@@ -167,6 +176,7 @@ export interface SeguimientoLead {
   operadorNombre?: string | null;
   /** Timestamp de creación del seguimiento en la base de datos. */
   creadoEn?: string | null;
+  comprasAdicionales?: CompraAdicional[] | null;
 }
 
 export interface Lead {
@@ -451,8 +461,20 @@ export interface PijCierreDetalle {
   estadoPago: string | null;
 }
 
+export interface TerrenoCierreDetalle {
+  leadId: string;
+  leadNombre: string;
+  leadTelefono: string;
+  numeroRecibo: string;
+  idBarrio: string | null;
+  fechaCierre: string;
+  estadoPago: string | null;
+}
+
 export interface PersonaPijCierres {
   operadorNombre: string;
   cantidad: number;
   cierres: PijCierreDetalle[];
+  cantidadRecibos?: number;
+  recibos?: TerrenoCierreDetalle[];
 }

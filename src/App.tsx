@@ -90,33 +90,65 @@ function obtenerParametro(params: URLSearchParams, claves: string[]): string {
   return encontrado;
 }
 
-/** Códigos del canal de origen acordados con el SP: 1=QR, 2=Manual, 3=Instagram, 4=Facebook, 5=WhatsApp. */
+/**
+ * Tabla de canal de origen (acuerdo DBA):
+ * id | origen    | cadenaBusca
+ *  1 | QR        | QR
+ *  2 | MANUAL    | MN
+ *  3 | INSTAGRAM | INSTAGRAM
+ *  4 | FACEBOOK  | FACEBOOK
+ *  5 | WHATSAPP  | WHATSAPP
+ *  6 | TIKTOK    | TIKTOK
+ *  7 | OTRA 1    | OTRAREDSOCIAL
+ *  8 | OTRA 2    | OTRAREDSOCIAL
+ *  9 | OTRA 3    | OTRAREDSOCIAL
+ * 10 | OTRA 4    | OTRAREDSOCIAL
+ * 11 | NULL      | OTRAREDSOCIAL (sin origen en URL → null)
+ */
 const CODIGO_CANAL_ORIGEN: Record<string, number> = {
-  qr: 1,
-  manual: 2,
-  instagram: 3,
-  ig: 3,
-  facebook: 4,
-  fb: 4,
-  whatsapp: 5,
-  wa: 5,
+  // cadenaBusca exacta (tal como viene en ?origen=...)
+  qr:            1,
+  mn:            2,
+  manual:        2,
+  instagram:     3,
+  ig:            3,
+  facebook:      4,
+  fb:            4,
+  whatsapp:      5,
+  wa:            5,
+  wsp:           5,
+  tiktok:        6,
+  tt:            6,
+  otraredsocial: 7,
+  otra:          7,
+};
+
+const TEXTO_CANAL_ORIGEN: Record<number, string> = {
+  1: "QR",
+  2: "MANUAL",
+  3: "INSTAGRAM",
+  4: "FACEBOOK",
+  5: "WHATSAPP",
+  6: "TIKTOK",
+  7: "OTRAREDSOCIAL",
 };
 
 function textoDeCanalOrigen(codigo: number | null): string {
   if (codigo === null) return "";
-  return ({ 1: "qr", 2: "manual", 3: "instagram", 4: "facebook", 5: "whatsapp" } as Record<number, string>)[codigo] ?? "";
+  return TEXTO_CANAL_ORIGEN[codigo] ?? "";
 }
 
 /**
- * Lee el canal de origen desde la query (?origen=1|2|3|4|5 o ?origen=qr|manual|instagram|facebook|whatsapp).
- * Devuelve `null` si no viene o si es un valor desconocido (el SP decide qué hacer con null).
+ * Lee el canal de origen desde la query (?origen=QR|MN|INSTAGRAM|FACEBOOK|WHATSAPP|TIKTOK|OTRAREDSOCIAL
+ * o ?origen=1..10). Devuelve `null` si no viene (→ el SP guarda id=11/NULL).
  */
 function obtenerCanalOrigen(params: URLSearchParams): { codigo: number | null; texto: string } {
   const raw = obtenerParametro(params, ["origen", "Origen", "ORIGEN", "o", "canal", "origin"]);
   if (!raw) return { codigo: null, texto: "" };
   const limpio = raw.trim().toLowerCase();
+  // Acepta número directo 1-10
   const n = Number(limpio);
-  if (Number.isInteger(n) && n >= 1 && n <= 5) {
+  if (Number.isInteger(n) && n >= 1 && n <= 10) {
     return { codigo: n, texto: textoDeCanalOrigen(n) };
   }
   const codigo = CODIGO_CANAL_ORIGEN[limpio] ?? null;

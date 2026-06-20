@@ -33,6 +33,26 @@ git fetch origin main
 git reset --hard origin/main
 log "HEAD local: $(git log -1 --oneline)"
 
+# ── Inyectar variables requeridas en .env (sin duplicar) ──────────────────────
+# Agregar aquí cualquier variable que deba estar en producción pero no está en git.
+ENV_FILE="${APP_DIR}/.env"
+ensure_env_var() {
+  local key="$1" value="$2"
+  if [[ ! -f "$ENV_FILE" ]]; then
+    touch "$ENV_FILE"
+    log "WARN: .env no existía, se creó en $ENV_FILE"
+  fi
+  if grep -qE "^${key}=" "$ENV_FILE" 2>/dev/null; then
+    log "ENV: ${key} ya está en .env (sin cambios)"
+  else
+    echo "${key}=${value}" >> "$ENV_FILE"
+    log "ENV: ${key}=${value} agregado a .env"
+  fi
+}
+
+ensure_env_var "SP_INCLUDE_ORIGEN" "true"
+# ─────────────────────────────────────────────────────────────────────────────
+
 chmod +x "${APP_DIR}/deploy/ensure-leads-env.sh" 2>/dev/null || true
 chmod +x "${APP_DIR}/leads/deploy/deploy-vps-docker.sh" 2>/dev/null || true
 

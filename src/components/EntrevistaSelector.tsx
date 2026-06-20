@@ -54,6 +54,23 @@ function EntrevistaSelector({
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
 
+  const obtenerHorariosDisponibles = (): string[] => {
+    if (!fechaSeleccionada) return HORARIOS;
+    const hoyStr = toValorFecha(new Date());
+    if (fechaSeleccionada !== hoyStr) return HORARIOS;
+
+    const ahora = new Date();
+    const currentHour = ahora.getHours();
+    const currentMinute = ahora.getMinutes();
+
+    return HORARIOS.filter((hora) => {
+      const [hStr, mStr] = hora.split(":");
+      const h = parseInt(hStr, 10);
+      const m = parseInt(mStr, 10);
+      return h > currentHour || (h === currentHour && m > currentMinute);
+    });
+  };
+
   const claseContenedor = `entrevista-selector${deshabilitado ? " entrevista-selector--deshabilitado" : ""}`;
   const [menuFechaAbierto, setMenuFechaAbierto] = useState(false);
   const [mesVista, setMesVista] = useState({ año: hoy.getFullYear(), mes: hoy.getMonth() });
@@ -71,6 +88,47 @@ function EntrevistaSelector({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [menuFechaAbierto, menuHoraAbierto]);
+
+  useEffect(() => {
+    if (!fechaSeleccionada) return;
+
+    const hoyStr = toValorFecha(new Date());
+    const esHoy = fechaSeleccionada === hoyStr;
+
+    if (esHoy) {
+      const ahora = new Date();
+      const currentHour = ahora.getHours();
+      const currentMinute = ahora.getMinutes();
+
+      let esInvalida = !horaSeleccionada;
+      if (horaSeleccionada) {
+        const [hStr, mStr] = horaSeleccionada.split(":");
+        const h = parseInt(hStr, 10);
+        const m = parseInt(mStr, 10);
+        if (h < currentHour || (h === currentHour && m <= currentMinute)) {
+          esInvalida = true;
+        }
+      }
+
+      if (esInvalida) {
+        const primerDisponible = HORARIOS.find((hora) => {
+          const [hStr, mStr] = hora.split(":");
+          const h = parseInt(hStr, 10);
+          const m = parseInt(mStr, 10);
+          return h > currentHour || (h === currentHour && m > currentMinute);
+        });
+        if (primerDisponible) {
+          onHoraChange(primerDisponible);
+        } else {
+          onHoraChange("");
+        }
+      }
+    } else {
+      if (!horaSeleccionada) {
+        onHoraChange(HORARIOS[0]);
+      }
+    }
+  }, [fechaSeleccionada, horaSeleccionada, onHoraChange]);
 
   const esMesActual =
     mesVista.año === hoy.getFullYear() && mesVista.mes === hoy.getMonth();
@@ -98,14 +156,19 @@ function EntrevistaSelector({
     const diasEnMes = new Date(año, mes + 1, 0).getDate();
     const primerDiaSemana = primerDia.getDay();
 
+    const ahora = new Date();
+    // El último turno disponible es "20:00"
+    const ultimoTurnoPaso = ahora.getHours() > 20 || (ahora.getHours() === 20 && ahora.getMinutes() >= 0);
+
     const celdas: Celda[] = [];
     for (let i = 0; i < primerDiaSemana; i++) celdas.push(null);
     for (let d = 1; d <= diasEnMes; d++) {
       const fecha = new Date(año, mes, d);
+      const esHoy = fecha.getTime() === hoy.getTime();
       celdas.push({
         dia: d,
         fecha: toValorFecha(fecha),
-        pasado: fecha < hoy,
+        pasado: fecha < hoy || (esHoy && ultimoTurnoPaso),
         esDomingo: fecha.getDay() === 0,
       });
     }
@@ -214,7 +277,7 @@ function EntrevistaSelector({
         {menuHoraAbierto && !deshabilitado && (
           <div className="hora-picker__dropdown hora-picker__dropdown--full" role="listbox" aria-label="Seleccioná un horario">
             <div className="hora-picker__grid">
-              {HORARIOS.map((hora) => (
+              {obtenerHorariosDisponibles().map((hora) => (
                 <button
                   key={hora}
                   type="button"

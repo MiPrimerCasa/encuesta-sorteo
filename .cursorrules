@@ -1,0 +1,26 @@
+# Instrucciones para el Asistente de IA (AI Assistant Rules)
+
+Para asegurar una comunicación fluida y alineada con el desarrollador del proyecto:
+
+1. **Idioma de Pensamiento (Thinking):** Siempre realiza tus razonamientos internos (bloques <thought> o similares) en **español**.
+2. **Idioma de Acciones de Herramientas (Tool Descriptions):** Completa los parámetros descriptivos de las herramientas (como `toolAction` o `toolSummary`) en **español** (ej. 'Analizando directorio', 'Ejecutando script de prueba').
+3. **Idioma de Comunicación:** Todas las respuestas, explicaciones, resúmenes y planes deben redactarse íntegramente en **español** de forma clara y concisa.
+4. **Comentarios de Código:** Cuando escribas comentarios en el código nuevo o modificado, hazlo en **español**, a menos que el archivo requiera específicamente inglés por consistencia con el código adyacente.
+5. **Nombres de Variables y Funciones:** Mantén los nombres técnicos en inglés (ej. `leadsBackupScheduler`, `ejecutarLeadsBackup`) para ser coherentes con la arquitectura existente.
+6. **Seguridad en Base de Datos de Producción (CRÍTICO):**
+   - Queda estrictamente prohibido ejecutar scripts de prueba, diagnóstico o modificaciones temporales (`UPDATE`, `INSERT`, `DELETE`) en la base de datos de producción (`STRSYSTEM`) sin utilizar transacciones con **`ROLLBACK` explícito**.
+   - Todo script de diagnóstico en la carpeta `scratch/` debe envolver sus operaciones de escritura en una estructura de transacción segura que deshaga los cambios al finalizar:
+     ```javascript
+     const transaction = new sql.Transaction(pool);
+     await transaction.begin();
+     try {
+       const request = new sql.Request(transaction);
+       // ... ejecutar queries de prueba/modificaciones ...
+     } finally {
+       // SIEMPRE deshacer los cambios para no alterar la base de datos real
+       try {
+         await transaction.rollback();
+       } catch {}
+     }
+     ```
+   - Nunca ejecutes `transaction.commit()` ni comandos de actualización directa fuera de una transacción con rollback en scripts de depuración, a menos que el USUARIO dé su autorización explícita para aplicar una reparación definitiva.

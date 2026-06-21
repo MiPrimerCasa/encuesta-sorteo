@@ -22,6 +22,11 @@ dist-ssr
 !.env.example
 !.env.docker.example
 
+# Bases de datos y archivos locales de la landing
+data/*.db
+data/*.db-*
+$ENV
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

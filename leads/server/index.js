@@ -7,6 +7,7 @@ import { isSqlServerConfigured } from './db/mssql.js';
 import { warmOperadoresCatalog } from './db/operadores-catalog.js';
 import { isLinksAcortadorEnabled } from './db/links-acortador.js';
 import { startLinksInstagramScheduler } from './jobs/links-instagram-job.js';
+import { startLeadsBackupScheduler } from './jobs/leads-backup-job.js';
 
 const PORT = Number(process.env.PORT || process.env.API_PORT || 3001);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -54,6 +55,7 @@ app.listen(PORT, () => {
     } else {
       console.log('  Links acortador → deshabilitado (links directos desde SP)');
     }
+    startLeadsBackupScheduler();
     console.log(`  Health rápido → ${base}api/health/live`);
   } else {
     console.error('FALTA .env: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME — no hay modo demo.');

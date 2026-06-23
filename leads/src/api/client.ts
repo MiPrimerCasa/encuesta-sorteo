@@ -396,3 +396,17 @@ export async function reasignarLead(leadId: string, nuevoUsuarioCarga: string): 
   );
   return data.lead;
 }
+
+export async function duplicarLead(leadId: string, codigoVendedorDestino: string): Promise<Lead> {
+  if (_isDemoActive) {
+    throw new Error('La duplicación de leads no está disponible en modo demo.');
+  }
+  const data = await apiFetch<{ lead: Lead; message?: string }>(
+    `/api/admin/leads/${encodeURIComponent(leadId)}/duplicate`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ codigoVendedorDestino }),
+    },
+  );
+  return data.lead;
+}

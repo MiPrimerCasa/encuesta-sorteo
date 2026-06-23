@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
+import { cleanTelefonoSuffix } from '../../domain/whatsapp';
 import {
   formatEntrevistaCalendario,
   getHorarioEntrevistaLead,
@@ -14,6 +15,7 @@ import {
   ETIQUETA_CIERRE_SUPERVISOR,
   ETIQUETA_SEGUIMIENTO_PIJ,
 } from '../../domain/leads';
+import { parseIsoLocal } from '../../domain/seguimiento-historial';
 import {
   esPlanInversion,
   esTerreno,
@@ -856,7 +858,7 @@ export function LeadModalForm({
               >
                 {lead.nombre}
               </Drawer.Title>
-              <p className="mt-0.5 text-[13px] tabular-nums text-zinc-500">{lead.telefono}</p>
+              <p className="mt-0.5 text-[13px] tabular-nums text-zinc-500">{cleanTelefonoSuffix(lead.telefono)}</p>
             </div>
             <button
               type="button"
@@ -869,7 +871,17 @@ export function LeadModalForm({
             </button>
           </div>
 
-          {soloLectura && lead && (
+          {lead.bloqueadoSupervisor48h && (
+            <div className="mx-4 mb-3 shrink-0 rounded-lg border border-purple-200 bg-purple-50 px-3 py-2.5">
+              <p className="text-[13px] font-medium text-purple-900">
+                Prioridad Promotor (48hs)
+              </p>
+              <p className="mt-0.5 text-[12px] leading-snug text-purple-800/90">
+                No podés interactuar con este lead hasta que pasen 48 horas de su creación para dar prioridad al promotor. El teléfono está oculto temporalmente.
+              </p>
+            </div>
+          )}
+          {!lead.bloqueadoSupervisor48h && soloLectura && lead && (
             <div className="mx-4 mb-3 shrink-0 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2.5">
               <p className="text-[13px] font-medium text-indigo-900">
                 {leadSeguimientoPijPromotor(lead)
@@ -1331,8 +1343,8 @@ export function LeadModalForm({
                           <p className="mt-1 text-[15px] font-medium text-zinc-900">
                             {(() => {
                               try {
-                                const d = new Date(lead.seguimiento.fechaCierre);
-                                if (isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
+                                const d = parseIsoLocal(lead.seguimiento.fechaCierre);
+                                if (!d || isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
                                 const day = String(d.getDate()).padStart(2, '0');
                                 const month = String(d.getMonth() + 1).padStart(2, '0');
                                 const year = d.getFullYear();
@@ -1356,8 +1368,8 @@ export function LeadModalForm({
                           Cierre registrado el:{' '}
                           {(() => {
                             try {
-                              const d = new Date(lead.seguimiento.fechaCierre);
-                              if (isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
+                              const d = parseIsoLocal(lead.seguimiento.fechaCierre);
+                              if (!d || isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
                               const day = String(d.getDate()).padStart(2, '0');
                               const month = String(d.getMonth() + 1).padStart(2, '0');
                               const year = d.getFullYear();

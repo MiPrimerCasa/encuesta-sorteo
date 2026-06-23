@@ -29,13 +29,14 @@ import { EntrevistaAgendaBadge } from './EntrevistaAgendaBadge';
 import { LeadHistorialInline } from './LeadHistorialInline';
 import { StatusPill } from '../ui/StatusPill';
 import { WhatsAppLeadButton } from './WhatsAppLeadButton';
+import { cleanTelefonoSuffix } from '../../domain/whatsapp';
+import { parseIsoLocal } from '../../domain/seguimiento-historial';
 
 const formatearFechaHora = (fechaStr?: string) => {
   if (!fechaStr) return '';
   try {
-    const normalized = fechaStr.includes('T') ? fechaStr : fechaStr.replace(' ', 'T');
-    const d = new Date(normalized);
-    if (isNaN(d.getTime())) return fechaStr;
+    const d = parseIsoLocal(fechaStr);
+    if (!d || isNaN(d.getTime())) return fechaStr;
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
@@ -277,6 +278,13 @@ export function LeadCard({
                 </span>
               </div>
             )}
+            {lead.bloqueadoSupervisor48h && (
+              <div className="mt-2">
+                <span className="inline-flex items-center rounded-md border border-purple-300 bg-purple-100 px-2 py-1 text-[11px] font-semibold leading-snug text-purple-900">
+                  Prioridad Promotor (48hs)
+                </span>
+              </div>
+            )}
           </div>
           <div className="shrink-0">
             {esArchivo && <StatusPill variant="compro" dot>Cierre</StatusPill>}
@@ -310,7 +318,7 @@ export function LeadCard({
           <div className="text-[13px]">
             <dt className={`inline ${esNoCompro ? 'text-zinc-400' : 'text-zinc-400'}`}>Tel: </dt>
             <dd className={`inline ${esNoCompro ? 'text-zinc-300' : 'text-zinc-600'}`}>
-              {lead.telefono || (
+              {cleanTelefonoSuffix(lead.telefono) || (
                 <span className="italic text-zinc-400">Sin teléfono en encuesta</span>
               )}
             </dd>
@@ -394,8 +402,8 @@ export function LeadCard({
                 · Cierre:{' '}
                 {(() => {
                   try {
-                    const d = new Date(lead.seguimiento.fechaCierre);
-                    if (isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
+                    const d = parseIsoLocal(lead.seguimiento.fechaCierre);
+                    if (!d || isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
                     const day = String(d.getDate()).padStart(2, '0');
                     const month = String(d.getMonth() + 1).padStart(2, '0');
                     const hours = String(d.getHours()).padStart(2, '0');
@@ -459,6 +467,13 @@ export function LeadCard({
           nombreUsuario={nombreUsuario}
           tieneCitaPrevia={leadTieneCitaPrevia(lead)}
           onAutoContacto={onWhatsAppAutoContacto ? () => onWhatsAppAutoContacto(lead) : undefined}
+          bloqueadoSupervisor48h={lead.bloqueadoSupervisor48h}
+          disabled={soloLecturaSupervisor}
+          disabledTooltip={
+            lead.bloqueadoSupervisor48h
+              ? 'Prioridad Promotor (48hs)'
+              : 'Pendiente de derivación por el promotor'
+          }
         />
       </div>
     </div>

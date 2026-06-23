@@ -4,9 +4,12 @@ import { formatRangoSemana } from '../../domain/admin-metrics';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
-import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios } from '../../api/client';
+import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, duplicarLead } from '../../api/client';
 import type { OperadorCatalogo } from '../../api/client';
 import { getBarrioNombre } from '../../domain/venta';
+import { useAuth } from '../../context/AuthContext';
+import { cleanTelefonoSuffix } from '../../domain/whatsapp';
+
 
 interface SuperadminDashboardProps {
   data: AdminDashboardData;
@@ -90,6 +93,7 @@ function PromotorRow({
 }
 
 export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: SuperadminDashboardProps) {
+  const esPeriodoFecha = /^\d{4}-\d{2}-\d{2}$/.test(periodo);
   const [selectedPerson, setSelectedPerson] = useState<PersonaPijCierres | null>(null);
   const [selectedPersonReceipts, setSelectedPersonReceipts] = useState<PersonaPijCierres | null>(null);
   const [filterText, setFilterText] = useState('');
@@ -120,6 +124,39 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const [resultadoReasignacion, setResultadoReasignacion] = useState<{ tipo: 'success' | 'error'; mensaje: string } | null>(null);
   const [selectedOperatorCodes, setSelectedOperatorCodes] = useState<Record<string, string>>({});
 
+  const { usuario } = useAuth();
+  const [duplicatingLead, setDuplicatingLead] = useState<Lead | null>(null);
+  const [targetVendedorCode, setTargetVendedorCode] = useState('');
+  const [duplicatingPending, setDuplicatingPending] = useState(false);
+  const [duplicatingMessage, setDuplicatingMessage] = useState<{ tipo: 'success' | 'error'; mensaje: string } | null>(null);
+
+  const handleDuplicarLeadSubmit = async () => {
+    if (!duplicatingLead || !targetVendedorCode) return;
+    setDuplicatingPending(true);
+    setDuplicatingMessage(null);
+    try {
+      const newLead = await duplicarLead(duplicatingLead.id, targetVendedorCode);
+      setLeads((prev) => [newLead, ...prev]);
+      setDuplicatingMessage({
+        tipo: 'success',
+        mensaje: `Lead "${newLead.nombre}" duplicado con éxito.`,
+      });
+      setTargetVendedorCode('');
+      setTimeout(() => {
+        setDuplicatingLead(null);
+        setDuplicatingMessage(null);
+      }, 2000);
+    } catch (err) {
+      console.error(err);
+      setDuplicatingMessage({
+        tipo: 'error',
+        mensaje: err instanceof Error ? err.message : 'Error al duplicar el lead.',
+      });
+    } finally {
+      setDuplicatingPending(false);
+    }
+  };
+
   useEffect(() => {
     if ((tabActivo === 'buscador' || tabActivo === 'reasignacion') && leads.length === 0) {
       setCargandoLeads(true);
@@ -136,7 +173,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   }, [tabActivo, leads.length]);
 
   useEffect(() => {
-    if (tabActivo === 'reasignacion' && operadores.length === 0) {
+    if ((tabActivo === 'reasignacion' || tabActivo === 'buscador' || duplicatingLead !== null) && operadores.length === 0) {
       setCargandoOperadores(true);
       fetchAdminOperadores()
         .then((data) => {
@@ -148,7 +185,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
           setCargandoOperadores(false);
         });
     }
-  }, [tabActivo, operadores.length]);
+  }, [tabActivo, duplicatingLead, operadores.length]);
 
   const queryReasignar = busquedaReasignar.trim().toLowerCase();
   const leadsFiltradosReasignar = useMemo(() => {
@@ -449,7 +486,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
           Panel global de equipos
         </h2>
         <p className="mt-0.5 text-[13px] text-zinc-500">
-          {periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'} ({rango}) · Resultados de hoy ({hoyLabel})
+          {esPeriodoFecha ? 'Día seleccionado' : periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'} ({rango}) · Resultados de hoy ({hoyLabel})
         </p>
       </div>
 
@@ -728,7 +765,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                 </div>
                 <div className="flex flex-wrap gap-3 text-[12px] text-zinc-600">
                   <span>
-                    {periodo === 'hoy' ? 'Hoy' : periodo === 'semana' ? 'Semana' : 'Mes'}: <strong>{sup.totales.entrevistasSemana}</strong> ent. ·{' '}
+                    {esPeriodoFecha ? 'Día' : periodo === 'hoy' ? 'Hoy' : periodo === 'semana' ? 'Semana' : 'Mes'}: <strong>{sup.totales.entrevistasSemana}</strong> ent. ·{' '}
                     <strong>{sup.totales.cierresSemana}</strong> cierres
                   </span>
                   <span className="text-brand-700">
@@ -744,9 +781,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                     <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
                       <th className="py-2 pr-3 text-left">Promotor</th>
                       <th className="px-2 py-2 text-center">Leads</th>
-                      <th className="px-2 py-2 text-center">Ent. {periodo === 'hoy' ? 'hoy' : periodo === 'semana' ? 'sem.' : 'mes'}</th>
+                      <th className="px-2 py-2 text-center">Ent. {esPeriodoFecha ? 'día' : periodo === 'hoy' ? 'hoy' : periodo === 'semana' ? 'sem.' : 'mes'}</th>
                       <th className="px-2 py-2 text-center">Ent. hoy</th>
-                      <th className="px-2 py-2 text-center">Cierres {periodo === 'hoy' ? 'hoy' : periodo === 'semana' ? 'sem.' : 'mes'}</th>
+                      <th className="px-2 py-2 text-center">Cierres {esPeriodoFecha ? 'día' : periodo === 'hoy' ? 'hoy' : periodo === 'semana' ? 'sem.' : 'mes'}</th>
                       <th className="px-2 py-2 text-center">Cierres hoy</th>
                       <th className="px-2 py-2 text-center">Terrenos</th>
                       <th className="pl-2 py-2 text-center">PIJ</th>
@@ -769,7 +806,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
       {tabActivo === 'informe' && (
         <section className="space-y-4 printable-ranking-section">
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400 no-print">
-            INFORME DE OPERACIONES ({periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana Móvil' : 'Mes Actual'})
+            INFORME DE OPERACIONES ({esPeriodoFecha ? 'Día Seleccionado' : periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana Móvil' : 'Mes Actual'})
           </h3>
           <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col printable-ranking-card">
             <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -777,45 +814,61 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                 <h4 className="text-[14px] font-semibold text-zinc-900">INFORME DE OPERACIONES</h4>
                 <p className="text-[11px] text-zinc-500 no-print">Listado general de promotores y operadores con desglose de gestiones y leads tratados.</p>
                 <p className="hidden print:block text-[12px] text-zinc-600 mt-1 font-semibold">
-                  Rango ({periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'}): {rango}
+                  Rango ({esPeriodoFecha ? 'Día seleccionado' : periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'}): {rango}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto no-print">
-                {/* Selector de periodo */}
-                <div className="flex items-center rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/50 shadow-sm shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => onCambiarPeriodo('hoy')}
-                    className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
-                      periodo === 'hoy'
-                        ? 'bg-white text-zinc-900 shadow-sm'
-                        : 'text-zinc-500 hover:text-zinc-800'
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  {/* Selector de periodo */}
+                  <div className="flex items-center rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/50 shadow-sm shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onCambiarPeriodo('hoy')}
+                      className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+                        periodo === 'hoy'
+                          ? 'bg-white text-zinc-900 shadow-sm'
+                          : 'text-zinc-500 hover:text-zinc-800'
+                      }`}
+                    >
+                      Hoy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onCambiarPeriodo('semana')}
+                      className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+                        periodo === 'semana'
+                          ? 'bg-white text-zinc-900 shadow-sm'
+                          : 'text-zinc-500 hover:text-zinc-800'
+                      }`}
+                    >
+                      Semana
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onCambiarPeriodo('mes')}
+                      className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+                        periodo === 'mes'
+                          ? 'bg-white text-zinc-900 shadow-sm'
+                          : 'text-zinc-500 hover:text-zinc-800'
+                      }`}
+                    >
+                      Mes
+                    </button>
+                  </div>
+
+                  {/* Calendario */}
+                  <input
+                    type="date"
+                    value={esPeriodoFecha ? periodo : ''}
+                    onChange={(e) => {
+                      onCambiarPeriodo(e.target.value || 'mes');
+                    }}
+                    className={`rounded-lg border px-2 py-1 text-[11.5px] font-semibold focus:outline-none focus:ring-1 focus:ring-brand-100 transition-all ${
+                      esPeriodoFecha
+                        ? 'border-brand-300 bg-brand-50/50 text-brand-900'
+                        : 'border-zinc-200 bg-white text-zinc-500 hover:text-zinc-800'
                     }`}
-                  >
-                    Hoy
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onCambiarPeriodo('semana')}
-                    className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
-                      periodo === 'semana'
-                        ? 'bg-white text-zinc-900 shadow-sm'
-                        : 'text-zinc-500 hover:text-zinc-800'
-                    }`}
-                  >
-                    Semana
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onCambiarPeriodo('mes')}
-                    className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
-                      periodo === 'mes'
-                        ? 'bg-white text-zinc-900 shadow-sm'
-                        : 'text-zinc-500 hover:text-zinc-800'
-                    }`}
-                  >
-                    Mes
-                  </button>
+                  />
                 </div>
 
                 <div className="relative w-full sm:w-48 shrink-0">
@@ -996,12 +1049,13 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                         <th className="py-2.5 px-4 text-left">Equipo (Supervisor)</th>
                         <th className="py-2.5 px-4 text-center">Fecha Ingreso</th>
                         <th className="py-2.5 px-4 text-center">Estado</th>
+                        {(usuario?.rol === 'superadmin' || usuario?.panelGlobal) && <th className="py-2.5 px-4 text-center">Acción</th>}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-100 text-zinc-700">
                       {leadsPaginados.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-8 text-center text-zinc-400">
+                          <td colSpan={(usuario?.rol === 'superadmin' || usuario?.panelGlobal) ? 6 : 5} className="py-8 text-center text-zinc-400">
                             No se encontraron leads para la búsqueda "{busquedaLeads}".
                           </td>
                         </tr>
@@ -1010,7 +1064,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                           <tr key={l.id} className="hover:bg-zinc-50/80 transition-colors">
                             <td className="py-3 px-4">
                               <div className="font-semibold text-zinc-900">{l.nombre}</div>
-                              <div className="text-[11px] font-mono text-zinc-400">{l.telefono || 'Sin teléfono'}</div>
+                              <div className="text-[11px] font-mono text-zinc-400">
+                                {l.telefono ? cleanTelefonoSuffix(l.telefono) : 'Sin teléfono'}
+                              </div>
                             </td>
                             <td className="py-3 px-4 font-medium text-zinc-800">
                               {l.promotorNombre || 'Sin promotor'}
@@ -1024,6 +1080,21 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                             <td className="py-3 px-4 text-center">
                               {renderEstadoBadge(l.lista)}
                             </td>
+                            {(usuario?.rol === 'superadmin' || usuario?.panelGlobal) && (
+                              <td className="py-3 px-4 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDuplicatingLead(l);
+                                    setTargetVendedorCode('');
+                                    setDuplicatingMessage(null);
+                                  }}
+                                  className="text-[12px] font-semibold text-brand-600 hover:text-brand-800 hover:underline cursor-pointer"
+                                >
+                                  Duplicar
+                                </button>
+                              </td>
+                            )}
                           </tr>
                         ))
                       )}
@@ -1272,7 +1343,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                             <tr key={l.id} className="hover:bg-zinc-50/80 transition-colors">
                               <td className="py-3 px-4">
                                 <div className="font-semibold text-zinc-900">{l.nombre}</div>
-                                <div className="text-[11px] font-mono text-zinc-400">{l.telefono || 'Sin teléfono'}</div>
+                                <div className="text-[11px] font-mono text-zinc-400">
+                                  {l.telefono ? cleanTelefonoSuffix(l.telefono) : 'Sin teléfono'}
+                                </div>
                               </td>
                               <td className="py-3 px-4 font-medium text-zinc-800">
                                 {l.promotorNombre || 'Sin promotor'}
@@ -1460,10 +1533,10 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                             <td className="py-3 font-medium text-zinc-900">{cierre.leadNombre}</td>
                             <td className="py-3">
                               <a
-                                href={`tel:${cierre.leadTelefono}`}
+                                href={`tel:${cleanTelefonoSuffix(cierre.leadTelefono)}`}
                                 className="text-brand-600 hover:underline inline-flex items-center gap-1 font-mono text-[12px] tabular-nums"
                               >
-                                {cierre.leadTelefono}
+                                {cleanTelefonoSuffix(cierre.leadTelefono)}
                               </a>
                             </td>
                             <td className="py-3 text-center">
@@ -1603,10 +1676,10 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                             <td className="py-3 font-medium text-zinc-900">{recibo.leadNombre}</td>
                             <td className="py-3">
                               <a
-                                href={`tel:${recibo.leadTelefono}`}
+                                href={`tel:${cleanTelefonoSuffix(recibo.leadTelefono)}`}
                                 className="text-brand-600 hover:underline inline-flex items-center gap-1 font-mono text-[12px] tabular-nums"
                               >
-                                {recibo.leadTelefono}
+                                {cleanTelefonoSuffix(recibo.leadTelefono)}
                               </a>
                             </td>
                             <td className="py-3 text-center text-zinc-600">
@@ -1741,10 +1814,10 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                             <td className="py-3 font-semibold text-zinc-900">{c.nombre}</td>
                             <td className="py-3">
                               <a
-                                href={`tel:${c.telefono}`}
+                                href={`tel:${cleanTelefonoSuffix(c.telefono)}`}
                                 className="text-brand-600 hover:underline inline-flex items-center gap-1 font-mono text-[12px] tabular-nums"
                               >
-                                {c.telefono}
+                                {cleanTelefonoSuffix(c.telefono)}
                               </a>
                             </td>
                             <td className="py-3 text-center">
@@ -1779,6 +1852,152 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                 className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-all active:scale-[0.98] cursor-pointer"
               >
                 Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Duplicación de Lead */}
+      {duplicatingLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm transition-opacity"
+            onClick={() => {
+              if (!duplicatingPending) {
+                setDuplicatingLead(null);
+                setDuplicatingMessage(null);
+              }
+            }}
+          />
+
+          {/* Modal Content */}
+          <div className="relative z-50 flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl transition-all duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-zinc-900">
+                  Duplicar Lead
+                </h3>
+                <p className="text-[12px] text-zinc-500">
+                  Crear una copia de este contacto para otro vendedor
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={duplicatingPending}
+                onClick={() => {
+                  setDuplicatingLead(null);
+                  setDuplicatingMessage(null);
+                }}
+                className="flex h-8 w-8 items-center justify-center text-[20px] rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors disabled:opacity-50 cursor-pointer"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-4 space-y-4">
+              {duplicatingMessage && (
+                <div
+                  className={`rounded-lg border px-4 py-2.5 text-[13px] ${
+                    duplicatingMessage.tipo === 'success'
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
+                      : 'border-rose-200 bg-rose-50 text-rose-950'
+                  }`}
+                >
+                  {duplicatingMessage.mensaje}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Cliente Original</p>
+                <p className="text-[14px] font-semibold text-zinc-800">{duplicatingLead.nombre}</p>
+                <p className="text-[12px] text-zinc-500 tabular-nums">
+                  Teléfono: {cleanTelefonoSuffix(duplicatingLead.telefono)}
+                </p>
+                <p className="text-[12px] text-zinc-500">
+                  Vendedor actual: {duplicatingLead.promotorNombre || duplicatingLead.supervisorNombre || 'Sin asignar'}
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                  Vendedor de Destino
+                </label>
+                <select
+                  value={targetVendedorCode}
+                  disabled={duplicatingPending}
+                  onChange={(e) => setTargetVendedorCode(e.target.value)}
+                  className="w-full rounded-lg border border-zinc-200 bg-white py-2 px-3 text-[13px] text-zinc-800 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100 disabled:bg-zinc-50 disabled:text-zinc-400"
+                >
+                  <option value="">Seleccionar operador...</option>
+                  {operadores.filter(o => o.rol === 'supervisor').length > 0 && (
+                    <optgroup label="Supervisores">
+                      {operadores
+                        .filter(o => o.rol === 'supervisor')
+                        .map(o => (
+                          <option key={o.codigo} value={o.codigo}>
+                            {o.nombre} ({o.codigo})
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                  {operadores.filter(o => o.rol === 'promotor').length > 0 && (
+                    <optgroup label="Promotores">
+                      {operadores
+                        .filter(o => o.rol === 'promotor')
+                        .map(o => (
+                          <option key={o.codigo} value={o.codigo}>
+                            {o.nombre} ({o.codigo})
+                          </option>
+                        ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+
+              <p className="text-[12px] leading-relaxed text-zinc-500 bg-zinc-50 rounded-lg p-3 border border-zinc-100">
+                ℹ️ El lead duplicado se creará con el estado <strong>"Sin tratar"</strong> para el vendedor de destino, permitiendo una gestión comercial independiente. No se copiará el historial de seguimientos del vendedor anterior.
+              </p>
+            </div>
+
+            {/* Footer */}
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-zinc-100 px-6 py-3.5 bg-zinc-50/50">
+              <button
+                type="button"
+                disabled={duplicatingPending}
+                onClick={() => {
+                  setDuplicatingLead(null);
+                  setDuplicatingMessage(null);
+                }}
+                className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!targetVendedorCode || duplicatingPending}
+                onClick={handleDuplicarLeadSubmit}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-semibold text-white transition-all shadow-sm active:scale-[0.98] ${
+                  targetVendedorCode && !duplicatingPending
+                    ? 'bg-brand-600 hover:bg-brand-700 cursor-pointer'
+                    : 'bg-zinc-300 cursor-not-allowed shadow-none'
+                }`}
+              >
+                {duplicatingPending ? (
+                  <>
+                    <svg className="animate-spin -ml-0.5 mr-0.5 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Duplicando...
+                  </>
+                ) : (
+                  'Duplicar'
+                )}
               </button>
             </div>
           </div>

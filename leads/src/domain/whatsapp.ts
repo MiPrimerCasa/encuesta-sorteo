@@ -73,3 +73,8 @@ Para construir tu casa 🏠?
   }
   return `Hola ${nombre}! Buenos días, me comunico para confirmar la entrevista desde Mi Primer Casa S.A.`;
 }
+
+export function cleanTelefonoSuffix(tel?: string | null): string {
+  if (!tel) return '';
+  return String(tel).trim().replace(/_dup[a-z]+$/i, '');
+}

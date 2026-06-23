@@ -3,6 +3,7 @@ import { FUENTE_LABEL } from '../../domain/fuenteLabels';
 import { leadCompro, leadReagendaEntrevista, getPromotorNombre } from '../../domain/leads';
 import type { Lead, Promotor } from '../../types';
 import { StatusPill } from '../ui/StatusPill';
+import { cleanTelefonoSuffix } from '../../domain/whatsapp';
 
 interface LeadsHistorialProps {
   leads: Lead[];
@@ -159,7 +160,7 @@ export function LeadsHistorial({ leads, promotores, modoPromotor = false }: Lead
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[14px] font-semibold text-zinc-900">{lead.nombre}</p>
                       <p className="mt-0.5 text-[12px] text-zinc-400">
-                        {lead.telefono}
+                        {cleanTelefonoSuffix(lead.telefono)}
                         {!modoPromotor && filtroPromotor === ALL && promotorNombre && (
                           <>
                             <span className="mx-1.5" aria-hidden="true">·</span>

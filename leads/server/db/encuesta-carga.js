@@ -159,7 +159,12 @@ function mapLugarEntrevistaSp(lugar) {
 }
 
 export function digitsTelefono(raw) {
-  return String(raw ?? '').replace(/\D/g, '');
+  const str = String(raw ?? '').trim();
+  const match = str.match(/^(.+?)(_dup[a-z]+)$/i);
+  if (match) {
+    return match[1].replace(/\D/g, '') + match[2].toLowerCase();
+  }
+  return str.replace(/\D/g, '');
 }
 
 export function telefonosCoinciden(tel1, tel2) {
@@ -703,6 +708,119 @@ export async function reasignarLeadManual(leadId, nuevoUsuarioCarga, usuarioSesi
   throw new CargaEncuestaSinPersistirError(
     'El SP se ejecutó pero el lead no aparece reasignado. Verificá que el SP encuestaSorteo01Update en la base de datos de producción tenga la línea "usuario = @usuario" en la sección de UPDATE.',
     `id=${leadId}, usuarioNuevo=${nuevoUsuarioCargaNorm}`
+  );
+}
+
+export async function duplicarLeadEnDb(leadId, codigoVendedorDestino, usuarioSesion) {
+  const idEncuesta = Number.parseInt(String(leadId), 10);
+  if (!Number.isFinite(idEncuesta) || idEncuesta <= 0) {
+    throw new LeadNoEncontradoError();
+  }
+
+  const leads = await listAllLeadsFromEncuestas();
+  const leadOriginal = leads.find((l) => String(l.id) === String(leadId));
+  if (!leadOriginal) {
+    throw new LeadNoEncontradoError();
+  }
+
+  const cleanPhone = String(leadOriginal.telefono).replace(/_dup[a-z]+$/i, '').replace(/\D/g, '');
+  if (!cleanPhone) {
+    throw new Error('El teléfono del lead original no es válido.');
+  }
+
+  const matchingLeads = leads.filter(l => {
+    const p = String(l.telefono).replace(/_dup[a-z]+$/i, '').replace(/\D/g, '');
+    return p === cleanPhone;
+  });
+
+  let suffix = '';
+  if (matchingLeads.length > 0) {
+    const charCode = 97 + (matchingLeads.length - 1);
+    const char = String.fromCharCode(charCode);
+    suffix = `_dup${char}`;
+  }
+
+  const nuevoUsuarioCargaNorm = String(codigoVendedorDestino ?? '').trim().toUpperCase();
+  if (!nuevoUsuarioCargaNorm) {
+    throw new Error('El código de vendedor de destino es requerido.');
+  }
+
+  // Resolve target supervisor's sucursal address
+  let newSupervisorDireccion = null;
+  try {
+    const pool = await getSqlPoolEncuestas();
+    const resVendedor = await pool.request()
+      .input('codigo', nuevoUsuarioCargaNorm)
+      .execute('encuestaSorteo01CargaVendedor');
+    const vendedorRow = resVendedor.recordset?.[0];
+    if (vendedorRow) {
+      newSupervisorDireccion = vendedorRow.supervisorSucursalDireccion ?? vendedorRow.SupervisorSucursalDireccion ?? null;
+    }
+  } catch (err) {
+    console.warn('[duplicarLead] Error fetching supervisor sucursal address:', err.message);
+  }
+
+  const telefonoNuevoConSufijo = `${cleanPhone}${suffix}`;
+  
+  const agendar = Boolean(leadOriginal.horarioEntrevista || leadOriginal.quiereEntrevista);
+  const campo6 = leadOriginal.horarioEntrevista
+    ? formatHorarioEntrevistaSp(leadOriginal.horarioEntrevista)
+    : null;
+  const campo7 = leadOriginal.lugarEntrevista ? mapLugarEntrevistaSp(leadOriginal.lugarEntrevista) : null;
+  let campo8 = leadOriginal.domicilioEntrevista?.trim() || null;
+  if (leadOriginal.lugarEntrevista === 'sucursal' && newSupervisorDireccion) {
+    campo8 = newSupervisorDireccion;
+  } else if (!campo8 && leadOriginal.lugarEntrevista === 'domicilio') {
+    campo8 = leadOriginal.domicilio?.trim() || null;
+  }
+
+  let origenMapped = 2;
+  if (leadOriginal.origenEncuesta) {
+    const rawOrigen = String(leadOriginal.origenEncuesta).toLowerCase().trim();
+    if (rawOrigen === '1' || rawOrigen.includes('qr')) {
+      origenMapped = 1;
+    } else if (rawOrigen === '3' || rawOrigen.includes('insta') || rawOrigen.includes('ig') || rawOrigen === 'instagram') {
+      origenMapped = 3;
+    } else if (rawOrigen === '4' || rawOrigen.includes('face') || rawOrigen.includes('fb') || rawOrigen === 'facebook') {
+      origenMapped = 4;
+    } else if (rawOrigen === '5' || rawOrigen.includes('whats') || rawOrigen.includes('wapp') || rawOrigen === 'whatsapp') {
+      origenMapped = 5;
+    } else if (rawOrigen === '2' || rawOrigen.includes('manual') || rawOrigen.includes('app')) {
+      origenMapped = 2;
+    }
+  }
+
+  const cargaParams = {
+    telefono: telefonoNuevoConSufijo,
+    encuesta: leadOriginal.codigoCampania || getEncuestaCampaniaId(),
+    usuario: nuevoUsuarioCargaNorm,
+    campo1Valor: leadOriginal.nombre?.trim() || null,
+    campo2Valor: leadOriginal.domicilio?.trim() || null,
+    campo3Valor: siNoDesdeTriState(leadOriginal.conoceMpc),
+    campo4Valor: siNoDesdeTriState(leadOriginal.sabiaPlanInversionJoven),
+    campo5Valor: leadOriginal.quiereEntrevista ? 'SI' : 'NO',
+    campo6Valor: campo6,
+    campo7Valor: campo7,
+    campo8Valor: campo8,
+    origen: origenMapped,
+  };
+
+  await execEncuestaCargaSorteo01(cargaParams);
+
+  const leadsPost = await listAllLeadsFromEncuestas();
+  const leadDuplicado = leadsPost.find(
+    (l) =>
+      l.telefono === telefonoNuevoConSufijo &&
+      l.encuestaUsuario === nuevoUsuarioCargaNorm
+  );
+
+  if (leadDuplicado) {
+    return leadDuplicado;
+  }
+
+  throw new CargaEncuestaSinPersistirError(
+    'El lead se duplicó pero no aparece en el listado del sistema. Verificá si el vendedor de destino tiene permisos.',
+    `telefono=${telefonoNuevoConSufijo}, vendedor=${nuevoUsuarioCargaNorm}`
   );
 }
 

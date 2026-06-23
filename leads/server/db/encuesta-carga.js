@@ -711,6 +711,35 @@ export async function reasignarLeadManual(leadId, nuevoUsuarioCarga, usuarioSesi
   );
 }
 
+export async function execEncuestaCargaSorteo01AddVendedor(params) {
+  const pool = await getSqlPoolEncuestas();
+  const proc = process.env.SP_DUPLICAR_ENCUESTA || 'encuestaCargaSorteo01AddVendedor';
+  const request = pool.request();
+
+  const telefonoSp = digitsTelefono(params.telefono) || String(params.telefono ?? '').trim();
+  request.input('telefono', sql.NVarChar(50), telefonoSp);
+  request.input('encuesta', sql.NVarChar(50), params.encuesta);
+  request.input('usuario', sql.NVarChar(100), params.usuario);
+
+  bindCampo(request, 1, params.campo1Valor);
+  bindCampo(request, 2, params.campo2Valor);
+  bindCampo(request, 3, params.campo3Valor);
+  bindCampo(request, 4, params.campo4Valor);
+  bindCampo(request, 5, params.campo5Valor ?? 'NO');
+  bindCampo(request, 6, params.campo6Valor, { vacioComoCadenaVacia: true });
+  bindCampo(request, 7, params.campo7Valor, { vacioComoCadenaVacia: true });
+  bindCampo(request, 8, params.campo8Valor, { vacioComoCadenaVacia: true });
+
+  const origen = String(params.origen ?? 2).trim().charAt(0) || '2';
+  request.input('origen', sql.Char(1), origen);
+
+  const result = await request.execute(proc);
+  if (process.env.DEBUG_CARGA_ENCUESTA === '1') {
+    console.info('[encuestaCargaAddVendedor] SP=%s returnValue=%s rows=%s', proc, result.returnValue, JSON.stringify(result.recordset));
+  }
+  return result;
+}
+
 export async function duplicarLeadEnDb(leadId, codigoVendedorDestino, usuarioSesion) {
   const idEncuesta = Number.parseInt(String(leadId), 10);
   if (!Number.isFinite(idEncuesta) || idEncuesta <= 0) {
@@ -726,18 +755,6 @@ export async function duplicarLeadEnDb(leadId, codigoVendedorDestino, usuarioSes
   const cleanPhone = String(leadOriginal.telefono).replace(/_dup[a-z]+$/i, '').replace(/\D/g, '');
   if (!cleanPhone) {
     throw new Error('El teléfono del lead original no es válido.');
-  }
-
-  const matchingLeads = leads.filter(l => {
-    const p = String(l.telefono).replace(/_dup[a-z]+$/i, '').replace(/\D/g, '');
-    return p === cleanPhone;
-  });
-
-  let suffix = '';
-  if (matchingLeads.length > 0) {
-    const charCode = 97 + (matchingLeads.length - 1);
-    const char = String.fromCharCode(charCode);
-    suffix = `_dup${char}`;
   }
 
   const nuevoUsuarioCargaNorm = String(codigoVendedorDestino ?? '').trim().toUpperCase();
@@ -760,8 +777,6 @@ export async function duplicarLeadEnDb(leadId, codigoVendedorDestino, usuarioSes
     console.warn('[duplicarLead] Error fetching supervisor sucursal address:', err.message);
   }
 
-  const telefonoNuevoConSufijo = `${cleanPhone}${suffix}`;
-  
   const agendar = Boolean(leadOriginal.horarioEntrevista || leadOriginal.quiereEntrevista);
   const campo6 = leadOriginal.horarioEntrevista
     ? formatHorarioEntrevistaSp(leadOriginal.horarioEntrevista)
@@ -791,7 +806,7 @@ export async function duplicarLeadEnDb(leadId, codigoVendedorDestino, usuarioSes
   }
 
   const cargaParams = {
-    telefono: telefonoNuevoConSufijo,
+    telefono: cleanPhone,
     encuesta: leadOriginal.codigoCampania || getEncuestaCampaniaId(),
     usuario: nuevoUsuarioCargaNorm,
     campo1Valor: leadOriginal.nombre?.trim() || null,
@@ -805,12 +820,12 @@ export async function duplicarLeadEnDb(leadId, codigoVendedorDestino, usuarioSes
     origen: origenMapped,
   };
 
-  await execEncuestaCargaSorteo01(cargaParams);
+  await execEncuestaCargaSorteo01AddVendedor(cargaParams);
 
   const leadsPost = await listAllLeadsFromEncuestas();
   const leadDuplicado = leadsPost.find(
     (l) =>
-      l.telefono === telefonoNuevoConSufijo &&
+      String(l.telefono).replace(/_dup[a-z]+$/i, '').replace(/\D/g, '') === cleanPhone &&
       l.encuestaUsuario === nuevoUsuarioCargaNorm
   );
 
@@ -820,8 +835,9 @@ export async function duplicarLeadEnDb(leadId, codigoVendedorDestino, usuarioSes
 
   throw new CargaEncuestaSinPersistirError(
     'El lead se duplicó pero no aparece en el listado del sistema. Verificá si el vendedor de destino tiene permisos.',
-    `telefono=${telefonoNuevoConSufijo}, vendedor=${nuevoUsuarioCargaNorm}`
+    `telefono=${cleanPhone}, vendedor=${nuevoUsuarioCargaNorm}`
   );
 }
 
 export { MSG_CONTACTO_YA_REGISTRADO };
+

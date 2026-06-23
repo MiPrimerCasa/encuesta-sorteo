@@ -410,3 +410,17 @@ export async function duplicarLead(leadId: string, codigoVendedorDestino: string
   );
   return data.lead;
 }
+
+export async function resetearLeadSeguimiento(leadId: string): Promise<Lead> {
+  if (_isDemoActive) {
+    throw new Error('El reseteo de leads no está disponible en modo demo.');
+  }
+  const data = await apiFetch<{ lead: Lead; message?: string }>(
+    `/api/admin/leads/${encodeURIComponent(leadId)}/reset`,
+    {
+      method: 'POST',
+    },
+  );
+  return data.lead;
+}
+

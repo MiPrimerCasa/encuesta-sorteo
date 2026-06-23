@@ -4,7 +4,7 @@ import { formatRangoSemana } from '../../domain/admin-metrics';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
-import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, duplicarLead } from '../../api/client';
+import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, duplicarLead, resetearLeadSeguimiento } from '../../api/client';
 import type { OperadorCatalogo } from '../../api/client';
 import { getBarrioNombre } from '../../domain/venta';
 import { useAuth } from '../../context/AuthContext';
@@ -154,6 +154,36 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
       });
     } finally {
       setDuplicatingPending(false);
+    }
+  };
+
+  const [resettingLead, setResettingLead] = useState<Lead | null>(null);
+  const [resettingPending, setResettingPending] = useState(false);
+  const [resettingMessage, setResettingMessage] = useState<{ tipo: 'success' | 'error'; mensaje: string } | null>(null);
+
+  const handleResetearLeadSubmit = async () => {
+    if (!resettingLead) return;
+    setResettingPending(true);
+    setResettingMessage(null);
+    try {
+      const updatedLead = await resetearLeadSeguimiento(resettingLead.id);
+      setLeads((prev) => prev.map((l) => (l.id === updatedLead.id ? updatedLead : l)));
+      setResettingMessage({
+        tipo: 'success',
+        mensaje: `Seguimiento de "${updatedLead.nombre}" reseteado con éxito.`,
+      });
+      setTimeout(() => {
+        setResettingLead(null);
+        setResettingMessage(null);
+      }, 2000);
+    } catch (err) {
+      console.error(err);
+      setResettingMessage({
+        tipo: 'error',
+        mensaje: err instanceof Error ? err.message : 'Error al resetear el lead.',
+      });
+    } finally {
+      setResettingPending(false);
     }
   };
 
@@ -1082,17 +1112,30 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                             </td>
                             {(usuario?.rol === 'superadmin' || usuario?.panelGlobal) && (
                               <td className="py-3 px-4 text-center">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setDuplicatingLead(l);
-                                    setTargetVendedorCode('');
-                                    setDuplicatingMessage(null);
-                                  }}
-                                  className="text-[12px] font-semibold text-brand-600 hover:text-brand-800 hover:underline cursor-pointer"
-                                >
-                                  Duplicar
-                                </button>
+                                <div className="flex justify-center items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setDuplicatingLead(l);
+                                      setTargetVendedorCode('');
+                                      setDuplicatingMessage(null);
+                                    }}
+                                    className="text-[12px] font-semibold text-brand-600 hover:text-brand-800 hover:underline cursor-pointer"
+                                  >
+                                    Duplicar
+                                  </button>
+                                  <span className="text-zinc-300">|</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setResettingLead(l);
+                                      setResettingMessage(null);
+                                    }}
+                                    className="text-[12px] font-semibold text-red-600 hover:text-red-800 hover:underline cursor-pointer"
+                                  >
+                                    Resetear
+                                  </button>
+                                </div>
                               </td>
                             )}
                           </tr>
@@ -1997,6 +2040,122 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                   </>
                 ) : (
                   'Duplicar'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Reseteo de Lead */}
+      {resettingLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm transition-opacity"
+            onClick={() => {
+              if (!resettingPending) {
+                setResettingLead(null);
+                setResettingMessage(null);
+              }
+            }}
+          />
+
+          {/* Modal Content */}
+          <div className="relative z-50 flex w-full max-w-md flex-col rounded-2xl bg-white shadow-2xl transition-all duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-zinc-900">
+                  Resetear Seguimiento
+                </h3>
+                <p className="text-[12px] text-zinc-500">
+                  Limpiar el historial de seguimiento del cliente
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={resettingPending}
+                onClick={() => {
+                  setResettingLead(null);
+                  setResettingMessage(null);
+                }}
+                className="flex h-8 w-8 items-center justify-center text-[20px] rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 transition-colors disabled:opacity-50 cursor-pointer"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-4 space-y-4">
+              {resettingMessage && (
+                <div
+                  className={`rounded-lg border px-4 py-2.5 text-[13px] ${
+                    resettingMessage.tipo === 'success'
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
+                      : 'border-rose-200 bg-rose-50 text-rose-950'
+                  }`}
+                >
+                  {resettingMessage.mensaje}
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Cliente</p>
+                <p className="text-[14px] font-semibold text-zinc-800">{resettingLead.nombre}</p>
+                <p className="text-[12px] text-zinc-500 tabular-nums">
+                  Teléfono: {cleanTelefonoSuffix(resettingLead.telefono)}
+                </p>
+                <p className="text-[12px] text-zinc-500">
+                  Vendedor asignado: {resettingLead.promotorNombre || resettingLead.supervisorNombre || 'Sin asignar'}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-red-100 bg-red-50/50 p-3.5 space-y-2">
+                <p className="text-[12px] leading-relaxed text-red-950 font-medium flex items-start gap-1.5">
+                  <span>⚠️</span>
+                  <span>¿Estás seguro de que deseas resetear el seguimiento de este lead?</span>
+                </p>
+                <p className="text-[12px] leading-relaxed text-red-700/80 pl-5">
+                  Esta acción <strong>eliminará la asociación del operador actual</strong>, borrará el historial de seguimientos, y devolverá el lead al estado <strong>"Sin tratar"</strong>. Esto permitirá que cualquier operador o el promotor original vuelvan a contactarlo y gestionarlo desde cero.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-zinc-100 px-6 py-3.5 bg-zinc-50/50">
+              <button
+                type="button"
+                disabled={resettingPending}
+                onClick={() => {
+                  setResettingLead(null);
+                  setResettingMessage(null);
+                }}
+                className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={resettingPending}
+                onClick={handleResetearLeadSubmit}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-[13px] font-semibold text-white transition-all shadow-sm active:scale-[0.98] ${
+                  !resettingPending
+                    ? 'bg-red-600 hover:bg-red-700 cursor-pointer'
+                    : 'bg-zinc-300 cursor-not-allowed shadow-none'
+                }`}
+              >
+                {resettingPending ? (
+                  <>
+                    <svg className="animate-spin -ml-0.5 mr-0.5 h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Reseteando...
+                  </>
+                ) : (
+                  'Confirmar Reseteo'
                 )}
               </button>
             </div>

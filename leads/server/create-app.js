@@ -54,6 +54,7 @@ import {
   listHistorialForLead,
   SeguimientoRegistroError,
   useSeguimientoSql,
+  resetearSeguimientoLead,
 } from './db/seguimiento-sql.js';
 import { getHealthInfo, respondIfNotConfigured } from './require-production.js';
 import { formatSqlError } from './sql-errors.js';
@@ -523,6 +524,53 @@ function registerApiRoutes(api) {
       console.error('Error al duplicar lead:', error);
       return res.status(500).json({
         message: 'No se pudo duplicar el lead.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
+  api.post('/admin/leads/:id/reset', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso =
+      esSuperadminUsuario(usuario) ||
+      esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message: 'Acción no autorizada. Requiere acceso al panel global para resetear leads.',
+      });
+    }
+
+    const leadId = String(req.params.id || '').trim();
+    if (!leadId) {
+      return res.status(400).json({ message: 'Id de lead inválido.' });
+    }
+
+    try {
+      getDb();
+      const leads = await listAllLeadsFromEncuestas();
+      const leadOriginal = leads.find((l) => String(l.id) === leadId);
+      if (!leadOriginal) {
+        return res.status(404).json({ message: 'Lead no encontrado.' });
+      }
+
+      await resetearSeguimientoLead(leadId, leadOriginal);
+
+      const leadsPost = await listAllLeadsFromEncuestas();
+      const leadActualizado = leadsPost.find((l) => String(l.id) === leadId);
+
+      return res.json({
+        message: 'Seguimiento del lead reseteado correctamente.',
+        lead: leadActualizado || leadOriginal,
+      });
+    } catch (error) {
+      console.error('Error al resetear lead:', error);
+      return res.status(500).json({
+        message: 'No se pudo resetear el lead.',
         detail: error instanceof Error ? error.message : 'Error desconocido',
       });
     }

@@ -881,7 +881,42 @@ function supervisorIdsDesdeFilasEncuesta(rows) {
   return [...ids];
 }
 
-async function mapEncuestaRowsToLeads(rows, idOperador = null, operadorIdsBatch = null) {
+export function hasPassed48Hours(fechaAltaStr) {
+  if (!fechaAltaStr) return true;
+  let normalizedStr = String(fechaAltaStr).trim();
+  if (/T\d{2}:\d{2}:\d{2}$/.test(normalizedStr)) {
+    normalizedStr += '-03:00';
+  }
+  const fechaAlta = new Date(normalizedStr);
+  if (isNaN(fechaAlta.getTime())) return true;
+  const ahora = new Date();
+  const diffMs = ahora.getTime() - fechaAlta.getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+  return diffHours >= 48;
+}
+
+export function esCargaPropia(lead, usuarioSesion) {
+  if (!usuarioSesion) return false;
+  
+  const normUsuario = usuarioSesion.nombre ? normalizeNombre(usuarioSesion.nombre) : null;
+  const normPromotor = lead.promotorNombre ? normalizeNombre(lead.promotorNombre) : null;
+  if (normUsuario && normPromotor && normUsuario === normPromotor) {
+    return true;
+  }
+  
+  if (usuarioSesion.codigoCarga && lead.codigoPromotorCarga && lead.codigoPromotorCarga === usuarioSesion.codigoCarga) {
+    return true;
+  }
+  
+  const idOp = String(usuarioSesion.idOperador ?? usuarioSesion.id ?? '').trim();
+  if (idOp) {
+    if (lead.idVendedor && String(lead.idVendedor).trim() === idOp) return true;
+  }
+  
+  return false;
+}
+
+async function mapEncuestaRowsToLeads(rows, idOperador = null, operadorIdsBatch = null, usuarioSesion = null) {
   const ids = rows
     .map((r) => {
       const pk = pickField(r, 'id', 'Id', 'ID');
@@ -905,7 +940,36 @@ async function mapEncuestaRowsToLeads(rows, idOperador = null, operadorIdsBatch 
       pk != null && String(pk).trim() !== ''
         ? String(pk)
         : String(pickField(row, 'usuario', 'Usuario'));
-    return enrichLeadParaCliente(mapEncuestaRowToLead(row, { [id]: seguimientoById[id] }));
+    let lead = enrichLeadParaCliente(mapEncuestaRowToLead(row, { [id]: seguimientoById[id] }));
+
+    if (usuarioSesion?.rol === 'supervisor') {
+      const isLocked =
+        lead.cargadoPorRol === 'promotor' &&
+        !hasPassed48Hours(lead.fechaAlta) &&
+        lead.seguimiento?.resultadoEntrevista !== 'derivar_terreno' &&
+        !esCargaPropia(lead, usuarioSesion);
+
+      const hasPendingInterview =
+        leadTieneCitaPrevia(lead) &&
+        lead.cargadoPorRol === 'promotor' &&
+        lead.seguimiento?.resultadoEntrevista !== 'derivar_terreno' &&
+        !esCargaPropia(lead, usuarioSesion);
+
+      if (isLocked) {
+        lead = {
+          ...lead,
+          telefono: 'Oculto (48 hs)',
+          bloqueadoSupervisor48h: true,
+        };
+      } else if (hasPendingInterview) {
+        lead = {
+          ...lead,
+          telefono: 'Oculto (Cita Previa)',
+        };
+      }
+    }
+
+    return lead;
   });
   leads.sort((a, b) => (a.fechaAlta ?? '').localeCompare(b.fechaAlta ?? ''));
   return leads;
@@ -917,6 +981,8 @@ export async function listLeadsFromEncuestas(usuario) {
   const leads = await mapEncuestaRowsToLeads(
     rows,
     Number.isFinite(idOperador) ? idOperador : null,
+    null,
+    usuario,
   );
 
   try {
@@ -933,7 +999,7 @@ export async function listLeadsFromEncuestas(usuario) {
 /** Listado global vía encuestasMuestra — panel superadmin. */
 export async function listAllLeadsFromEncuestas() {
   const rows = await fetchEncuestasMuestraGlobalRaw();
-  const leads = await mapEncuestaRowsToLeads(rows, null);
+  const leads = await mapEncuestaRowsToLeads(rows, null, null, { rol: 'superadmin' });
   const usuario = { rol: 'superadmin' };
 
   try {
@@ -982,6 +1048,21 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     throw err;
   }
   const base = mapEncuestaRowToLead(row, { [leadId]: prevSeg });
+  
+  if (
+    usuario?.rol === 'supervisor' &&
+    base.cargadoPorRol === 'promotor' &&
+    !hasPassed48Hours(base.fechaAlta) &&
+    !esCargaPropia(base, usuario) &&
+    prevSeg?.resultadoEntrevista !== 'derivar_terreno'
+  ) {
+    const err = new Error(
+      'No podés interactuar con este lead hasta que pasen 48 horas de su creación para dar prioridad al promotor.',
+    );
+    err.code = 'PRIORIDAD_PROMOTOR_BLOQUEO_48H';
+    throw err;
+  }
+
   if (
     usuario?.rol === 'supervisor' &&
     leadTieneCitaPrevia(base) &&

@@ -222,6 +222,7 @@ export interface Lead {
   conoceMpc?: boolean | null;
   /** Respuesta encuesta sobre Plan Inversión Joven / vivienda propia (S/N). */
   sabiaPlanInversionJoven?: boolean | null;
+  bloqueadoSupervisor48h?: boolean;
   seguimiento: SeguimientoLead;
 }
 

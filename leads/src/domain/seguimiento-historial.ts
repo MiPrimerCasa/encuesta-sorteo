@@ -48,9 +48,28 @@ export function etiquetaEstadoHistorial(seguimiento: SeguimientoLead, lead: Lead
   return partes.join(' · ');
 }
 
+export function parseIsoLocal(isoStr: string): Date | null {
+  if (!isoStr?.trim()) return null;
+  const m = isoStr.trim().match(/^(\d{4})[/-](\d{2})[/-](\d{2})[T\s](\d{2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) {
+    const d = new Date(isoStr);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(
+    Number(m[1]),
+    Number(m[2]) - 1,
+    Number(m[3]),
+    Number(m[4]),
+    Number(m[5]),
+    Number(m[6] ?? 0),
+    0,
+  );
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export function formatHistorialFecha(creadoEn: string) {
-  const d = new Date(creadoEn.includes('T') ? creadoEn : `${creadoEn.replace(' ', 'T')}Z`);
-  if (Number.isNaN(d.getTime())) return creadoEn;
+  const d = parseIsoLocal(creadoEn);
+  if (!d || Number.isNaN(d.getTime())) return creadoEn;
   return d.toLocaleString('es-AR', {
     day: '2-digit',
     month: 'short',

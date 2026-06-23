@@ -8,6 +8,7 @@ import type {
   SeguimientoLead,
 } from '../types';
 import { ID_PRODUCTO_TERRENO } from './venta';
+import { parseIsoLocal } from './seguimiento-historial';
 
 /** Lista única de promotores a partir de los leads ya cargados (evita 2.º SP en supervisor). */
 export function buildPromotoresFromLeads(leads: Lead[]): Promotor[] {
@@ -104,6 +105,7 @@ export function etiquetaSeguimientoAgendaOtroRol(
 }
 
 export function leadSoloLecturaSupervisor(lead: Lead) {
+  if (lead.bloqueadoSupervisor48h) return true;
   if (leadSeguimientoPijPromotor(lead)) return true;
   if (
     leadTieneCitaPrevia(lead) &&
@@ -315,19 +317,8 @@ export function formatEntrevistaCalendario(
   isoLocal?: string | null,
 ): EntrevistaCalendarioFmt | null {
   if (!isoLocal) return null;
-  let d = new Date(isoLocal);
-  if (Number.isNaN(d.getTime())) {
-    const m = String(isoLocal).match(/(\d{4})[/-](\d{2})[/-](\d{2})\s+(\d{2}):(\d{2})/);
-    if (!m) return null;
-    d = new Date(
-      Number(m[1]),
-      Number(m[2]) - 1,
-      Number(m[3]),
-      Number(m[4]),
-      Number(m[5]),
-    );
-  }
-  if (Number.isNaN(d.getTime())) return null;
+  const d = parseIsoLocal(isoLocal);
+  if (!d || Number.isNaN(d.getTime())) return null;
   const diaRaw = d.toLocaleDateString('es-AR', { weekday: 'long' });
   const diaSemana = diaRaw.charAt(0).toUpperCase() + diaRaw.slice(1);
   return {

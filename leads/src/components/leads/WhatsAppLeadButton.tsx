@@ -12,6 +12,9 @@ interface WhatsAppLeadButtonProps {
   className?: string;
   /** Callback opcional: se invoca tras abrir WhatsApp (para registrar contacto automático). */
   onAutoContacto?: () => void;
+  bloqueadoSupervisor48h?: boolean;
+  disabled?: boolean;
+  disabledTooltip?: string;
 }
 
 function IconoWhatsApp() {
@@ -36,10 +39,25 @@ export function WhatsAppLeadButton({
   tieneCitaPrevia,
   className = '',
   onAutoContacto,
+  bloqueadoSupervisor48h,
+  disabled = false,
+  disabledTooltip,
 }: WhatsAppLeadButtonProps) {
   const mensaje = mensajeWhatsAppLead(nombre, nombreUsuario, tieneCitaPrevia);
-  const numeroOk = Boolean(telefonoParaWhatsApp(telefono));
-  const titulo = numeroOk
+  const isOculto =
+    telefono === 'Oculto (48 hs)' ||
+    telefono === 'Oculto (Cita Previa)' ||
+    bloqueadoSupervisor48h;
+  const isDisabled = isOculto || disabled;
+  const numeroOk = !isDisabled && Boolean(telefonoParaWhatsApp(telefono));
+
+  const titulo = telefono === 'Oculto (Cita Previa)'
+    ? 'Pendiente de derivación por el promotor'
+    : isOculto
+    ? 'Prioridad Promotor (48hs)'
+    : disabled
+    ? disabledTooltip || 'Contacto inhabilitado'
+    : numeroOk
     ? `Chatear por WhatsApp con ${nombre || 'el cliente'}`
     : 'Sin teléfono en la encuesta';
 

@@ -141,10 +141,24 @@ function formatCreadoEn(row) {
     row.creado_en ??
     row.fecha_registro ??
     row.fecha_alta ??
-    row.registrado_en;
-  if (raw instanceof Date) return raw.toISOString();
-  if (raw != null && String(raw).trim() !== '') return String(raw);
-  return new Date().toISOString();
+    row.registrado_en ??
+    row.creadoEn ??
+    row.fechaAlta;
+  if (raw instanceof Date) {
+    if (isNaN(raw.getTime())) return null;
+    const year = raw.getUTCFullYear();
+    const month = String(raw.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(raw.getUTCDate()).padStart(2, '0');
+    const hours = String(raw.getUTCHours()).padStart(2, '0');
+    const minutes = String(raw.getUTCMinutes()).padStart(2, '0');
+    const seconds = String(raw.getUTCSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+  }
+  if (raw != null && String(raw).trim() !== '') {
+    const str = String(raw).trim();
+    return str.replace(' ', 'T').replace(/Z$/, '').slice(0, 19);
+  }
+  return null;
 }
 
 /** Normaliza fila SQL o JSON del SP → objeto seguimiento (camelCase) de la app. */
@@ -212,13 +226,7 @@ export function mapSqlRowToSeguimiento(row) {
     operadorRol: row.operador_rol ?? row.operadorRol ?? base.operadorRol ?? null,
     operadorNombre:
       row.operador_nombre ?? row.operadorNombre ?? base.operadorNombre ?? null,
-    creadoEn:
-      row.creado_en ??
-      row.creadoEn ??
-      row.fechaAlta ??
-      row.fecha_alta ??
-      base.creadoEn ??
-      null,
+    creadoEn: formatCreadoEn(row) ?? base.creadoEn ?? null,
     comprasAdicionales: base.comprasAdicionales ?? null,
   };
 }
@@ -237,7 +245,7 @@ function mapSqlRowToHistorialEntry(row, lead = {}) {
     resultadoEntrevista: snapshot.resultadoEntrevista ?? undefined,
     pestana: pestanaDesdeSeguimiento(snapshot, lead),
     seguimientoSnapshot: snapshot,
-    creadoEn: formatCreadoEn(row),
+    creadoEn: formatCreadoEn(row) ?? new Date().toISOString(),
   };
 }
 

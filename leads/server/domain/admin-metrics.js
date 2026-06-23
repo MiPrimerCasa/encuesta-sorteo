@@ -15,7 +15,6 @@ export function endOfDay(date = new Date()) {
   return d;
 }
 
-/** Rango de fechas por periodo: hoy, semana o mes. */
 export function rangoPorPeriodo(periodo, hoy = new Date()) {
   if (periodo === 'hoy') {
     return {
@@ -29,6 +28,20 @@ export function rangoPorPeriodo(periodo, hoy = new Date()) {
     const desde = startOfDay(hoy);
     desde.setDate(desde.getDate() - 6);
     return { desde, hasta, hoy: startOfDay(hoy) };
+  }
+  if (periodo && /^\d{4}-\d{2}-\d{2}$/.test(periodo)) {
+    const parts = periodo.split('-');
+    const parsedDate = new Date(
+      parseInt(parts[0], 10),
+      parseInt(parts[1], 10) - 1,
+      parseInt(parts[2], 10),
+      12, 0, 0
+    );
+    return {
+      desde: startOfDay(parsedDate),
+      hasta: endOfDay(parsedDate),
+      hoy: startOfDay(parsedDate),
+    };
   }
   // Default 'mes'
   const desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0, 0);

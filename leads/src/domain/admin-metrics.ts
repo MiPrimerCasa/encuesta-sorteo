@@ -38,6 +38,20 @@ export function rangoPorPeriodo(periodo: string, hoy = new Date()) {
     desde.setDate(desde.getDate() - 6);
     return { desde, hasta, hoy: startOfDay(hoy) };
   }
+  if (periodo && /^\d{4}-\d{2}-\d{2}$/.test(periodo)) {
+    const parts = periodo.split('-');
+    const parsedDate = new Date(
+      parseInt(parts[0], 10),
+      parseInt(parts[1], 10) - 1,
+      parseInt(parts[2], 10),
+      12, 0, 0
+    );
+    return {
+      desde: startOfDay(parsedDate),
+      hasta: endOfDay(parsedDate),
+      hoy: startOfDay(parsedDate),
+    };
+  }
   // Default 'mes'
   const desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1, 0, 0, 0, 0);
   const hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -625,5 +639,8 @@ export function formatRangoSemana(desde: string, hasta: string) {
   const d2 = new Date(hasta);
   const fmt = (d: Date) =>
     d.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (d1.toDateString() === d2.toDateString()) {
+    return fmt(d1);
+  }
   return `${fmt(d1)} — ${fmt(d2)}`;
 }

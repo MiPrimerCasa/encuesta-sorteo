@@ -463,7 +463,7 @@ export function LeadsPanel({
         <>
           {/* Tab bar */}
           <nav
-            className="mb-6 flex rounded-xl border border-zinc-200 bg-zinc-50 p-1 gap-1"
+            className="sticky top-[97px] md:top-[65px] z-30 mb-6 flex rounded-xl border border-zinc-200 bg-zinc-50/95 backdrop-blur-xs p-1 gap-1 shadow-sm"
             aria-label="Secciones de leads"
             role="tablist"
           >

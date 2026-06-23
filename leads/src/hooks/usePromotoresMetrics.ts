@@ -17,7 +17,10 @@ export function usePromotoresMetrics(leads: Lead[], promotores: Promotor[]) {
       const bucket = counts[lead.promotorId];
       if (!bucket) continue;
       bucket.total += 1;
-      if (leadCompro(lead)) bucket.compro += 1;
+      if (leadCompro(lead)) {
+        const adicionales = lead.seguimiento?.comprasAdicionales?.length ?? 0;
+        bucket.compro += 1 + adicionales;
+      }
 
       const fStr = (lead.fechaAlta || lead.fechaObtencion || '').slice(0, 10);
       if (fStr) {

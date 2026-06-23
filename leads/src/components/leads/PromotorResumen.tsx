@@ -13,14 +13,19 @@ function fueContactado(l: Lead) {
 export function PromotorResumen({ leads }: Props) {
   const stats = useMemo(() => {
     const total = leads.length;
-    const vendidos = leads.filter(leadCompro).length;
+    const leadsVendidos = leads.filter(leadCompro).length;
+    const vendidos = leads.reduce((acc, l) => {
+      if (!leadCompro(l)) return acc;
+      const adicionales = l.seguimiento?.comprasAdicionales?.length ?? 0;
+      return acc + 1 + adicionales;
+    }, 0);
     const enSeguimiento = leads.filter(
       (l) => !leadCompro(l) && leadReagendaEntrevista(l),
     ).length;
     const contactados = leads.filter(
       (l) => !leadCompro(l) && !leadReagendaEntrevista(l) && fueContactado(l),
     ).length;
-    const conversion = total > 0 ? Math.round((vendidos / total) * 100) : 0;
+    const conversion = total > 0 ? Math.round((leadsVendidos / total) * 100) : 0;
 
     const hoyStr = new Date().toISOString().slice(0, 10);
     const leadsHoy = leads.filter(

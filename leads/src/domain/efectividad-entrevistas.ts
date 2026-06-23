@@ -40,11 +40,12 @@ function resultadoEntrevistaLead(lead: Lead): ResultadoEntrevista | 'pendiente' 
 function bumpBucket(
   bucket: ReturnType<typeof emptyBucket>,
   resultado: ResultadoEntrevista | 'pendiente',
+  adicionales: number = 0,
 ) {
   bucket.entrevistas += 1;
   switch (resultado) {
     case 'compro':
-      bucket.compro += 1;
+      bucket.compro += 1 + adicionales;
       break;
     case 'no_compro':
       bucket.noCompro += 1;
@@ -100,10 +101,11 @@ export function buildEfectividadEntrevistasEquipo(
   for (const lead of leads) {
     if (!leadTuvoEntrevistaRealizada(lead)) continue;
     const resultado = resultadoEntrevistaLead(lead);
-    bumpBucket(resumen, resultado);
+    const adicionales = lead.seguimiento?.comprasAdicionales?.length ?? 0;
+    bumpBucket(resumen, resultado, adicionales);
 
     const bucket = porId.get(lead.promotorId) ?? emptyBucket();
-    bumpBucket(bucket, resultado);
+    bumpBucket(bucket, resultado, adicionales);
     porId.set(lead.promotorId, bucket);
   }
 

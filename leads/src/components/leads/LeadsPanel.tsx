@@ -469,7 +469,13 @@ export function LeadsPanel({
           >
             {TABS.map((tab) => {
               const activo = tabActivo === tab.id;
-              const count = listas[tab.key].length;
+              let count = listas[tab.key].length;
+              if (tab.id === 'compro') {
+                count = listas.compraron.reduce((acc, l) => {
+                  const adicionales = l.seguimiento?.comprasAdicionales?.length ?? 0;
+                  return acc + 1 + adicionales;
+                }, 0);
+              }
               return (
                 <button
                   key={tab.id}
@@ -513,7 +519,11 @@ export function LeadsPanel({
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
                 {tabData.tituloLargo}
               </h2>
-              <span className="text-[13px] tabular-nums text-zinc-400">{itemsVisibles.length}</span>
+              <span className="text-[13px] tabular-nums text-zinc-400">
+                {tabActivo === 'compro'
+                  ? itemsVisibles.reduce((acc, l) => acc + 1 + (l.seguimiento?.comprasAdicionales?.length ?? 0), 0)
+                  : itemsVisibles.length}
+              </span>
             </div>
 
             {esTabPrioridad && (

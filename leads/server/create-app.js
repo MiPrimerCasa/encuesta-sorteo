@@ -171,7 +171,7 @@ function registerApiRoutes(api) {
           );
         }
       }
-      const panelGlobal = esSupervisorPanelGlobal(user.loginId ?? usuario);
+      const panelGlobal = esSupervisorPanelGlobal(user.loginId || usuario);
       return res.json({
         token: `sql-${user.id}`,
         usuario: {

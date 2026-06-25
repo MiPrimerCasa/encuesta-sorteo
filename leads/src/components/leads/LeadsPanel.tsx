@@ -18,6 +18,7 @@ import { useHistorialLeads } from '../../hooks/useHistorialLeads';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
 import type { Barrio, GuardarSeguimientoResult, Lead, NuevoLeadData, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
 import { AlertasSinContactar } from './AlertasSinContactar';
+import { AgregarReferidosSheet } from './AgregarReferidosSheet';
 import { LeadCard } from './LeadCard';
 import { LeadModalForm } from './LeadModalForm';
 import { ModificarTelefonoSheet } from './ModificarTelefonoSheet';
@@ -161,6 +162,7 @@ export function LeadsPanel({
   const [modalAbierto, setModalAbierto] = useState(false);
   const [agendarAbierto, setAgendarAbierto] = useState(false);
   const [leadModificarTelefono, setLeadModificarTelefono] = useState<Lead | null>(null);
+  const [leadReferidos, setLeadReferidos] = useState<Lead | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [filtroPrioridad, setFiltroPrioridad] = useState<'prioridad' | 'primeros' | 'recientes' | 'entrevistas'>('prioridad');
 
@@ -290,6 +292,8 @@ export function LeadsPanel({
     ? (lead: Lead) => setLeadModificarTelefono(lead)
     : undefined;
 
+  const abrirAgregarReferidos = (lead: Lead) => setLeadReferidos(lead);
+
   const renderTarjetaLead = (lead: Lead, variante: VarianteCard) =>
     esPromotor && variante !== 'compro' ? (
       <SwipeableLeadCard
@@ -325,6 +329,7 @@ export function LeadsPanel({
         onModificarTelefono={abrirModificarTelefono}
         fetchHistorial={fetchHistorial}
         onWhatsAppAutoContacto={handleWhatsAppAutoContacto}
+        onAgregarReferidos={abrirAgregarReferidos}
       />
     );
 
@@ -452,6 +457,7 @@ export function LeadsPanel({
                     historial={historialPorLead[lead.id] ?? []}
                     onModificarTelefono={abrirModificarTelefono}
                     fetchHistorial={fetchHistorial}
+                    onAgregarReferidos={abrirAgregarReferidos}
                   />
                 );
               })}
@@ -640,6 +646,15 @@ export function LeadsPanel({
           onSave={onModificarTelefonoLead}
         />
       )}
+
+      <AgregarReferidosSheet
+        lead={leadReferidos}
+        open={leadReferidos != null}
+        onClose={() => setLeadReferidos(null)}
+        onSave={async (leadId, seg) => {
+          await guardarSeguimientoLead(leadId, seg);
+        }}
+      />
     </div>
   );
 }

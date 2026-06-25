@@ -64,6 +64,8 @@ interface LeadCardProps {
   fetchHistorial?: (leadId: string) => void;
   /** Se invoca al presionar WhatsApp para registrar contacto automático. */
   onWhatsAppAutoContacto?: (lead: Lead) => void;
+  /** Abre el drawer para agregar referidos sin modificar el seguimiento actual. */
+  onAgregarReferidos?: (lead: Lead) => void;
 }
 
 export function LeadCard({
@@ -80,6 +82,7 @@ export function LeadCard({
   onModificarTelefono,
   fetchHistorial,
   onWhatsAppAutoContacto,
+  onAgregarReferidos,
 }: LeadCardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -453,12 +456,32 @@ export function LeadCard({
         </button>
       )}
 
-      {/* Badge fuente — bottom-left */}
-      {lead.seguimiento?.fuente && (
-        <span className="absolute bottom-4 left-4 inline-flex items-center rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-500">
-          {FUENTE_LABEL[lead.seguimiento.fuente]}
-        </span>
-      )}
+      {/* Bottom-left: fuente badge + botón referidos */}
+      <div className="absolute bottom-3.5 left-4 flex items-center gap-2">
+        {lead.seguimiento?.fuente && (
+          <span className="inline-flex items-center rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-zinc-500">
+            {FUENTE_LABEL[lead.seguimiento.fuente]}
+          </span>
+        )}
+        {onAgregarReferidos && !soloLecturaSupervisor && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAgregarReferidos(lead);
+            }}
+            style={{ touchAction: 'manipulation' }}
+            aria-label="Agregar referidos"
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+              esNoCompro
+                ? 'border-emerald-400/40 bg-emerald-500/20 text-emerald-100 hover:bg-emerald-500/30'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+            }`}
+          >
+            <span aria-hidden="true">＋</span> Referidos
+          </button>
+        )}
+      </div>
 
       <div className="absolute bottom-3.5 right-4 md:bottom-4 md:right-5">
         <WhatsAppLeadButton

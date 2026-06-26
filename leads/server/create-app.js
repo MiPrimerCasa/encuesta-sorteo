@@ -26,6 +26,11 @@ import {
   resolveCargaEncuestaContext,
   reasignarLeadManual,
   duplicarLeadEnDb,
+  execEncuestaSorteo01Update,
+  buildCargaParamsFromLead,
+  getEncuestaCampaniaId,
+  digitsTelefono,
+  formatHorarioEntrevistaSp,
 } from './db/encuesta-carga.js';
 import { isLinksAcortadorEnabled } from './db/links-acortador.js';
 import { resolveLinksRedesParaUsuario } from './db/links-redes.js';
@@ -524,6 +529,131 @@ function registerApiRoutes(api) {
       console.error('Error al duplicar lead:', error);
       return res.status(500).json({
         message: 'No se pudo duplicar el lead.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
+  api.patch('/admin/leads/:id/datos', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso =
+      esSuperadminUsuario(usuario) ||
+      esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message: 'Acción no autorizada. Requiere acceso al panel global para modificar leads.',
+      });
+    }
+
+    const leadId = String(req.params.id || '').trim();
+    if (!leadId) {
+      return res.status(400).json({ message: 'Id de lead inválido.' });
+    }
+
+    const {
+      nombre,
+      telefono,
+      domicilio,
+      conoceMpc,
+      sabiaPlanInversionJoven,
+      quiereEntrevista,
+      horarioEntrevista,
+      lugarEntrevista,
+      domicilioEntrevista,
+    } = req.body;
+
+    if (!nombre || !String(nombre).trim()) {
+      return res.status(400).json({ message: 'El nombre es obligatorio.' });
+    }
+    if (!telefono || !String(telefono).trim()) {
+      return res.status(400).json({ message: 'El teléfono es obligatorio.' });
+    }
+
+    try {
+      getDb();
+      const leads = await listAllLeadsFromEncuestas();
+      const lead = leads.find((l) => String(l.id) === leadId);
+      if (!lead) {
+        return res.status(404).json({ message: 'Lead no encontrado.' });
+      }
+
+      const usuarioSp =
+        lead.codigoPromotorCarga?.trim() ||
+        lead.encuestaUsuario?.trim() ||
+        null;
+      if (!usuarioSp) {
+        return res.status(400).json({
+          message: 'No se encontró el código de promotor del lead. No se puede modificar.',
+        });
+      }
+
+      function siNo(val) {
+        if (val === true) return 'SI';
+        if (val === false) return 'NO';
+        return null;
+      }
+
+      function mapLugar(lugar) {
+        if (lugar === 'sucursal') return '2';
+        if (lugar === 'domicilio') return '3';
+        return null;
+      }
+
+      const agendar = Boolean(quiereEntrevista);
+      const campo6 = agendar && horarioEntrevista
+        ? formatHorarioEntrevistaSp(horarioEntrevista)
+        : null;
+      const campo7 = agendar && lugarEntrevista ? mapLugar(lugarEntrevista) : null;
+      const campo8 = agendar && lugarEntrevista === 'domicilio'
+        ? (domicilioEntrevista?.trim() || domicilio?.trim() || null)
+        : agendar && lugarEntrevista === 'sucursal'
+          ? (domicilioEntrevista?.trim() || null)
+          : null;
+
+      const telefonoNorm = digitsTelefono(telefono) || String(telefono).trim();
+      const encuesta = lead.codigoCampania || getEncuestaCampaniaId();
+
+      await execEncuestaSorteo01Update({
+        idEncuesta: leadId,
+        telefono: telefonoNorm,
+        encuesta,
+        usuario: usuarioSp,
+        campo1Valor: String(nombre).trim(),
+        campo2Valor: domicilio?.trim() || null,
+        campo3Valor: siNo(conoceMpc),
+        campo4Valor: siNo(sabiaPlanInversionJoven),
+        campo5Valor: agendar ? 'SI' : 'NO',
+        campo6Valor: campo6,
+        campo7Valor: campo7,
+        campo8Valor: campo8,
+        origen: 2,
+      });
+
+      const leadsPost = await listAllLeadsFromEncuestas();
+      const leadActualizado = leadsPost.find((l) => String(l.id) === leadId) ?? lead;
+
+      return res.json({
+        message: 'Lead modificado correctamente.',
+        lead: leadActualizado,
+      });
+    } catch (error) {
+      if (error instanceof LeadNoEncontradoError) {
+        return res.status(404).json({ message: error.message, code: error.code });
+      }
+      if (error instanceof ContactoYaRegistradoError) {
+        return res.status(409).json({ message: error.message, code: error.code });
+      }
+      if (error instanceof CargaEncuestaSinPersistirError) {
+        return res.status(502).json({ message: error.message, code: error.code });
+      }
+      console.error('Error al modificar lead:', error);
+      return res.status(500).json({
+        message: 'No se pudo modificar el lead.',
         detail: error instanceof Error ? error.message : 'Error desconocido',
       });
     }

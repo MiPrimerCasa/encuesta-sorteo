@@ -4,11 +4,12 @@ import { formatRangoSemana } from '../../domain/admin-metrics';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
-import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, duplicarLead, resetearLeadSeguimiento } from '../../api/client';
-import type { OperadorCatalogo } from '../../api/client';
+import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, duplicarLead, resetearLeadSeguimiento, modificarDatosLead } from '../../api/client';
+import type { ModificarDatosLeadPayload, OperadorCatalogo } from '../../api/client';
 import { getBarrioNombre } from '../../domain/venta';
 import { useAuth } from '../../context/AuthContext';
 import { cleanTelefonoSuffix } from '../../domain/whatsapp';
+import { AdminModificarLeadModal } from './AdminModificarLeadModal';
 
 
 interface SuperadminDashboardProps {
@@ -160,6 +161,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const [resettingLead, setResettingLead] = useState<Lead | null>(null);
   const [resettingPending, setResettingPending] = useState(false);
   const [resettingMessage, setResettingMessage] = useState<{ tipo: 'success' | 'error'; mensaje: string } | null>(null);
+  const [modificandoLead, setModificandoLead] = useState<Lead | null>(null);
 
   const handleResetearLeadSubmit = async () => {
     if (!resettingLead) return;
@@ -185,6 +187,11 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
     } finally {
       setResettingPending(false);
     }
+  };
+
+  const handleModificarLead = async (leadId: string, datos: ModificarDatosLeadPayload) => {
+    const updatedLead = await modificarDatosLead(leadId, datos);
+    setLeads((prev) => prev.map((l) => (l.id === updatedLead.id ? updatedLead : l)));
   };
 
   useEffect(() => {
@@ -1113,6 +1120,14 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                             {(usuario?.rol === 'superadmin' || usuario?.panelGlobal) && (
                               <td className="py-3 px-4 text-center">
                                 <div className="flex justify-center items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setModificandoLead(l)}
+                                    className="text-[12px] font-semibold text-amber-600 hover:text-amber-800 hover:underline cursor-pointer"
+                                  >
+                                    Modificar
+                                  </button>
+                                  <span className="text-zinc-300">|</span>
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -2162,6 +2177,13 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
           </div>
         </div>
       )}
+
+      <AdminModificarLeadModal
+        lead={modificandoLead}
+        open={modificandoLead !== null}
+        onClose={() => setModificandoLead(null)}
+        onSave={handleModificarLead}
+      />
     </div>
   );
 }

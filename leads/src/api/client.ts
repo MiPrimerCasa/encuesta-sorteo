@@ -424,3 +424,31 @@ export async function resetearLeadSeguimiento(leadId: string): Promise<Lead> {
   return data.lead;
 }
 
+export interface ModificarDatosLeadPayload {
+  nombre: string;
+  telefono: string;
+  domicilio?: string;
+  conoceMpc?: boolean | null;
+  sabiaPlanInversionJoven?: boolean | null;
+  quiereEntrevista?: boolean;
+  horarioEntrevista?: string;
+  lugarEntrevista?: 'sucursal' | 'domicilio';
+  domicilioEntrevista?: string;
+}
+
+export async function modificarDatosLead(
+  leadId: string,
+  datos: ModificarDatosLeadPayload,
+): Promise<Lead> {
+  if (_isDemoActive) {
+    throw new Error('La modificación de leads no está disponible en modo demo.');
+  }
+  const data = await apiFetch<{ lead: Lead; message?: string }>(
+    `/api/admin/leads/${encodeURIComponent(leadId)}/datos`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify(datos),
+    },
+  );
+  return data.lead;
+}

@@ -378,6 +378,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const totalPromotoresEntrevistas = todosPromotores.reduce((acc, p) => acc + p.entrevistasSemana, 0);
   const totalPromotoresLeads = todosPromotores.reduce((acc, p) => acc + p.leadsSemana, 0);
   const totalPromotoresTerrenos = todosPromotores.reduce((acc, p) => acc + p.ventasTerrenoSemana, 0);
+  const totalPromotoresTerrenosSeña = todosPromotores.reduce((acc, p) => acc + (p.ventasTerrenoSenaSemana ?? 0), 0);
   const totalPromotoresPij = todosPromotores.reduce((acc, p) => acc + p.ventasPijSemana, 0);
   const totalPromotoresTratadosHoy = todosPromotores.reduce((acc, p) => acc + (p.tratadosHoy ?? 0), 0);
   const totalPromotoresTratadosSemana = todosPromotores.reduce((acc, p) => acc + (p.tratadosSemana ?? 0), 0);
@@ -976,14 +977,15 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                     <th className="py-2.5 px-3 text-center">Tratados (D/S/M)</th>
                     <th className="py-2.5 px-3 text-center">Entrevistas</th>
                     <th className="py-2.5 px-3 text-center">Cierres</th>
-                    <th className="py-2.5 px-3 text-center">Terrenos</th>
+                    <th className="py-2.5 px-3 text-center">Terrenos 100%</th>
+                    <th className="py-2.5 px-3 text-center">T. Seña</th>
                     <th className="py-2.5 px-4 text-center">PIJ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100 text-zinc-700">
                   {promotoresFiltradosRanking.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-8 text-center text-zinc-400 text-[13px]">
+                      <td colSpan={10} className="py-8 text-center text-zinc-400 text-[13px]">
                         No se encontraron resultados para la búsqueda "{rankingSearch}".
                       </td>
                     </tr>
@@ -1006,6 +1008,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                           <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{p.entrevistasSemana}</td>
                           <td className="py-2.5 px-3 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
                           <td className="py-2.5 px-3 text-center tabular-nums text-amber-700 font-semibold">{p.ventasTerrenoSemana}</td>
+                          <td className="py-2.5 px-3 text-center tabular-nums text-orange-500 font-semibold">{p.ventasTerrenoSenaSemana ?? 0}</td>
                           <td className="py-2.5 px-4 text-center tabular-nums text-indigo-600 font-semibold">{p.ventasPijSemana}</td>
                         </tr>
                       );
@@ -1026,6 +1029,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                     <td className="py-3 px-3 text-center tabular-nums text-brand-700">{totalPromotoresEntrevistas}</td>
                     <td className="py-3 px-3 text-center tabular-nums text-emerald-700 font-extrabold">{totalPromotoresCierres}</td>
                     <td className="py-3 px-3 text-center tabular-nums text-amber-700 font-extrabold">{totalPromotoresTerrenos}</td>
+                    <td className="py-3 px-3 text-center tabular-nums text-orange-500 font-extrabold">{totalPromotoresTerrenosSeña}</td>
                     <td className="py-3 px-4 text-center tabular-nums text-indigo-600 font-extrabold">{totalPromotoresPij}</td>
                   </tr>
                 </tfoot>

@@ -12,7 +12,8 @@ export const ADMIN_CHART_SERIES = [
   { key: 'Leads', tipo: 'lead' as const, color: '#71717A' },
   { key: 'Entrevistas', tipo: 'entrevista' as const, color: '#9A1620' },
   { key: 'Cierres', tipo: 'cierre' as const, color: '#059669' },
-  { key: 'Terrenos', tipo: 'terreno' as const, color: '#D97706' },
+  { key: 'Terrenos 100%', tipo: 'terreno' as const, color: '#D97706' },
+  { key: 'T. Seña', tipo: 'terreno_sena' as const, color: '#F97316' },
   { key: 'PIJ', tipo: 'pij' as const, color: '#6366F1' },
 ];
 

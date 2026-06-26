@@ -289,8 +289,12 @@ export interface PromotorMetricasAdmin {
   entrevistasHoy: number;
   cierresSemana: number;
   cierresHoy: number;
+  /** Terrenos 100% (cien) — cuentan como cierre. */
   ventasTerrenoSemana: number;
   ventasTerrenoHoy: number;
+  /** Terrenos en seña — NO cuentan como cierre. */
+  ventasTerrenoSenaSemana: number;
+  ventasTerrenoSenaHoy: number;
   ventasPijSemana: number;
   ventasPijHoy: number;
   tratadosHoy: number;
@@ -312,7 +316,7 @@ export interface RankingAdminEntry {
   valor: number;
 }
 
-export type AdminChartEventTipo = 'lead' | 'entrevista' | 'cierre' | 'terreno' | 'pij';
+export type AdminChartEventTipo = 'lead' | 'entrevista' | 'cierre' | 'terreno' | 'terreno_sena' | 'pij';
 
 export interface AdminChartEvent {
   fecha: string;

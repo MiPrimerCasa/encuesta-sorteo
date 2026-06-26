@@ -135,6 +135,8 @@ function crearBucketPromotor(lead: Lead): PromotorBucket {
     cierresHoy: 0,
     ventasTerrenoSemana: 0,
     ventasTerrenoHoy: 0,
+    ventasTerrenoSenaSemana: 0,
+    ventasTerrenoSenaHoy: 0,
     ventasPijSemana: 0,
     ventasPijHoy: 0,
     tratadosHoy: 0,
@@ -156,6 +158,8 @@ function sumarBuckets(
     cierresHoy: a.cierresHoy + b.cierresHoy,
     ventasTerrenoSemana: a.ventasTerrenoSemana + b.ventasTerrenoSemana,
     ventasTerrenoHoy: a.ventasTerrenoHoy + b.ventasTerrenoHoy,
+    ventasTerrenoSenaSemana: (a.ventasTerrenoSenaSemana ?? 0) + (b.ventasTerrenoSenaSemana ?? 0),
+    ventasTerrenoSenaHoy: (a.ventasTerrenoSenaHoy ?? 0) + (b.ventasTerrenoSenaHoy ?? 0),
     ventasPijSemana: a.ventasPijSemana + b.ventasPijSemana,
     ventasPijHoy: a.ventasPijHoy + b.ventasPijHoy,
     tratadosHoy: (a.tratadosHoy ?? 0) + b.tratadosHoy,
@@ -196,6 +200,7 @@ export function buildAdminChartEvents(
   const entrevistasVistas = new Set<string>();
   const cierresVistas = new Set<string>();
   const terrenosVistas = new Set<string>();
+  const terrenosSenaVistas = new Set<string>();
   const pijVistas = new Set<string>();
 
   for (const item of leadsConSupervisor) {
@@ -237,9 +242,15 @@ export function buildAdminChartEvents(
       const esTerrenoActual =
         item.lead.seguimiento?.resultadoEntrevista === 'compro' &&
         item.lead.seguimiento?.idProducto === 'prod-terreno';
-      if (esTerrenoActual && !terrenosVistas.has(leadId)) {
-        terrenosVistas.add(leadId);
-        eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno', supervisorNombre: supNombre });
+      if (esTerrenoActual && !terrenosVistas.has(leadId) && !terrenosSenaVistas.has(leadId)) {
+        const esSena = item.lead.seguimiento?.estadoPago === 'sena';
+        if (esSena) {
+          terrenosSenaVistas.add(leadId);
+          eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno_sena', supervisorNombre: supNombre });
+        } else {
+          terrenosVistas.add(leadId);
+          eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno', supervisorNombre: supNombre });
+        }
       }
     }
     if (esVentaPij(row)) {
@@ -365,20 +376,36 @@ export function buildAdminDashboardFromLeads(
         const cierreEsHoy = esMismoDia(fechaCierre, hoy);
 
         if (cierreEnSemana) {
-          bucket.cierresSemana += 1;
           if (lead.seguimiento?.idProducto === ID_PRODUCTO_TERRENO) {
-            bucket.ventasTerrenoSemana += 1;
+            const esSena = lead.seguimiento?.estadoPago === 'sena';
+            if (esSena) {
+              bucket.ventasTerrenoSenaSemana += 1;
+            } else {
+              bucket.cierresSemana += 1;
+              bucket.ventasTerrenoSemana += 1;
+            }
           } else if (lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ) {
+            bucket.cierresSemana += 1;
             bucket.ventasPijSemana += 1;
+          } else {
+            bucket.cierresSemana += 1;
           }
         }
 
         if (cierreEsHoy) {
-          bucket.cierresHoy += 1;
           if (lead.seguimiento?.idProducto === ID_PRODUCTO_TERRENO) {
-            bucket.ventasTerrenoHoy += 1;
+            const esSena = lead.seguimiento?.estadoPago === 'sena';
+            if (esSena) {
+              bucket.ventasTerrenoSenaHoy += 1;
+            } else {
+              bucket.cierresHoy += 1;
+              bucket.ventasTerrenoHoy += 1;
+            }
           } else if (lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ) {
+            bucket.cierresHoy += 1;
             bucket.ventasPijHoy += 1;
+          } else {
+            bucket.cierresHoy += 1;
           }
         }
       }
@@ -392,20 +419,36 @@ export function buildAdminDashboardFromLeads(
         const cierreEsHoy = esMismoDia(fechaC, hoy);
 
         if (cierreEnSemana) {
-          bucket.cierresSemana += 1;
           if (compra.idProducto === ID_PRODUCTO_TERRENO) {
-            bucket.ventasTerrenoSemana += 1;
+            const esSena = compra.estadoPago === 'sena';
+            if (esSena) {
+              bucket.ventasTerrenoSenaSemana += 1;
+            } else {
+              bucket.cierresSemana += 1;
+              bucket.ventasTerrenoSemana += 1;
+            }
           } else if (compra.idProducto === ID_PRODUCTO_PIJ) {
+            bucket.cierresSemana += 1;
             bucket.ventasPijSemana += 1;
+          } else {
+            bucket.cierresSemana += 1;
           }
         }
 
         if (cierreEsHoy) {
-          bucket.cierresHoy += 1;
           if (compra.idProducto === ID_PRODUCTO_TERRENO) {
-            bucket.ventasTerrenoHoy += 1;
+            const esSena = compra.estadoPago === 'sena';
+            if (esSena) {
+              bucket.ventasTerrenoSenaHoy += 1;
+            } else {
+              bucket.cierresHoy += 1;
+              bucket.ventasTerrenoHoy += 1;
+            }
           } else if (compra.idProducto === ID_PRODUCTO_PIJ) {
+            bucket.cierresHoy += 1;
             bucket.ventasPijHoy += 1;
+          } else {
+            bucket.cierresHoy += 1;
           }
         }
       }
@@ -459,6 +502,8 @@ export function buildAdminDashboardFromLeads(
     cierresHoy: 0,
     ventasTerrenoSemana: 0,
     ventasTerrenoHoy: 0,
+    ventasTerrenoSenaSemana: 0,
+    ventasTerrenoSenaHoy: 0,
     ventasPijSemana: 0,
     ventasPijHoy: 0,
     tratadosHoy: 0,

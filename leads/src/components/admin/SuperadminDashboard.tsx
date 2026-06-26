@@ -1,15 +1,16 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres, Lead, Barrio } from '../../types';
+import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres, Lead, Barrio, Producto, SeguimientoLead } from '../../types';
 import { formatRangoSemana } from '../../domain/admin-metrics';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
-import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, duplicarLead, resetearLeadSeguimiento, modificarDatosLead } from '../../api/client';
+import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, fetchProductos, guardarSeguimiento, duplicarLead, resetearLeadSeguimiento, modificarDatosLead } from '../../api/client';
 import type { ModificarDatosLeadPayload, OperadorCatalogo } from '../../api/client';
 import { getBarrioNombre } from '../../domain/venta';
 import { useAuth } from '../../context/AuthContext';
 import { cleanTelefonoSuffix } from '../../domain/whatsapp';
 import { AdminModificarLeadModal } from './AdminModificarLeadModal';
+import { LeadModalForm } from '../leads/LeadModalForm';
 
 
 interface SuperadminDashboardProps {
@@ -101,11 +102,16 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
   const [rankingSearch, setRankingSearch] = useState('');
   const [barrios, setBarrios] = useState<Barrio[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [seguimientoLead, setSeguimientoLead] = useState<Lead | null>(null);
 
   useEffect(() => {
     fetchBarrios()
       .then((data) => setBarrios(data))
       .catch((err) => console.error('Error al cargar barrios para dashboard:', err));
+    fetchProductos('supervisor')
+      .then((data) => setProductos(data))
+      .catch((err) => console.error('Error al cargar productos para dashboard:', err));
   }, []);
 
   const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador' | 'sin_tratar' | 'reasignacion' | 'informe'>('metricas');
@@ -192,6 +198,12 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const handleModificarLead = async (leadId: string, datos: ModificarDatosLeadPayload) => {
     const updatedLead = await modificarDatosLead(leadId, datos);
     setLeads((prev) => prev.map((l) => (l.id === updatedLead.id ? updatedLead : l)));
+  };
+
+  const handleGuardarSeguimiento = async (leadId: string, seg: SeguimientoLead) => {
+    const result = await guardarSeguimiento(leadId, seg);
+    setLeads((prev) => prev.map((l) => (l.id === result.lead.id ? result.lead : l)));
+    setSeguimientoLead(null);
   };
 
   useEffect(() => {
@@ -1119,7 +1131,15 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                             </td>
                             {(usuario?.rol === 'superadmin' || usuario?.panelGlobal) && (
                               <td className="py-3 px-4 text-center">
-                                <div className="flex justify-center items-center gap-2">
+                                <div className="flex justify-center items-center gap-2 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={() => setSeguimientoLead(l)}
+                                    className="text-[12px] font-semibold text-emerald-600 hover:text-emerald-800 hover:underline cursor-pointer"
+                                  >
+                                    Seguimiento
+                                  </button>
+                                  <span className="text-zinc-300">|</span>
                                   <button
                                     type="button"
                                     onClick={() => setModificandoLead(l)}
@@ -2183,6 +2203,16 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         open={modificandoLead !== null}
         onClose={() => setModificandoLead(null)}
         onSave={handleModificarLead}
+      />
+
+      <LeadModalForm
+        lead={seguimientoLead}
+        open={seguimientoLead !== null}
+        rolUsuario="supervisor"
+        productos={productos}
+        barrios={barrios}
+        onClose={() => setSeguimientoLead(null)}
+        onSave={handleGuardarSeguimiento}
       />
     </div>
   );

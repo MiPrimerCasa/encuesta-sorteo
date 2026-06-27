@@ -17,16 +17,24 @@ export function fechaDiaKey(fecha) {
   return `${y}-${m}-${day}`;
 }
 
+export function fechaMesKey(fecha) {
+  const d = fecha instanceof Date ? fecha : new Date(fecha);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
+}
+
 export function semaforoCumplimiento(cantidad, meta) {
   if (cantidad >= meta) return 'verde';
   if (cantidad >= Math.ceil(meta / 2)) return 'amarillo';
   return 'rojo';
 }
 
-export function buildResumenCumplimiento(grabacionesActivas) {
-  const manana = grabacionesActivas.filter((g) => g.franja === 'manana').length;
-  const tarde = grabacionesActivas.filter((g) => g.franja === 'tarde').length;
-  const total = grabacionesActivas.length;
+/** Resumen diario de promociones aprobadas (entrevistas no cuentan hacia el objetivo 4/día). */
+export function buildResumenCumplimiento(grabacionesPromocionActivas) {
+  const manana = grabacionesPromocionActivas.filter((g) => g.franja === 'manana').length;
+  const tarde = grabacionesPromocionActivas.filter((g) => g.franja === 'tarde').length;
+  const total = grabacionesPromocionActivas.length;
   const metaTotal = getCuotaDiaria();
   const metaFranja = getCuotaFranja();
 

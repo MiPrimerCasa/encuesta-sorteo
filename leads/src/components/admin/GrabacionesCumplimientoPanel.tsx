@@ -228,7 +228,8 @@ export function GrabacionesCumplimientoPanel() {
       <div>
         <h3 className="text-[16px] font-semibold text-zinc-900">Grabaciones diarias</h3>
         <p className="mt-0.5 text-[13px] text-zinc-500">
-          Cumplimiento de audios aprobados por promotor · cuota 4/día (2 mañana + 2 tarde sugerido)
+          Cumplimiento de promociones aprobadas · objetivo 4/día (2 mañana + 2 tarde). Entrevistas
+          listadas aparte, no suman al objetivo diario. Tope 20 audios/mes total (no es cuota).
         </p>
       </div>
 

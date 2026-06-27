@@ -46,6 +46,12 @@ export function getCuotaFranja() {
   return 2;
 }
 
+/** Tope mensual de subidas (promoción + entrevista). No es objetivo de cumplimiento. */
+export function getMaxAudiosMes() {
+  const n = Number.parseInt(process.env.GRABACIONES_MAX_MES || '20', 10);
+  return Number.isFinite(n) && n > 0 ? n : 20;
+}
+
 /** Resuelve el nombre visible desde catálogo de operadores / mapa canónico (sin hardcodear). */
 function nombreDesdeMapaCanonicoPorId(operadorId) {
   const id = String(operadorId ?? '').trim();

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchMisGrabaciones, uploadGrabacion } from '../../api/client';
-import type { GrabacionPromotor, Lead, ResumenGrabacionesDia, TipoGrabacion } from '../../types';
+import type { GrabacionPromotor, Lead, ResumenGrabacionesDia, ResumenTopeGrabacionesMes, TipoGrabacion } from '../../types';
 
 interface GrabacionDiariaPanelProps {
   leads: Lead[];
@@ -14,9 +14,22 @@ function estiloSemaforo(semaforo: string): string {
   return 'bg-red-50 text-red-700 ring-1 ring-red-200';
 }
 
+function ResumenTopeMes({ resumen }: { resumen: ResumenTopeGrabacionesMes }) {
+  return (
+    <p className="text-[12px] text-zinc-500">
+      Tope del mes: {resumen.usados}/{resumen.maximo} audios subidos (promoción + entrevista). Las
+      entrevistas no tienen cuota diaria; el tope evita abusos de almacenamiento.
+    </p>
+  );
+}
+
 function ResumenDia({ resumen }: { resumen: ResumenGrabacionesDia }) {
   return (
-    <div className="grid grid-cols-3 gap-3">
+    <div>
+      <p className="mb-2 text-[11px] font-medium text-zinc-500">
+        Promoción aprobada · objetivo 4/día (2 mañana + 2 tarde)
+      </p>
+      <div className="grid grid-cols-3 gap-3">
       {(
         [
           ['Mañana', resumen.manana, resumen.metaManana, resumen.semaforoManana],
@@ -34,6 +47,7 @@ function ResumenDia({ resumen }: { resumen: ResumenGrabacionesDia }) {
           </p>
         </div>
       ))}
+      </div>
     </div>
   );
 }
@@ -57,6 +71,7 @@ export function GrabacionDiariaPanel({
   const [progreso, setProgreso] = useState(0);
   const [mensaje, setMensaje] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
   const [resumen, setResumen] = useState<ResumenGrabacionesDia | null>(null);
+  const [resumenTopeMes, setResumenTopeMes] = useState<ResumenTopeGrabacionesMes | null>(null);
   const [lista, setLista] = useState<GrabacionPromotor[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -65,6 +80,7 @@ export function GrabacionDiariaPanel({
     try {
       const data = await fetchMisGrabaciones();
       setResumen(data.resumen);
+      setResumenTopeMes(data.resumenTopeMes);
       setLista(data.grabaciones);
     } catch (err) {
       setMensaje({
@@ -96,11 +112,24 @@ export function GrabacionDiariaPanel({
 
   const leadSeleccionado = leads.find((l) => l.id === leadId);
 
+  const promocionesHoy = useMemo(
+    () =>
+      lista.filter(
+        (g) => g.tipo === 'promocion' && g.estado !== 'rechazado',
+      ).length,
+    [lista],
+  );
+
+  const topeMensualOk = resumenTopeMes == null || resumenTopeMes.usados < resumenTopeMes.maximo;
+  const cupoPromocionOk = promocionesHoy < (resumen?.metaTotal ?? 4);
+
   const puedeSubir =
     Boolean(archivo) &&
     !subiendo &&
-    (tipo === 'promocion' || Boolean(leadId)) &&
-    (resumen == null || resumen.total < resumen.metaTotal);
+    topeMensualOk &&
+    (tipo === 'promocion'
+      ? cupoPromocionOk
+      : Boolean(leadId));
 
   const onSubmit = async () => {
     if (!archivo || !puedeSubir) return;
@@ -123,6 +152,7 @@ export function GrabacionDiariaPanel({
         setProgreso,
       );
       setResumen(result.resumen);
+      setResumenTopeMes(result.resumenTopeMes);
       setLista((prev) => [...prev, result.grabacion]);
       setArchivo(null);
       setLeadId('');
@@ -141,16 +171,21 @@ export function GrabacionDiariaPanel({
     <div className="mx-auto max-w-lg px-4 py-6 md:max-w-2xl md:px-6">
       <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-zinc-900">Grabación diaria</h2>
       <p className="mt-1 text-[13px] text-zinc-500">
-        Subí audios grabados con la app del celular. Cuota: 4 por día · máx.{' '}
-        {maxMb} MB. El supervisor revisará y aprobará cada audio.
+        Promoción: 4/día (2 mañana + 2 tarde), solo audios aprobados cuentan para el objetivo.
+        Entrevistas: sin cuota diaria. Tope {resumenTopeMes?.maximo ?? 20} audios/mes en total
+        (promoción + entrevista). Máx. {maxMb} MB por archivo. El supervisor aprueba o rechaza cada
+        audio (rechazado se elimina del servidor).
       </p>
 
       {resumen && (
-        <div className="mt-5">
-          <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-            Resumen de hoy
-          </p>
-          <ResumenDia resumen={resumen} />
+        <div className="mt-5 space-y-4">
+          <div>
+            <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
+              Promoción de hoy
+            </p>
+            <ResumenDia resumen={resumen} />
+          </div>
+          {resumenTopeMes && <ResumenTopeMes resumen={resumenTopeMes} />}
         </div>
       )}
 

@@ -554,21 +554,31 @@ export interface ResumenGrabacionesDia {
   cumple: boolean;
 }
 
+export interface ResumenTopeGrabacionesMes {
+  mesKey: string;
+  usados: number;
+  maximo: number;
+  restantes: number;
+}
+
 export interface GrabacionesConfigResponse {
   moduloActivo: boolean;
   habilitado: boolean;
   puedeAuditar: boolean;
   cuotaDiaria: number;
   cuotaFranja: number;
+  maxAudiosMes: number;
   minDuracionSeg: number;
   formatos: string[];
   maxMb: number;
   resumenHoy: ResumenGrabacionesDia | null;
+  resumenTopeMes: ResumenTopeGrabacionesMes | null;
 }
 
 export interface GrabacionesMiasResponse {
   diaKey: string;
   resumen: ResumenGrabacionesDia;
+  resumenTopeMes: ResumenTopeGrabacionesMes;
   grabaciones: GrabacionPromotor[];
 }
 

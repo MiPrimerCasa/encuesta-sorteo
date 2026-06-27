@@ -10,6 +10,7 @@ import {
   getGrabacionesMinDurationSec,
   getGrabacionesPromotoresConfig,
   getCuotaDiaria,
+  getMaxAudiosMes,
   isGrabacionesEnabled,
   mimePermitido,
   resolvePromotorIdGrabaciones,
@@ -20,12 +21,14 @@ import {
   getGrabacionById,
   insertGrabacion,
   listGrabacionesPromotorDia,
-  listGrabacionesOcupanCuotaPromotorDia,
+  listPromocionesOcupanCuotaPromotorDia,
+  countGrabacionesMesSubidas,
   aprobarGrabacion,
   rechazarYEliminarGrabacion,
   resumenPromotorDia,
+  resumenTopeMesPromotor,
 } from '../db/grabaciones-store.js';
-import { calcularFranja, fechaDiaKey } from '../domain/grabaciones.js';
+import { calcularFranja, fechaDiaKey, fechaMesKey } from '../domain/grabaciones.js';
 import { esSuperadminUsuario, esSupervisorPanelGlobal } from '../db/superadmin-auth.js';
 
 function getGrabacionesRoot() {
@@ -133,20 +136,25 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
     const habilitado =
       moduloActivo && usuario.rol === 'promotor' && usuarioPromotorTieneGrabaciones(usuario);
     const diaKey = fechaDiaKey(new Date());
+    const mesKey = fechaMesKey(new Date());
     const promotorId = resolvePromotorIdGrabaciones(usuario);
     const resumen =
       habilitado && promotorId ? resumenPromotorDia(promotorId, diaKey) : null;
+    const resumenTopeMes =
+      habilitado && promotorId ? resumenTopeMesPromotor(promotorId, mesKey) : null;
 
     res.json({
       moduloActivo,
       habilitado,
       puedeAuditar: moduloActivo && puedeAuditarGrabaciones(usuario),
-      cuotaDiaria: 4,
+      cuotaDiaria: getCuotaDiaria(),
       cuotaFranja: 2,
+      maxAudiosMes: getMaxAudiosMes(),
       minDuracionSeg: getGrabacionesMinDurationSec(),
       formatos: ['.m4a', '.mp3', '.wav', '.ogg'],
       maxMb: Math.round(getGrabacionesMaxBytes() / (1024 * 1024)),
       resumenHoy: resumen,
+      resumenTopeMes,
     });
   });
 
@@ -163,11 +171,13 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
       return res.status(403).json({ error: 'Grabaciones no habilitadas' });
     }
     const diaKey = String(req.query.fecha ?? fechaDiaKey(new Date())).slice(0, 10);
+    const mesKey = diaKey.slice(0, 7);
     const promotorId = resolvePromotorIdGrabaciones(usuario);
     const grabaciones = listGrabacionesPromotorDia(promotorId, diaKey);
     res.json({
       diaKey,
       resumen: resumenPromotorDia(promotorId, diaKey),
+      resumenTopeMes: resumenTopeMesPromotor(promotorId, mesKey),
       grabaciones,
     });
   });
@@ -228,14 +238,33 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
 
         const franja = calcularFranja(fechaGrab);
         const diaKey = fechaDiaKey(fechaGrab);
+        const mesKey = fechaMesKey(fechaGrab);
         const promotorId = resolvePromotorIdGrabaciones(usuario);
 
-        const ocupanCuota = listGrabacionesOcupanCuotaPromotorDia(promotorId, diaKey);
-        if (ocupanCuota.length >= getCuotaDiaria()) {
-          try { unlinkSync(req.file.path); } catch { /* ignore */ }
+        const enMes = countGrabacionesMesSubidas(promotorId, mesKey);
+        if (enMes >= getMaxAudiosMes()) {
+          try {
+            unlinkSync(req.file.path);
+          } catch {
+            /* ignore */
+          }
           return res.status(400).json({
-            error: `Ya subiste los ${getCuotaDiaria()} audios de ese día`,
+            error: `Alcanzaste el tope de ${getMaxAudiosMes()} audios del mes (promoción + entrevista)`,
           });
+        }
+
+        if (tipo === 'promocion') {
+          const promosHoy = listPromocionesOcupanCuotaPromotorDia(promotorId, diaKey);
+          if (promosHoy.length >= getCuotaDiaria()) {
+            try {
+              unlinkSync(req.file.path);
+            } catch {
+              /* ignore */
+            }
+            return res.status(400).json({
+              error: `Ya subiste los ${getCuotaDiaria()} audios de promoción de ese día`,
+            });
+          }
         }
 
         const grabacion = insertGrabacion({
@@ -256,6 +285,7 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
         res.json({
           grabacion,
           resumen: resumenPromotorDia(promotorId, diaKey),
+          resumenTopeMes: resumenTopeMesPromotor(promotorId, mesKey),
         });
       } catch (e) {
         if (req.file?.path) try { unlinkSync(req.file.path); } catch { /* ignore */ }

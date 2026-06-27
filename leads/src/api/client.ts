@@ -533,6 +533,7 @@ export async function fetchGrabacionesConfig(): Promise<GrabacionesConfigRespons
       puedeAuditar: _demoUsuario.rol !== 'promotor',
       cuotaDiaria: 4,
       cuotaFranja: 2,
+      maxAudiosMes: 20,
       minDuracionSeg: 0,
       formatos: ['.m4a', '.mp3', '.wav', '.ogg'],
       maxMb: 25,
@@ -547,6 +548,12 @@ export async function fetchGrabacionesConfig(): Promise<GrabacionesConfigRespons
         semaforoTarde: 'rojo',
         semaforoTotal: 'amarillo',
         cumple: false,
+      },
+      resumenTopeMes: {
+        mesKey: new Date().toISOString().slice(0, 7),
+        usados: 3,
+        maximo: 20,
+        restantes: 17,
       },
     };
   }
@@ -569,6 +576,12 @@ export async function fetchMisGrabaciones(fecha?: string): Promise<GrabacionesMi
         semaforoTarde: 'amarillo',
         semaforoTotal: 'amarillo',
         cumple: false,
+      },
+      resumenTopeMes: {
+        mesKey: diaKey.slice(0, 7),
+        usados: 5,
+        maximo: 20,
+        restantes: 15,
       },
       grabaciones: [
         {
@@ -639,7 +652,11 @@ export async function uploadGrabacion(
   file: File,
   payload: { tipo: 'promocion' | 'entrevista'; leadId?: string; leadNombre?: string },
   onProgress?: (pct: number) => void,
-): Promise<{ grabacion: GrabacionPromotor; resumen: GrabacionesMiasResponse['resumen'] }> {
+): Promise<{
+  grabacion: GrabacionPromotor;
+  resumen: GrabacionesMiasResponse['resumen'];
+  resumenTopeMes: GrabacionesMiasResponse['resumenTopeMes'];
+}> {
   if (_isDemoActive) {
     throw new Error('Subida de grabaciones no disponible en modo demo.');
   }
@@ -673,7 +690,13 @@ export async function uploadGrabacion(
         return;
       }
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(data as { grabacion: GrabacionPromotor; resumen: GrabacionesMiasResponse['resumen'] });
+        resolve(
+          data as {
+            grabacion: GrabacionPromotor;
+            resumen: GrabacionesMiasResponse['resumen'];
+            resumenTopeMes: GrabacionesMiasResponse['resumenTopeMes'];
+          },
+        );
         return;
       }
       const msg =

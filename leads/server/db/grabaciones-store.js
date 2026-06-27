@@ -4,7 +4,9 @@ import { buildResumenCumplimiento } from '../domain/grabaciones.js';
 import {
   getGrabacionesPromotoresConfig,
   getGrabacionesRetentionDays,
+  getMaxAudiosMes,
 } from '../config/grabaciones-config.js';
+import { fechaMesKey } from '../domain/grabaciones.js';
 
 const GRABACIONES_DDL = `
     CREATE TABLE IF NOT EXISTS promotor_grabaciones (
@@ -157,19 +159,47 @@ export function listGrabacionesPromotorDia(promotorId, diaKey) {
   return rows.map(mapRow);
 }
 
-/** Audios aprobados — cuentan para cumplimiento del día. */
+/** Promociones aprobadas del día — cuentan para cumplimiento (objetivo 4/día). */
 export function listGrabacionesActivasPromotorDia(promotorId, diaKey) {
   return listGrabacionesPromotorDia(promotorId, diaKey).filter((g) => g.estado === 'activo');
 }
 
-/** Audios que ocupan cupo diario (pendientes + aprobados; rechazados no). */
-export function listGrabacionesOcupanCuotaPromotorDia(promotorId, diaKey) {
-  return listGrabacionesPromotorDia(promotorId, diaKey).filter((g) => g.estado !== 'rechazado');
+/** Promociones del día que ocupan cupo diario (pendientes + aprobadas). */
+export function listPromocionesOcupanCuotaPromotorDia(promotorId, diaKey) {
+  return listGrabacionesPromotorDia(promotorId, diaKey).filter(
+    (g) => g.tipo === 'promocion' && g.estado !== 'rechazado',
+  );
+}
+
+/** Tope mensual de subidas (promoción + entrevista). Rechazados no cuentan (se borran). */
+export function countGrabacionesMesSubidas(promotorId, mesKey) {
+  ensureSchema();
+  const row = getDb()
+    .prepare(
+      `SELECT COUNT(*) AS n FROM promotor_grabaciones
+       WHERE promotor_id = ? AND substr(dia_key, 1, 7) = ?
+         AND estado IN ('pendiente', 'activo')`,
+    )
+    .get(String(promotorId), mesKey);
+  return Number(row?.n ?? 0);
+}
+
+export function resumenTopeMesPromotor(promotorId, mesKey = fechaMesKey(new Date())) {
+  const usados = countGrabacionesMesSubidas(promotorId, mesKey);
+  const maximo = getMaxAudiosMes();
+  return {
+    mesKey,
+    usados,
+    maximo,
+    restantes: Math.max(0, maximo - usados),
+  };
 }
 
 export function resumenPromotorDia(promotorId, diaKey) {
-  const activas = listGrabacionesActivasPromotorDia(promotorId, diaKey);
-  return buildResumenCumplimiento(activas);
+  const promocionesActivas = listGrabacionesActivasPromotorDia(promotorId, diaKey).filter(
+    (g) => g.tipo === 'promocion',
+  );
+  return buildResumenCumplimiento(promocionesActivas);
 }
 
 export function listGrabacionesAdminDia(diaKey, promotorIds = null) {
@@ -209,8 +239,10 @@ export function buildCumplimientoAdmin(diaKey, promotorIdsFiltro = null) {
 
   return promotoresBase.map((promotor) => {
     const delPromotor = grabaciones.filter((g) => g.promotorId === promotor.id);
-    const activas = delPromotor.filter((g) => g.estado === 'activo');
-    const resumen = buildResumenCumplimiento(activas);
+    const promocionesActivas = delPromotor.filter(
+      (g) => g.estado === 'activo' && g.tipo === 'promocion',
+    );
+    const resumen = buildResumenCumplimiento(promocionesActivas);
     return {
       promotorId: promotor.id,
       promotorNombre: promotor.nombre,

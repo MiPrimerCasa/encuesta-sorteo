@@ -209,10 +209,17 @@ export function buildAdminChartEvents(leadsConSupervisor, historialRows = []) {
     const supNombre = item.supervisorNombre;
 
     if (filaIndicaEntrevista(row)) {
-      const key = `${leadId}|${fecha.toISOString().slice(0, 10)}`;
-      if (!entrevistasVistas.has(key)) {
-        entrevistasVistas.add(key);
-        eventos.push({ fecha: fecha.toISOString(), tipo: 'entrevista', supervisorNombre: supNombre });
+      const esModificacionTecnicaCierre =
+        item.lead.seguimiento?.resultadoEntrevista === 'compro' &&
+        item.lead.seguimiento?.fechaCierre &&
+        !esMismoDia(item.lead.seguimiento.fechaCierre, fecha);
+
+      if (!esModificacionTecnicaCierre) {
+        const key = `${leadId}|${fecha.toISOString().slice(0, 10)}`;
+        if (!entrevistasVistas.has(key)) {
+          entrevistasVistas.add(key);
+          eventos.push({ fecha: fecha.toISOString(), tipo: 'entrevista', supervisorNombre: supNombre });
+        }
       }
     }
     if (filaIndicaCierre(row)) {
@@ -465,13 +472,20 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
     const esHoy = esMismoDia(fecha, hoy);
 
     if (filaIndicaEntrevista(row)) {
-      if (enSemana && !entrevistasPorLeadSemana.has(`${leadId}|${fecha.toISOString().slice(0, 10)}`)) {
-        entrevistasPorLeadSemana.add(`${leadId}|${fecha.toISOString().slice(0, 10)}`);
-        bucket.entrevistasSemana += 1;
-      }
-      if (esHoy && !entrevistasPorLeadHoy.has(leadId)) {
-        entrevistasPorLeadHoy.add(leadId);
-        bucket.entrevistasHoy += 1;
+      const esModificacionTecnicaCierre =
+        item.lead.seguimiento?.resultadoEntrevista === 'compro' &&
+        item.lead.seguimiento?.fechaCierre &&
+        !esMismoDia(item.lead.seguimiento.fechaCierre, fecha);
+
+      if (!esModificacionTecnicaCierre) {
+        if (enSemana && !entrevistasPorLeadSemana.has(`${leadId}|${fecha.toISOString().slice(0, 10)}`)) {
+          entrevistasPorLeadSemana.add(`${leadId}|${fecha.toISOString().slice(0, 10)}`);
+          bucket.entrevistasSemana += 1;
+        }
+        if (esHoy && !entrevistasPorLeadHoy.has(leadId)) {
+          entrevistasPorLeadHoy.add(leadId);
+          bucket.entrevistasHoy += 1;
+        }
       }
     }
   }

@@ -1,5 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
+import {
+  buildOperadorHistoryMap,
+  resolveOperadorCanonico,
+} from '../domain/operador-canonical.js';
 
 const CAJA_URL = 'https://docs.google.com/spreadsheets/d/1jOxw0FXv_HDNkkh9vwQR9T5PoAPk5rcErUJEVjvayBA/export?format=csv&gid=288750825';
 
@@ -588,6 +592,7 @@ function nombresCoincidenFuzzy(a, b) {
 async function resolverUsuarioDeSincronizacion(cambio, lead, pool, catalog) {
   const vendedorExcel = String(cambio.excelRow?.nombreVendedor ?? '').trim().toUpperCase();
   let targetOperator = null;
+  let history = [];
   
   if (vendedorExcel && pool) {
     try {
@@ -595,7 +600,7 @@ async function resolverUsuarioDeSincronizacion(cambio, lead, pool, catalog) {
       const histRes = await pool.query(`
         EXEC SP_HistorialSeguimientoAdmin @desde = '2026-01-01 00:00:00'
       `);
-      const history = histRes.recordset || [];
+      history = histRes.recordset || [];
       
       const opMap = new Map(); // operador_nombre -> { id, nombre, rol }
       for (const r of history) {
@@ -613,7 +618,17 @@ async function resolverUsuarioDeSincronizacion(cambio, lead, pool, catalog) {
         'ROCDAN CRISTIAN': 'ROCDAN CRISTIAN GABRIEL',
         'LUCILA': 'NOGUERA LUCIA ESTHER',
         'ESTEFANIA': 'GAMARRA ESTEFANIA LIA',
-        'MARINA': 'LEIVA MARINA SOLEDAD'
+        'ESTEFANIA GAMARRA': 'GAMARRA ESTEFANIA LIA',
+        'MARINA': 'LEIVA MARINA SOLEDAD',
+        'EZEQUIEL GAMARRA': 'GAMARRA EZEQUIEL',
+        'GAMARRA EZEQUIEL': 'GAMARRA EZEQUIEL',
+        'VELAZCO GERALDINE': 'VELAZCO GERALDINE',
+        'NAARA PONA': 'PONA NAARA',
+        'BELEN ALLENDRE': 'ALLENDRE BELÉN ELIZABETH',
+        'ALLENDRE BELEN': 'ALLENDRE BELÉN ELIZABETH',
+        'AGUIRRE CAROLINA': 'AGUIRRE CAROLINA',
+        'DAHIANA CERRIZUELA': 'CERRIZUELA DAHIANA  AYLEN',
+        'CATHERINE CONTRERAS': 'CONTRERAS CATHERINE  GERALDINE',
       };
       
       const mappedName = MAPA_VENDEDORES_EXPLICITO[vendedorExcel];
@@ -638,7 +653,12 @@ async function resolverUsuarioDeSincronizacion(cambio, lead, pool, catalog) {
           'ROCDAN CRISTIAN': 'Christian R',
           'LUCILA': 'Lucia N',
           'ESTEFANIA': 'Estefania G',
-          'MARINA': 'Marina L'
+          'ESTEFANIA GAMARRA': 'Estefania G',
+          'MARINA': 'Marina L',
+          'EZEQUIEL GAMARRA': 'Gamarra E ',
+          'GAMARRA EZEQUIEL': 'Gamarra E ',
+          'VELAZCO GERALDINE': 'Velazco G',
+          'NAARA PONA': 'Naara Pona',
         };
         
         const catMappedName = MAPA_CATALOGO_EXPLICITO[vendedorExcel];
@@ -695,6 +715,33 @@ async function resolverUsuarioDeSincronizacion(cambio, lead, pool, catalog) {
       id: '1',
       nombre: lead.promotorNombre,
       rol: 'promotor'
+    };
+  }
+
+  if (!history.length && pool) {
+    try {
+      const histRes = await pool.query(`
+        EXEC SP_HistorialSeguimientoAdmin @desde = '2026-01-01 00:00:00'
+      `);
+      history = histRes.recordset || [];
+    } catch {
+      // ignorar — se resuelve con mapa estático
+    }
+  }
+
+  const historyMap = buildOperadorHistoryMap(history);
+  const canonico = resolveOperadorCanonico({
+    operadorId: targetOperator?.id,
+    operadorNombre: targetOperator?.nombre || vendedorExcel,
+    promotorNombre: lead?.promotorNombre,
+    historyMap,
+  });
+
+  if (canonico?.nombre) {
+    return {
+      id: canonico.id ? String(canonico.id) : (targetOperator?.id ? String(targetOperator.id) : '1'),
+      nombre: canonico.nombre,
+      rol: canonico.rol || targetOperator?.rol || 'promotor',
     };
   }
   

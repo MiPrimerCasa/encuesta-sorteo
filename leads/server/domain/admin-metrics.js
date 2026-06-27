@@ -1,4 +1,9 @@
 import { buildAdminProductividad } from './admin-productividad.js';
+import {
+  buildOperadorHistoryMap,
+  claveAgrupacionOperador,
+  resolveOperadorCanonico,
+} from './operador-canonical.js';
 
 const ID_PRODUCTO_PIJ = 'prod-pij';
 const ID_PRODUCTO_TERRENO = 'prod-terreno';
@@ -556,16 +561,32 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
     },
   );
 
+  const operadorHistoryMap = buildOperadorHistoryMap(historialRows);
   const pijCierresMap = new Map();
   const terrenoCierresMap = new Map();
+  const operadorNombrePorClave = new Map();
   const leadsSinTratar = [];
+
+  const resolverNombreAgrupacion = (lead) => {
+    const canonico = resolveOperadorCanonico({
+      operadorId: lead.seguimiento?.operadorId,
+      operadorNombre: lead.seguimiento?.operadorNombre,
+      promotorNombre: lead.promotorNombre,
+      historyMap: operadorHistoryMap,
+    });
+    const clave = claveAgrupacionOperador(canonico);
+    if (!operadorNombrePorClave.has(clave)) {
+      operadorNombrePorClave.set(clave, canonico.nombre);
+    }
+    return operadorNombrePorClave.get(clave);
+  };
 
   for (const item of leadsConSupervisor) {
     const { lead, supervisorNombre } = item;
     const esCierre = lead.seguimiento?.resultadoEntrevista === 'compro';
     const esPij = lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ;
     const esTerreno = lead.seguimiento?.idProducto === ID_PRODUCTO_TERRENO;
-    const operadorNombre = (lead.seguimiento?.operadorNombre || lead.promotorNombre || 'Sin asignar').trim();
+    const operadorNombre = resolverNombreAgrupacion(lead);
 
     if (esCierre && esPij) {
       if (!pijCierresMap.has(operadorNombre)) {

@@ -88,6 +88,38 @@ export interface EfectividadEntrevistasEquipo {
   porPromotor: EfectividadEntrevistasPromotor[];
 }
 
+export interface ApiError {
+  message: string;
+  code?: string;
+  detail?: string;
+  technicalDetail?: string;
+}
+
+export interface SyncPreviewItem {
+  idUnico: string;
+  leadId: string;
+  isCompraAdicional: boolean;
+  compraId: string | null;
+  nombreCliente: string;
+  numeroRecibo: string;
+  fechaActual: string;
+  nuevaFecha: string;
+  excelRow: {
+    fecha: string;
+    ordenAdh: string;
+    ordenAnexo: string;
+    nombreCliente: string;
+  };
+}
+
+export interface SyncPreviewResponse {
+  cambiosPropuestos: SyncPreviewItem[];
+}
+
+export interface SyncCommitResponse {
+  actualizados: number;
+}
+
 export interface Producto {
   id: string;
   codigo: string;

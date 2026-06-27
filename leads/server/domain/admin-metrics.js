@@ -52,7 +52,23 @@ export function rangoPorPeriodo(periodo, hoy = new Date()) {
 export function parseFecha(val) {
   if (!val) return null;
   if (val instanceof Date) return Number.isNaN(val.getTime()) ? null : val;
-  const d = new Date(String(val));
+  
+  const str = String(val).trim();
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}):(\d{2}))?/i);
+  if (m) {
+    const year = parseInt(m[1], 10);
+    const month = parseInt(m[2], 10) - 1;
+    const day = parseInt(m[3], 10);
+    if (m[4]) {
+      const hour = parseInt(m[4], 10);
+      const min = parseInt(m[5], 10);
+      const sec = parseInt(m[6], 10);
+      return new Date(year, month, day, hour, min, sec);
+    }
+    return new Date(year, month, day);
+  }
+  
+  const d = new Date(str);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
@@ -339,7 +355,7 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
     // Calcular cierres y ventas directo del estado actual (ultimo seguimiento)
     const esCierre = lead.seguimiento?.resultadoEntrevista === 'compro';
     if (esCierre) {
-      const fechaCierre = parseFecha(lead.seguimiento?.creadoEn ?? lead.seguimiento?.fechaCierre ?? lead.seguimiento?.creado_en);
+      const fechaCierre = parseFecha(lead.seguimiento?.fechaCierre ?? lead.seguimiento?.creadoEn ?? lead.seguimiento?.creado_en);
       if (fechaCierre) {
         const cierreEnSemana = enRango(fechaCierre, desde, hasta);
         const cierreEsHoy = esMismoDia(fechaCierre, hoy);

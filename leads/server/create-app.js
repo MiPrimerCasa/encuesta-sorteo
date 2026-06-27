@@ -438,6 +438,66 @@ function registerApiRoutes(api) {
     }
   });
 
+  api.post('/admin/sync-caja-pij/preview', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso = esSuperadminUsuario(usuario) || esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message: 'Panel de administración solo disponible para superadmin o supervisores con acceso global.',
+      });
+    }
+
+    try {
+      const { buildSyncPreview } = await import('./services/sync-caja.js');
+      const leads = await listAllLeadsFromEncuestas();
+      const cambiosPropuestos = await buildSyncPreview(leads);
+      return res.json({ cambiosPropuestos });
+    } catch (error) {
+      console.error('Error en previsualización de sync caja:', error);
+      return res.status(500).json({
+        message: 'Error al obtener datos de la caja.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
+  api.post('/admin/sync-caja-pij/commit', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso = esSuperadminUsuario(usuario) || esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message: 'Panel de administración solo disponible para superadmin o supervisores con acceso global.',
+      });
+    }
+
+    const { cambiosAprobados } = req.body;
+    if (!cambiosAprobados || !Array.isArray(cambiosAprobados)) {
+      return res.status(400).json({ message: 'Se requiere la lista de cambios aprobados.' });
+    }
+
+    try {
+      const { executeSyncCommit } = await import('./services/sync-caja.js');
+      const resultado = await executeSyncCommit(cambiosAprobados, usuario);
+      return res.json(resultado);
+    } catch (error) {
+      console.error('Error al hacer commit de sync caja:', error);
+      return res.status(500).json({
+        message: 'Error al aplicar los cambios.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
   api.post('/admin/leads/:id/reasignar', async (req, res) => {
     if (!respondIfNotConfigured(res)) return;
 

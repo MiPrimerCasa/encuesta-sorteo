@@ -11,6 +11,9 @@ import { useAuth } from '../../context/AuthContext';
 import { cleanTelefonoSuffix } from '../../domain/whatsapp';
 import { AdminModificarLeadModal } from './AdminModificarLeadModal';
 import { LeadModalForm } from '../leads/LeadModalForm';
+import { SyncCajaModal } from './SyncCajaModal';
+import { previewSyncCajaPij, commitSyncCajaPij } from '../../api/client';
+import type { SyncPreviewItem } from '../../types';
 
 
 interface SuperadminDashboardProps {
@@ -161,6 +164,38 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
       });
     } finally {
       setDuplicatingPending(false);
+    }
+  };
+
+  const [isSyncModalOpen, setIsSyncModalOpen] = useState(false);
+  const [syncPreviewItems, setSyncPreviewItems] = useState<SyncPreviewItem[]>([]);
+  const [isSyncLoading, setIsSyncLoading] = useState(false);
+
+  const handlePreviewSync = async () => {
+    try {
+      setIsSyncLoading(true);
+      const res = await previewSyncCajaPij();
+      setSyncPreviewItems(res.cambiosPropuestos);
+      setIsSyncModalOpen(true);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error de sincronización');
+    } finally {
+      setIsSyncLoading(false);
+    }
+  };
+
+  const handleCommitSync = async (aprobados: SyncPreviewItem[]) => {
+    try {
+      setIsSyncLoading(true);
+      const res = await commitSyncCajaPij(aprobados);
+      alert(`Se actualizaron exitosamente ${res.actualizados} registros.`);
+      setIsSyncModalOpen(false);
+      // Forzar recarga del dashboard
+      window.location.reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al confirmar cambios');
+    } finally {
+      setIsSyncLoading(false);
     }
   };
 
@@ -623,9 +658,29 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
 
       {/* Control de Anexos y Recibos por Operador */}
       <section className="space-y-4">
-        <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-          Control de Anexos y Recibos por Operador
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
+            Control de Anexos y Recibos por Operador
+          </h3>
+          <button
+            onClick={handlePreviewSync}
+            disabled={isSyncLoading}
+            className="rounded-lg bg-emerald-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            {isSyncLoading ? (
+              <svg className="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                <polyline points="12 15 17 21 24 14"></polyline>
+              </svg>
+            )}
+            Sincronizar PIJ con Caja
+          </button>
+        </div>
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
           <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
             <h4 className="text-[14px] font-semibold text-zinc-900">Historial de Anexos y Recibos Cargados por Operador</h4>
@@ -2217,6 +2272,14 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         barrios={barrios}
         onClose={() => setSeguimientoLead(null)}
         onSave={handleGuardarSeguimiento}
+      />
+
+      <SyncCajaModal 
+        isOpen={isSyncModalOpen}
+        onClose={() => setIsSyncModalOpen(false)}
+        cambiosPropuestos={syncPreviewItems}
+        onCommit={handleCommitSync}
+        isLoading={isSyncLoading}
       />
     </div>
   );

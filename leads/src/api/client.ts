@@ -452,3 +452,25 @@ export async function modificarDatosLead(
   );
   return data.lead;
 }
+
+import type { SyncPreviewResponse, SyncCommitResponse, SyncPreviewItem } from '../types';
+
+export async function previewSyncCajaPij(): Promise<SyncPreviewResponse> {
+  if (_isDemoActive) {
+    return { cambiosPropuestos: [] };
+  }
+  return apiFetch<SyncPreviewResponse>('/api/admin/sync-caja-pij/preview', {
+    method: 'POST',
+  });
+}
+
+export async function commitSyncCajaPij(cambiosAprobados: SyncPreviewItem[]): Promise<SyncCommitResponse> {
+  if (_isDemoActive) {
+    return { actualizados: 0 };
+  }
+  return apiFetch<SyncCommitResponse>('/api/admin/sync-caja-pij/commit', {
+    method: 'POST',
+    body: JSON.stringify({ cambiosAprobados }),
+  });
+}
+

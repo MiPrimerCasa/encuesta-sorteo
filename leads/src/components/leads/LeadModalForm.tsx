@@ -230,6 +230,25 @@ export function LeadModalForm({
     idBarrio: '',
     numeroRecibo: '',
   });
+  // Campos estructurados para número de anexo PIJ (principal)
+  const [pijSerie, setPijSerie] = useState<'A' | 'B'>('A');
+  const [pijAdh, setPijAdh] = useState('');
+  const [pijAnexo, setPijAnexo] = useState('');
+  // Campos estructurados para número de anexo PIJ (adicional)
+  const [adicPijSerie, setAdicPijSerie] = useState<'A' | 'B'>('A');
+  const [adicPijAdh, setAdicPijAdh] = useState('');
+  const [adicPijAnexo, setAdicPijAnexo] = useState('');
+
+  // Ensambla el string de recibo PIJ desde los campos estructurados
+  function buildPijRecibo(serie: string, adh: string, anexo: string): string {
+    const s = serie.trim().toUpperCase();
+    const a = adh.trim().replace(/\D/g, '');
+    const x = anexo.trim().replace(/\D/g, '');
+    const parts: string[] = [];
+    if (a) parts.push(`${s}${a}/300`);
+    if (x) parts.push(`ANEXO ${x}/300`);
+    return parts.join(' ');
+  }
 
   const rol: RolUsuario = rolUsuario === 'promotor' ? 'promotor' : 'supervisor';
   const productosDisponibles = useMemo(
@@ -1527,19 +1546,85 @@ export function LeadModalForm({
                       )}
 
                       {muestraRecibo && (
-                        <div className="space-y-1.5">
+                        <div className="space-y-2">
                           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
                             {etiquetaNumeroDocumentoVenta(form.idProducto)}
                           </p>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={form.numeroRecibo}
-                            onChange={(e) => patch({ numeroRecibo: e.target.value })}
-                            placeholder="Ej. 001234"
-                            className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                            required
-                          />
+                          {esPlanInversion(form.idProducto) ? (
+                            // Entrada estructurada solo para PIJ (serie + adh + anexo)
+                            <div className="space-y-2">
+                              {/* Serie */}
+                              <div className="flex gap-2">
+                                {(['A', 'B'] as const).map((s) => (
+                                  <button
+                                    key={s}
+                                    type="button"
+                                    onClick={() => {
+                                      setPijSerie(s);
+                                      patch({ numeroRecibo: buildPijRecibo(s, pijAdh, pijAnexo) });
+                                    }}
+                                    className={`flex-1 h-11 rounded-lg border text-[15px] font-bold transition-all ${
+                                      pijSerie === s
+                                        ? 'border-brand-700 bg-brand-600 text-white'
+                                        : 'border-zinc-200 bg-white text-zinc-700 active:bg-zinc-50'
+                                    }`}
+                                  >
+                                    Serie {s}
+                                  </button>
+                                ))}
+                              </div>
+                              {/* N° Adhesión */}
+                              <div className="flex gap-2">
+                                <div className="flex-1 space-y-1">
+                                  <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">N° Adhesión</label>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={pijAdh}
+                                    onChange={(e) => {
+                                      const v = e.target.value.replace(/\D/g, '');
+                                      setPijAdh(v);
+                                      patch({ numeroRecibo: buildPijRecibo(pijSerie, v, pijAnexo) });
+                                    }}
+                                    placeholder="128"
+                                    className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                                  />
+                                </div>
+                                <div className="flex-1 space-y-1">
+                                  <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">N° Anexo</label>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={pijAnexo}
+                                    onChange={(e) => {
+                                      const v = e.target.value.replace(/\D/g, '');
+                                      setPijAnexo(v);
+                                      patch({ numeroRecibo: buildPijRecibo(pijSerie, pijAdh, v) });
+                                    }}
+                                    placeholder="233"
+                                    className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                                  />
+                                </div>
+                              </div>
+                              {/* Preview del recibo ensamblado */}
+                              {form.numeroRecibo.trim() && (
+                                <p className="rounded-lg bg-brand-50 border border-brand-100 px-3 py-2 text-[13px] font-mono font-semibold text-brand-800">
+                                  {form.numeroRecibo}
+                                </p>
+                              )}
+                            </div>
+                          ) : (
+                            // Terreno: texto libre
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={form.numeroRecibo}
+                              onChange={(e) => patch({ numeroRecibo: e.target.value })}
+                              placeholder="Ej. 001234"
+                              className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                              required
+                            />
+                          )}
                         </div>
                       )}
 
@@ -1712,14 +1797,80 @@ export function LeadModalForm({
                                 <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
                                   {showAddAdicional === 'pij' ? 'Número de anexo' : 'Número de recibo'}
                                 </label>
-                                <input
-                                  type="text"
-                                  inputMode="numeric"
-                                  value={adicionalForm.numeroRecibo}
-                                  onChange={(e) => setAdicionalForm(f => ({ ...f, numeroRecibo: e.target.value }))}
-                                  placeholder={showAddAdicional === 'pij' ? 'Ej. 001234' : 'Ej. 005678'}
-                                  className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-brand-600"
-                                />
+                                {showAddAdicional === 'pij' ? (
+                                  // Entrada estructurada PIJ adicional
+                                  <div className="space-y-2">
+                                    <div className="flex gap-2">
+                                      {(['A', 'B'] as const).map((s) => (
+                                        <button
+                                          key={s}
+                                          type="button"
+                                          onClick={() => {
+                                            setAdicPijSerie(s);
+                                            const r = buildPijRecibo(s, adicPijAdh, adicPijAnexo);
+                                            setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
+                                          }}
+                                          className={`flex-1 h-10 rounded-lg border text-[14px] font-bold transition-all ${
+                                            adicPijSerie === s
+                                              ? 'border-brand-700 bg-brand-600 text-white'
+                                              : 'border-zinc-200 bg-white text-zinc-700'
+                                          }`}
+                                        >
+                                          Serie {s}
+                                        </button>
+                                      ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <div className="flex-1 space-y-1">
+                                        <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">N° Adhesión</label>
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          value={adicPijAdh}
+                                          onChange={(e) => {
+                                            const v = e.target.value.replace(/\D/g, '');
+                                            setAdicPijAdh(v);
+                                            const r = buildPijRecibo(adicPijSerie, v, adicPijAnexo);
+                                            setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
+                                          }}
+                                          placeholder="128"
+                                          className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                        />
+                                      </div>
+                                      <div className="flex-1 space-y-1">
+                                        <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">N° Anexo</label>
+                                        <input
+                                          type="text"
+                                          inputMode="numeric"
+                                          value={adicPijAnexo}
+                                          onChange={(e) => {
+                                            const v = e.target.value.replace(/\D/g, '');
+                                            setAdicPijAnexo(v);
+                                            const r = buildPijRecibo(adicPijSerie, adicPijAdh, v);
+                                            setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
+                                          }}
+                                          placeholder="233"
+                                          className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                        />
+                                      </div>
+                                    </div>
+                                    {adicionalForm.numeroRecibo.trim() && (
+                                      <p className="rounded-lg bg-brand-50 border border-brand-100 px-3 py-1.5 text-[12px] font-mono font-semibold text-brand-800">
+                                        {adicionalForm.numeroRecibo}
+                                      </p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  // Terreno: texto libre
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={adicionalForm.numeroRecibo}
+                                    onChange={(e) => setAdicionalForm(f => ({ ...f, numeroRecibo: e.target.value }))}
+                                    placeholder="Ej. 005678"
+                                    className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                  />
+                                )}
                               </div>
 
                               <button
@@ -1765,6 +1916,9 @@ export function LeadModalForm({
                                     idBarrio: '',
                                     numeroRecibo: '',
                                   });
+                                  setAdicPijSerie('A');
+                                  setAdicPijAdh('');
+                                  setAdicPijAnexo('');
                                 }}
                                 className="h-10 w-full rounded-lg bg-zinc-900 text-[13px] font-semibold text-white shadow-sm hover:bg-zinc-800 active:scale-[0.98] transition-all"
                               >

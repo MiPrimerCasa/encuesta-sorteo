@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
 import { cleanTelefonoSuffix } from '../../domain/whatsapp';
+import { fetchRecibosOcupados } from '../../api/client';
 import {
   formatEntrevistaCalendario,
   getHorarioEntrevistaLead,
@@ -167,11 +168,11 @@ function patchFechaReagenda(
     v.trim()
       ? { fechaReagenda: v, ...activarReagenda() }
       : {
-          fechaReagenda: '',
-          reagendarEntrevista: false,
-          resultadoEntrevista: null,
-          huboEntrevista: null,
-        },
+        fechaReagenda: '',
+        reagendarEntrevista: false,
+        resultadoEntrevista: null,
+        huboEntrevista: null,
+      },
   );
 }
 
@@ -242,6 +243,24 @@ export function LeadModalForm({
   const [adicPijAdh, setAdicPijAdh] = useState('');
   const [adicPijAnexo, setAdicPijAnexo] = useState('');
 
+  const [recibosOcupados, setRecibosOcupados] = useState<
+    Record<string, { cliente: string; vendedor: string; leadId: string }>
+  >({});
+
+  useEffect(() => {
+    if (open) {
+      console.log('[LeadModalForm] Cargando adhesiones ocupadas globalmente...');
+      fetchRecibosOcupados()
+        .then((res) => {
+          console.log('[LeadModalForm] Adhesiones ocupadas cargadas:', res);
+          setRecibosOcupados(res);
+        })
+        .catch((err) => console.error('[LeadModalForm] Error al obtener recibos ocupados:', err));
+    } else {
+      setRecibosOcupados({});
+    }
+  }, [open]);
+
   // Ensambla el string de recibo PIJ desde los campos estructurados
   function buildPijRecibo(serie: string, adh: string, anexo: string): string {
     const s = serie.trim().toUpperCase();
@@ -253,18 +272,61 @@ export function LeadModalForm({
     return parts.join(' ');
   }
 
-  // Verifica si un recibo PIJ ya existe en otro lead (excluye el lead actual y compara por partes)
-  function buscarDuplicadoRecibo(recibo: string, excluirLeadId?: string, excluirCompraId?: string): string | null {
-    if (!recibo.trim()) return null;
-    const normalizar = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
-    const reciboNorm = normalizar(recibo);
+  // Parsea un recibo guardado tipo PIJ ("A107/300 ANEXO 278/300") en campos estructurados
+  function parsePijRecibo(recibo: string): { serie: 'A' | 'B'; adhesion: string; anexo: string } {
+    const clean = recibo.trim().toUpperCase().replace(/\s+/g, ' ');
+    const match = clean.match(/^([AB])(\d+)(?:\/300)?(?:\s+ANEXO\s+(\d+)(?:\/300)?)?$/);
+    if (match) {
+      return {
+        serie: match[1] as 'A' | 'B',
+        adhesion: match[2],
+        anexo: match[3] || '',
+      };
+    }
+    const matchFuzzy = clean.match(/^([AB])(\d+)/);
+    if (matchFuzzy) {
+      const anexoMatch = clean.match(/ANEXO\s*(\d+)/);
+      return {
+        serie: matchFuzzy[1] as 'A' | 'B',
+        adhesion: matchFuzzy[2],
+        anexo: anexoMatch ? anexoMatch[1] : '',
+      };
+    }
+    return { serie: 'A', adhesion: '', anexo: '' };
+  }
+
+  // Verifica si una combinación de Serie y Adhesión ya está utilizada por otro lead (tiempo real global + fallback local)
+  function buscarDuplicadoAdhesion(serie: string, adhesion: string, excluirLeadId?: string, excluirCompraId?: string): string | null {
+    const s = serie.trim().toUpperCase();
+    const a = adhesion.trim().replace(/\D/g, '');
+    if (!s || !a) return null;
+
+    const claveNorm = `${s}${a}`;
+    console.log(`[LeadModalForm] Buscando duplicado para clave: "${claveNorm}". ExcluirLeadId: ${excluirLeadId}`);
+
+    // 1. Validar contra el mapa global de adhesiones ocupadas
+    const ocupanteGlobal = recibosOcupados[claveNorm];
+    if (ocupanteGlobal) {
+      const esLeadActual = excluirLeadId && String(ocupanteGlobal.leadId) === String(excluirLeadId);
+      if (!esLeadActual) {
+        return `${ocupanteGlobal.cliente} (${ocupanteGlobal.vendedor})`;
+      }
+    }
+
+    // 2. Fallback / validación local sobre los leads en memoria
+    const cleanRecibo = (rec: string) => rec.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, '/');
+    const extraerSerieAdh = (rec: string) => {
+      const clean = cleanRecibo(rec);
+      const m = clean.match(/^([A-Z]+)(\d+)/);
+      return m ? `${m[1]}${m[2]}` : null;
+    };
+
     for (const l of todosLosLeads) {
       const esLeadActual = excluirLeadId && String(l.id) === String(excluirLeadId);
       // Revisar recibo principal
       if (l.seguimiento?.numeroRecibo) {
-        const existente = normalizar(l.seguimiento.numeroRecibo);
-        if (existente === reciboNorm) {
-          // Si es el mismo lead y no hay compraId excluida, es el propio registro → no es duplicado
+        const existenteClave = extraerSerieAdh(l.seguimiento.numeroRecibo);
+        if (existenteClave === claveNorm) {
           if (esLeadActual && !excluirCompraId) continue;
           if (!esLeadActual) return l.nombre;
         }
@@ -272,8 +334,8 @@ export function LeadModalForm({
       // Revisar compras adicionales
       for (const compra of (l.seguimiento?.comprasAdicionales ?? [])) {
         if (compra.numeroRecibo) {
-          const existente = normalizar(compra.numeroRecibo);
-          if (existente === reciboNorm) {
+          const existenteClave = extraerSerieAdh(compra.numeroRecibo);
+          if (existenteClave === claveNorm) {
             if (esLeadActual && excluirCompraId && String(compra.id) === String(excluirCompraId)) continue;
             return l.nombre;
           }
@@ -306,6 +368,18 @@ export function LeadModalForm({
       setForm(initial);
       setErrorVenta('');
       setErrorForm('');
+
+      // Sincronizar campos estructurados del recibo principal PIJ
+      if (initial.numeroRecibo && initial.idProducto === 'prod-pij') {
+        const parsed = parsePijRecibo(initial.numeroRecibo);
+        setPijSerie(parsed.serie);
+        setPijAdh(parsed.adhesion);
+        setPijAnexo(parsed.anexo);
+      } else {
+        setPijSerie('A');
+        setPijAdh('');
+        setPijAnexo('');
+      }
     }
   }, [open, lead, rol, productos, soloLectura]);
 
@@ -494,8 +568,8 @@ export function LeadModalForm({
         reagendarEntrevista: false,
         resultadoEntrevista:
           form.resultadoEntrevista === 'reagenda' ||
-          form.resultadoEntrevista === 'sin_interes' ||
-          form.resultadoEntrevista === 'derivar_terreno'
+            form.resultadoEntrevista === 'sin_interes' ||
+            form.resultadoEntrevista === 'derivar_terreno'
             ? null
             : form.resultadoEntrevista,
         fechaReagenda: '',
@@ -647,10 +721,10 @@ export function LeadModalForm({
         setErrorVenta(mensajeErrorNumeroDocumentoVenta(form.idProducto));
         return;
       }
-      if (esPlanInversion(form.idProducto) && form.numeroRecibo.trim()) {
-        const dup = buscarDuplicadoRecibo(form.numeroRecibo, lead?.id ?? undefined);
+      if (esPlanInversion(form.idProducto) && pijAdh.trim()) {
+        const dup = buscarDuplicadoAdhesion(pijSerie, pijAdh, lead?.id ?? undefined);
         if (dup) {
-          setErrorVenta(`Este número de anexo ya está registrado para ${dup}. Verificá el número antes de guardar.`);
+          setErrorVenta(`Este número de adhesión ya está registrado para ${dup}. Verificá el número antes de guardar.`);
           return;
         }
       }
@@ -705,7 +779,7 @@ export function LeadModalForm({
           : null,
       numeroRecibo:
         form.resultadoEntrevista === 'compro' &&
-        requiereNumeroRecibo(form.idProducto, form.estadoPago)
+          requiereNumeroRecibo(form.idProducto, form.estadoPago)
           ? form.numeroRecibo.trim()
           : null,
       brindoReferidos: form.brindoReferidos,
@@ -817,10 +891,10 @@ export function LeadModalForm({
       ? form.resultadoEntrevista != null
       : form.resultadoEntrevista === 'derivar_terreno'
         ? form.proponeFechaDerivacion !== null &&
-          (form.proponeFechaDerivacion === false || Boolean(form.horarioDerivacion.trim()))
+        (form.proponeFechaDerivacion === false || Boolean(form.horarioDerivacion.trim()))
         : form.resultadoEntrevista === 'no_compro'
           ? form.reagendaPijTrasNoCompro !== null &&
-            (form.reagendaPijTrasNoCompro === false || Boolean(form.fechaReagenda.trim()))
+          (form.reagendaPijTrasNoCompro === false || Boolean(form.fechaReagenda.trim()))
           : form.resultadoEntrevista != null);
 
   const flujoSinCitaEnPersonaEntrevistaCompleto =
@@ -828,17 +902,17 @@ export function LeadModalForm({
     form.resultadoEntrevista != null &&
     (form.resultadoEntrevista === 'compro'
       ? Boolean(form.idProducto && form.estadoPago) &&
-        (!esTerreno(form.idProducto) || Boolean(form.idBarrio)) &&
-        (!requiereNumeroRecibo(form.idProducto, form.estadoPago) ||
-          Boolean(form.numeroRecibo.trim()))
+      (!esTerreno(form.idProducto) || Boolean(form.idBarrio)) &&
+      (!requiereNumeroRecibo(form.idProducto, form.estadoPago) ||
+        Boolean(form.numeroRecibo.trim()))
       : form.resultadoEntrevista === 'no_compro'
         ? form.reagendaTrasNoComproEnPersona !== null &&
-          (form.reagendaTrasNoComproEnPersona === false ||
-            Boolean(form.fechaReagenda.trim()))
+        (form.reagendaTrasNoComproEnPersona === false ||
+          Boolean(form.fechaReagenda.trim()))
         : form.resultadoEntrevista === 'derivar_terreno'
           ? form.proponeFechaDerivacion !== null &&
-            (form.proponeFechaDerivacion === false ||
-              Boolean(form.horarioDerivacion.trim()))
+          (form.proponeFechaDerivacion === false ||
+            Boolean(form.horarioDerivacion.trim()))
           : true);
 
   const flujoSinCitaCompleto =
@@ -946,9 +1020,9 @@ export function LeadModalForm({
                 {leadSeguimientoPijPromotor(lead)
                   ? ETIQUETA_SEGUIMIENTO_PIJ
                   : etiquetaSeguimientoAgendaOtroRol(lead, rol) ??
-                    (lead.seguimiento?.operadorNombre
-                      ? `Último seguimiento por ${lead.seguimiento.operadorNombre}`
-                      : ETIQUETA_CIERRE_SUPERVISOR)}
+                  (lead.seguimiento?.operadorNombre
+                    ? `Último seguimiento por ${lead.seguimiento.operadorNombre}`
+                    : ETIQUETA_CIERRE_SUPERVISOR)}
               </p>
               <p className="mt-0.5 text-[12px] leading-snug text-indigo-800/90">
                 {lead.seguimiento?.operadorNombre
@@ -965,441 +1039,466 @@ export function LeadModalForm({
             className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5"
           >
             <fieldset disabled={soloLectura} className="m-0 space-y-6 border-0 p-0">
-            {/* Información de la encuesta (Conoce MPC / Sabía PIJ) */}
-            {(lead.conoceMpc !== null || lead.sabiaPlanInversionJoven !== null) && (
-              <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-4 space-y-3">
-                <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                  Respuestas de la Encuesta
-                </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  {lead.conoceMpc !== null && (
-                    <div>
-                      <p className="text-[12px] text-zinc-400 font-medium">¿Conocían Mi Primer Casa?</p>
-                      <p className="mt-0.5 text-[14px] font-semibold text-zinc-900">
-                        {lead.conoceMpc ? 'Sí' : 'No'}
-                      </p>
-                    </div>
-                  )}
-                  {lead.sabiaPlanInversionJoven !== null && (
-                    <div>
-                      <p className="text-[12px] text-zinc-400 font-medium">¿Sabían del Plan Inversión Joven?</p>
-                      <p className="mt-0.5 text-[14px] font-semibold text-zinc-900">
-                        {lead.sabiaPlanInversionJoven ? 'Sí' : 'No'}
-                      </p>
-                    </div>
-                  )}
+              {/* Información de la encuesta (Conoce MPC / Sabía PIJ) */}
+              {(lead.conoceMpc !== null || lead.sabiaPlanInversionJoven !== null) && (
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-4 space-y-3">
+                  <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                    Respuestas de la Encuesta
+                  </h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    {lead.conoceMpc !== null && (
+                      <div>
+                        <p className="text-[12px] text-zinc-400 font-medium">¿Conocían Mi Primer Casa?</p>
+                        <p className="mt-0.5 text-[14px] font-semibold text-zinc-900">
+                          {lead.conoceMpc ? 'Sí' : 'No'}
+                        </p>
+                      </div>
+                    )}
+                    {lead.sabiaPlanInversionJoven !== null && (
+                      <div>
+                        <p className="text-[12px] text-zinc-400 font-medium">¿Sabían del Plan Inversión Joven?</p>
+                        <p className="mt-0.5 text-[14px] font-semibold text-zinc-900">
+                          {lead.sabiaPlanInversionJoven ? 'Sí' : 'No'}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-            {showContactoSinCita && (
-              <FormSection title="¿Se contactó con el cliente?" step={1} totalSteps={totalPasos}>
-                <ButtonGroup
-                  name="seContactoCliente"
-                  options={[
-                    { value: true, label: 'Sí' },
-                    { value: false, label: 'No' },
-                  ]}
-                  value={form.seContactoCliente}
-                  onChange={handleSeContactoCliente}
-                />
-              </FormSection>
-            )}
+              )}
+              {showContactoSinCita && (
+                <FormSection title="¿Se contactó con el cliente?" step={1} totalSteps={totalPasos}>
+                  <ButtonGroup
+                    name="seContactoCliente"
+                    options={[
+                      { value: true, label: 'Sí' },
+                      { value: false, label: 'No' },
+                    ]}
+                    value={form.seContactoCliente}
+                    onChange={handleSeContactoCliente}
+                  />
+                </FormSection>
+              )}
 
-            {showCanalSinCita && (
-              <FormSection title="Canal de contacto" step={2} totalSteps={totalPasos}>
-                <ButtonGroup
-                  name="canalSinCita"
-                  options={opcionesCanalContacto()}
-                  value={form.canal}
-                  onChange={handleCanal}
-                />
-              </FormSection>
-            )}
+              {showCanalSinCita && (
+                <FormSection title="Canal de contacto" step={2} totalSteps={totalPasos}>
+                  <ButtonGroup
+                    name="canalSinCita"
+                    options={opcionesCanalContacto()}
+                    value={form.canal}
+                    onChange={handleCanal}
+                  />
+                </FormSection>
+              )}
 
-            {showAgendoPregunta && (
-              <FormSection title="¿Agendó una entrevista?" step={3} totalSteps={totalPasos}>
-                <ButtonGroup
-                  name="agendoEntrevista"
-                  options={[
-                    { value: true, label: 'Sí' },
-                    { value: false, label: 'No' },
-                  ]}
-                  value={form.agendoEntrevista}
-                  onChange={handleAgendoEntrevista}
-                />
-              </FormSection>
-            )}
+              {showAgendoPregunta && (
+                <FormSection title="¿Agendó una entrevista?" step={3} totalSteps={totalPasos}>
+                  <ButtonGroup
+                    name="agendoEntrevista"
+                    options={[
+                      { value: true, label: 'Sí' },
+                      { value: false, label: 'No' },
+                    ]}
+                    value={form.agendoEntrevista}
+                    onChange={handleAgendoEntrevista}
+                  />
+                </FormSection>
+              )}
 
-            {showAgendoCalendario && (
-              <FormSection title="Fecha y hora de entrevista" step={4} totalSteps={totalPasos}>
-                <CampoFechaReagenda
-                  value={form.fechaReagenda}
-                  onChange={(v) => patchFechaReagenda(v, patch)}
-                />
-                <p className="mt-3 text-[12px] leading-relaxed text-brand-700">
-                  Al guardar, el lead pasa a{' '}
-                  <span className="font-medium">En seguimiento</span> y aparece en el calendario.
-                </p>
-              </FormSection>
-            )}
-
-            {showAgendoNoEnPersonaOpciones && (
-              <FormSection title="¿Qué pasó?" step={4} totalSteps={totalPasos}>
-                <RadioOption
-                  name="agendoNoEnPersona"
-                  value="sin_interes"
-                  label="No muestra interés"
-                  checked={form.resultadoEntrevista === 'sin_interes'}
-                  onChange={() => handleAgendoNoEnPersona('sin_interes')}
-                />
-                <RadioOption
-                  name="agendoNoEnPersona"
-                  value="entrevista_momento"
-                  label="La entrevista fue en el momento"
-                  checked={form.huboEntrevista === true}
-                  onChange={() => handleAgendoNoEnPersona('entrevista_momento')}
-                />
-              </FormSection>
-            )}
-
-            {showSinInteresSinCita && (
-              <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-[13px] text-zinc-700">
-                El cliente <span className="font-medium">no estaba interesado</span>. Al guardar pasa
-                a Contactado.
-              </p>
-            )}
-
-            {showSinInteresSinCitaEnPersona && (
-              <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-[13px] text-zinc-700">
-                El cliente <span className="font-medium">no muestra interés</span>. Al guardar pasa
-                a Contactado.
-              </p>
-            )}
-
-            {/* Con cita previa: confirmación de entrevista agendada */}
-            {!flujoSinCita && (
-              <FormSection title="¿Confirmó entrevista?" step={1} totalSteps={totalPasos}>
-                <ButtonGroup
-                  name="confirmoEntrevista"
-                  options={[
-                    { value: true, label: 'Sí' },
-                    { value: false, label: 'No' },
-                  ]}
-                  value={form.confirmoEntrevista}
-                  onChange={handleConfirmoEntrevista}
-                />
-              </FormSection>
-            )}
-
-            {showCanalSiConfirmo && (
-              <FormSection title="Canal de contacto" step={2} totalSteps={totalPasos}>
-                <ButtonGroup
-                  name="canal"
-                  options={opcionesCanalContacto()}
-                  value={form.canal}
-                  onChange={handleCanal}
-                />
-              </FormSection>
-            )}
-
-            {showCitaExistente && fmtCitaLead && (
-              <FormSection title="Entrevista agendada" step={3} totalSteps={totalPasos}>
-                <div className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-600">
-                    Fecha y hora
-                  </p>
-                  <p className="mt-1 text-[16px] font-semibold tabular-nums text-brand-900">
-                    {fmtCitaLead.diaSemana} {fmtCitaLead.diaNumero} · {fmtCitaLead.hora}
-                  </p>
-                  {lugarCitaLead && labelLugarEntrevista(lugarCitaLead) && (
-                    <p className="mt-1.5 text-[12px] text-brand-700">
-                      {labelLugarEntrevista(lugarCitaLead)}
-                    </p>
-                  )}
-                </div>
-              </FormSection>
-            )}
-
-            {showHuboEntrevista && (
-              <FormSection
-                title={esFlujoCampo ? 'Visita en calle' : 'Entrevista'}
-                step={flujoSinCita ? 1 : showCitaExistente ? 4 : 3}
-                totalSteps={totalPasos}
-              >
-                <ButtonGroup
-                  name="huboEntrevista"
-                  label="¿Hubo entrevista?"
-                  options={[
-                    { value: true, label: 'Sí' },
-                    { value: false, label: 'No' },
-                  ]}
-                  value={form.huboEntrevista}
-                  onChange={handleEntrevista}
-                />
-                {esFlujoCampo && (
-                  <p className="mt-2 text-[12px] leading-relaxed text-zinc-500">
-                    Registrá el resultado de la visita o el cierre de Plan Inversión Joven en el momento.
-                  </p>
-                )}
-              </FormSection>
-            )}
-
-            {showSinEntrevistaResultado && (
-              <FormSection title="Resultado" step={flujoSinCita ? (esFlujoCampo ? 2 : undefined) : undefined} totalSteps={totalPasos}>
-                <RadioOption
-                  name="sinEntrevista"
-                  value="sin_interes"
-                  label="No muestra interés"
-                  checked={form.resultadoEntrevista === 'sin_interes'}
-                  onChange={() =>
-                    patch({
-                      resultadoEntrevista: 'sin_interes',
-                      fechaReagenda: '',
-                      reagendarEntrevista: false,
-                      ...resetCamposVenta(),
-                    })
-                  }
-                />
-                <RadioOption
-                  name="sinEntrevista"
-                  value="reagenda"
-                  label="Quiere reagendar"
-                  checked={form.resultadoEntrevista === 'reagenda'}
-                  onChange={() => patch({ ...activarReagenda(), reagendarEntrevista: true })}
-                />
-                {showReagendaSinEntrevistaCampo && (
+              {showAgendoCalendario && (
+                <FormSection title="Fecha y hora de entrevista" step={4} totalSteps={totalPasos}>
                   <CampoFechaReagenda
                     value={form.fechaReagenda}
                     onChange={(v) => patchFechaReagenda(v, patch)}
                   />
-                )}
-              </FormSection>
-            )}
+                  <p className="mt-3 text-[12px] leading-relaxed text-brand-700">
+                    Al guardar, el lead pasa a{' '}
+                    <span className="font-medium">En seguimiento</span> y aparece en el calendario.
+                  </p>
+                </FormSection>
+              )}
 
-            {showEntrevistaDetalle && (
-              <FormSection
-                title="Resultado de la entrevista"
-                step={
-                  entrevistaEnElMomento ? 5 : esFlujoCampo ? 2 : 4
-                }
-                totalSteps={totalPasos}
-              >
-                <div className="mt-2 space-y-2">
+              {showAgendoNoEnPersonaOpciones && (
+                <FormSection title="¿Qué pasó?" step={4} totalSteps={totalPasos}>
                   <RadioOption
-                    name="conEntrevista"
-                    value="no_compro"
-                    label={labelsEntrevista.noCompro}
-                    checked={form.resultadoEntrevista === 'no_compro'}
+                    name="agendoNoEnPersona"
+                    value="sin_interes"
+                    label="No muestra interés"
+                    checked={form.resultadoEntrevista === 'sin_interes'}
+                    onChange={() => handleAgendoNoEnPersona('sin_interes')}
+                  />
+                  <RadioOption
+                    name="agendoNoEnPersona"
+                    value="entrevista_momento"
+                    label="La entrevista fue en el momento"
+                    checked={form.huboEntrevista === true}
+                    onChange={() => handleAgendoNoEnPersona('entrevista_momento')}
+                  />
+                </FormSection>
+              )}
+
+              {showSinInteresSinCita && (
+                <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-[13px] text-zinc-700">
+                  El cliente <span className="font-medium">no estaba interesado</span>. Al guardar pasa
+                  a Contactado.
+                </p>
+              )}
+
+              {showSinInteresSinCitaEnPersona && (
+                <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3 text-[13px] text-zinc-700">
+                  El cliente <span className="font-medium">no muestra interés</span>. Al guardar pasa
+                  a Contactado.
+                </p>
+              )}
+
+              {/* Con cita previa: confirmación de entrevista agendada */}
+              {!flujoSinCita && (
+                <FormSection title="¿Confirmó entrevista?" step={1} totalSteps={totalPasos}>
+                  <ButtonGroup
+                    name="confirmoEntrevista"
+                    options={[
+                      { value: true, label: 'Sí' },
+                      { value: false, label: 'No' },
+                    ]}
+                    value={form.confirmoEntrevista}
+                    onChange={handleConfirmoEntrevista}
+                  />
+                </FormSection>
+              )}
+
+              {showCanalSiConfirmo && (
+                <FormSection title="Canal de contacto" step={2} totalSteps={totalPasos}>
+                  <ButtonGroup
+                    name="canal"
+                    options={opcionesCanalContacto()}
+                    value={form.canal}
+                    onChange={handleCanal}
+                  />
+                </FormSection>
+              )}
+
+              {showCitaExistente && fmtCitaLead && (
+                <FormSection title="Entrevista agendada" step={3} totalSteps={totalPasos}>
+                  <div className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-600">
+                      Fecha y hora
+                    </p>
+                    <p className="mt-1 text-[16px] font-semibold tabular-nums text-brand-900">
+                      {fmtCitaLead.diaSemana} {fmtCitaLead.diaNumero} · {fmtCitaLead.hora}
+                    </p>
+                    {lugarCitaLead && labelLugarEntrevista(lugarCitaLead) && (
+                      <p className="mt-1.5 text-[12px] text-brand-700">
+                        {labelLugarEntrevista(lugarCitaLead)}
+                      </p>
+                    )}
+                  </div>
+                </FormSection>
+              )}
+
+              {showHuboEntrevista && (
+                <FormSection
+                  title={esFlujoCampo ? 'Visita en calle' : 'Entrevista'}
+                  step={flujoSinCita ? 1 : showCitaExistente ? 4 : 3}
+                  totalSteps={totalPasos}
+                >
+                  <ButtonGroup
+                    name="huboEntrevista"
+                    label="¿Hubo entrevista?"
+                    options={[
+                      { value: true, label: 'Sí' },
+                      { value: false, label: 'No' },
+                    ]}
+                    value={form.huboEntrevista}
+                    onChange={handleEntrevista}
+                  />
+                  {esFlujoCampo && (
+                    <p className="mt-2 text-[12px] leading-relaxed text-zinc-500">
+                      Registrá el resultado de la visita o el cierre de Plan Inversión Joven en el momento.
+                    </p>
+                  )}
+                </FormSection>
+              )}
+
+              {showSinEntrevistaResultado && (
+                <FormSection title="Resultado" step={flujoSinCita ? (esFlujoCampo ? 2 : undefined) : undefined} totalSteps={totalPasos}>
+                  <RadioOption
+                    name="sinEntrevista"
+                    value="sin_interes"
+                    label="No muestra interés"
+                    checked={form.resultadoEntrevista === 'sin_interes'}
                     onChange={() =>
                       patch({
-                        resultadoEntrevista: 'no_compro',
-                        reagendaPijTrasNoCompro: null,
-                        reagendaTrasNoComproEnPersona: null,
-                        reagendarEntrevista: false,
+                        resultadoEntrevista: 'sin_interes',
                         fechaReagenda: '',
-                        proponeFechaDerivacion: null,
-                        horarioDerivacion: '',
+                        reagendarEntrevista: false,
                         ...resetCamposVenta(),
                       })
                     }
                   />
-                  {showReagendaTrasNoComproSinCita && (
-                    <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50 p-4">
-                      <ButtonGroup
-                        name="reagendaTrasNoComproEnPersona"
-                        label="¿Qué hacemos ahora?"
-                        options={[
-                          { value: true, label: 'Reagendar' },
-                          { value: false, label: 'No muestra interés' },
-                        ]}
-                        value={form.reagendaTrasNoComproEnPersona}
-                        onChange={(v) =>
-                          patch({
-                            reagendaTrasNoComproEnPersona: v,
-                            reagendarEntrevista: v,
-                            resultadoEntrevista: v ? 'reagenda' : 'sin_interes',
-                            fechaReagenda: v ? form.fechaReagenda : '',
-                          })
-                        }
-                      />
-                      {showFechaReagendaTrasNoComproSinCita && (
-                        <CampoFechaReagenda
-                          value={form.fechaReagenda}
-                          onChange={(v) => patchFechaReagenda(v, patch)}
-                        />
-                      )}
-                      {showFechaReagendaTrasNoComproSinCita && (
-                        <p className="text-[12px] leading-relaxed text-brand-800">
-                          Al guardar, el lead pasa a{' '}
-                          <span className="font-semibold">En seguimiento</span> con la nueva fecha.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  {showReagendaPijTrasNoCompro && (
-                    <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50 p-4">
-                      <ButtonGroup
-                        name="reagendaPijTrasNoCompro"
-                        label="¿Reagendar para ofrecer nuevamente el Plan Inversión Joven?"
-                        options={[
-                          { value: true, label: 'Sí, reagendar' },
-                          { value: false, label: 'No, cerrar sin seguimiento' },
-                        ]}
-                        value={form.reagendaPijTrasNoCompro}
-                        onChange={(v) =>
-                          patch({
-                            reagendaPijTrasNoCompro: v,
-                            reagendarEntrevista: v,
-                            fechaReagenda: v ? form.fechaReagenda : '',
-                          })
-                        }
-                      />
-                      {showFechaReagendaPij && (
-                        <div className="space-y-1.5">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                            Nueva fecha y hora de contacto
-                          </p>
-                          <DateTimePicker
-                            value={form.fechaReagenda}
-                            onChange={(v) => patch({ fechaReagenda: v })}
-                            autoOpen={!form.fechaReagenda}
-                            required
-                          />
-                        </div>
-                      )}
-                      {showFechaReagendaPij && (
-                        <p className="text-[12px] leading-relaxed text-brand-800">
-                          Al guardar, el lead sale de Prioridad y queda en{' '}
-                          <span className="font-semibold">En seguimiento</span>, ordenado por esta
-                          fecha.
-                        </p>
-                      )}
-                    </div>
-                  )}
                   <RadioOption
-                    name="conEntrevista"
-                    value="compro"
-                    label={labelsEntrevista.compro}
-                    checked={form.resultadoEntrevista === 'compro'}
-                    onChange={() => {
-                      setErrorVenta('');
-                      const defaultProducto =
-                        rol === 'supervisor'
-                          ? productosDisponibles.find((p) => p.id === ID_PRODUCTO_TERRENO)?.id ??
-                            productosDisponibles[0]?.id ??
-                            ''
-                          : productosDisponibles[0]?.id ?? '';
-                      patch({
-                        resultadoEntrevista: 'compro',
-                        proponeFechaDerivacion: null,
-                        horarioDerivacion: '',
-                        idProducto: form.idProducto || defaultProducto,
-                      });
-                    }}
+                    name="sinEntrevista"
+                    value="reagenda"
+                    label="Quiere reagendar"
+                    checked={form.resultadoEntrevista === 'reagenda'}
+                    onChange={() => patch({ ...activarReagenda(), reagendarEntrevista: true })}
                   />
-                  {labelDerivarTerreno && (
+                  {showReagendaSinEntrevistaCampo && (
+                    <CampoFechaReagenda
+                      value={form.fechaReagenda}
+                      onChange={(v) => patchFechaReagenda(v, patch)}
+                    />
+                  )}
+                </FormSection>
+              )}
+
+              {showEntrevistaDetalle && (
+                <FormSection
+                  title="Resultado de la entrevista"
+                  step={
+                    entrevistaEnElMomento ? 5 : esFlujoCampo ? 2 : 4
+                  }
+                  totalSteps={totalPasos}
+                >
+                  <div className="mt-2 space-y-2">
                     <RadioOption
                       name="conEntrevista"
-                      value="derivar_terreno"
-                      label={labelDerivarTerreno}
-                      tone="terreno"
-                      checked={form.resultadoEntrevista === 'derivar_terreno'}
+                      value="no_compro"
+                      label={labelsEntrevista.noCompro}
+                      checked={form.resultadoEntrevista === 'no_compro'}
                       onChange={() =>
                         patch({
-                          resultadoEntrevista: 'derivar_terreno',
+                          resultadoEntrevista: 'no_compro',
+                          reagendaPijTrasNoCompro: null,
+                          reagendaTrasNoComproEnPersona: null,
+                          reagendarEntrevista: false,
+                          fechaReagenda: '',
                           proponeFechaDerivacion: null,
                           horarioDerivacion: '',
                           ...resetCamposVenta(),
                         })
                       }
                     />
-                  )}
-
-                  {showDerivarTerreno && (
-                    <div className="lead-card--terreno space-y-3 rounded-xl border border-red-300 bg-gradient-to-br from-red-50 to-orange-50/90 p-4">
-                      <ButtonGroup
-                        name="proponeFechaDerivacion"
-                        label="¿El cliente propuso fecha para la entrevista?"
-                        options={[
-                          { value: true, label: 'Sí' },
-                          { value: false, label: 'No' },
-                        ]}
-                        value={form.proponeFechaDerivacion}
-                        onChange={(v) =>
+                    {showReagendaTrasNoComproSinCita && (
+                      <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50 p-4">
+                        <ButtonGroup
+                          name="reagendaTrasNoComproEnPersona"
+                          label="¿Qué hacemos ahora?"
+                          options={[
+                            { value: true, label: 'Reagendar' },
+                            { value: false, label: 'No muestra interés' },
+                          ]}
+                          value={form.reagendaTrasNoComproEnPersona}
+                          onChange={(v) =>
+                            patch({
+                              reagendaTrasNoComproEnPersona: v,
+                              reagendarEntrevista: v,
+                              resultadoEntrevista: v ? 'reagenda' : 'sin_interes',
+                              fechaReagenda: v ? form.fechaReagenda : '',
+                            })
+                          }
+                        />
+                        {showFechaReagendaTrasNoComproSinCita && (
+                          <CampoFechaReagenda
+                            value={form.fechaReagenda}
+                            onChange={(v) => patchFechaReagenda(v, patch)}
+                          />
+                        )}
+                        {showFechaReagendaTrasNoComproSinCita && (
+                          <p className="text-[12px] leading-relaxed text-brand-800">
+                            Al guardar, el lead pasa a{' '}
+                            <span className="font-semibold">En seguimiento</span> con la nueva fecha.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {showReagendaPijTrasNoCompro && (
+                      <div className="space-y-3 rounded-xl border border-brand-100 bg-brand-50 p-4">
+                        <ButtonGroup
+                          name="reagendaPijTrasNoCompro"
+                          label="¿Reagendar para ofrecer nuevamente el Plan Inversión Joven?"
+                          options={[
+                            { value: true, label: 'Sí, reagendar' },
+                            { value: false, label: 'No, cerrar sin seguimiento' },
+                          ]}
+                          value={form.reagendaPijTrasNoCompro}
+                          onChange={(v) =>
+                            patch({
+                              reagendaPijTrasNoCompro: v,
+                              reagendarEntrevista: v,
+                              fechaReagenda: v ? form.fechaReagenda : '',
+                            })
+                          }
+                        />
+                        {showFechaReagendaPij && (
+                          <div className="space-y-1.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                              Nueva fecha y hora de contacto
+                            </p>
+                            <DateTimePicker
+                              value={form.fechaReagenda}
+                              onChange={(v) => patch({ fechaReagenda: v })}
+                              autoOpen={!form.fechaReagenda}
+                              required
+                            />
+                          </div>
+                        )}
+                        {showFechaReagendaPij && (
+                          <p className="text-[12px] leading-relaxed text-brand-800">
+                            Al guardar, el lead sale de Prioridad y queda en{' '}
+                            <span className="font-semibold">En seguimiento</span>, ordenado por esta
+                            fecha.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    <RadioOption
+                      name="conEntrevista"
+                      value="compro"
+                      label={labelsEntrevista.compro}
+                      checked={form.resultadoEntrevista === 'compro'}
+                      onChange={() => {
+                        setErrorVenta('');
+                        const defaultProducto =
+                          rol === 'supervisor'
+                            ? productosDisponibles.find((p) => p.id === ID_PRODUCTO_TERRENO)?.id ??
+                            productosDisponibles[0]?.id ??
+                            ''
+                            : productosDisponibles[0]?.id ?? '';
+                        patch({
+                          resultadoEntrevista: 'compro',
+                          proponeFechaDerivacion: null,
+                          horarioDerivacion: '',
+                          idProducto: form.idProducto || defaultProducto,
+                        });
+                      }}
+                    />
+                    {labelDerivarTerreno && (
+                      <RadioOption
+                        name="conEntrevista"
+                        value="derivar_terreno"
+                        label={labelDerivarTerreno}
+                        tone="terreno"
+                        checked={form.resultadoEntrevista === 'derivar_terreno'}
+                        onChange={() =>
                           patch({
-                            proponeFechaDerivacion: v,
-                            horarioDerivacion: v ? form.horarioDerivacion : '',
+                            resultadoEntrevista: 'derivar_terreno',
+                            proponeFechaDerivacion: null,
+                            horarioDerivacion: '',
+                            ...resetCamposVenta(),
                           })
                         }
                       />
-                      {showAgendarDerivacion && (
-                        <div className="space-y-1.5">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-red-700">
-                            Fecha y hora de entrevista
-                          </p>
-                          <DateTimePicker
-                            value={form.horarioDerivacion}
-                            onChange={(v) => patch({ horarioDerivacion: v })}
-                            autoOpen={!form.horarioDerivacion}
-                            required
-                          />
-                        </div>
-                      )}
-                      {form.proponeFechaDerivacion === false && (
-                        <p className="text-[12px] leading-relaxed text-red-800/90">
-                          Sin fecha agendada: el supervisor hará el seguimiento del lead.
-                        </p>
-                      )}
-                    </div>
-                  )}
+                    )}
 
-                  {showCompro && soloLectura && (
-                    <div className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
-                      <div>
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                          Producto cerrado
-                        </p>
-                        <p className="mt-1 text-[15px] font-medium text-zinc-900">
-                          {getProductoNombre(idProductoCierre, productos) ?? '—'}
-                        </p>
+                    {showDerivarTerreno && (
+                      <div className="lead-card--terreno space-y-3 rounded-xl border border-red-300 bg-gradient-to-br from-red-50 to-orange-50/90 p-4">
+                        <ButtonGroup
+                          name="proponeFechaDerivacion"
+                          label="¿El cliente propuso fecha para la entrevista?"
+                          options={[
+                            { value: true, label: 'Sí' },
+                            { value: false, label: 'No' },
+                          ]}
+                          value={form.proponeFechaDerivacion}
+                          onChange={(v) =>
+                            patch({
+                              proponeFechaDerivacion: v,
+                              horarioDerivacion: v ? form.horarioDerivacion : '',
+                            })
+                          }
+                        />
+                        {showAgendarDerivacion && (
+                          <div className="space-y-1.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-red-700">
+                              Fecha y hora de entrevista
+                            </p>
+                            <DateTimePicker
+                              value={form.horarioDerivacion}
+                              onChange={(v) => patch({ horarioDerivacion: v })}
+                              autoOpen={!form.horarioDerivacion}
+                              required
+                            />
+                          </div>
+                        )}
+                        {form.proponeFechaDerivacion === false && (
+                          <p className="text-[12px] leading-relaxed text-red-800/90">
+                            Sin fecha agendada: el supervisor hará el seguimiento del lead.
+                          </p>
+                        )}
                       </div>
-                      {productoEsTerreno && (
+                    )}
+
+                    {showCompro && soloLectura && (
+                      <div className="space-y-4 rounded-xl border border-zinc-200 bg-zinc-50 p-4">
                         <div>
                           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                            Barrio
+                            Producto cerrado
                           </p>
                           <p className="mt-1 text-[15px] font-medium text-zinc-900">
-                            {getBarrioNombre(idBarrioCierre, barrios) ?? '—'}
+                            {getProductoNombre(idProductoCierre, productos) ?? '—'}
                           </p>
                         </div>
-                      )}
-                      {estadoPagoCierre && (
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                            {tituloEstadoCompra('supervisor')}
-                          </p>
-                          <p className="mt-1 text-[15px] font-medium text-zinc-900">
-                            {etiquetaEstadoPagoVisible('supervisor', estadoPagoCierre, idProductoCierre) ??
-                              estadoPagoCierre}
-                          </p>
-                        </div>
-                      )}
-                      {numeroReciboCierre.trim() && (
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                            {etiquetaCortaNumeroDocumentoVenta(idProductoCierre)}
-                          </p>
-                          <p className="mt-1 text-[15px] font-medium tabular-nums text-zinc-900">
-                            {numeroReciboCierre}
-                          </p>
-                        </div>
-                      )}
-                      {lead.seguimiento?.fechaCierre && (
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                            Fecha de cierre
-                          </p>
-                          <p className="mt-1 text-[15px] font-medium text-zinc-900">
+                        {productoEsTerreno && (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                              Barrio
+                            </p>
+                            <p className="mt-1 text-[15px] font-medium text-zinc-900">
+                              {getBarrioNombre(idBarrioCierre, barrios) ?? '—'}
+                            </p>
+                          </div>
+                        )}
+                        {estadoPagoCierre && (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                              {tituloEstadoCompra('supervisor')}
+                            </p>
+                            <p className="mt-1 text-[15px] font-medium text-zinc-900">
+                              {etiquetaEstadoPagoVisible('supervisor', estadoPagoCierre, idProductoCierre) ??
+                                estadoPagoCierre}
+                            </p>
+                          </div>
+                        )}
+                        {numeroReciboCierre.trim() && (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                              {etiquetaCortaNumeroDocumentoVenta(idProductoCierre)}
+                            </p>
+                            <p className="mt-1 text-[15px] font-medium tabular-nums text-zinc-900">
+                              {numeroReciboCierre}
+                            </p>
+                          </div>
+                        )}
+                        {lead.seguimiento?.fechaCierre && (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                              Fecha de cierre
+                            </p>
+                            <p className="mt-1 text-[15px] font-medium text-zinc-900">
+                              {(() => {
+                                try {
+                                  const d = parseIsoLocal(lead.seguimiento.fechaCierre);
+                                  if (!d || isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
+                                  const day = String(d.getDate()).padStart(2, '0');
+                                  const month = String(d.getMonth() + 1).padStart(2, '0');
+                                  const year = d.getFullYear();
+                                  const hours = String(d.getHours()).padStart(2, '0');
+                                  const minutes = String(d.getMinutes()).padStart(2, '0');
+                                  return `${day}/${month}/${year} ${hours}:${minutes}`;
+                                } catch {
+                                  return lead.seguimiento.fechaCierre;
+                                }
+                              })()}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {showCompro && !soloLectura && (
+                      <div className="space-y-5 rounded-xl border border-brand-100 bg-brand-50 p-4">
+                        {lead.seguimiento?.fechaCierre && (
+                          <div className="text-[13px] font-semibold text-brand-800">
+                            Cierre registrado el:{' '}
                             {(() => {
                               try {
                                 const d = parseIsoLocal(lead.seguimiento.fechaCierre);
@@ -1414,740 +1513,707 @@ export function LeadModalForm({
                                 return lead.seguimiento.fechaCierre;
                               }
                             })()}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {showCompro && !soloLectura && (
-                    <div className="space-y-5 rounded-xl border border-brand-100 bg-brand-50 p-4">
-                      {lead.seguimiento?.fechaCierre && (
-                        <div className="text-[13px] font-semibold text-brand-800">
-                          Cierre registrado el:{' '}
-                          {(() => {
-                            try {
-                              const d = parseIsoLocal(lead.seguimiento.fechaCierre);
-                              if (!d || isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
-                              const day = String(d.getDate()).padStart(2, '0');
-                              const month = String(d.getMonth() + 1).padStart(2, '0');
-                              const year = d.getFullYear();
-                              const hours = String(d.getHours()).padStart(2, '0');
-                              const minutes = String(d.getMinutes()).padStart(2, '0');
-                              return `${day}/${month}/${year} ${hours}:${minutes}`;
-                            } catch {
-                              return lead.seguimiento.fechaCierre;
-                            }
-                          })()}
-                        </div>
-                      )}
-                      {/* Producto */}
-                      <div className="space-y-2">
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                            ¿Qué producto cerró?
-                          </p>
-                          <p className="mt-0.5 text-[12px] text-zinc-500">
-                            {rol === 'promotor' ? 'Solo Plan Inversión Joven' : 'Plan Inversión Joven o Terreno'}
-                          </p>
-                        </div>
+                          </div>
+                        )}
+                        {/* Producto */}
                         <div className="space-y-2">
-                          {productosDisponibles.map((prod) => {
-                            const sel = form.idProducto === prod.id;
-                            return (
-                              <button
-                                key={prod.id}
-                                type="button"
-                                onClick={() => {
-                                  setErrorVenta('');
-                                  patch(resetCamposAlCambiarProducto(prod.id));
-                                }}
-                                style={{ touchAction: 'manipulation' }}
-                                className={`h-12 w-full rounded-lg border px-4 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${
-                                  sel
-                                    ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
-                                    : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
-                                }`}
-                              >
-                                {prod.nombre}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Barrio (solo terrenos) */}
-                      {productoEsTerreno && (
-                        <div className="space-y-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                            Barrio
-                          </p>
-                          {barrios.length === 0 ? (
-                            <p className="text-[13px] text-red-600">No hay barrios cargados.</p>
-                          ) : (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => setBarrioPickerOpen(true)}
-                                style={{ touchAction: 'manipulation' }}
-                                className={`flex h-12 w-full items-center justify-between rounded-lg border px-4 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${
-                                  form.idBarrio
-                                    ? 'border-brand-600 bg-brand-50 text-brand-800 active:bg-brand-100'
-                                    : 'border-zinc-200 bg-white text-zinc-500 active:bg-zinc-50'
-                                }`}
-                              >
-                                <span>
-                                  {form.idBarrio
-                                    ? (getBarrioNombre(form.idBarrio, barrios) ?? 'Barrio seleccionado')
-                                    : 'Seleccionar barrio'}
-                                </span>
-                                <svg
-                                  className="h-5 w-5 shrink-0 text-zinc-400"
-                                  viewBox="0 0 20 20"
-                                  fill="currentColor"
-                                  aria-hidden="true"
-                                >
-                                  <path
-                                    fillRule="evenodd"
-                                    d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
-                                    clipRule="evenodd"
-                                  />
-                                </svg>
-                              </button>
-                              <BarrioPickerSheet
-                                open={barrioPickerOpen}
-                                barrios={barrios}
-                                selectedId={form.idBarrio}
-                                onClose={() => setBarrioPickerOpen(false)}
-                                onSelect={(idBarrio) => {
-                                  setErrorVenta('');
-                                  patch({ idBarrio });
-                                }}
-                              />
-                            </>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Estado del pago */}
-                      {form.idProducto && opcionesPago.length > 0 && (
-                        <div className="space-y-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                            {tituloEstadoCompra(rol)}
-                          </p>
-                          {productoEsPij && (
-                            <p className="text-[12px] text-zinc-500">
-                              La entrega de $33.000 equivale al cierre del plan.
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                              ¿Qué producto cerró?
                             </p>
-                          )}
+                            <p className="mt-0.5 text-[12px] text-zinc-500">
+                              {rol === 'promotor' ? 'Solo Plan Inversión Joven' : 'Plan Inversión Joven o Terreno'}
+                            </p>
+                          </div>
                           <div className="space-y-2">
-                            {opcionesPago.map((op) => {
-                              const sel = form.estadoPago === op.value;
-                              const bloqueada = Boolean(op.disabled);
+                            {productosDisponibles.map((prod) => {
+                              const sel = form.idProducto === prod.id;
                               return (
                                 <button
-                                  key={op.value}
-                                  type="button"
-                                  disabled={bloqueada}
-                                  onClick={() => {
-                                    if (bloqueada) return;
-                                    setErrorVenta('');
-                                    const limpiaRecibo = !requiereNumeroRecibo(form.idProducto, op.value);
-                                    patch({
-                                      estadoPago: op.value,
-                                      numeroRecibo: limpiaRecibo ? '' : form.numeroRecibo,
-                                    });
-                                  }}
-                                  style={{ touchAction: bloqueada ? undefined : 'manipulation' }}
-                                  className={`min-h-[48px] w-full rounded-lg border px-4 py-2 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${
-                                    bloqueada
-                                      ? 'cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400'
-                                      : sel
-                                        ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
-                                        : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
-                                  }`}
-                                >
-                                  {op.label}
-                                  {bloqueada && (
-                                    <span className="mt-0.5 block text-[12px] font-normal text-zinc-400">
-                                      No disponible
-                                    </span>
-                                  )}
-                                  {op.hint && sel && !bloqueada && (
-                                    <span className="mt-0.5 block text-[12px] font-normal opacity-90">
-                                      {op.hint}
-                                    </span>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {muestraRecibo && (
-                        <div className="space-y-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                            {etiquetaNumeroDocumentoVenta(form.idProducto)}
-                          </p>
-                          {esPlanInversion(form.idProducto) ? (
-                            // Entrada estructurada solo para PIJ (serie + adh + anexo)
-                            <div className="space-y-2">
-                              {/* Serie */}
-                              <div className="flex gap-2">
-                                {(['A', 'B'] as const).map((s) => (
-                                  <button
-                                    key={s}
-                                    type="button"
-                                    onClick={() => {
-                                      setPijSerie(s);
-                                      patch({ numeroRecibo: buildPijRecibo(s, pijAdh, pijAnexo) });
-                                    }}
-                                    className={`flex-1 h-11 rounded-lg border text-[15px] font-bold transition-all ${
-                                      pijSerie === s
-                                        ? 'border-brand-700 bg-brand-600 text-white'
-                                        : 'border-zinc-200 bg-white text-zinc-700 active:bg-zinc-50'
-                                    }`}
-                                  >
-                                    Serie {s}
-                                  </button>
-                                ))}
-                              </div>
-                              {/* N° Adhesión */}
-                              <div className="flex gap-2">
-                                <div className="flex-1 space-y-1">
-                                  <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">N° Adhesión</label>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={pijAdh}
-                                    onChange={(e) => {
-                                      const v = e.target.value.replace(/\D/g, '');
-                                      setPijAdh(v);
-                                      patch({ numeroRecibo: buildPijRecibo(pijSerie, v, pijAnexo) });
-                                    }}
-                                    placeholder="128"
-                                    className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                                  />
-                                </div>
-                                <div className="flex-1 space-y-1">
-                                  <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">N° Anexo</label>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={pijAnexo}
-                                    onChange={(e) => {
-                                      const v = e.target.value.replace(/\D/g, '');
-                                      setPijAnexo(v);
-                                      patch({ numeroRecibo: buildPijRecibo(pijSerie, pijAdh, v) });
-                                    }}
-                                    placeholder="233"
-                                    className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                                  />
-                                </div>
-                              </div>
-                              {/* Preview del recibo ensamblado */}
-                              {form.numeroRecibo.trim() && (() => {
-                                const dup = buscarDuplicadoRecibo(form.numeroRecibo, lead?.id ?? undefined);
-                                return (
-                                  <>
-                                    <p className={`rounded-lg border px-3 py-2 text-[13px] font-mono font-semibold ${
-                                      dup
-                                        ? 'bg-red-50 border-red-300 text-red-700'
-                                        : 'bg-brand-50 border-brand-100 text-brand-800'
-                                    }`}>
-                                      {form.numeroRecibo}
-                                    </p>
-                                    {dup && (
-                                      <p className="text-[12px] font-semibold text-red-600">
-                                        ⚠️ Este número ya está registrado para {dup}
-                                      </p>
-                                    )}
-                                  </>
-                                );
-                              })()}
-                            </div>
-                          ) : (
-                            // Terreno: texto libre
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={form.numeroRecibo}
-                              onChange={(e) => patch({ numeroRecibo: e.target.value })}
-                              placeholder="Ej. 001234"
-                              className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                              required
-                            />
-                          )}
-                        </div>
-                      )}
-
-                      {errorVenta && (
-                        <p className="rounded-lg bg-red-50 px-3 py-2.5 text-[13px] font-medium text-red-700">
-                          {errorVenta}
-                        </p>
-                      )}
-                    </div>
-                  )}
-
-                  {showCompro && (
-                    <div className="space-y-4">
-                      {/* List of additional purchases */}
-                      {form.comprasAdicionales && form.comprasAdicionales.length > 0 && (
-                        <div className="space-y-2 mt-4">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                            Compras Adicionales
-                          </p>
-                          <div className="space-y-2">
-                            {form.comprasAdicionales.map((compra) => {
-                              const prodNombre = getProductoNombre(compra.idProducto, productos) ?? compra.idProducto;
-                              const pagoLabel = etiquetaEstadoPagoVisible(rol, compra.estadoPago, compra.idProducto);
-                              const barrioNombre = compra.idBarrio ? (getBarrioNombre(compra.idBarrio, barrios) ?? '') : '';
-                              const docLabel = esPlanInversion(compra.idProducto) ? 'Anexo' : 'Recibo';
-                              return (
-                                <div key={compra.id} className="relative flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
-                                  <div className="space-y-0.5">
-                                    <div className="text-[14px] font-semibold text-zinc-800">
-                                      {prodNombre}
-                                    </div>
-                                    <div className="text-[12px] text-zinc-500 font-medium">
-                                      {pagoLabel} {barrioNombre ? `· ${barrioNombre}` : ''}
-                                    </div>
-                                    <div className="text-[12px] tabular-nums font-semibold text-brand-600">
-                                      {docLabel}: {compra.numeroRecibo}
-                                    </div>
-                                  </div>
-                                  {!soloLectura && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        patch({
-                                          comprasAdicionales: form.comprasAdicionales?.filter((c) => c.id !== compra.id)
-                                        });
-                                      }}
-                                      className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"
-                                      title="Eliminar compra"
-                                    >
-                                      ✕
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Add buttons and subform if !soloLectura */}
-                      {!soloLectura && (
-                        <>
-                          {!showAddAdicional && (
-                            <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                              {productosDisponibles.some((p) => esPlanInversion(p.id)) && (
-                                <button
+                                  key={prod.id}
                                   type="button"
                                   onClick={() => {
-                                    setShowAddAdicional('pij');
-                                    setAdicionalForm({
-                                      idProducto: ID_PRODUCTO_PIJ,
-                                      estadoPago: 'entrega_33',
-                                      idBarrio: '',
-                                      numeroRecibo: '',
-                                    });
                                     setErrorVenta('');
+                                    patch(resetCamposAlCambiarProducto(prod.id));
                                   }}
                                   style={{ touchAction: 'manipulation' }}
-                                  className="flex-1 h-11 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-[13px] font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
+                                  className={`h-12 w-full rounded-lg border px-4 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${sel
+                                      ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
+                                      : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
+                                    }`}
                                 >
-                                  <span>+ Compró otro plan</span>
+                                  {prod.nombre}
                                 </button>
-                              )}
-                              {productosDisponibles.some((p) => esTerreno(p.id)) && (
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Barrio (solo terrenos) */}
+                        {productoEsTerreno && (
+                          <div className="space-y-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                              Barrio
+                            </p>
+                            {barrios.length === 0 ? (
+                              <p className="text-[13px] text-red-600">No hay barrios cargados.</p>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => setBarrioPickerOpen(true)}
+                                  style={{ touchAction: 'manipulation' }}
+                                  className={`flex h-12 w-full items-center justify-between rounded-lg border px-4 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${form.idBarrio
+                                      ? 'border-brand-600 bg-brand-50 text-brand-800 active:bg-brand-100'
+                                      : 'border-zinc-200 bg-white text-zinc-500 active:bg-zinc-50'
+                                    }`}
+                                >
+                                  <span>
+                                    {form.idBarrio
+                                      ? (getBarrioNombre(form.idBarrio, barrios) ?? 'Barrio seleccionado')
+                                      : 'Seleccionar barrio'}
+                                  </span>
+                                  <svg
+                                    className="h-5 w-5 shrink-0 text-zinc-400"
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                    aria-hidden="true"
+                                  >
+                                    <path
+                                      fillRule="evenodd"
+                                      d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.25a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"
+                                      clipRule="evenodd"
+                                    />
+                                  </svg>
+                                </button>
+                                <BarrioPickerSheet
+                                  open={barrioPickerOpen}
+                                  barrios={barrios}
+                                  selectedId={form.idBarrio}
+                                  onClose={() => setBarrioPickerOpen(false)}
+                                  onSelect={(idBarrio) => {
+                                    setErrorVenta('');
+                                    patch({ idBarrio });
+                                  }}
+                                />
+                              </>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Estado del pago */}
+                        {form.idProducto && opcionesPago.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                              {tituloEstadoCompra(rol)}
+                            </p>
+                            {productoEsPij && (
+                              <p className="text-[12px] text-zinc-500">
+                                La entrega de $33.000 equivale al cierre del plan.
+                              </p>
+                            )}
+                            <div className="space-y-2">
+                              {opcionesPago.map((op) => {
+                                const sel = form.estadoPago === op.value;
+                                const bloqueada = Boolean(op.disabled);
+                                return (
+                                  <button
+                                    key={op.value}
+                                    type="button"
+                                    disabled={bloqueada}
+                                    onClick={() => {
+                                      if (bloqueada) return;
+                                      setErrorVenta('');
+                                      const limpiaRecibo = !requiereNumeroRecibo(form.idProducto, op.value);
+                                      patch({
+                                        estadoPago: op.value,
+                                        numeroRecibo: limpiaRecibo ? '' : form.numeroRecibo,
+                                      });
+                                    }}
+                                    style={{ touchAction: bloqueada ? undefined : 'manipulation' }}
+                                    className={`min-h-[48px] w-full rounded-lg border px-4 py-2 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${bloqueada
+                                        ? 'cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400'
+                                        : sel
+                                          ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
+                                          : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
+                                      }`}
+                                  >
+                                    {op.label}
+                                    {bloqueada && (
+                                      <span className="mt-0.5 block text-[12px] font-normal text-zinc-400">
+                                        No disponible
+                                      </span>
+                                    )}
+                                    {op.hint && sel && !bloqueada && (
+                                      <span className="mt-0.5 block text-[12px] font-normal opacity-90">
+                                        {op.hint}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {muestraRecibo && (
+                          <div className="space-y-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                              {etiquetaNumeroDocumentoVenta(form.idProducto)}
+                            </p>
+                            {esPlanInversion(form.idProducto) ? (
+                              // Entrada estructurada solo para PIJ (serie + adh + anexo)
+                              <div className="space-y-2">
+                                {/* Serie */}
+                                <div className="flex gap-2">
+                                  {(['A', 'B'] as const).map((s) => (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      onClick={() => {
+                                        setPijSerie(s);
+                                        patch({ numeroRecibo: buildPijRecibo(s, pijAdh, pijAnexo) });
+                                      }}
+                                      className={`flex-1 h-11 rounded-lg border text-[15px] font-bold transition-all ${pijSerie === s
+                                          ? 'border-brand-700 bg-brand-600 text-white'
+                                          : 'border-zinc-200 bg-white text-zinc-700 active:bg-zinc-50'
+                                        }`}
+                                    >
+                                      Serie {s}
+                                    </button>
+                                  ))}
+                                </div>
+                                {/* N° Adhesión */}
+                                <div className="flex gap-2">
+                                  <div className="flex-1 space-y-1">
+                                    <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">N° Adhesión</label>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={pijAdh}
+                                      onChange={(e) => {
+                                        const v = e.target.value.replace(/\D/g, '');
+                                        setPijAdh(v);
+                                        patch({ numeroRecibo: buildPijRecibo(pijSerie, v, pijAnexo) });
+                                      }}
+                                      placeholder="128"
+                                      className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                                    />
+                                  </div>
+                                  <div className="flex-1 space-y-1">
+                                    <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">N° Anexo</label>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={pijAnexo}
+                                      onChange={(e) => {
+                                        const v = e.target.value.replace(/\D/g, '');
+                                        setPijAnexo(v);
+                                        patch({ numeroRecibo: buildPijRecibo(pijSerie, pijAdh, v) });
+                                      }}
+                                      placeholder="233"
+                                      className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                                    />
+                                  </div>
+                                </div>
+                                {/* Preview del recibo ensamblado */}
+                                {pijAdh.trim() && (() => {
+                                  const dup = buscarDuplicadoAdhesion(pijSerie, pijAdh, lead?.id ?? undefined);
+                                  return (
+                                    <>
+                                      <p className={`rounded-lg border px-3 py-2 text-[13px] font-mono font-semibold ${dup
+                                          ? 'bg-red-50 border-red-300 text-red-700'
+                                          : 'bg-brand-50 border-brand-100 text-brand-800'
+                                        }`}>
+                                        {form.numeroRecibo}
+                                      </p>
+                                      {dup && (
+                                        <p className="text-[12px] font-semibold text-red-600">
+                                          ⚠️ Esta adhesión ya está registrada para {dup}
+                                        </p>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            ) : (
+                              // Terreno: texto libre
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={form.numeroRecibo}
+                                onChange={(e) => patch({ numeroRecibo: e.target.value })}
+                                placeholder="Ej. 001234"
+                                className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                                required
+                              />
+                            )}
+                          </div>
+                        )}
+
+                        {errorVenta && (
+                          <p className="rounded-lg bg-red-50 px-3 py-2.5 text-[13px] font-medium text-red-700">
+                            {errorVenta}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {showCompro && (
+                      <div className="space-y-4">
+                        {/* List of additional purchases */}
+                        {form.comprasAdicionales && form.comprasAdicionales.length > 0 && (
+                          <div className="space-y-2 mt-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                              Compras Adicionales
+                            </p>
+                            <div className="space-y-2">
+                              {form.comprasAdicionales.map((compra) => {
+                                const prodNombre = getProductoNombre(compra.idProducto, productos) ?? compra.idProducto;
+                                const pagoLabel = etiquetaEstadoPagoVisible(rol, compra.estadoPago, compra.idProducto);
+                                const barrioNombre = compra.idBarrio ? (getBarrioNombre(compra.idBarrio, barrios) ?? '') : '';
+                                const docLabel = esPlanInversion(compra.idProducto) ? 'Anexo' : 'Recibo';
+                                return (
+                                  <div key={compra.id} className="relative flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
+                                    <div className="space-y-0.5">
+                                      <div className="text-[14px] font-semibold text-zinc-800">
+                                        {prodNombre}
+                                      </div>
+                                      <div className="text-[12px] text-zinc-500 font-medium">
+                                        {pagoLabel} {barrioNombre ? `· ${barrioNombre}` : ''}
+                                      </div>
+                                      <div className="text-[12px] tabular-nums font-semibold text-brand-600">
+                                        {docLabel}: {compra.numeroRecibo}
+                                      </div>
+                                    </div>
+                                    {!soloLectura && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          patch({
+                                            comprasAdicionales: form.comprasAdicionales?.filter((c) => c.id !== compra.id)
+                                          });
+                                        }}
+                                        className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"
+                                        title="Eliminar compra"
+                                      >
+                                        ✕
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Add buttons and subform if !soloLectura */}
+                        {!soloLectura && (
+                          <>
+                            {!showAddAdicional && (
+                              <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                                {productosDisponibles.some((p) => esPlanInversion(p.id)) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowAddAdicional('pij');
+                                      setAdicionalForm({
+                                        idProducto: ID_PRODUCTO_PIJ,
+                                        estadoPago: 'entrega_33',
+                                        idBarrio: '',
+                                        numeroRecibo: '',
+                                      });
+                                      setErrorVenta('');
+                                    }}
+                                    style={{ touchAction: 'manipulation' }}
+                                    className="flex-1 h-11 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-[13px] font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
+                                  >
+                                    <span>+ Compró otro plan</span>
+                                  </button>
+                                )}
+                                {productosDisponibles.some((p) => esTerreno(p.id)) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setShowAddAdicional('terreno');
+                                      setAdicionalForm({
+                                        idProducto: ID_PRODUCTO_TERRENO,
+                                        estadoPago: null,
+                                        idBarrio: '',
+                                        numeroRecibo: '',
+                                      });
+                                      setErrorVenta('');
+                                    }}
+                                    style={{ touchAction: 'manipulation' }}
+                                    className="flex-1 h-11 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-[13px] font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
+                                  >
+                                    <span>+ Compró otro terreno</span>
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
+                            {showAddAdicional && (
+                              <div className="mt-4 rounded-xl border border-dashed border-brand-200 bg-zinc-50/50 p-4 space-y-4">
+                                <div className="flex items-center justify-between">
+                                  <h5 className="text-[12px] font-bold uppercase tracking-wider text-brand-800">
+                                    Nueva Compra Adicional ({showAddAdicional === 'pij' ? 'Plan' : 'Terreno'})
+                                  </h5>
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAddAdicional(null)}
+                                    className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-600"
+                                  >
+                                    Cancelar
+                                  </button>
+                                </div>
+
+                                {showAddAdicional === 'terreno' && (
+                                  <>
+                                    <div className="space-y-1.5">
+                                      <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                                        Barrio
+                                      </label>
+                                      <select
+                                        value={adicionalForm.idBarrio}
+                                        onChange={(e) => setAdicionalForm(f => ({ ...f, idBarrio: e.target.value }))}
+                                        className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                      >
+                                        <option value="">Seleccionar barrio...</option>
+                                        {barrios.map((b) => (
+                                          <option key={b.id} value={b.id}>{b.nombre}</option>
+                                        ))}
+                                      </select>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                      <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                                        Estado de compra
+                                      </label>
+                                      <div className="flex gap-2">
+                                        {[
+                                          { value: 'sena', label: 'Operaciones en Seña' },
+                                          { value: 'cien', label: 'Cobrado 100%' }
+                                        ].map((op) => {
+                                          const sel = adicionalForm.estadoPago === op.value;
+                                          return (
+                                            <button
+                                              key={op.value}
+                                              type="button"
+                                              onClick={() => setAdicionalForm(f => ({ ...f, estadoPago: op.value as EstadoPago }))}
+                                              className={`h-10 flex-1 rounded-lg border text-[13px] font-medium transition-all ${sel
+                                                  ? 'border-brand-700 bg-brand-600 text-white'
+                                                  : 'border-zinc-200 bg-white text-zinc-700'
+                                                }`}
+                                            >
+                                              {op.label}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+
+                                <div className="space-y-1.5">
+                                  <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                                    {showAddAdicional === 'pij' ? 'Número de anexo' : 'Número de recibo'}
+                                  </label>
+                                  {showAddAdicional === 'pij' ? (
+                                    // Entrada estructurada PIJ adicional
+                                    <div className="space-y-2">
+                                      <div className="flex gap-2">
+                                        {(['A', 'B'] as const).map((s) => (
+                                          <button
+                                            key={s}
+                                            type="button"
+                                            onClick={() => {
+                                              setAdicPijSerie(s);
+                                              const r = buildPijRecibo(s, adicPijAdh, adicPijAnexo);
+                                              setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
+                                            }}
+                                            className={`flex-1 h-10 rounded-lg border text-[14px] font-bold transition-all ${adicPijSerie === s
+                                                ? 'border-brand-700 bg-brand-600 text-white'
+                                                : 'border-zinc-200 bg-white text-zinc-700'
+                                              }`}
+                                          >
+                                            Serie {s}
+                                          </button>
+                                        ))}
+                                      </div>
+                                      <div className="flex gap-2">
+                                        <div className="flex-1 space-y-1">
+                                          <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">N° Adhesión</label>
+                                          <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={adicPijAdh}
+                                            onChange={(e) => {
+                                              const v = e.target.value.replace(/\D/g, '');
+                                              setAdicPijAdh(v);
+                                              const r = buildPijRecibo(adicPijSerie, v, adicPijAnexo);
+                                              setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
+                                            }}
+                                            placeholder="128"
+                                            className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                          />
+                                        </div>
+                                        <div className="flex-1 space-y-1">
+                                          <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">N° Anexo</label>
+                                          <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={adicPijAnexo}
+                                            onChange={(e) => {
+                                              const v = e.target.value.replace(/\D/g, '');
+                                              setAdicPijAnexo(v);
+                                              const r = buildPijRecibo(adicPijSerie, adicPijAdh, v);
+                                              setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
+                                            }}
+                                            placeholder="233"
+                                            className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                          />
+                                        </div>
+                                      </div>
+                                      {adicPijAdh.trim() && (() => {
+                                        const dup = buscarDuplicadoAdhesion(adicPijSerie, adicPijAdh, lead?.id ?? undefined);
+                                        return (
+                                          <>
+                                            <p className={`rounded-lg border px-3 py-1.5 text-[12px] font-mono font-semibold ${dup
+                                                ? 'bg-red-50 border-red-300 text-red-700'
+                                                : 'bg-brand-50 border-brand-100 text-brand-800'
+                                              }`}>
+                                              {adicionalForm.numeroRecibo}
+                                            </p>
+                                            {dup && (
+                                              <p className="text-[12px] font-semibold text-red-600">
+                                                ⚠️ Esta adhesión ya está registrada para {dup}
+                                              </p>
+                                            )}
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
+                                  ) : (
+                                    // Terreno: texto libre
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={adicionalForm.numeroRecibo}
+                                      onChange={(e) => setAdicionalForm(f => ({ ...f, numeroRecibo: e.target.value }))}
+                                      placeholder="Ej. 005678"
+                                      className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                    />
+                                  )}
+                                </div>
+
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    setShowAddAdicional('terreno');
+                                    if (showAddAdicional === 'terreno') {
+                                      if (!adicionalForm.idBarrio) {
+                                        setErrorVenta('Seleccioná el barrio para el terreno adicional.');
+                                        return;
+                                      }
+                                      if (!adicionalForm.estadoPago) {
+                                        setErrorVenta('Seleccioná el estado de pago para el terreno adicional.');
+                                        return;
+                                      }
+                                    }
+                                    if (!adicionalForm.numeroRecibo.trim()) {
+                                      setErrorVenta(
+                                        showAddAdicional === 'pij'
+                                          ? 'Ingresá el número de anexo adicional.'
+                                          : 'Ingresá el número de recibo adicional.'
+                                      );
+                                      return;
+                                    }
+                                    if (showAddAdicional === 'pij') {
+                                      const dup = buscarDuplicadoAdhesion(adicPijSerie, adicPijAdh, lead?.id ?? undefined);
+                                      if (dup) {
+                                        setErrorVenta(`Este número de adhesión ya está registrado para ${dup}. No se puede duplicar.`);
+                                        return;
+                                      }
+                                    }
+
+                                    setErrorVenta('');
+                                    const newCompra: CompraAdicional = {
+                                      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
+                                      idProducto: adicionalForm.idProducto,
+                                      estadoPago: adicionalForm.estadoPago as EstadoPago,
+                                      idBarrio: adicionalForm.idBarrio || null,
+                                      numeroRecibo: adicionalForm.numeroRecibo.trim(),
+                                      fechaCierre: new Date().toISOString(),
+                                    };
+
+                                    patch({
+                                      comprasAdicionales: [...(form.comprasAdicionales || []), newCompra]
+                                    });
+
+                                    setShowAddAdicional(null);
                                     setAdicionalForm({
-                                      idProducto: ID_PRODUCTO_TERRENO,
+                                      idProducto: '',
                                       estadoPago: null,
                                       idBarrio: '',
                                       numeroRecibo: '',
                                     });
-                                    setErrorVenta('');
+                                    setAdicPijSerie('A');
+                                    setAdicPijAdh('');
+                                    setAdicPijAnexo('');
                                   }}
-                                  style={{ touchAction: 'manipulation' }}
-                                  className="flex-1 h-11 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-[13px] font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
+                                  className="h-10 w-full rounded-lg bg-zinc-900 text-[13px] font-semibold text-white shadow-sm hover:bg-zinc-800 active:scale-[0.98] transition-all"
                                 >
-                                  <span>+ Compró otro terreno</span>
-                                </button>
-                              )}
-                            </div>
-                          )}
-
-                          {showAddAdicional && (
-                            <div className="mt-4 rounded-xl border border-dashed border-brand-200 bg-zinc-50/50 p-4 space-y-4">
-                              <div className="flex items-center justify-between">
-                                <h5 className="text-[12px] font-bold uppercase tracking-wider text-brand-800">
-                                  Nueva Compra Adicional ({showAddAdicional === 'pij' ? 'Plan' : 'Terreno'})
-                                </h5>
-                                <button
-                                  type="button"
-                                  onClick={() => setShowAddAdicional(null)}
-                                  className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-600"
-                                >
-                                  Cancelar
+                                  Agregar Compra
                                 </button>
                               </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </FormSection>
+              )}
 
-                              {showAddAdicional === 'terreno' && (
-                                <>
-                                  <div className="space-y-1.5">
-                                    <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                                      Barrio
-                                    </label>
-                                    <select
-                                      value={adicionalForm.idBarrio}
-                                      onChange={(e) => setAdicionalForm(f => ({ ...f, idBarrio: e.target.value }))}
-                                      className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-brand-600"
-                                    >
-                                      <option value="">Seleccionar barrio...</option>
-                                      {barrios.map((b) => (
-                                        <option key={b.id} value={b.id}>{b.nombre}</option>
-                                      ))}
-                                    </select>
-                                  </div>
+              {showMotivoNoConfirmo && (
+                <FormSection title="¿Qué pasó?" step={2} totalSteps={totalPasos}>
+                  <ButtonGroup
+                    name="motivoNoConfirmo"
+                    label="Seleccioná una opción"
+                    options={[
+                      { value: true, label: 'Quiere reagendar' },
+                      { value: false, label: 'No estaba interesado' },
+                    ]}
+                    value={
+                      form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda'
+                        ? true
+                        : form.resultadoEntrevista === 'sin_interes'
+                          ? false
+                          : null
+                    }
+                    onChange={handleNoConfirmoMotivo}
+                  />
+                  {showReagendaNoConfirmo && (
+                    <CampoFechaReagenda
+                      value={form.fechaReagenda}
+                      onChange={(v) => patchFechaReagenda(v, patch)}
+                    />
+                  )}
+                </FormSection>
+              )}
 
-                                  <div className="space-y-1.5">
-                                    <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                                      Estado de compra
-                                    </label>
-                                    <div className="flex gap-2">
-                                      {[
-                                        { value: 'sena', label: 'Operaciones en Seña' },
-                                        { value: 'cien', label: 'Cobrado 100%' }
-                                      ].map((op) => {
-                                        const sel = adicionalForm.estadoPago === op.value;
-                                        return (
-                                          <button
-                                            key={op.value}
-                                            type="button"
-                                            onClick={() => setAdicionalForm(f => ({ ...f, estadoPago: op.value as EstadoPago }))}
-                                            className={`h-10 flex-1 rounded-lg border text-[13px] font-medium transition-all ${
-                                              sel
-                                                ? 'border-brand-700 bg-brand-600 text-white'
-                                                : 'border-zinc-200 bg-white text-zinc-700'
-                                            }`}
-                                          >
-                                            {op.label}
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                </>
-                              )}
+              {showCanalTrasNoConfirmo && (
+                <FormSection title="Canal de contacto" step={3} totalSteps={totalPasos}>
+                  <ButtonGroup
+                    name="canalNoConfirmo"
+                    options={opcionesCanalContacto()}
+                    value={form.canal}
+                    onChange={handleCanal}
+                  />
+                </FormSection>
+              )}
 
-                              <div className="space-y-1.5">
-                                <label className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                                  {showAddAdicional === 'pij' ? 'Número de anexo' : 'Número de recibo'}
-                                </label>
-                                {showAddAdicional === 'pij' ? (
-                                  // Entrada estructurada PIJ adicional
-                                  <div className="space-y-2">
-                                    <div className="flex gap-2">
-                                      {(['A', 'B'] as const).map((s) => (
-                                        <button
-                                          key={s}
-                                          type="button"
-                                          onClick={() => {
-                                            setAdicPijSerie(s);
-                                            const r = buildPijRecibo(s, adicPijAdh, adicPijAnexo);
-                                            setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
-                                          }}
-                                          className={`flex-1 h-10 rounded-lg border text-[14px] font-bold transition-all ${
-                                            adicPijSerie === s
-                                              ? 'border-brand-700 bg-brand-600 text-white'
-                                              : 'border-zinc-200 bg-white text-zinc-700'
-                                          }`}
-                                        >
-                                          Serie {s}
-                                        </button>
-                                      ))}
-                                    </div>
-                                    <div className="flex gap-2">
-                                      <div className="flex-1 space-y-1">
-                                        <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">N° Adhesión</label>
-                                        <input
-                                          type="text"
-                                          inputMode="numeric"
-                                          value={adicPijAdh}
-                                          onChange={(e) => {
-                                            const v = e.target.value.replace(/\D/g, '');
-                                            setAdicPijAdh(v);
-                                            const r = buildPijRecibo(adicPijSerie, v, adicPijAnexo);
-                                            setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
-                                          }}
-                                          placeholder="128"
-                                          className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
-                                        />
-                                      </div>
-                                      <div className="flex-1 space-y-1">
-                                        <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">N° Anexo</label>
-                                        <input
-                                          type="text"
-                                          inputMode="numeric"
-                                          value={adicPijAnexo}
-                                          onChange={(e) => {
-                                            const v = e.target.value.replace(/\D/g, '');
-                                            setAdicPijAnexo(v);
-                                            const r = buildPijRecibo(adicPijSerie, adicPijAdh, v);
-                                            setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
-                                          }}
-                                          placeholder="233"
-                                          className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
-                                        />
-                                      </div>
-                                    </div>
-                                    {adicionalForm.numeroRecibo.trim() && (() => {
-                                      const dup = buscarDuplicadoRecibo(adicionalForm.numeroRecibo, lead?.id ?? undefined);
-                                      return (
-                                        <>
-                                          <p className={`rounded-lg border px-3 py-1.5 text-[12px] font-mono font-semibold ${
-                                            dup
-                                              ? 'bg-red-50 border-red-300 text-red-700'
-                                              : 'bg-brand-50 border-brand-100 text-brand-800'
-                                          }`}>
-                                            {adicionalForm.numeroRecibo}
-                                          </p>
-                                          {dup && (
-                                            <p className="text-[12px] font-semibold text-red-600">
-                                              ⚠️ Este número ya está registrado para {dup}
-                                            </p>
-                                          )}
-                                        </>
-                                      );
-                                    })()}
-                                  </div>
-                                ) : (
-                                  // Terreno: texto libre
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={adicionalForm.numeroRecibo}
-                                    onChange={(e) => setAdicionalForm(f => ({ ...f, numeroRecibo: e.target.value }))}
-                                    placeholder="Ej. 005678"
-                                    className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-brand-600"
-                                  />
-                                )}
-                              </div>
+              {(showReagendaNoConfirmo && form.canal) ||
+                (showReagendaSinEntrevistaCampo && form.fechaReagenda) ||
+                (showAgendoCalendario && form.fechaReagenda) ||
+                (showFechaReagendaTrasNoComproSinCita && form.fechaReagenda) ? (
+                <p className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-[13px] text-brand-700">
+                  Al guardar, el lead pasa a{' '}
+                  <span className="font-medium">En seguimiento</span> con la nueva fecha.
+                </p>
+              ) : null}
 
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (showAddAdicional === 'terreno') {
-                                    if (!adicionalForm.idBarrio) {
-                                      setErrorVenta('Seleccioná el barrio para el terreno adicional.');
-                                      return;
-                                    }
-                                    if (!adicionalForm.estadoPago) {
-                                      setErrorVenta('Seleccioná el estado de pago para el terreno adicional.');
-                                      return;
-                                    }
-                                  }
-                                  if (!adicionalForm.numeroRecibo.trim()) {
-                                    setErrorVenta(
-                                      showAddAdicional === 'pij'
-                                        ? 'Ingresá el número de anexo adicional.'
-                                        : 'Ingresá el número de recibo adicional.'
-                                    );
-                                    return;
-                                  }
-                                  if (showAddAdicional === 'pij') {
-                                    const dup = buscarDuplicadoRecibo(adicionalForm.numeroRecibo, lead?.id ?? undefined);
-                                    if (dup) {
-                                      setErrorVenta(`Este número de anexo ya está registrado para ${dup}. No se puede duplicar.`);
-                                      return;
-                                    }
-                                  }
+              {showReferidosObs && (
+                <FormSection
+                  title="Referidos"
+                  step={flujoSinCita ? (esFlujoCampo ? 3 : 4) : 4}
+                  totalSteps={totalPasos}
+                >
+                  <ButtonGroup
+                    name="referidos"
+                    label="¿Brindó referidos?"
+                    options={[
+                      { value: true, label: 'Sí' },
+                      { value: false, label: 'No' },
+                    ]}
+                    value={form.brindoReferidos}
+                    onChange={(v) => patch({ brindoReferidos: v })}
+                  />
 
-                                  setErrorVenta('');
-                                  const newCompra: CompraAdicional = {
-                                    id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
-                                    idProducto: adicionalForm.idProducto,
-                                    estadoPago: adicionalForm.estadoPago as EstadoPago,
-                                    idBarrio: adicionalForm.idBarrio || null,
-                                    numeroRecibo: adicionalForm.numeroRecibo.trim(),
-                                    fechaCierre: new Date().toISOString(),
-                                  };
-
-                                  patch({
-                                    comprasAdicionales: [...(form.comprasAdicionales || []), newCompra]
-                                  });
-
-                                  setShowAddAdicional(null);
-                                  setAdicionalForm({
-                                    idProducto: '',
-                                    estadoPago: null,
-                                    idBarrio: '',
-                                    numeroRecibo: '',
-                                  });
-                                  setAdicPijSerie('A');
-                                  setAdicPijAdh('');
-                                  setAdicPijAnexo('');
-                                }}
-                                className="h-10 w-full rounded-lg bg-zinc-900 text-[13px] font-semibold text-white shadow-sm hover:bg-zinc-800 active:scale-[0.98] transition-all"
-                              >
-                                Agregar Compra
-                              </button>
-                            </div>
-                          )}
-                        </>
-                      )}
+                  {showReferidos && (
+                    <div className="space-y-4 pt-1">
+                      <p className="text-[12px] text-zinc-500">
+                        Al guardar, cada referido nuevo se carga automáticamente como lead del mismo
+                        promotor (si el teléfono no existe ya en la campaña).
+                      </p>
+                      {form.referidos.map((ref, idx) => (
+                        <div key={idx} className="space-y-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
+                            Referido {idx + 1}
+                          </p>
+                          <input
+                            type="text"
+                            placeholder="Nombre y apellido"
+                            value={ref.nombre}
+                            onChange={(e) => {
+                              const next = [...form.referidos];
+                              next[idx] = { ...next[idx], nombre: e.target.value };
+                              patch({ referidos: next });
+                            }}
+                            autoComplete="name"
+                            className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                          />
+                          <input
+                            type="tel"
+                            placeholder="Teléfono"
+                            value={ref.telefono}
+                            inputMode="tel"
+                            autoComplete="tel"
+                            onChange={(e) => {
+                              const next = [...form.referidos];
+                              next[idx] = { ...next[idx], telefono: e.target.value };
+                              patch({ referidos: next });
+                            }}
+                            className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                          />
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => patch({ referidos: [...form.referidos, emptyReferido()] })}
+                        style={{ touchAction: 'manipulation' }}
+                        className="h-12 w-full rounded-lg border border-dashed border-zinc-300 text-[14px] font-medium text-zinc-500 transition-colors active:bg-brand-50 active:border-brand-400 active:text-brand-700"
+                      >
+                        + Agregar otro referido
+                      </button>
                     </div>
                   )}
-                </div>
-              </FormSection>
-            )}
-
-            {showMotivoNoConfirmo && (
-              <FormSection title="¿Qué pasó?" step={2} totalSteps={totalPasos}>
-                <ButtonGroup
-                  name="motivoNoConfirmo"
-                  label="Seleccioná una opción"
-                  options={[
-                    { value: true, label: 'Quiere reagendar' },
-                    { value: false, label: 'No estaba interesado' },
-                  ]}
-                  value={
-                    form.reagendarEntrevista || form.resultadoEntrevista === 'reagenda'
-                      ? true
-                      : form.resultadoEntrevista === 'sin_interes'
-                        ? false
-                        : null
-                  }
-                  onChange={handleNoConfirmoMotivo}
-                />
-                {showReagendaNoConfirmo && (
-                  <CampoFechaReagenda
-                    value={form.fechaReagenda}
-                    onChange={(v) => patchFechaReagenda(v, patch)}
-                  />
-                )}
-              </FormSection>
-            )}
-
-            {showCanalTrasNoConfirmo && (
-              <FormSection title="Canal de contacto" step={3} totalSteps={totalPasos}>
-                <ButtonGroup
-                  name="canalNoConfirmo"
-                  options={opcionesCanalContacto()}
-                  value={form.canal}
-                  onChange={handleCanal}
-                />
-              </FormSection>
-            )}
-
-            {(showReagendaNoConfirmo && form.canal) ||
-            (showReagendaSinEntrevistaCampo && form.fechaReagenda) ||
-            (showAgendoCalendario && form.fechaReagenda) ||
-            (showFechaReagendaTrasNoComproSinCita && form.fechaReagenda) ? (
-              <p className="rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 text-[13px] text-brand-700">
-                Al guardar, el lead pasa a{' '}
-                <span className="font-medium">En seguimiento</span> con la nueva fecha.
-              </p>
-            ) : null}
-
-            {showReferidosObs && (
-            <FormSection
-              title="Referidos"
-              step={flujoSinCita ? (esFlujoCampo ? 3 : 4) : 4}
-              totalSteps={totalPasos}
-            >
-              <ButtonGroup
-                name="referidos"
-                label="¿Brindó referidos?"
-                options={[
-                  { value: true, label: 'Sí' },
-                  { value: false, label: 'No' },
-                ]}
-                value={form.brindoReferidos}
-                onChange={(v) => patch({ brindoReferidos: v })}
-              />
-
-              {showReferidos && (
-                <div className="space-y-4 pt-1">
-                  <p className="text-[12px] text-zinc-500">
-                    Al guardar, cada referido nuevo se carga automáticamente como lead del mismo
-                    promotor (si el teléfono no existe ya en la campaña).
-                  </p>
-                  {form.referidos.map((ref, idx) => (
-                    <div key={idx} className="space-y-2">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-                        Referido {idx + 1}
-                      </p>
-                      <input
-                        type="text"
-                        placeholder="Nombre y apellido"
-                        value={ref.nombre}
-                        onChange={(e) => {
-                          const next = [...form.referidos];
-                          next[idx] = { ...next[idx], nombre: e.target.value };
-                          patch({ referidos: next });
-                        }}
-                        autoComplete="name"
-                        className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                      />
-                      <input
-                        type="tel"
-                        placeholder="Teléfono"
-                        value={ref.telefono}
-                        inputMode="tel"
-                        autoComplete="tel"
-                        onChange={(e) => {
-                          const next = [...form.referidos];
-                          next[idx] = { ...next[idx], telefono: e.target.value };
-                          patch({ referidos: next });
-                        }}
-                        className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                      />
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => patch({ referidos: [...form.referidos, emptyReferido()] })}
-                    style={{ touchAction: 'manipulation' }}
-                    className="h-12 w-full rounded-lg border border-dashed border-zinc-300 text-[14px] font-medium text-zinc-500 transition-colors active:bg-brand-50 active:border-brand-400 active:text-brand-700"
-                  >
-                    + Agregar otro referido
-                  </button>
-                </div>
+                </FormSection>
               )}
-            </FormSection>
-            )}
 
-            {showReferidosObs && (
-            <FormSection
-              title={tituloObservaciones}
-              step={flujoSinCita ? (esFlujoCampo ? 4 : 5) : 5}
-              totalSteps={totalPasos}
-            >
-              <textarea
-                value={form.observaciones}
-                onChange={(e) => patch({ observaciones: e.target.value })}
-                rows={4}
-                placeholder={placeholderObservaciones}
-                className="w-full resize-y rounded-lg border border-zinc-200 px-3 py-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                style={{ minHeight: '120px' }}
-              />
-            </FormSection>
-            )}
+              {showReferidosObs && (
+                <FormSection
+                  title={tituloObservaciones}
+                  step={flujoSinCita ? (esFlujoCampo ? 4 : 5) : 5}
+                  totalSteps={totalPasos}
+                >
+                  <textarea
+                    value={form.observaciones}
+                    onChange={(e) => patch({ observaciones: e.target.value })}
+                    rows={4}
+                    placeholder={placeholderObservaciones}
+                    className="w-full resize-y rounded-lg border border-zinc-200 px-3 py-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                    style={{ minHeight: '120px' }}
+                  />
+                </FormSection>
+              )}
 
-            {errorForm && (
-              <p className="rounded-lg bg-red-50 px-3 py-2.5 text-[13px] font-medium text-red-700">
-                {errorForm}
-              </p>
-            )}
-            <div className="h-4" aria-hidden="true" />
+              {errorForm && (
+                <p className="rounded-lg bg-red-50 px-3 py-2.5 text-[13px] font-medium text-red-700">
+                  {errorForm}
+                </p>
+              )}
+              <div className="h-4" aria-hidden="true" />
             </fieldset>
           </form>
 

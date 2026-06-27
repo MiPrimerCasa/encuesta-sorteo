@@ -407,32 +407,6 @@ export async function buildSyncPreview(leadsDB, comprasAdicionalesDB) {
 export async function executeSyncCommit(cambiosAprobados, usuario) {
   if (!cambiosAprobados || cambiosAprobados.length === 0) return { actualizados: 0 };
   
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backupDir = path.join(process.cwd(), 'server', 'backups', 'sync_caja');
-  
-  await fs.mkdir(backupDir, { recursive: true });
-  const backupPath = path.join(backupDir, `pij_sync_${timestamp}.json`);
-  
-  // Guardamos el backup con el nombre del cliente, número de recibo, vendedor de excel, y concepto
-  const backupData = cambiosAprobados.map(c => ({
-    idUnico: c.idUnico,
-    leadId: c.leadId,
-    nombreCliente: c.nombreCliente,
-    numeroAnexo: c.excelRow?.ordenAnexo || c.numeroRecibo || '',
-    nombreVendedor: c.excelRow?.nombreVendedor || '',
-    concepto: c.excelRow?.concepto || 'ADHESION',
-    isCompraAdicional: c.isCompraAdicional,
-    compraId: c.compraId,
-    fechaCierreCRMAnterior: c.fechaActual,
-    fechaCierreNueva: c.nuevaFecha,
-    excelRow: c.excelRow
-  }));
-
-  await fs.writeFile(backupPath, JSON.stringify(backupData, null, 2), 'utf-8');
-  console.log(`[SyncCaja] Backup guardado en ${backupPath}`);
-  
-  let actualizados = 0;
-  
   const { listAllLeadsFromEncuestas } = await import('../db/encuestas.js');
   const { persistirSeguimientoLead } = await import('../db/seguimiento-sql.js');
   const { getSqlPool } = await import('../db/mssql.js');
@@ -450,53 +424,113 @@ export async function executeSyncCommit(cambiosAprobados, usuario) {
     console.error('[SyncCaja] Error al conectar a la base de datos o cargar catálogo:', err);
   }
 
+  const conservarHoraOriginal = (nuevaFechaStr, fechaOriginalStr) => {
+    if (!nuevaFechaStr) return null;
+    if (!fechaOriginalStr) return `${nuevaFechaStr}T12:00:00`;
+    const matchHora = fechaOriginalStr.trim().match(/(?:T|\s+)(\d{2}:\d{2}(?::\d{2})?)/);
+    if (matchHora) {
+      return `${nuevaFechaStr}T${matchHora[1]}`;
+    }
+    return `${nuevaFechaStr}T12:00:00`;
+  };
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupDir = path.join(process.cwd(), 'server', 'backups', 'sync_caja');
+  await fs.mkdir(backupDir, { recursive: true });
+
+  // Pre-procesar todos los cambios para calcular el backup final exacto
+  const listaCambiosProcesados = [];
+  
   for (const cambio of cambiosAprobados) {
     if (!cambio.nuevaFecha) continue;
-    
     const lead = leadsMap.get(String(cambio.leadId));
-    if (!lead) {
-      console.warn(`[SyncCaja] Lead no encontrado para id: ${cambio.leadId}`);
-      continue;
-    }
+    if (!lead) continue;
 
-    // Resolver el operador correspondiente para este registro
     const targetOperator = await resolverUsuarioDeSincronizacion(cambio, lead, pool, catalog);
-    console.log(`[SyncCaja] Lead ${lead.id}: Sincronizando bajo vendedor "${targetOperator.nombre}" (ID: ${targetOperator.id}, Rol: ${targetOperator.rol})`);
-
-    // Formatear el número de recibo completo (SERIE + ADH + ANEXO)
     const formattedRecibo = formatReciboCaja(
       cambio.excelRow?.ordenAdh ? (cambio.excelRow.serie || 'A') : '',
       cambio.excelRow?.ordenAdh,
       cambio.excelRow?.ordenAnexo
     );
-    
-    let patch = {};
+
+    let fechaOriginal = null;
+    let reciboOriginal = null;
     if (cambio.isCompraAdicional) {
+      const compra = (lead.seguimiento?.comprasAdicionales || []).find(c => String(c.id) === String(cambio.compraId));
+      fechaOriginal = compra?.fechaCierre;
+      reciboOriginal = compra?.numeroRecibo;
+    } else {
+      fechaOriginal = lead.seguimiento?.fechaCierre;
+      reciboOriginal = lead.seguimiento?.numeroRecibo;
+    }
+
+    const nuevaFechaConHora = conservarHoraOriginal(cambio.nuevaFecha, fechaOriginal);
+
+    listaCambiosProcesados.push({
+      leadId: lead.id,
+      nombreCliente: lead.nombre,
+      promotorNombreCRM: lead.promotorNombre || 'Sin Vendedor',
+      isCompraAdicional: cambio.isCompraAdicional,
+      compraId: cambio.compraId,
+      reciboAnterior: reciboOriginal || '',
+      reciboNuevo: formattedRecibo,
+      fechaCierreAnterior: fechaOriginal || '',
+      fechaCierreNueva: nuevaFechaConHora,
+      operadorAnterior: lead.seguimiento?.operadorNombre || 'Sin Operador',
+      operadorNuevo: {
+        id: targetOperator.id,
+        nombre: targetOperator.nombre,
+        rol: targetOperator.rol
+      },
+      excelRow: cambio.excelRow
+    });
+  }
+
+  // Guardar backup rico y estructurado
+  const backupPath = path.join(backupDir, `pij_sync_${timestamp}.json`);
+  const backupPayload = {
+    fechaEjecucion: new Date().toISOString(),
+    operadorQueSincroniza: usuario?.nombre || 'Sistema',
+    totalRegistros: listaCambiosProcesados.length,
+    cambios: listaCambiosProcesados
+  };
+  await fs.writeFile(backupPath, JSON.stringify(backupPayload, null, 2), 'utf-8');
+  console.log(`[SyncCaja] Backup rico guardado en ${backupPath}`);
+
+  let actualizados = 0;
+
+  // Aplicar cambios en la Base de Datos
+  for (const item of listaCambiosProcesados) {
+    const lead = leadsMap.get(String(item.leadId));
+    if (!lead) continue;
+
+    let patch = {};
+    if (item.isCompraAdicional) {
       const compras = lead.seguimiento?.comprasAdicionales || [];
       const updatedCompras = compras.map(c => {
-        if (String(c.id) === String(cambio.compraId)) {
-          return { ...c, fechaCierre: cambio.nuevaFecha, numeroRecibo: formattedRecibo };
+        if (String(c.id) === String(item.compraId)) {
+          return { ...c, fechaCierre: item.fechaCierreNueva, numeroRecibo: item.reciboNuevo };
         }
         return c;
       });
       patch = {
         comprasAdicionales: updatedCompras,
-        operadorId: targetOperator.id,
-        operadorNombre: targetOperator.nombre,
-        operadorRol: targetOperator.rol
+        operadorId: item.operadorNuevo.id,
+        operadorNombre: item.operadorNuevo.nombre,
+        operadorRol: item.operadorNuevo.rol
       };
     } else {
       patch = {
-        fechaCierre: cambio.nuevaFecha,
-        numeroRecibo: formattedRecibo,
-        operadorId: targetOperator.id,
-        operadorNombre: targetOperator.nombre,
-        operadorRol: targetOperator.rol
+        fechaCierre: item.fechaCierreNueva,
+        numeroRecibo: item.reciboNuevo,
+        operadorId: item.operadorNuevo.id,
+        operadorNombre: item.operadorNuevo.nombre,
+        operadorRol: item.operadorNuevo.rol
       };
     }
-    
+
     try {
-      const res = await persistirSeguimientoLead(lead.id, patch, targetOperator, lead);
+      const res = await persistirSeguimientoLead(lead.id, patch, item.operadorNuevo, lead);
       if (res && res.saved) {
         actualizados++;
       }

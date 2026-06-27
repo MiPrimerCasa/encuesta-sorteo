@@ -205,6 +205,81 @@ function registerApiRoutes(api) {
     }
   });
 
+  api.get('/leads/recibos-ocupados', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      console.log('[API /recibos-ocupados] Sesión inválida.');
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+
+    try {
+      console.log('[API /recibos-ocupados] Iniciando búsqueda global de leads...');
+      const leads = await listAllLeadsFromEncuestas();
+      const recibos = {};
+
+      const extraerSerieAdhesion = (recibo) => {
+        if (!recibo) return null;
+        const clean = recibo.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, '/');
+        const m = clean.match(/^([A-Z]+)(\d+)/);
+        if (m) {
+          return `${m[1]}${m[2]}`;
+        }
+        return null;
+      };
+
+      for (const l of leads) {
+        // Recibo principal
+        if (l.seguimiento?.idProducto === 'prod-pij' && l.seguimiento?.numeroRecibo) {
+          const clave = extraerSerieAdhesion(l.seguimiento.numeroRecibo);
+          if (clave) {
+            recibos[clave] = {
+              cliente: l.nombre,
+              vendedor: l.promotorNombre || 'Sin Vendedor',
+              leadId: l.id
+            };
+          }
+        }
+
+        // Compras adicionales
+        let adicionales = [];
+        if (l.seguimiento?.comprasAdicionales) {
+          try {
+            adicionales = typeof l.seguimiento.comprasAdicionales === 'string'
+              ? JSON.parse(l.seguimiento.comprasAdicionales)
+              : l.seguimiento.comprasAdicionales;
+          } catch (_) {}
+        }
+
+        if (Array.isArray(adicionales)) {
+          for (const comp of adicionales) {
+            if (comp.idProducto === 'prod-pij' && comp.numeroRecibo) {
+              const clave = extraerSerieAdhesion(comp.numeroRecibo);
+              if (clave) {
+                recibos[clave] = {
+                  cliente: l.nombre,
+                  vendedor: l.promotorNombre || 'Sin Vendedor',
+                  leadId: l.id,
+                  isAdicional: true
+                };
+              }
+            }
+          }
+        }
+      }
+
+      console.log(`[API /recibos-ocupados] Búsqueda completada. Total adhesiones indexadas: ${Object.keys(recibos).length}`);
+      return res.json({ recibos });
+    } catch (error) {
+      console.error('[API /recibos-ocupados] Error al listar recibos ocupados:', error);
+      return res.status(500).json({
+        message: 'Error al obtener la lista de recibos ocupados.',
+        detail: error instanceof Error ? error.message : 'Error desconocido'
+      });
+    }
+  });
+
   api.get('/leads', async (req, res) => {
     if (!respondIfNotConfigured(res)) return;
 

@@ -207,6 +207,24 @@ export async function fetchLeads(): Promise<{
   };
 }
 
+export async function fetchRecibosOcupados(): Promise<
+  Record<string, { cliente: string; vendedor: string; leadId: string }>
+> {
+  if (_isDemoActive) {
+    return {
+      "A23/300ANEXO171/300": {
+        cliente: "Federico Ceballos Bertero",
+        vendedor: "Catherine Contreras",
+        leadId: "233"
+      }
+    };
+  }
+  const data = await apiFetch<{
+    recibos: Record<string, { cliente: string; vendedor: string; leadId: string }>;
+  }>('/api/leads/recibos-ocupados');
+  return data.recibos || {};
+}
+
 export async function fetchNotificacionesLinksRedes(): Promise<{
   total: number;
   items: NotificacionLinkRed[];

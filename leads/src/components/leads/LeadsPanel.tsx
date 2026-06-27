@@ -603,6 +603,7 @@ export function LeadsPanel({
         rolUsuario={rolUsuario}
         productos={productos}
         barrios={barrios}
+        todosLosLeads={leads}
         soloLectura={
           leadSeleccionado != null &&
           (leadSoloLecturaUltimoModificador(leadSeleccionado, usuario?.idOperador ?? usuario?.id, rolUsuario) ||

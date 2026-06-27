@@ -198,6 +198,8 @@ interface LeadModalFormProps {
   rolUsuario: RolUsuario;
   productos: Producto[];
   barrios: Barrio[];
+  /** Lista de todos los leads para validar duplicados de recibo. */
+  todosLosLeads?: Lead[];
   /** Promotor consultando un cierre cargado por el supervisor. */
   soloLectura?: boolean;
   onClose: () => void;
@@ -210,6 +212,7 @@ export function LeadModalForm({
   rolUsuario,
   productos,
   barrios,
+  todosLosLeads = [],
   soloLectura = false,
   onClose,
   onSave,
@@ -248,6 +251,36 @@ export function LeadModalForm({
     if (a) parts.push(`${s}${a}/300`);
     if (x) parts.push(`ANEXO ${x}/300`);
     return parts.join(' ');
+  }
+
+  // Verifica si un recibo PIJ ya existe en otro lead (excluye el lead actual y compara por partes)
+  function buscarDuplicadoRecibo(recibo: string, excluirLeadId?: string, excluirCompraId?: string): string | null {
+    if (!recibo.trim()) return null;
+    const normalizar = (s: string) => s.trim().toUpperCase().replace(/\s+/g, ' ');
+    const reciboNorm = normalizar(recibo);
+    for (const l of todosLosLeads) {
+      const esLeadActual = excluirLeadId && String(l.id) === String(excluirLeadId);
+      // Revisar recibo principal
+      if (l.seguimiento?.numeroRecibo) {
+        const existente = normalizar(l.seguimiento.numeroRecibo);
+        if (existente === reciboNorm) {
+          // Si es el mismo lead y no hay compraId excluida, es el propio registro → no es duplicado
+          if (esLeadActual && !excluirCompraId) continue;
+          if (!esLeadActual) return l.nombre;
+        }
+      }
+      // Revisar compras adicionales
+      for (const compra of (l.seguimiento?.comprasAdicionales ?? [])) {
+        if (compra.numeroRecibo) {
+          const existente = normalizar(compra.numeroRecibo);
+          if (existente === reciboNorm) {
+            if (esLeadActual && excluirCompraId && String(compra.id) === String(excluirCompraId)) continue;
+            return l.nombre;
+          }
+        }
+      }
+    }
+    return null;
   }
 
   const rol: RolUsuario = rolUsuario === 'promotor' ? 'promotor' : 'supervisor';
@@ -613,6 +646,13 @@ export function LeadModalForm({
       if (requiereNumeroRecibo(form.idProducto, form.estadoPago) && !form.numeroRecibo.trim()) {
         setErrorVenta(mensajeErrorNumeroDocumentoVenta(form.idProducto));
         return;
+      }
+      if (esPlanInversion(form.idProducto) && form.numeroRecibo.trim()) {
+        const dup = buscarDuplicadoRecibo(form.numeroRecibo, lead?.id ?? undefined);
+        if (dup) {
+          setErrorVenta(`Este número de anexo ya está registrado para ${dup}. Verificá el número antes de guardar.`);
+          return;
+        }
       }
     }
 
@@ -1607,11 +1647,25 @@ export function LeadModalForm({
                                 </div>
                               </div>
                               {/* Preview del recibo ensamblado */}
-                              {form.numeroRecibo.trim() && (
-                                <p className="rounded-lg bg-brand-50 border border-brand-100 px-3 py-2 text-[13px] font-mono font-semibold text-brand-800">
-                                  {form.numeroRecibo}
-                                </p>
-                              )}
+                              {form.numeroRecibo.trim() && (() => {
+                                const dup = buscarDuplicadoRecibo(form.numeroRecibo, lead?.id ?? undefined);
+                                return (
+                                  <>
+                                    <p className={`rounded-lg border px-3 py-2 text-[13px] font-mono font-semibold ${
+                                      dup
+                                        ? 'bg-red-50 border-red-300 text-red-700'
+                                        : 'bg-brand-50 border-brand-100 text-brand-800'
+                                    }`}>
+                                      {form.numeroRecibo}
+                                    </p>
+                                    {dup && (
+                                      <p className="text-[12px] font-semibold text-red-600">
+                                        ⚠️ Este número ya está registrado para {dup}
+                                      </p>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           ) : (
                             // Terreno: texto libre
@@ -1854,11 +1908,25 @@ export function LeadModalForm({
                                         />
                                       </div>
                                     </div>
-                                    {adicionalForm.numeroRecibo.trim() && (
-                                      <p className="rounded-lg bg-brand-50 border border-brand-100 px-3 py-1.5 text-[12px] font-mono font-semibold text-brand-800">
-                                        {adicionalForm.numeroRecibo}
-                                      </p>
-                                    )}
+                                    {adicionalForm.numeroRecibo.trim() && (() => {
+                                      const dup = buscarDuplicadoRecibo(adicionalForm.numeroRecibo, lead?.id ?? undefined);
+                                      return (
+                                        <>
+                                          <p className={`rounded-lg border px-3 py-1.5 text-[12px] font-mono font-semibold ${
+                                            dup
+                                              ? 'bg-red-50 border-red-300 text-red-700'
+                                              : 'bg-brand-50 border-brand-100 text-brand-800'
+                                          }`}>
+                                            {adicionalForm.numeroRecibo}
+                                          </p>
+                                          {dup && (
+                                            <p className="text-[12px] font-semibold text-red-600">
+                                              ⚠️ Este número ya está registrado para {dup}
+                                            </p>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
                                   </div>
                                 ) : (
                                   // Terreno: texto libre
@@ -1893,6 +1961,13 @@ export function LeadModalForm({
                                         : 'Ingresá el número de recibo adicional.'
                                     );
                                     return;
+                                  }
+                                  if (showAddAdicional === 'pij') {
+                                    const dup = buscarDuplicadoRecibo(adicionalForm.numeroRecibo, lead?.id ?? undefined);
+                                    if (dup) {
+                                      setErrorVenta(`Este número de anexo ya está registrado para ${dup}. No se puede duplicar.`);
+                                      return;
+                                    }
                                   }
 
                                   setErrorVenta('');

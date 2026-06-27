@@ -2270,6 +2270,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         rolUsuario="supervisor"
         productos={productos}
         barrios={barrios}
+        todosLosLeads={leads}
         onClose={() => setSeguimientoLead(null)}
         onSave={handleGuardarSeguimiento}
       />

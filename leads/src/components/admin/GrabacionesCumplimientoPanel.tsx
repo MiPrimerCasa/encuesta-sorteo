@@ -1,0 +1,327 @@
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  fetchGrabacionAudioBlob,
+  fetchGrabacionesCumplimiento,
+  rechazarGrabacion,
+} from '../../api/client';
+import type { FilaCumplimientoGrabaciones, GrabacionPromotor, SemaforoGrabacion } from '../../types';
+import { PromotorInformeFilter } from './PromotorInformeFilter';
+
+function estiloSemaforo(semaforo: SemaforoGrabacion): string {
+  if (semaforo === 'verde') return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
+  if (semaforo === 'amarillo') return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
+  return 'bg-red-50 text-red-700 ring-1 ring-red-200';
+}
+
+function CeldaCumplimiento({
+  cantidad,
+  meta,
+  semaforo,
+}: {
+  cantidad: number;
+  meta: number;
+  semaforo: SemaforoGrabacion;
+}) {
+  return (
+    <span
+      className={`inline-flex min-w-[3rem] items-center justify-center rounded-md px-2 py-0.5 text-[13px] font-bold tabular-nums ${estiloSemaforo(semaforo)}`}
+    >
+      {cantidad}/{meta}
+    </span>
+  );
+}
+
+function AudioPlayer({ grabacionId }: { grabacionId: number }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (src) URL.revokeObjectURL(src);
+    };
+  }, [src]);
+
+  const cargar = async () => {
+    if (src || cargando) return;
+    setCargando(true);
+    setError('');
+    try {
+      const url = await fetchGrabacionAudioBlob(grabacionId);
+      setSrc(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar audio');
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  if (error) return <span className="text-[11px] text-red-600">{error}</span>;
+  if (!src) {
+    return (
+      <button
+        type="button"
+        onClick={() => void cargar()}
+        disabled={cargando}
+        className="text-[12px] font-semibold text-brand-600 hover:text-brand-700"
+      >
+        {cargando ? 'Cargando…' : 'Escuchar'}
+      </button>
+    );
+  }
+  return <audio controls preload="none" src={src} className="h-8 max-w-[180px]" />;
+}
+
+function DetalleGrabaciones({
+  grabaciones,
+  onRechazado,
+}: {
+  grabaciones: GrabacionPromotor[];
+  onRechazado: () => void;
+}) {
+  const [rechazandoId, setRechazandoId] = useState<number | null>(null);
+
+  const handleRechazar = async (id: number) => {
+    const motivo = window.prompt('Motivo del rechazo (opcional):') ?? '';
+    setRechazandoId(id);
+    try {
+      await rechazarGrabacion(id, motivo || undefined);
+      onRechazado();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'No se pudo rechazar');
+    } finally {
+      setRechazandoId(null);
+    }
+  };
+
+  if (!grabaciones.length) {
+    return <p className="text-[12px] text-zinc-400">Sin audios este día.</p>;
+  }
+
+  return (
+    <ul className="space-y-2">
+      {grabaciones.map((g) => (
+        <li
+          key={g.id}
+          className={`flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 text-[12px] ${
+            g.estado === 'rechazado' ? 'border-red-200 bg-red-50/40' : 'border-zinc-100 bg-zinc-50'
+          }`}
+        >
+          <span className="font-semibold capitalize">
+            {g.tipo === 'promocion' ? 'Promoción' : 'Entrevista'}
+          </span>
+          <span className="text-zinc-500">{g.franja === 'manana' ? 'Mañana' : 'Tarde'}</span>
+          <span className="text-zinc-500">{Math.round(g.duracionSeg)}s</span>
+          <span className="text-zinc-600">
+            {g.leadNombre ? `Lead: ${g.leadNombre}` : 'Sin lead asociado'}
+          </span>
+          {g.estado === 'activo' ? (
+            <>
+              <AudioPlayer grabacionId={g.id} />
+              <button
+                type="button"
+                disabled={rechazandoId === g.id}
+                onClick={() => void handleRechazar(g.id)}
+                className="text-[12px] font-semibold text-red-600 hover:text-red-700"
+              >
+                Rechazar
+              </button>
+            </>
+          ) : (
+            <span className="text-red-600">
+              Rechazado{g.motivoRechazo ? `: ${g.motivoRechazo}` : ''}
+            </span>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function GrabacionesCumplimientoPanel() {
+  const hoy = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const [fecha, setFecha] = useState(hoy);
+  const [promotoresSeleccionados, setPromotoresSeleccionados] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [filas, setFilas] = useState<FilaCumplimientoGrabaciones[]>([]);
+  const [promotoresConfig, setPromotoresConfig] = useState<Array<{ id: string; nombre: string }>>(
+    [],
+  );
+  const [expandido, setExpandido] = useState<string | null>(null);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState('');
+  const fechaInputRef = useRef<HTMLInputElement>(null);
+
+  const cargar = useCallback(async () => {
+    setCargando(true);
+    setError('');
+    try {
+      const ids =
+        promotoresSeleccionados.size > 0 ? Array.from(promotoresSeleccionados) : undefined;
+      const data = await fetchGrabacionesCumplimiento(fecha, ids);
+      setFilas(data.filas);
+      setPromotoresConfig(data.promotoresConfig);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar cumplimiento');
+    } finally {
+      setCargando(false);
+    }
+  }, [fecha, promotoresSeleccionados]);
+
+  useEffect(() => {
+    void cargar();
+  }, [cargar]);
+
+  const opcionesPromotor = useMemo(
+    () =>
+      promotoresConfig.map((p) => ({
+        promotorId: p.id,
+        promotorNombre: p.nombre,
+      })),
+    [promotoresConfig],
+  );
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-[16px] font-semibold text-zinc-900">Grabaciones diarias</h3>
+        <p className="mt-0.5 text-[13px] text-zinc-500">
+          Cumplimiento de audios por promotor · cuota 4/día (2 mañana + 2 tarde sugerido)
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+            Fecha
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setFecha(hoy)}
+              className={`rounded-lg px-3 py-1.5 text-[13px] font-semibold ${
+                fecha === hoy
+                  ? 'bg-brand-600 text-white'
+                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+              }`}
+            >
+              Hoy
+            </button>
+            <input
+              ref={fechaInputRef}
+              type="date"
+              value={fecha}
+              max={hoy}
+              onChange={(e) => setFecha(e.target.value || hoy)}
+              className="rounded-lg border border-zinc-200 px-3 py-1.5 text-[13px]"
+            />
+          </div>
+        </div>
+
+        {opcionesPromotor.length > 0 && (
+          <PromotorInformeFilter
+            promotores={opcionesPromotor}
+            selectedIds={promotoresSeleccionados}
+            onChangeSelected={setPromotoresSeleccionados}
+          />
+        )}
+      </div>
+
+      {error && (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-[13px] text-red-700">
+          {error}
+        </p>
+      )}
+
+      <div className="overflow-x-auto rounded-xl border border-zinc-200 bg-white shadow-sm">
+        <table className="w-full min-w-[640px] text-left text-[13px]">
+          <thead>
+            <tr className="border-b border-zinc-100 bg-zinc-50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+              <th className="py-2.5 px-4">Promotor</th>
+              <th className="py-2.5 px-2 text-center">Mañana</th>
+              <th className="py-2.5 px-2 text-center">Tarde</th>
+              <th className="py-2.5 px-2 text-center">Total</th>
+              <th className="py-2.5 px-4 text-center">Estado</th>
+              <th className="py-2.5 px-4" />
+            </tr>
+          </thead>
+          <tbody>
+            {cargando ? (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-zinc-400">
+                  Cargando…
+                </td>
+              </tr>
+            ) : filas.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-zinc-400">
+                  Sin promotores configurados o sin datos para esta fecha.
+                </td>
+              </tr>
+            ) : (
+              filas.map((fila) => (
+                <Fragment key={fila.promotorId}>
+                  <tr className="border-b border-zinc-50 hover:bg-zinc-50/50">
+                    <td className="py-2.5 px-4 font-medium text-zinc-900">{fila.promotorNombre}</td>
+                    <td className="py-2.5 px-2 text-center">
+                      <CeldaCumplimiento
+                        cantidad={fila.manana}
+                        meta={fila.metaManana}
+                        semaforo={fila.semaforoManana}
+                      />
+                    </td>
+                    <td className="py-2.5 px-2 text-center">
+                      <CeldaCumplimiento
+                        cantidad={fila.tarde}
+                        meta={fila.metaTarde}
+                        semaforo={fila.semaforoTarde}
+                      />
+                    </td>
+                    <td className="py-2.5 px-2 text-center">
+                      <CeldaCumplimiento
+                        cantidad={fila.total}
+                        meta={fila.metaTotal}
+                        semaforo={fila.semaforoTotal}
+                      />
+                    </td>
+                    <td className="py-2.5 px-4 text-center">
+                      <span
+                        className={`inline-flex rounded-md px-2 py-0.5 text-[12px] font-semibold ${estiloSemaforo(fila.semaforoTotal)}`}
+                      >
+                        {fila.cumple ? 'Cumple' : 'Pendiente'}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandido((prev) =>
+                            prev === fila.promotorId ? null : fila.promotorId,
+                          )
+                        }
+                        className="text-[12px] font-semibold text-brand-600 hover:text-brand-700"
+                      >
+                        {expandido === fila.promotorId ? 'Ocultar' : 'Ver audios'}
+                      </button>
+                    </td>
+                  </tr>
+                  {expandido === fila.promotorId && (
+                    <tr>
+                      <td colSpan={6} className="bg-zinc-50/80 px-4 py-3">
+                        <DetalleGrabaciones
+                          grabaciones={fila.grabaciones}
+                          onRechazado={() => void cargar()}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

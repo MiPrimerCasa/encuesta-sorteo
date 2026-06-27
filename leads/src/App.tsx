@@ -4,6 +4,7 @@ import {
   modificarTelefonoLead,
   fetchAdminDashboard,
   fetchBarrios,
+  fetchGrabacionesConfig,
   fetchLeads,
   fetchPromotores,
   fetchProductos,
@@ -42,6 +43,11 @@ const SuperadminDashboard = lazy(() =>
     default: m.SuperadminDashboard,
   })),
 );
+const GrabacionDiariaPanel = lazy(() =>
+  import('./components/grabaciones/GrabacionDiariaPanel').then((m) => ({
+    default: m.GrabacionDiariaPanel,
+  })),
+);
 
 function VistaCargando({ texto = 'Cargando…' }: { texto?: string }) {
   return <p className="px-4 py-12 text-center text-neutral-600">{texto}</p>;
@@ -63,6 +69,12 @@ function AppShell() {
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
   const [aviso, setAviso] = useState('');
+  const [grabacionesHabilitado, setGrabacionesHabilitado] = useState(false);
+  const [grabacionesConfig, setGrabacionesConfig] = useState<{
+    minDuracionSeg: number;
+    maxMb: number;
+    formatos: string[];
+  } | null>(null);
 
   const cargarDatos = useCallback(async (p = periodo) => {
     if (!usuario) return;
@@ -111,6 +123,28 @@ function AppShell() {
   useEffect(() => {
     void cargarDatos();
   }, [cargarDatos]);
+
+  useEffect(() => {
+    if (!usuario || usuario.rol !== 'promotor') {
+      setGrabacionesHabilitado(false);
+      setGrabacionesConfig(null);
+      return;
+    }
+    fetchGrabacionesConfig()
+      .then((cfg) => {
+        setGrabacionesHabilitado(cfg.moduloActivo && cfg.habilitado);
+        if (cfg.moduloActivo && cfg.habilitado) {
+          setGrabacionesConfig({
+            minDuracionSeg: cfg.minDuracionSeg,
+            maxMb: cfg.maxMb,
+            formatos: cfg.formatos,
+          });
+        }
+      })
+      .catch(() => {
+        setGrabacionesHabilitado(false);
+      });
+  }, [usuario]);
 
   const onActualizarLead = useCallback(
     async (leadId: string, seguimiento: SeguimientoLead) => {
@@ -190,6 +224,13 @@ function AppShell() {
       <PromotoresPanel leads={leads} promotores={promotores} />
     ) : vistaActiva === 'metricas' && usuario.rol === 'promotor' ? (
       <PromotorMetricasPanel leads={leads} />
+    ) : vistaActiva === 'grabacion' && usuario.rol === 'promotor' && grabacionesConfig ? (
+      <GrabacionDiariaPanel
+        leads={leads}
+        minDuracionSeg={grabacionesConfig.minDuracionSeg}
+        maxMb={grabacionesConfig.maxMb}
+        formatos={grabacionesConfig.formatos}
+      />
     ) : (
       <LeadsPanel
         leads={leads}
@@ -214,6 +255,7 @@ function AppShell() {
         onCambiarVista={setVistaActiva}
         usuario={usuario}
         onLogout={logout}
+        grabacionesHabilitado={grabacionesHabilitado}
       />
       <main>
         {aviso && (

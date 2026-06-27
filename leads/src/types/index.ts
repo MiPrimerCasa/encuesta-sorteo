@@ -1,5 +1,5 @@
 export type RolUsuario = 'promotor' | 'supervisor' | 'superadmin';
-export type VistaActiva = 'leads' | 'promotores' | 'metricas' | 'calendario' | 'admin';
+export type VistaActiva = 'leads' | 'promotores' | 'metricas' | 'calendario' | 'admin' | 'grabacion';
 export type ListaLead = 'entrevista' | 'contacto';
 /** Dónde quiere la entrevista el cliente (encuesta / SP). */
 export type LugarEntrevista = 'sucursal' | 'domicilio';
@@ -514,4 +514,72 @@ export interface PersonaPijCierres {
   cierres: PijCierreDetalle[];
   cantidadRecibos?: number;
   recibos?: TerrenoCierreDetalle[];
+}
+
+export type TipoGrabacion = 'promocion' | 'entrevista';
+export type FranjaGrabacion = 'manana' | 'tarde';
+export type SemaforoGrabacion = 'verde' | 'amarillo' | 'rojo';
+export type EstadoGrabacion = 'activo' | 'rechazado';
+
+export interface GrabacionPromotor {
+  id: number;
+  promotorId: string;
+  promotorNombre: string;
+  leadId: string | null;
+  leadNombre: string | null;
+  tipo: TipoGrabacion;
+  franja: FranjaGrabacion;
+  fechaGrabacion: string;
+  diaKey: string;
+  duracionSeg: number;
+  mimeType: string;
+  tamanoBytes: number;
+  estado: EstadoGrabacion;
+  rechazadoPor: string | null;
+  rechazadoEn: string | null;
+  motivoRechazo: string | null;
+  creadoEn: string;
+}
+
+export interface ResumenGrabacionesDia {
+  manana: number;
+  tarde: number;
+  total: number;
+  metaManana: number;
+  metaTarde: number;
+  metaTotal: number;
+  semaforoManana: SemaforoGrabacion;
+  semaforoTarde: SemaforoGrabacion;
+  semaforoTotal: SemaforoGrabacion;
+  cumple: boolean;
+}
+
+export interface GrabacionesConfigResponse {
+  moduloActivo: boolean;
+  habilitado: boolean;
+  puedeAuditar: boolean;
+  cuotaDiaria: number;
+  cuotaFranja: number;
+  minDuracionSeg: number;
+  formatos: string[];
+  maxMb: number;
+  resumenHoy: ResumenGrabacionesDia | null;
+}
+
+export interface GrabacionesMiasResponse {
+  diaKey: string;
+  resumen: ResumenGrabacionesDia;
+  grabaciones: GrabacionPromotor[];
+}
+
+export interface FilaCumplimientoGrabaciones extends ResumenGrabacionesDia {
+  promotorId: string;
+  promotorNombre: string;
+  grabaciones: GrabacionPromotor[];
+}
+
+export interface GrabacionesCumplimientoResponse {
+  diaKey: string;
+  filas: FilaCumplimientoGrabaciones[];
+  promotoresConfig: Array<{ id: string; nombre: string }>;
 }

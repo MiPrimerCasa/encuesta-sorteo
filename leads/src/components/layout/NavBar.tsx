@@ -22,6 +22,13 @@ const TABS_PROMOTOR = [
   { value: 'metricas' as const, label: 'Métricas' },
 ];
 
+const TABS_PROMOTOR_GRABACION = [
+  { value: 'leads' as const, label: 'Leads' },
+  { value: 'calendario' as const, label: 'Calendario' },
+  { value: 'metricas' as const, label: 'Métricas' },
+  { value: 'grabacion' as const, label: 'Grabación' },
+];
+
 const TABS_PROMOTOR_GLOBAL = [
   { value: 'leads' as const, label: 'Leads' },
   { value: 'calendario' as const, label: 'Calendario' },
@@ -48,9 +55,16 @@ interface NavBarProps {
   onCambiarVista: (id: VistaActiva) => void;
   usuario: UsuarioSesion;
   onLogout: () => void;
+  grabacionesHabilitado?: boolean;
 }
 
-export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBarProps) {
+export function NavBar({
+  vistaActiva,
+  onCambiarVista,
+  usuario,
+  onLogout,
+  grabacionesHabilitado = false,
+}: NavBarProps) {
   const tabs: Array<{ value: VistaActiva; label: string }> =
     usuario.rol === 'superadmin'
       ? TABS_SUPERADMIN
@@ -58,9 +72,13 @@ export function NavBar({ vistaActiva, onCambiarVista, usuario, onLogout }: NavBa
         ? usuario.panelGlobal
           ? TABS_SUPERVISOR_GLOBAL
           : TABS_SUPERVISOR
-        : usuario.panelGlobal
-          ? TABS_PROMOTOR_GLOBAL
-          : TABS_PROMOTOR;
+        : grabacionesHabilitado
+          ? usuario.panelGlobal
+            ? [...TABS_PROMOTOR_GRABACION, { value: 'admin' as const, label: 'Panel global' }]
+            : TABS_PROMOTOR_GRABACION
+          : usuario.panelGlobal
+            ? TABS_PROMOTOR_GLOBAL
+            : TABS_PROMOTOR;
 
   return (
     <header

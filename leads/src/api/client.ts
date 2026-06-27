@@ -1,6 +1,10 @@
 import type {
   AdminDashboardData,
   Barrio,
+  GrabacionesConfigResponse,
+  GrabacionesCumplimientoResponse,
+  GrabacionesMiasResponse,
+  GrabacionPromotor,
   GuardarSeguimientoResult,
   Lead,
   LinksRedes,
@@ -115,6 +119,9 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     if (session.usuario.sucursal) {
       headers['x-usuario-sucursal'] = session.usuario.sucursal;
     }
+    if (session.usuario.panelGlobal) {
+      headers['x-usuario-panel-global'] = 'true';
+    }
   }
 
   const url = apiUrl(path);
@@ -147,7 +154,9 @@ async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
     const msg =
       typeof data.message === 'string'
         ? data.message
-        : res.status === 401
+        : typeof data.error === 'string'
+          ? data.error
+          : res.status === 401
           ? 'Usuario o contraseña incorrectos.'
           : res.status === 503
             ? 'Servidor o base de datos no disponible.'
@@ -490,5 +499,306 @@ export async function commitSyncCajaPij(cambiosAprobados: SyncPreviewItem[]): Pr
     method: 'POST',
     body: JSON.stringify({ cambiosAprobados }),
   });
+}
+
+function authHeadersForSession(contentTypeJson = true): Record<string, string> {
+  const session = getSession();
+  const headers: Record<string, string> = {};
+  if (contentTypeJson) headers['Content-Type'] = 'application/json';
+  if (!session) return headers;
+  headers['x-usuario-id'] = session.usuario.id;
+  headers['x-usuario-rol'] = session.usuario.rol;
+  headers['x-usuario-nombre'] = session.usuario.nombre;
+  if (session.usuario.loginId) headers['x-usuario-login-id'] = session.usuario.loginId;
+  if (session.usuario.codigoCarga) headers['x-usuario-codigo-carga'] = session.usuario.codigoCarga;
+  if (session.usuario.codigoPromotor) {
+    headers['x-usuario-codigo-promotor'] = session.usuario.codigoPromotor;
+  }
+  if (session.usuario.codigoSupervisor) {
+    headers['x-usuario-codigo-supervisor'] = session.usuario.codigoSupervisor;
+  }
+  if (session.usuario.idVendedor) headers['x-usuario-id-vendedor'] = session.usuario.idVendedor;
+  if (session.usuario.idSupervisor) headers['x-usuario-id-supervisor'] = session.usuario.idSupervisor;
+  if (session.usuario.idOperador) headers['x-usuario-id-operador'] = session.usuario.idOperador;
+  if (session.usuario.sucursal) headers['x-usuario-sucursal'] = session.usuario.sucursal;
+  if (session.usuario.panelGlobal) headers['x-usuario-panel-global'] = 'true';
+  return headers;
+}
+
+export async function fetchGrabacionesConfig(): Promise<GrabacionesConfigResponse> {
+  if (_isDemoActive) {
+    return {
+      moduloActivo: true,
+      habilitado: _demoUsuario.rol === 'promotor',
+      puedeAuditar: _demoUsuario.rol !== 'promotor',
+      cuotaDiaria: 4,
+      cuotaFranja: 2,
+      minDuracionSeg: 20,
+      formatos: ['.m4a', '.mp3', '.wav', '.ogg'],
+      maxMb: 25,
+      resumenHoy: {
+        manana: 1,
+        tarde: 0,
+        total: 1,
+        metaManana: 2,
+        metaTarde: 2,
+        metaTotal: 4,
+        semaforoManana: 'amarillo',
+        semaforoTarde: 'rojo',
+        semaforoTotal: 'amarillo',
+        cumple: false,
+      },
+    };
+  }
+  return apiFetch<GrabacionesConfigResponse>('/api/grabaciones/config');
+}
+
+export async function fetchMisGrabaciones(fecha?: string): Promise<GrabacionesMiasResponse> {
+  if (_isDemoActive) {
+    const diaKey = fecha ?? new Date().toISOString().slice(0, 10);
+    return {
+      diaKey,
+      resumen: {
+        manana: 2,
+        tarde: 1,
+        total: 3,
+        metaManana: 2,
+        metaTarde: 2,
+        metaTotal: 4,
+        semaforoManana: 'verde',
+        semaforoTarde: 'amarillo',
+        semaforoTotal: 'amarillo',
+        cumple: false,
+      },
+      grabaciones: [
+        {
+          id: 1,
+          promotorId: 'prom-1',
+          promotorNombre: 'Martín González',
+          leadId: '1001',
+          leadNombre: 'Juan Pérez',
+          tipo: 'entrevista',
+          franja: 'manana',
+          fechaGrabacion: `${diaKey}T09:15:00.000Z`,
+          diaKey,
+          duracionSeg: 142,
+          mimeType: 'audio/mp4',
+          tamanoBytes: 2_400_000,
+          estado: 'activo',
+          rechazadoPor: null,
+          rechazadoEn: null,
+          motivoRechazo: null,
+          creadoEn: `${diaKey} 09:20:00`,
+        },
+        {
+          id: 2,
+          promotorId: 'prom-1',
+          promotorNombre: 'Martín González',
+          leadId: null,
+          leadNombre: null,
+          tipo: 'promocion',
+          franja: 'manana',
+          fechaGrabacion: `${diaKey}T10:30:00.000Z`,
+          diaKey,
+          duracionSeg: 95,
+          mimeType: 'audio/mp4',
+          tamanoBytes: 1_800_000,
+          estado: 'activo',
+          rechazadoPor: null,
+          rechazadoEn: null,
+          motivoRechazo: null,
+          creadoEn: `${diaKey} 10:32:00`,
+        },
+        {
+          id: 3,
+          promotorId: 'prom-1',
+          promotorNombre: 'Martín González',
+          leadId: '1002',
+          leadNombre: 'María López',
+          tipo: 'entrevista',
+          franja: 'tarde',
+          fechaGrabacion: `${diaKey}T14:05:00.000Z`,
+          diaKey,
+          duracionSeg: 210,
+          mimeType: 'audio/mp4',
+          tamanoBytes: 3_100_000,
+          estado: 'activo',
+          rechazadoPor: null,
+          rechazadoEn: null,
+          motivoRechazo: null,
+          creadoEn: `${diaKey} 14:08:00`,
+        },
+      ],
+    };
+  }
+  const q = fecha ? `?fecha=${encodeURIComponent(fecha)}` : '';
+  return apiFetch<GrabacionesMiasResponse>(`/api/grabaciones/mias${q}`);
+}
+
+export async function uploadGrabacion(
+  file: File,
+  payload: { tipo: 'promocion' | 'entrevista'; leadId?: string; leadNombre?: string },
+  onProgress?: (pct: number) => void,
+): Promise<{ grabacion: GrabacionPromotor; resumen: GrabacionesMiasResponse['resumen'] }> {
+  if (_isDemoActive) {
+    throw new Error('Subida de grabaciones no disponible en modo demo.');
+  }
+
+  const form = new FormData();
+  form.append('audio', file);
+  form.append('tipo', payload.tipo);
+  if (payload.leadId) form.append('leadId', payload.leadId);
+  if (payload.leadNombre) form.append('leadNombre', payload.leadNombre);
+
+  const url = apiUrl('/api/grabaciones/upload');
+  const headers = authHeadersForSession(false);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
+
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable && onProgress) {
+        onProgress(Math.round((ev.loaded / ev.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      let data: Record<string, unknown> = {};
+      try {
+        data = xhr.responseText ? (JSON.parse(xhr.responseText) as Record<string, unknown>) : {};
+      } catch {
+        reject(new Error('Respuesta inválida del servidor'));
+        return;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data as { grabacion: GrabacionPromotor; resumen: GrabacionesMiasResponse['resumen'] });
+        return;
+      }
+      const msg =
+        typeof data.error === 'string'
+          ? data.error
+          : typeof data.message === 'string'
+            ? data.message
+            : `Error al subir (${xhr.status})`;
+      reject(new Error(msg));
+    };
+
+    xhr.onerror = () => reject(new Error('No se pudo subir. Reintentá cuando tengas señal.'));
+    xhr.send(form);
+  });
+}
+
+export async function fetchGrabacionesCumplimiento(
+  fecha?: string,
+  promotorIds?: string[],
+): Promise<GrabacionesCumplimientoResponse> {
+  if (_isDemoActive) {
+    const diaKey = fecha ?? new Date().toISOString().slice(0, 10);
+    const filas = [
+      {
+        promotorId: 'prom-1',
+        promotorNombre: 'Martín González',
+        manana: 2,
+        tarde: 1,
+        total: 3,
+        metaManana: 2,
+        metaTarde: 2,
+        metaTotal: 4,
+        semaforoManana: 'verde' as const,
+        semaforoTarde: 'amarillo' as const,
+        semaforoTotal: 'amarillo' as const,
+        cumple: false,
+        grabaciones: [
+          {
+            id: 1,
+            promotorId: 'prom-1',
+            promotorNombre: 'Martín González',
+            leadId: '1001',
+            leadNombre: 'Juan Pérez',
+            tipo: 'entrevista' as const,
+            franja: 'manana' as const,
+            fechaGrabacion: `${diaKey}T09:15:00.000Z`,
+            diaKey,
+            duracionSeg: 142,
+            mimeType: 'audio/mp4',
+            tamanoBytes: 2_400_000,
+            estado: 'activo' as const,
+            rechazadoPor: null,
+            rechazadoEn: null,
+            motivoRechazo: null,
+            creadoEn: `${diaKey} 09:20:00`,
+          },
+        ],
+      },
+      {
+        promotorId: 'prom-2',
+        promotorNombre: 'Ana Rodríguez',
+        manana: 1,
+        tarde: 0,
+        total: 1,
+        metaManana: 2,
+        metaTarde: 2,
+        metaTotal: 4,
+        semaforoManana: 'amarillo' as const,
+        semaforoTarde: 'rojo' as const,
+        semaforoTotal: 'rojo' as const,
+        cumple: false,
+        grabaciones: [],
+      },
+      {
+        promotorId: 'prom-3',
+        promotorNombre: 'Carlos López',
+        manana: 2,
+        tarde: 2,
+        total: 4,
+        metaManana: 2,
+        metaTarde: 2,
+        metaTotal: 4,
+        semaforoManana: 'verde' as const,
+        semaforoTarde: 'verde' as const,
+        semaforoTotal: 'verde' as const,
+        cumple: true,
+        grabaciones: [],
+      },
+    ];
+    const filtradas =
+      promotorIds?.length
+        ? filas.filter((f) => promotorIds.includes(f.promotorId))
+        : filas;
+    return {
+      diaKey,
+      promotoresConfig: DEMO_PROMOTORES.map((p) => ({ id: p.id, nombre: p.nombre })),
+      filas: filtradas,
+    };
+  }
+  const params = new URLSearchParams();
+  if (fecha) params.set('fecha', fecha);
+  if (promotorIds?.length) params.set('promotorIds', promotorIds.join(','));
+  const q = params.toString() ? `?${params.toString()}` : '';
+  return apiFetch<GrabacionesCumplimientoResponse>(`/api/grabaciones/admin/cumplimiento${q}`);
+}
+
+export async function fetchGrabacionAudioBlob(id: number): Promise<string> {
+  if (_isDemoActive) throw new Error('Audio no disponible en demo.');
+  const res = await fetch(apiUrl(`/api/grabaciones/${id}/audio`), {
+    headers: authHeadersForSession(false),
+  });
+  if (!res.ok) throw new Error('No se pudo cargar el audio');
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
+export async function rechazarGrabacion(id: number, motivo?: string): Promise<GrabacionPromotor> {
+  if (_isDemoActive) throw new Error('Rechazo no disponible en demo.');
+  const data = await apiFetch<{ grabacion: GrabacionPromotor }>(
+    `/api/grabaciones/${id}/rechazar`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ motivo: motivo ?? '' }),
+    },
+  );
+  return data.grabacion;
 }
 

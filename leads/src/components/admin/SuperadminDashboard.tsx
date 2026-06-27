@@ -4,7 +4,7 @@ import { formatRangoSemana } from '../../domain/admin-metrics';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
-import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, fetchProductos, guardarSeguimiento, duplicarLead, resetearLeadSeguimiento, modificarDatosLead } from '../../api/client';
+import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, fetchProductos, guardarSeguimiento, duplicarLead, resetearLeadSeguimiento, modificarDatosLead, fetchGrabacionesConfig } from '../../api/client';
 import type { ModificarDatosLeadPayload, OperadorCatalogo } from '../../api/client';
 import { getBarrioNombre } from '../../domain/venta';
 import { useAuth } from '../../context/AuthContext';
@@ -13,6 +13,7 @@ import { AdminModificarLeadModal } from './AdminModificarLeadModal';
 import { LeadModalForm } from '../leads/LeadModalForm';
 import { SyncCajaModal } from './SyncCajaModal';
 import { PromotorInformeFilter } from './PromotorInformeFilter';
+import { GrabacionesCumplimientoPanel } from './GrabacionesCumplimientoPanel';
 import { previewSyncCajaPij, commitSyncCajaPij } from '../../api/client';
 import type { SyncPreviewItem } from '../../types';
 
@@ -176,9 +177,13 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
     fetchProductos('supervisor')
       .then((data) => setProductos(data))
       .catch((err) => console.error('Error al cargar productos para dashboard:', err));
+    fetchGrabacionesConfig()
+      .then((cfg) => setModuloGrabacionesActivo(Boolean(cfg.moduloActivo && cfg.puedeAuditar)))
+      .catch(() => setModuloGrabacionesActivo(false));
   }, []);
 
-  const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador' | 'sin_tratar' | 'reasignacion' | 'informe'>('metricas');
+  const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador' | 'sin_tratar' | 'reasignacion' | 'informe' | 'grabaciones'>('metricas');
+  const [moduloGrabacionesActivo, setModuloGrabacionesActivo] = useState(false);
   const [selectedOperatorUntreated, setSelectedOperatorUntreated] = useState<{ name: string; role: 'supervisor' | 'promotor'; team: string; count: number; leads: any[] } | null>(null);
   const [busquedaSinTratar, setBusquedaSinTratar] = useState('');
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -704,6 +709,19 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         >
           Informe de Operaciones
         </button>
+        {moduloGrabacionesActivo && (
+          <button
+            type="button"
+            onClick={() => setTabActivo('grabaciones')}
+            className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
+              tabActivo === 'grabaciones'
+                ? 'bg-white text-zinc-900 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-800'
+            }`}
+          >
+            Grabaciones
+          </button>
+        )}
       </div>
 
       {data.aviso && (
@@ -1154,6 +1172,12 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
               </table>
             </div>
           </div>
+        </section>
+      )}
+
+      {tabActivo === 'grabaciones' && moduloGrabacionesActivo && (
+        <section className="space-y-4">
+          <GrabacionesCumplimientoPanel />
         </section>
       )}
 

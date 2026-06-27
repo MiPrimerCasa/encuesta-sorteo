@@ -64,6 +64,7 @@ import {
 import { getHealthInfo, respondIfNotConfigured } from './require-production.js';
 import { formatSqlError } from './sql-errors.js';
 import { loginSchema, seguimientoSchema } from './schemas/seguimiento.js';
+import { registerGrabacionesRoutes } from './routes/grabaciones-routes.js';
 
 function usuarioDesdeRequest(req) {
   const rol = req.headers['x-usuario-rol'];
@@ -79,6 +80,11 @@ function usuarioDesdeRequest(req) {
   const sucursalHdr = String(req.headers['x-usuario-sucursal'] || '').trim();
   if (rol !== 'promotor' && rol !== 'supervisor' && rol !== 'superadmin') return null;
   if (!nombre || !id) return null;
+  const panelGlobalHdr = String(req.headers['x-usuario-panel-global'] || '').trim().toLowerCase();
+  const panelGlobal =
+    panelGlobalHdr === 'true' ||
+    panelGlobalHdr === '1' ||
+    (loginId && esSupervisorPanelGlobal(loginId));
   return {
     id,
     nombre,
@@ -91,6 +97,7 @@ function usuarioDesdeRequest(req) {
     idVendedor: idVendedorHdr || id,
     idSupervisor: idSupervisorHdr || undefined,
     sucursal: sucursalHdr || undefined,
+    panelGlobal: panelGlobal || undefined,
   };
 }
 
@@ -1120,6 +1127,8 @@ function registerApiRoutes(api) {
       });
     }
   });
+
+  registerGrabacionesRoutes(api, { usuarioDesdeRequest });
 }
 
 function mountStaticAndSpa(app, distPath, basePath) {

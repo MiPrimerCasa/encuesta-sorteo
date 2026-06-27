@@ -1,0 +1,232 @@
+================================================================================
+REQUISITOS — GRABACIONES DE PROMOTORES (Mi Primer Casa · Seguimiento Leads)
+================================================================================
+Documento consolidado a partir de definición con supervisor / ventas.
+Fecha de redacción: 27/06/2026
+Estado: PENDIENTE DE DESARROLLO
+
+--------------------------------------------------------------------------------
+1. OBJETIVO
+--------------------------------------------------------------------------------
+Controlar el cumplimiento de una política de grabaciones de audio para un grupo
+específico de promotores. Los supervisores (y usuarios con panel global) deben
+poder verificar si cada promotor subió la cantidad requerida de audios por día,
+escucharlos, rechazar los no aptos, y filtrar por fecha y promotor.
+
+--------------------------------------------------------------------------------
+2. FLUJO OPERATIVO
+--------------------------------------------------------------------------------
+- El promotor graba con la APP NATIVA del celular (Grabadora, Notas de voz, etc.).
+- Luego SUBE el archivo al CRM desde la sección "Grabación diaria" (ver sección 2b).
+- NO se graba dentro del navegador en la v1; solo subida de archivo.
+
+--------------------------------------------------------------------------------
+2b. SECCIÓN PROMOTOR — "GRABACIÓN DIARIA"
+--------------------------------------------------------------------------------
+Nueva sección/vista en la app, visible SOLO para promotores del grupo obligado
+(10 promotores). Acceso desde la barra de navegación (nueva pestaña).
+
+Título de la sección: "Grabación diaria"
+
+Contenido de la pantalla:
+  1. Botón / zona "Subir archivo" (selector de archivo del celular).
+     Formatos: .m4a, .mp3, .wav, .ogg — máx. 25 MB.
+  2. Selector de TIPO (obligatorio):
+     · Promoción
+     · Entrevista
+  3. Selector de LEAD (combobox/buscador sobre leads del promotor):
+     · Si tipo = PROMOCIÓN  → lead OPCIONAL (puede subir sin asociar lead).
+     · Si tipo = ENTREVISTA → lead OBLIGATORIO (no permite enviar sin elegir lead).
+  4. Botón "Subir" (deshabilitado hasta cumplir validaciones).
+  5. Barra de progreso durante la subida.
+  6. Resumen del día (opcional en v1, deseable):
+     · Audios subidos hoy: X/4
+     · Desglose mañana / tarde
+
+Reglas de validación en UI (antes de subir):
+  · Archivo seleccionado: obligatorio siempre.
+  · Tipo seleccionado: obligatorio siempre.
+  · Lead:
+      - promocion  → opcional
+      - entrevista → obligatorio (mostrar error si falta)
+  · Duración mínima 20 s: validar en servidor tras subir; mostrar error si no cumple.
+
+Flujo al cambiar tipo:
+  · Si pasa de "entrevista" a "promoción" → el lead seleccionado puede quedar o
+    limpiarse (no bloquea).
+  · Si pasa de "promoción" a "entrevista" → exigir lead antes de habilitar Subir.
+
+Mensajes al promotor:
+  · Éxito: "Audio subido correctamente"
+  · Error red: "No se pudo subir. Reintentá cuando tengas señal."
+  · Error duración: "El audio debe durar al menos 20 segundos"
+  · Error entrevista sin lead: "Seleccioná el lead de la entrevista"
+
+Ubicación en código (referencia implementación):
+  · Nueva VistaActiva: 'grabacion' (solo promotores del grupo obligado)
+  · Componente: src/components/grabaciones/GrabacionDiariaPanel.tsx
+  · NavBar: pestaña visible condicionalmente según flag del promotor
+
+--------------------------------------------------------------------------------
+3. CUOTA DIARIA
+--------------------------------------------------------------------------------
+- 4 audios por día por promotor (solo grupo obligado — ver sección 8).
+- Son 4 EN TOTAL; no importa si los hace todos de mañana o repartidos.
+- La tabla de cumplimiento muestra desglose informativo:
+  · Mañana (X/2)
+  · Tarde (X/2)
+  · Total (X/4)
+- Meta visual sugerida: 2 en mañana + 2 en tarde = 4 total, pero el cumplimiento
+  del TOTAL (4/4) es lo principal si hace los 4 en una sola franja.
+
+--------------------------------------------------------------------------------
+4. FRANJAS HORARIAS
+--------------------------------------------------------------------------------
+Mañana : 06:00 — 12:59  (antes de las 13:00)
+Tarde  : 13:00 — 23:59  (desde las 13:00 en adelante)
+
+Determinación de la franja del audio:
+1. PRIORIDAD: hora en que GRABÓ el audio, si el archivo trae metadatos de fecha/hora.
+2. FALLBACK: hora de SUBIDA al CRM si no hay metadatos en el archivo.
+
+--------------------------------------------------------------------------------
+5. TIPOS DE AUDIO
+--------------------------------------------------------------------------------
+- promocion   : grabación de promoción / pitch
+- entrevista  : grabación de entrevista con el lead
+
+El promotor selecciona el tipo al momento de subir.
+
+--------------------------------------------------------------------------------
+6. FORMATOS Y VALIDACIÓN TÉCNICA
+--------------------------------------------------------------------------------
+Formatos aceptados:
+  · .m4a
+  · .mp3
+  · .wav
+  · .ogg
+  (formatos habituales del celular)
+
+Duración mínima: 20 segundos (validación automática al subir).
+
+El SUPERVISOR puede RECHAZAR audios que considere no aptos aunque cumplan
+duración mínima. Un audio rechazado NO cuenta para el cumplimiento del día.
+
+Consentimiento del lead: NO hace falta checkbox ni registro en el sistema.
+
+--------------------------------------------------------------------------------
+7. RETENCIÓN
+--------------------------------------------------------------------------------
+- Los archivos de audio se conservan 60 días.
+- Pasado ese plazo: eliminación automática del almacenamiento + baja lógica en BD.
+
+--------------------------------------------------------------------------------
+8. ALCANCE — QUIÉN DEBE CUMPLIR
+--------------------------------------------------------------------------------
+- Aplica a un GRUPO ESPECÍFICO de 10 promotores (no todos).
+- Pendiente definir mecanismo exacto de inclusión (lista, flag en catálogo, equipo).
+- El supervisor revisa cumplimiento por su cuenta usando el informe + buscador
+  múltiple de promotores (mismo patrón que Informe de Operaciones).
+
+--------------------------------------------------------------------------------
+9. QUIÉN PUEDE AUDITAR
+--------------------------------------------------------------------------------
+- Todos los usuarios con acceso al PANEL GLOBAL (superadmin / panel global).
+- Incluye escuchar audios, ver cumplimiento, rechazar audios.
+
+--------------------------------------------------------------------------------
+10. INFORME DE CUMPLIMIENTO (SUPERVISOR)
+--------------------------------------------------------------------------------
+Nueva sección o pestaña en panel admin, con:
+
+Tabla ejemplo:
+  | Promotor | Mañana (2/2) | Tarde (2/2) | Total (4/4) | Estado |
+
+- Semáforo por promotor / franja / total (verde / amarillo / rojo).
+- Filtro por FECHA (como informe de operaciones: Hoy, Semana, Mes, día calendario).
+- Filtro múltiple por PROMOTOR (mismo componente que Informe de Operaciones).
+- Posibilidad de ESCUCHAR el audio desde el informe.
+- Si la grabación está asociada a un LEAD, mostrar a qué lead corresponde
+  (nombre / ID / teléfono).
+- Audios sin lead: listados igual, indicando "Sin lead asociado".
+
+--------------------------------------------------------------------------------
+11. FECHA DE INICIO DE LA POLÍTICA
+--------------------------------------------------------------------------------
+- La política entra en vigencia el DÍA EN QUE SE TERMINE Y DESPLIEGUE
+  el desarrollo de la función (no penalizar días anteriores).
+
+--------------------------------------------------------------------------------
+12. ALMACENAMIENTO
+--------------------------------------------------------------------------------
+- NO guardar audio en SQL Server (solo metadatos).
+- Opción preferida para v1: disco del VPS (carpeta dedicada + volumen Docker).
+- Metadatos en tabla SQL dedicada: lead_id (nullable), promotor_id, tipo,
+  franja, duracion_seg, storage_key, estado (activo/rechazado), fechas, etc.
+
+Estimación de espacio (10 promotores, 60 días):
+  · 10 promotores × 4 audios/día × ~2 min ≈ 80–160 MB/día
+  · Pico en 60 días (todos activos): ~5–10 GB
+  · VPS actual (jun. 2026): 100 GB disco, ~87 GB libres → MARGEN CÓMODO
+
+Specs VPS Hostinger (72.60.12.48, consultado 27/06/2026):
+  · CPU: 2 vCPU
+  · RAM: 7.8 GB (~5.5 GB disponibles)
+  · Disco: 100 GB (87 GB libres al momento de la consulta)
+  · Swap: ninguno
+  · Servicios compartidos: seguimiento-leads, encuesta-landingqr, Traefik,
+    Coolify, n8n, slack-vps-bot
+
+Riesgos a mitigar en VPS:
+  · Límite de tamaño por archivo: 25 MB
+  · Job de limpieza automática a los 60 días
+  · Monitoreo de disco (alerta al 80%)
+  · Servir audios solo vía endpoint autenticado (no carpeta pública)
+
+--------------------------------------------------------------------------------
+14. REGLAS TÉCNICAS DE IMPLEMENTACIÓN (SUBIDA Y CONCURRENCIA)
+--------------------------------------------------------------------------------
+Escenario analizado: los 10 promotores suben audios al mismo tiempo (pico fin
+de turno, ej. ~18:00). Con specs actuales del VPS, NO debería caer el servidor;
+lo más probable es subidas más lentas si la implementación no es correcta.
+
+Carga estimada (10 simultáneos):
+  · ~3–5 MB por audio (.m4a, ~2 min) → 30–50 MB total de transferencia
+  · Disco: insignificante frente a 87 GB libres
+  · RAM (bien implementado): ~50–100 MB pico
+  · Cuello de botella real en calle: señal del celular del promotor, no el VPS
+
+OBLIGATORIO al desarrollar:
+  [1] STREAM A DISCO — escribir el archivo mientras llega (multer/busboy stream).
+      NUNCA cargar el archivo entero en memoria antes de guardarlo.
+  [2] LÍMITE 25 MB por archivo — rechazar con error claro si excede.
+  [3] CARPETA DEDICADA fuera del repo, montada como volumen Docker:
+      /opt/seguimiento-leads/data/grabaciones/ (prod)
+  [4] ENDPOINT AUTENTICADO para subida y descarga/reproducción (no URL pública).
+  [5] TIMEOUT GENEROSO en cliente: 2–3 minutos (mala señal en calle).
+  [6] BARRA DE PROGRESO visible durante la subida (evitar re-subidas duplicadas).
+  [7] REINTENTO en cliente si falla por red (cola local opcional en fase 2).
+  [8] VALIDAR duración mínima (20 s) en servidor tras recibir el archivo.
+  [9] TRAEFIK — verificar/aumentar límite de body si el default (<10 MB) bloquea
+      archivos grandes (configurar buffering middleware si aplica).
+
+Comportamiento esperado bajo pico (10 simultáneos):
+  · Subidas más lentas para cada promotor: POSIBLE, aceptable
+  · CRM lento para supervisores cargando dashboard: POSIBLE si mal implementado
+  · Caída del servidor: MUY IMPROBABLE con 10 usuarios y stream a disco
+  · Timeout en celular con mala señal: PROBABLE — manejar con reintento + mensaje
+
+Uso actual contenedor seguimiento-leads (27/06/2026):
+  · RAM: ~35 MB en reposo (sin límite Docker impuesto)
+  · Margen disponible en host: ~5.5 GB RAM libre
+
+================================================================================
+15. PENDIENTES MENORES (A CONFIRMAR EN IMPLEMENTACIÓN)
+================================================================================
+[ ] Mecanismo para marcar qué promotores están en el grupo obligado (10)
+[ ] Regla exacta del semáforo (ej. verde = 4/4 total, amarillo = 2-3, rojo = 0-1)
+[ ] Días sin trabajo / licencia — ¿excluir del informe o marcar manual?
+
+================================================================================
+FIN DEL DOCUMENTO
+================================================================================

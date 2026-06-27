@@ -71,7 +71,6 @@ function AppShell() {
   const [aviso, setAviso] = useState('');
   const [grabacionesHabilitado, setGrabacionesHabilitado] = useState(false);
   const [grabacionesConfig, setGrabacionesConfig] = useState<{
-    minDuracionSeg: number;
     maxMb: number;
     formatos: string[];
   } | null>(null);
@@ -135,7 +134,6 @@ function AppShell() {
         setGrabacionesHabilitado(cfg.moduloActivo && cfg.habilitado);
         if (cfg.moduloActivo && cfg.habilitado) {
           setGrabacionesConfig({
-            minDuracionSeg: cfg.minDuracionSeg,
             maxMb: cfg.maxMb,
             formatos: cfg.formatos,
           });
@@ -227,7 +225,6 @@ function AppShell() {
     ) : vistaActiva === 'grabacion' && usuario.rol === 'promotor' && grabacionesConfig ? (
       <GrabacionDiariaPanel
         leads={leads}
-        minDuracionSeg={grabacionesConfig.minDuracionSeg}
         maxMb={grabacionesConfig.maxMb}
         formatos={grabacionesConfig.formatos}
       />

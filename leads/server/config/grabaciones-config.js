@@ -1,5 +1,8 @@
 /** Configuración de grabaciones diarias de promotores. */
 
+import { loadOperadoresCatalog, normalizeCodigoCatalog } from '../db/operadores-catalog.js';
+import { OPERADORES_CANONICOS, resolveOperadorCanonico } from '../domain/operador-canonical.js';
+
 const ALLOWED_EXTENSIONS = new Set(['.m4a', '.mp3', '.wav', '.ogg']);
 
 /** Kill switch global — requiere GRABACIONES_ENABLED=true explícito en producción. */
@@ -31,8 +34,8 @@ export function getGrabacionesRetentionDays() {
 }
 
 export function getGrabacionesMinDurationSec() {
-  const s = Number.parseInt(process.env.GRABACIONES_MIN_DURATION_SEC || '20', 10);
-  return Number.isFinite(s) && s > 0 ? s : 20;
+  const s = Number.parseInt(process.env.GRABACIONES_MIN_DURATION_SEC || '0', 10);
+  return Number.isFinite(s) && s >= 0 ? s : 0;
 }
 
 export function getCuotaDiaria() {
@@ -43,7 +46,52 @@ export function getCuotaFranja() {
   return 2;
 }
 
-/** id:nombre|alias1|alias2 — los alias no generan fila extra en el informe. */
+/** Resuelve el nombre visible desde catálogo de operadores / mapa canónico (sin hardcodear). */
+function nombreDesdeMapaCanonicoPorId(operadorId) {
+  const id = String(operadorId ?? '').trim();
+  if (!id) return null;
+  for (const op of Object.values(OPERADORES_CANONICOS)) {
+    if (op?.id != null && String(op.id) === id && op.nombre) {
+      return String(op.nombre).trim();
+    }
+  }
+  return null;
+}
+
+export function resolveNombrePromotorGrabaciones(promotorId, aliases = []) {
+  const id = String(promotorId ?? '').trim();
+  if (!id) return 'Sin asignar';
+
+  const catalog = loadOperadoresCatalog();
+  const claves = [id, ...aliases].map((v) => String(v ?? '').trim()).filter(Boolean);
+
+  for (const clave of claves) {
+    const porId = catalog.byIdOperador?.[clave];
+    if (porId?.vendedor) return String(porId.vendedor).trim();
+  }
+
+  const nombreCanonico = nombreDesdeMapaCanonicoPorId(id);
+  if (nombreCanonico) return nombreCanonico;
+
+  const canonico = resolveOperadorCanonico({ operadorId: id });
+  if (canonico?.nombre && canonico.nombre !== 'Sin asignar') {
+    return String(canonico.nombre).trim();
+  }
+
+  for (const clave of claves) {
+    const codigo = normalizeCodigoCatalog(clave);
+    const porCodigo = catalog.byCodigo?.[codigo];
+    if (porCodigo?.vendedor) return String(porCodigo.vendedor).trim();
+  }
+
+  return id;
+}
+
+/**
+ * Lista de promotores obligados — solo ids y aliases de match (códigos SORTEO, etc.).
+ * Formato: id|alias1|alias2  o  id:alias1|alias2
+ * El nombre para informes se obtiene del catálogo de operadores, no de esta variable.
+ */
 export function getGrabacionesPromotoresConfig() {
   const raw = String(process.env.GRABACIONES_PROMOTOR_IDS || '').trim();
   if (!raw) return [];
@@ -52,19 +100,38 @@ export function getGrabacionesPromotoresConfig() {
     .map((part) => {
       const trimmed = part.trim();
       if (!trimmed) return null;
+
+      let id = '';
+      let aliases = [];
+
       const colon = trimmed.indexOf(':');
+      const pipe = trimmed.indexOf('|');
+
       if (colon > 0) {
-        const id = trimmed.slice(0, colon).trim();
-        const rest = trimmed.slice(colon + 1).trim();
-        const segmentos = rest
+        id = trimmed.slice(0, colon).trim();
+        aliases = trimmed
+          .slice(colon + 1)
           .split('|')
           .map((s) => s.trim())
           .filter(Boolean);
-        const nombre = segmentos[0] || id;
-        const aliases = segmentos.slice(1);
-        return { id, nombre, aliases };
+      } else if (pipe > 0) {
+        id = trimmed.slice(0, pipe).trim();
+        aliases = trimmed
+          .slice(pipe + 1)
+          .split('|')
+          .map((s) => s.trim())
+          .filter(Boolean);
+      } else {
+        id = trimmed;
       }
-      return { id: trimmed, nombre: trimmed, aliases: [] };
+
+      if (!id) return null;
+
+      return {
+        id,
+        aliases,
+        nombre: resolveNombrePromotorGrabaciones(id, aliases),
+      };
     })
     .filter(Boolean);
 }

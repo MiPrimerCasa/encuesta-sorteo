@@ -1,5 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  aprobarGrabacion,
   fetchGrabacionAudioBlob,
   fetchGrabacionesCumplimiento,
   rechazarGrabacion,
@@ -74,23 +75,40 @@ function AudioPlayer({ grabacionId }: { grabacionId: number }) {
 
 function DetalleGrabaciones({
   grabaciones,
-  onRechazado,
+  onActualizado,
 }: {
   grabaciones: GrabacionPromotor[];
-  onRechazado: () => void;
+  onActualizado: () => void;
 }) {
-  const [rechazandoId, setRechazandoId] = useState<number | null>(null);
+  const [procesandoId, setProcesandoId] = useState<number | null>(null);
+
+  const handleAprobar = async (id: number) => {
+    setProcesandoId(id);
+    try {
+      await aprobarGrabacion(id);
+      onActualizado();
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'No se pudo aprobar');
+    } finally {
+      setProcesandoId(null);
+    }
+  };
 
   const handleRechazar = async (id: number) => {
+    const confirmar = window.confirm(
+      '¿Rechazar este audio?\n\nSe eliminará permanentemente del servidor y no contará para el cumplimiento del día.',
+    );
+    if (!confirmar) return;
+
     const motivo = window.prompt('Motivo del rechazo (opcional):') ?? '';
-    setRechazandoId(id);
+    setProcesandoId(id);
     try {
       await rechazarGrabacion(id, motivo || undefined);
-      onRechazado();
+      onActualizado();
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'No se pudo rechazar');
     } finally {
-      setRechazandoId(null);
+      setProcesandoId(null);
     }
   };
 
@@ -104,7 +122,11 @@ function DetalleGrabaciones({
         <li
           key={g.id}
           className={`flex flex-wrap items-center gap-3 rounded-lg border px-3 py-2 text-[12px] ${
-            g.estado === 'rechazado' ? 'border-red-200 bg-red-50/40' : 'border-zinc-100 bg-zinc-50'
+            g.estado === 'rechazado'
+              ? 'border-red-200 bg-red-50/40'
+              : g.estado === 'pendiente'
+                ? 'border-amber-200 bg-amber-50/40'
+                : 'border-zinc-100 bg-zinc-50'
           }`}
         >
           <span className="font-semibold capitalize">
@@ -115,19 +137,38 @@ function DetalleGrabaciones({
           <span className="text-zinc-600">
             {g.leadNombre ? `Lead: ${g.leadNombre}` : 'Sin lead asociado'}
           </span>
-          {g.estado === 'activo' ? (
+          {g.estado === 'pendiente' && (
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold text-amber-800">
+              Pendiente
+            </span>
+          )}
+          {g.estado === 'activo' && (
+            <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+              Aprobado
+            </span>
+          )}
+          {g.estado !== 'rechazado' && <AudioPlayer grabacionId={g.id} />}
+          {g.estado === 'pendiente' && (
             <>
-              <AudioPlayer grabacionId={g.id} />
               <button
                 type="button"
-                disabled={rechazandoId === g.id}
+                disabled={procesandoId === g.id}
+                onClick={() => void handleAprobar(g.id)}
+                className="text-[12px] font-semibold text-emerald-700 hover:text-emerald-800"
+              >
+                Aprobar
+              </button>
+              <button
+                type="button"
+                disabled={procesandoId === g.id}
                 onClick={() => void handleRechazar(g.id)}
                 className="text-[12px] font-semibold text-red-600 hover:text-red-700"
               >
                 Rechazar
               </button>
             </>
-          ) : (
+          )}
+          {g.estado === 'rechazado' && (
             <span className="text-red-600">
               Rechazado{g.motivoRechazo ? `: ${g.motivoRechazo}` : ''}
             </span>
@@ -187,7 +228,7 @@ export function GrabacionesCumplimientoPanel() {
       <div>
         <h3 className="text-[16px] font-semibold text-zinc-900">Grabaciones diarias</h3>
         <p className="mt-0.5 text-[13px] text-zinc-500">
-          Cumplimiento de audios por promotor · cuota 4/día (2 mañana + 2 tarde sugerido)
+          Cumplimiento de audios aprobados por promotor · cuota 4/día (2 mañana + 2 tarde sugerido)
         </p>
       </div>
 
@@ -311,7 +352,7 @@ export function GrabacionesCumplimientoPanel() {
                       <td colSpan={6} className="bg-zinc-50/80 px-4 py-3">
                         <DetalleGrabaciones
                           grabaciones={fila.grabaciones}
-                          onRechazado={() => void cargar()}
+                          onActualizado={() => void cargar()}
                         />
                       </td>
                     </tr>

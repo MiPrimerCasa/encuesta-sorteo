@@ -6,8 +6,7 @@ import {
   getGrabacionesRetentionDays,
 } from '../config/grabaciones-config.js';
 
-function initGrabacionesSchema() {
-  getDb().exec(`
+const GRABACIONES_DDL = `
     CREATE TABLE IF NOT EXISTS promotor_grabaciones (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       promotor_id TEXT NOT NULL,
@@ -22,7 +21,7 @@ function initGrabacionesSchema() {
       mime_type TEXT NOT NULL,
       storage_path TEXT NOT NULL UNIQUE,
       tamano_bytes INTEGER NOT NULL,
-      estado TEXT NOT NULL DEFAULT 'activo' CHECK(estado IN ('activo', 'rechazado')),
+      estado TEXT NOT NULL DEFAULT 'pendiente',
       rechazado_por TEXT,
       rechazado_en TEXT,
       motivo_rechazo TEXT,
@@ -32,7 +31,54 @@ function initGrabacionesSchema() {
       ON promotor_grabaciones (promotor_id, dia_key, estado);
     CREATE INDEX IF NOT EXISTS idx_grabaciones_dia
       ON promotor_grabaciones (dia_key, estado);
+`;
+
+function migrateGrabacionesEstados() {
+  const db = getDb();
+  const ddl = db
+    .prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='promotor_grabaciones'`)
+    .get();
+  if (!ddl?.sql || ddl.sql.includes("'pendiente'")) return;
+
+  db.exec(`
+    PRAGMA foreign_keys=off;
+    BEGIN;
+    CREATE TABLE promotor_grabaciones_v2 (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      promotor_id TEXT NOT NULL,
+      promotor_nombre TEXT NOT NULL,
+      lead_id TEXT,
+      lead_nombre TEXT,
+      tipo TEXT NOT NULL CHECK(tipo IN ('promocion', 'entrevista')),
+      franja TEXT NOT NULL CHECK(franja IN ('manana', 'tarde')),
+      fecha_grabacion TEXT NOT NULL,
+      dia_key TEXT NOT NULL,
+      duracion_seg REAL NOT NULL,
+      mime_type TEXT NOT NULL,
+      storage_path TEXT NOT NULL UNIQUE,
+      tamano_bytes INTEGER NOT NULL,
+      estado TEXT NOT NULL DEFAULT 'pendiente',
+      rechazado_por TEXT,
+      rechazado_en TEXT,
+      motivo_rechazo TEXT,
+      creado_en TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    INSERT INTO promotor_grabaciones_v2
+      SELECT * FROM promotor_grabaciones;
+    DROP TABLE promotor_grabaciones;
+    ALTER TABLE promotor_grabaciones_v2 RENAME TO promotor_grabaciones;
+    CREATE INDEX IF NOT EXISTS idx_grabaciones_promotor_dia
+      ON promotor_grabaciones (promotor_id, dia_key, estado);
+    CREATE INDEX IF NOT EXISTS idx_grabaciones_dia
+      ON promotor_grabaciones (dia_key, estado);
+    COMMIT;
+    PRAGMA foreign_keys=on;
   `);
+}
+
+function initGrabacionesSchema() {
+  getDb().exec(GRABACIONES_DDL);
+  migrateGrabacionesEstados();
 }
 
 let schemaReady = false;
@@ -73,8 +119,8 @@ export function insertGrabacion(data) {
     .prepare(
       `INSERT INTO promotor_grabaciones (
         promotor_id, promotor_nombre, lead_id, lead_nombre, tipo, franja,
-        fecha_grabacion, dia_key, duracion_seg, mime_type, storage_path, tamano_bytes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        fecha_grabacion, dia_key, duracion_seg, mime_type, storage_path, tamano_bytes, estado
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente')`,
     )
     .run(
       data.promotorId,
@@ -111,8 +157,14 @@ export function listGrabacionesPromotorDia(promotorId, diaKey) {
   return rows.map(mapRow);
 }
 
+/** Audios aprobados — cuentan para cumplimiento del día. */
 export function listGrabacionesActivasPromotorDia(promotorId, diaKey) {
   return listGrabacionesPromotorDia(promotorId, diaKey).filter((g) => g.estado === 'activo');
+}
+
+/** Audios que ocupan cupo diario (pendientes + aprobados; rechazados no). */
+export function listGrabacionesOcupanCuotaPromotorDia(promotorId, diaKey) {
+  return listGrabacionesPromotorDia(promotorId, diaKey).filter((g) => g.estado !== 'rechazado');
 }
 
 export function resumenPromotorDia(promotorId, diaKey) {
@@ -168,16 +220,28 @@ export function buildCumplimientoAdmin(diaKey, promotorIdsFiltro = null) {
   });
 }
 
-export function rechazarGrabacion(id, { rechazadoPor, motivo } = {}) {
+export function aprobarGrabacion(id, { aprobadoPor } = {}) {
   ensureSchema();
   getDb()
     .prepare(
       `UPDATE promotor_grabaciones
-       SET estado = 'rechazado', rechazado_por = ?, rechazado_en = datetime('now'), motivo_rechazo = ?
-       WHERE id = ? AND estado = 'activo'`,
+       SET estado = 'activo', rechazado_por = NULL, rechazado_en = NULL, motivo_rechazo = NULL
+       WHERE id = ? AND estado IN ('pendiente', 'rechazado')`,
     )
-    .run(rechazadoPor ?? null, motivo ?? null, id);
+    .run(id);
+  void aprobadoPor;
   return getGrabacionById(id);
+}
+
+/** Elimina archivo y registro. Devuelve datos previos si existía. */
+export function rechazarYEliminarGrabacion(id, { rechazadoPor, motivo } = {}) {
+  ensureSchema();
+  const grabacion = getGrabacionById(id);
+  if (!grabacion || grabacion.estado === 'rechazado') return null;
+  void rechazadoPor;
+  void motivo;
+  purgeGrabacion(grabacion);
+  return { id, eliminado: true };
 }
 
 export function listGrabacionesAntesDe(cutoffIso) {

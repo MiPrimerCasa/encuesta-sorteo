@@ -519,7 +519,7 @@ export interface PersonaPijCierres {
 export type TipoGrabacion = 'promocion' | 'entrevista';
 export type FranjaGrabacion = 'manana' | 'tarde';
 export type SemaforoGrabacion = 'verde' | 'amarillo' | 'rojo';
-export type EstadoGrabacion = 'activo' | 'rechazado';
+export type EstadoGrabacion = 'pendiente' | 'activo' | 'rechazado';
 
 export interface GrabacionPromotor {
   id: number;

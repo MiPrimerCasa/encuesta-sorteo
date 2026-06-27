@@ -533,7 +533,7 @@ export async function fetchGrabacionesConfig(): Promise<GrabacionesConfigRespons
       puedeAuditar: _demoUsuario.rol !== 'promotor',
       cuotaDiaria: 4,
       cuotaFranja: 2,
-      minDuracionSeg: 20,
+      minDuracionSeg: 0,
       formatos: ['.m4a', '.mp3', '.wav', '.ogg'],
       maxMb: 25,
       resumenHoy: {
@@ -790,15 +790,23 @@ export async function fetchGrabacionAudioBlob(id: number): Promise<string> {
   return URL.createObjectURL(blob);
 }
 
-export async function rechazarGrabacion(id: number, motivo?: string): Promise<GrabacionPromotor> {
-  if (_isDemoActive) throw new Error('Rechazo no disponible en demo.');
+export async function aprobarGrabacion(id: number): Promise<GrabacionPromotor> {
+  if (_isDemoActive) throw new Error('Aprobación no disponible en demo.');
   const data = await apiFetch<{ grabacion: GrabacionPromotor }>(
+    `/api/grabaciones/${id}/aprobar`,
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+  return data.grabacion;
+}
+
+export async function rechazarGrabacion(id: number, motivo?: string): Promise<void> {
+  if (_isDemoActive) throw new Error('Rechazo no disponible en demo.');
+  await apiFetch<{ ok: boolean; eliminado: boolean; id: number }>(
     `/api/grabaciones/${id}/rechazar`,
     {
       method: 'POST',
       body: JSON.stringify({ motivo: motivo ?? '' }),
     },
   );
-  return data.grabacion;
 }
 

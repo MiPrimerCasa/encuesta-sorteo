@@ -20,8 +20,9 @@ import {
   getGrabacionById,
   insertGrabacion,
   listGrabacionesPromotorDia,
-  listGrabacionesActivasPromotorDia,
-  rechazarGrabacion,
+  listGrabacionesOcupanCuotaPromotorDia,
+  aprobarGrabacion,
+  rechazarYEliminarGrabacion,
   resumenPromotorDia,
 } from '../db/grabaciones-store.js';
 import { calcularFranja, fechaDiaKey } from '../domain/grabaciones.js';
@@ -207,11 +208,21 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
 
       try {
         const uploadedAt = new Date();
-        const { fechaGrab, duracionSeg } = await resolveFechaYDuracion(req.file.path, uploadedAt);
-        if (duracionSeg == null || duracionSeg < getGrabacionesMinDurationSec()) {
-          try { unlinkSync(req.file.path); } catch { /* ignore */ }
+        const { fechaGrab, duracionSeg: duracionRaw } = await resolveFechaYDuracion(
+          req.file.path,
+          uploadedAt,
+        );
+        const duracionSeg =
+          typeof duracionRaw === 'number' && Number.isFinite(duracionRaw) ? duracionRaw : 0;
+        const minDuracion = getGrabacionesMinDurationSec();
+        if (minDuracion > 0 && duracionSeg < minDuracion) {
+          try {
+            unlinkSync(req.file.path);
+          } catch {
+            /* ignore */
+          }
           return res.status(400).json({
-            error: `El audio debe durar al menos ${getGrabacionesMinDurationSec()} segundos`,
+            error: `El audio debe durar al menos ${minDuracion} segundos`,
           });
         }
 
@@ -219,8 +230,8 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
         const diaKey = fechaDiaKey(fechaGrab);
         const promotorId = resolvePromotorIdGrabaciones(usuario);
 
-        const activasDia = listGrabacionesActivasPromotorDia(promotorId, diaKey);
-        if (activasDia.length >= getCuotaDiaria()) {
+        const ocupanCuota = listGrabacionesOcupanCuotaPromotorDia(promotorId, diaKey);
+        if (ocupanCuota.length >= getCuotaDiaria()) {
           try { unlinkSync(req.file.path); } catch { /* ignore */ }
           return res.status(400).json({
             error: `Ya subiste los ${getCuotaDiaria()} audios de ese día`,
@@ -296,18 +307,31 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
     createReadStream(grabacion.storagePath).pipe(res);
   });
 
+  api.post('/grabaciones/:id/aprobar', (req, res) => {
+    const usuario = usuarioDesdeRequest(req);
+    if (!puedeAuditarGrabaciones(usuario)) {
+      return res.status(403).json({ error: 'Sin permiso' });
+    }
+    const id = Number.parseInt(String(req.params.id), 10);
+    const actualizada = aprobarGrabacion(id, { aprobadoPor: usuario.nombre });
+    if (!actualizada || actualizada.estado !== 'activo') {
+      return res.status(404).json({ error: 'Grabación no encontrada o ya procesada' });
+    }
+    res.json({ grabacion: actualizada });
+  });
+
   api.post('/grabaciones/:id/rechazar', (req, res) => {
     const usuario = usuarioDesdeRequest(req);
     if (!puedeAuditarGrabaciones(usuario)) {
       return res.status(403).json({ error: 'Sin permiso' });
     }
     const id = Number.parseInt(String(req.params.id), 10);
-    const motivo = String(req.body?.motivo ?? '').trim() || null;
-    const actualizada = rechazarGrabacion(id, {
+    void String(req.body?.motivo ?? '').trim();
+    const resultado = rechazarYEliminarGrabacion(id, {
       rechazadoPor: usuario.nombre,
-      motivo,
+      motivo: String(req.body?.motivo ?? '').trim() || null,
     });
-    if (!actualizada) return res.status(404).json({ error: 'Grabación no encontrada' });
-    res.json({ grabacion: actualizada });
+    if (!resultado) return res.status(404).json({ error: 'Grabación no encontrada' });
+    res.json({ ok: true, eliminado: true, id: resultado.id });
   });
 }

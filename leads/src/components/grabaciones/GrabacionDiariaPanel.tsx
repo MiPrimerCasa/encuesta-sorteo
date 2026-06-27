@@ -4,7 +4,6 @@ import type { GrabacionPromotor, Lead, ResumenGrabacionesDia, TipoGrabacion } fr
 
 interface GrabacionDiariaPanelProps {
   leads: Lead[];
-  minDuracionSeg: number;
   maxMb: number;
   formatos: string[];
 }
@@ -47,7 +46,6 @@ function formatDuracion(seg: number): string {
 
 export function GrabacionDiariaPanel({
   leads,
-  minDuracionSeg,
   maxMb,
   formatos,
 }: GrabacionDiariaPanelProps) {
@@ -129,7 +127,7 @@ export function GrabacionDiariaPanel({
       setArchivo(null);
       setLeadId('');
       setBusquedaLead('');
-      setMensaje({ tipo: 'ok', texto: 'Audio subido correctamente' });
+      setMensaje({ tipo: 'ok', texto: 'Audio subido. Queda pendiente de revisión del supervisor.' });
     } catch (err) {
       const texto = err instanceof Error ? err.message : 'No se pudo subir. Reintentá cuando tengas señal.';
       setMensaje({ tipo: 'error', texto });
@@ -143,8 +141,8 @@ export function GrabacionDiariaPanel({
     <div className="mx-auto max-w-lg px-4 py-6 md:max-w-2xl md:px-6">
       <h2 className="text-[20px] font-semibold tracking-[-0.01em] text-zinc-900">Grabación diaria</h2>
       <p className="mt-1 text-[13px] text-zinc-500">
-        Subí audios grabados con la app del celular. Cuota: 4 por día · mínimo {minDuracionSeg}s · máx.{' '}
-        {maxMb} MB
+        Subí audios grabados con la app del celular. Cuota: 4 por día · máx.{' '}
+        {maxMb} MB. El supervisor revisará y aprobará cada audio.
       </p>
 
       {resumen && (
@@ -269,7 +267,9 @@ export function GrabacionDiariaPanel({
                 className={`rounded-xl border px-3 py-2.5 text-[13px] ${
                   g.estado === 'rechazado'
                     ? 'border-red-200 bg-red-50/50 text-red-800'
-                    : 'border-zinc-200 bg-white'
+                    : g.estado === 'pendiente'
+                      ? 'border-amber-200 bg-amber-50/50 text-amber-900'
+                      : 'border-zinc-200 bg-white'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
@@ -283,6 +283,14 @@ export function GrabacionDiariaPanel({
                 <p className="mt-0.5 text-zinc-600">
                   {g.leadNombre ? `Lead: ${g.leadNombre}` : 'Sin lead asociado'}
                 </p>
+                {g.estado === 'pendiente' && (
+                  <p className="mt-1 text-[12px] text-amber-700">
+                    Pendiente de revisión del supervisor
+                  </p>
+                )}
+                {g.estado === 'activo' && (
+                  <p className="mt-1 text-[12px] text-emerald-700">Aprobado</p>
+                )}
                 {g.estado === 'rechazado' && (
                   <p className="mt-1 text-[12px] text-red-600">
                     Rechazado{g.motivoRechazo ? `: ${g.motivoRechazo}` : ''}

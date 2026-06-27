@@ -58,6 +58,63 @@ function formatDuracion(seg: number): string {
   return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`;
 }
 
+const SPEECH_PROMOCION = [
+  {
+    titulo: 'Opción 1 — cuando el cliente puede desconfiar',
+    texto:
+      'Hola muy buenos días 👋 le invitamos a que participe GRATIS de un sorteo por dos motos y un terreno, es simple solo con su nombre y su número de teléfono usted está participando. ¿Le gustaría?',
+  },
+  {
+    titulo: 'Opción 2 — con QR',
+    texto:
+      'Hola muy buenos días 👋 le invitamos a que participe GRATIS de un sorteo por dos motos y un terreno, es simple escaneando este QR usted ya está participando. ¿Le gustaría?',
+  },
+] as const;
+
+function ModalSpeechPromocion({ abierto, onCerrar }: { abierto: boolean; onCerrar: () => void }) {
+  if (!abierto) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="fixed inset-0 bg-zinc-950/50 backdrop-blur-sm"
+        onClick={onCerrar}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="speech-promocion-titulo"
+        className="relative z-10 max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl"
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <h3 id="speech-promocion-titulo" className="text-[16px] font-semibold text-zinc-900">
+            Speech recomendado para promoción
+          </h3>
+          <button
+            type="button"
+            onClick={onCerrar}
+            className="shrink-0 rounded-lg px-2 py-1 text-[13px] font-semibold text-zinc-500 hover:bg-zinc-100"
+          >
+            Cerrar
+          </button>
+        </div>
+        <div className="space-y-4">
+          {SPEECH_PROMOCION.map((op) => (
+            <div key={op.titulo} className="rounded-xl border border-zinc-200 bg-zinc-50/80 p-4">
+              <p className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-brand-700">
+                {op.titulo}
+              </p>
+              <p className="text-[14px] leading-relaxed text-zinc-800">{op.texto}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function GrabacionDiariaPanel({
   leads,
   maxMb,
@@ -74,6 +131,7 @@ export function GrabacionDiariaPanel({
   const [resumenTopeMes, setResumenTopeMes] = useState<ResumenTopeGrabacionesMes | null>(null);
   const [lista, setLista] = useState<GrabacionPromotor[]>([]);
   const [cargando, setCargando] = useState(true);
+  const [speechAbierto, setSpeechAbierto] = useState(false);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -191,7 +249,19 @@ export function GrabacionDiariaPanel({
 
       <section className="mt-6 space-y-4 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
         <div>
-          <label className="mb-1.5 block text-[13px] font-semibold text-zinc-700">Archivo de audio</label>
+          <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+            <label className="text-[13px] font-semibold text-zinc-700">Archivo de audio</label>
+            {tipo === 'promocion' && (
+              <button
+                type="button"
+                disabled={subiendo}
+                onClick={() => setSpeechAbierto(true)}
+                className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-[12px] font-semibold text-brand-700 transition-colors hover:bg-brand-100 disabled:opacity-50"
+              >
+                Ver speech recomendado para promoción
+              </button>
+            )}
+          </div>
           <input
             type="file"
             accept={formatos.join(',') + ',audio/*'}
@@ -285,6 +355,8 @@ export function GrabacionDiariaPanel({
           {subiendo ? 'Subiendo…' : 'Subir audio'}
         </button>
       </section>
+
+      <ModalSpeechPromocion abierto={speechAbierto} onCerrar={() => setSpeechAbierto(false)} />
 
       <section className="mt-8">
         <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-400">

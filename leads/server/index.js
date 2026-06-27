@@ -9,6 +9,7 @@ import { warmOperadoresCatalog } from './db/operadores-catalog.js';
 import { isLinksAcortadorEnabled } from './db/links-acortador.js';
 import { startLinksInstagramScheduler } from './jobs/links-instagram-job.js';
 import { startLeadsBackupScheduler } from './jobs/leads-backup-job.js';
+import { startDataBackupScheduler } from './jobs/data-backup-job.js';
 import { startGrabacionesCleanupScheduler } from './jobs/grabaciones-cleanup-job.js';
 
 const PORT = Number(process.env.PORT || process.env.API_PORT || 3001);
@@ -58,6 +59,7 @@ app.listen(PORT, () => {
       console.log('  Links acortador → deshabilitado (links directos desde SP)');
     }
     startLeadsBackupScheduler();
+    startDataBackupScheduler();
     startGrabacionesCleanupScheduler();
     console.log(
       `  Grabaciones → ${isGrabacionesEnabled() ? 'habilitado (GRABACIONES_ENABLED=true)' : 'deshabilitado (kill switch)'}`,

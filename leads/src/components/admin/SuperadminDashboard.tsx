@@ -12,6 +12,7 @@ import { cleanTelefonoSuffix } from '../../domain/whatsapp';
 import { AdminModificarLeadModal } from './AdminModificarLeadModal';
 import { LeadModalForm } from '../leads/LeadModalForm';
 import { SyncCajaModal } from './SyncCajaModal';
+import { PromotorInformeFilter } from './PromotorInformeFilter';
 import { previewSyncCajaPij, commitSyncCajaPij } from '../../api/client';
 import type { SyncPreviewItem } from '../../types';
 
@@ -103,7 +104,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const [selectedPersonReceipts, setSelectedPersonReceipts] = useState<PersonaPijCierres | null>(null);
   const [filterText, setFilterText] = useState('');
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
-  const [rankingSearch, setRankingSearch] = useState('');
+  const [informePromotoresSeleccionados, setInformePromotoresSeleccionados] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [barrios, setBarrios] = useState<Barrio[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [seguimientoLead, setSeguimientoLead] = useState<Lead | null>(null);
@@ -403,21 +406,32 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
     return b.leadsTotal - a.leadsTotal;
   });
 
-  const promotoresFiltradosRanking = rankingSearch.trim()
-    ? promotoresOrdenados.filter((p) =>
-        p.promotorNombre.toLowerCase().includes(rankingSearch.trim().toLowerCase())
-      )
-    : promotoresOrdenados;
+  const promotoresFiltradosRanking =
+    informePromotoresSeleccionados.size === 0
+      ? promotoresOrdenados
+      : promotoresOrdenados.filter((p) => informePromotoresSeleccionados.has(p.promotorId));
 
-  const totalPromotoresCierres = todosPromotores.reduce((acc, p) => acc + p.cierresSemana, 0);
-  const totalPromotoresEntrevistas = todosPromotores.reduce((acc, p) => acc + p.entrevistasSemana, 0);
-  const totalPromotoresLeads = todosPromotores.reduce((acc, p) => acc + p.leadsSemana, 0);
-  const totalPromotoresTerrenos = todosPromotores.reduce((acc, p) => acc + p.ventasTerrenoSemana, 0);
-  const totalPromotoresTerrenosSeña = todosPromotores.reduce((acc, p) => acc + (p.ventasTerrenoSenaSemana ?? 0), 0);
-  const totalPromotoresPij = todosPromotores.reduce((acc, p) => acc + p.ventasPijSemana, 0);
-  const totalPromotoresTratadosHoy = todosPromotores.reduce((acc, p) => acc + (p.tratadosHoy ?? 0), 0);
-  const totalPromotoresTratadosSemana = todosPromotores.reduce((acc, p) => acc + (p.tratadosSemana ?? 0), 0);
-  const totalPromotoresTratadosMes = todosPromotores.reduce((acc, p) => acc + (p.tratadosMes ?? 0), 0);
+  const totalPromotoresCierres = promotoresFiltradosRanking.reduce((acc, p) => acc + p.cierresSemana, 0);
+  const totalPromotoresEntrevistas = promotoresFiltradosRanking.reduce((acc, p) => acc + p.entrevistasSemana, 0);
+  const totalPromotoresLeads = promotoresFiltradosRanking.reduce((acc, p) => acc + p.leadsSemana, 0);
+  const totalPromotoresTerrenos = promotoresFiltradosRanking.reduce((acc, p) => acc + p.ventasTerrenoSemana, 0);
+  const totalPromotoresTerrenosSeña = promotoresFiltradosRanking.reduce(
+    (acc, p) => acc + (p.ventasTerrenoSenaSemana ?? 0),
+    0,
+  );
+  const totalPromotoresPij = promotoresFiltradosRanking.reduce((acc, p) => acc + p.ventasPijSemana, 0);
+  const totalPromotoresTratadosHoy = promotoresFiltradosRanking.reduce(
+    (acc, p) => acc + (p.tratadosHoy ?? 0),
+    0,
+  );
+  const totalPromotoresTratadosSemana = promotoresFiltradosRanking.reduce(
+    (acc, p) => acc + (p.tratadosSemana ?? 0),
+    0,
+  );
+  const totalPromotoresTratadosMes = promotoresFiltradosRanking.reduce(
+    (acc, p) => acc + (p.tratadosMes ?? 0),
+    0,
+  );
 
 
   const rango = formatRangoSemana(data.semanaDesde, data.semanaHasta);
@@ -976,37 +990,15 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                   />
                 </div>
 
-                <div className="relative w-full sm:w-48 shrink-0">
-                  <svg
-                    width="14" height="14" viewBox="0 0 16 16" fill="none"
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
-                    aria-hidden="true"
-                  >
-                    <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="M10 10l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                  <input
-                    id="busqueda-ranking"
-                    type="search"
-                    value={rankingSearch}
-                    onChange={(e) => setRankingSearch(e.target.value)}
-                    placeholder="Buscar promotor…"
-                    className="w-full rounded-lg border border-zinc-200 bg-white py-1.5 pl-8 pr-8 text-[13px] text-zinc-800 placeholder:text-zinc-400 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100"
-                  />
-                  {rankingSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setRankingSearch('')}
-                      style={{ touchAction: 'manipulation' }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 active:text-zinc-700"
-                      aria-label="Limpiar búsqueda"
-                    >
-                      <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                        <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
+                <PromotorInformeFilter
+                  promotores={todosPromotores.map((p) => ({
+                    promotorId: p.promotorId,
+                    promotorNombre: p.promotorNombre,
+                    supervisorNombre: p.supervisorNombre,
+                  }))}
+                  selectedIds={informePromotoresSeleccionados}
+                  onChangeSelected={setInformePromotoresSeleccionados}
+                />
                 <button
                   type="button"
                   onClick={() => window.print()}
@@ -1041,7 +1033,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                   {promotoresFiltradosRanking.length === 0 ? (
                     <tr>
                       <td colSpan={10} className="py-8 text-center text-zinc-400 text-[13px]">
-                        No se encontraron resultados para la búsqueda "{rankingSearch}".
+                        {informePromotoresSeleccionados.size > 0
+                          ? 'Ningún promotor coincide con la selección actual.'
+                          : 'No hay promotores para mostrar.'}
                       </td>
                     </tr>
                   ) : (
@@ -1072,7 +1066,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                 </tbody>
                 <tfoot>
                   <tr className="bg-zinc-50/50 font-bold border-t-2 border-zinc-200">
-                    <td colSpan={3} className="py-3 px-3 text-left text-zinc-900 font-bold">Total Empresa</td>
+                    <td colSpan={3} className="py-3 px-3 text-left text-zinc-900 font-bold">
+                      {informePromotoresSeleccionados.size > 0 ? 'Total seleccionado' : 'Total Empresa'}
+                    </td>
                     <td className="py-3 px-3 text-center tabular-nums">{totalPromotoresLeads}</td>
                     <td className="py-3 px-3 text-center whitespace-nowrap tabular-nums font-extrabold text-zinc-900">
                       <span>{totalPromotoresTratadosHoy}</span>

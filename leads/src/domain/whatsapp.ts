@@ -5,11 +5,14 @@ export function telefonoParaWhatsApp(raw?: string | null): string | null {
   if (digits.length < 8) return null;
 
   if (digits.startsWith('00')) digits = digits.slice(2);
-  if (digits.startsWith('54')) return digits;
+  if (digits.startsWith('549') && digits.length >= 12) return digits;
+  if (digits.startsWith('54')) return digits.length === 12 ? `549${digits.slice(2)}` : digits;
   if (digits.startsWith('0')) return `54${digits.slice(1)}`;
+  // Celular Formosa/Chaco sin 0 ni 54: 370xxxxxxx / 371xxxxxxx (9 dígitos)
+  if (digits.length === 9 && /^37[01]/.test(digits)) return `549${digits}`;
   if (digits.length === 10 || digits.length === 11) return `54${digits}`;
 
-  return digits;
+  return digits.length >= 8 ? digits : null;
 }
 
 export function urlWhatsAppChat(

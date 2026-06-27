@@ -7,6 +7,7 @@ import {
 } from './codigo-promotor.js';
 import {
   buildCodigoPromotorIndex,
+  idSqlScalarToString,
   normalizeNombre,
   promotorTieneFilasEnMuestra,
   resolveCodigoCargaPorPromotor,
@@ -278,12 +279,12 @@ export function filterEncuestaRowsParaPromotor(rows, usuarioSesion) {
   }
 
   const filasConIdV = rows.filter((row) => {
-    const rv = pickEncuestaField(row, 'idVendedor', 'IdVendedor');
-    return rv != null && String(rv).trim() !== '';
+    return idSqlScalarToString(pickEncuestaField(row, 'idVendedor', 'IdVendedor')) != null;
   });
   if (filasConIdV.length > 0) {
     const porId = rows.filter(
-      (row) => String(pickEncuestaField(row, 'idVendedor', 'IdVendedor') ?? '').trim() === idV,
+      (row) =>
+        idSqlScalarToString(pickEncuestaField(row, 'idVendedor', 'IdVendedor')) === idV,
     );
     if (porId.length > 0) return porId;
   }

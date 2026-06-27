@@ -75,7 +75,8 @@ function pickField(row, ...candidates) {
 }
 
 export function parseIdEntero(valor) {
-  const n = Number.parseInt(String(valor ?? ''), 10);
+  const raw = Array.isArray(valor) ? valor[0] : valor;
+  const n = Number.parseInt(String(raw ?? ''), 10);
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 

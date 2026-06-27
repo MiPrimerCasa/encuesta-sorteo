@@ -159,6 +159,13 @@ function normalizeTelefonoValor(raw) {
   return String(raw).trim();
 }
 
+function looksLikeTelefonoEncuesta(valor) {
+  const digits = String(valor ?? '').replace(/\D/g, '');
+  // Acepta celular local (370xxxxxxx), con 54/549 o fijo corto — carga manual suele omitir prefijo.
+  return digits.length >= 8 && digits.length <= 15;
+}
+
+/** Heurística en columnas no telefónicas: exige más dígitos para evitar falsos positivos. */
 function looksLikeTelefonoCelular(valor) {
   const digits = String(valor ?? '').replace(/\D/g, '');
   if (digits.length < 10) return false;
@@ -175,14 +182,14 @@ export function extractTelefonoEncuesta(row) {
   for (const key of Object.keys(row)) {
     if (key.toLowerCase() === 'telefono') {
       const t = normalizeTelefonoValor(row[key]);
-      if (looksLikeTelefonoCelular(t)) return t;
+      if (looksLikeTelefonoEncuesta(t)) return t;
     }
   }
 
   const picked =
     pickField(row, 'telefono', 'Telefono', 'Teléfono', 'Celular', 'WhatsApp', 'whatsapp') ??
     pickFieldStartsWith(row, 'telefono', 'celular', 'whatsapp');
-  if (picked && looksLikeTelefonoCelular(picked)) {
+  if (picked && looksLikeTelefonoEncuesta(picked)) {
     return normalizeTelefonoValor(picked);
   }
 
@@ -227,9 +234,16 @@ function getEncuestasParamIdVendedor() {
 }
 
 /** Algunos drivers devuelven columnas duplicadas como array [valor, valor]. */
-function normalizeSqlScalar(val) {
+export function normalizeSqlScalar(val) {
   if (Array.isArray(val)) return val[0] ?? null;
   return val;
+}
+
+/** idVendedor / idSupervisor del SP como string estable (evita "137,137" por arrays). */
+export function idSqlScalarToString(val) {
+  const scalar = normalizeSqlScalar(val);
+  if (scalar == null || String(scalar).trim() === '') return null;
+  return String(scalar).trim();
 }
 
 /** idOperador del login → @idVendedor del SP. */
@@ -405,8 +419,8 @@ export async function fetchEncuestasMuestraGlobalRaw() {
  */
 export function resolveRolFromEncuestasRows(rows, idOperador, categoria) {
   if (!rows?.length) return null;
-  const idVendedor = pickField(rows[0], 'idVendedor', 'IdVendedor');
-  const idSupervisor = pickField(rows[0], 'idSupervisor', 'IdSupervisor');
+  const idVendedor = normalizeSqlScalar(pickField(rows[0], 'idVendedor', 'IdVendedor'));
+  const idSupervisor = normalizeSqlScalar(pickField(rows[0], 'idSupervisor', 'IdSupervisor'));
   const rolPorIds = mapOperadorVendedorToRol(idOperador, idVendedor);
   const rolPorCategoria = mapCategoriaToRol(categoria);
 
@@ -659,7 +673,7 @@ export function buildCodigoPromotorIndex(encuestaRows = []) {
   for (const row of encuestaRows) {
     const nombre = pickField(row, 'Promotor', 'promotor');
     const codigo = extraerCodigoPromotorDesdeFilaEncuesta(row);
-    const idVendedor = pickField(row, 'idVendedor', 'IdVendedor');
+    const idVendedor = idSqlScalarToString(pickField(row, 'idVendedor', 'IdVendedor'));
     if (!nombre || !codigo) continue;
     const key = `${idVendedor ?? ''}|${normalizeNombre(nombre)}`;
     const bucket = buckets.get(key) ?? { codigos: new Map(), nombre: String(nombre).trim() };
@@ -910,7 +924,8 @@ export function esCargaPropia(lead, usuarioSesion) {
   
   const idOp = String(usuarioSesion.idOperador ?? usuarioSesion.id ?? '').trim();
   if (idOp) {
-    if (lead.idVendedor && String(lead.idVendedor).trim() === idOp) return true;
+    const leadIdV = idSqlScalarToString(lead.idVendedor);
+    if (leadIdV && leadIdV === idOp) return true;
   }
   
   return false;

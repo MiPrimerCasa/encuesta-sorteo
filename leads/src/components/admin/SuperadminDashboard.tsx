@@ -98,8 +98,66 @@ function PromotorRow({
   );
 }
 
+/** Meta diaria de leads por promotor: rojo 1–15, amarillo 16–29, verde ≥30. */
+function estiloLeadsPorDia(cantidad: number): string {
+  if (cantidad >= 30) {
+    return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
+  }
+  if (cantidad > 15) {
+    return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
+  }
+  return 'bg-red-50 text-red-700 ring-1 ring-red-200';
+}
+
+function CeldaLeadsInforme({
+  cantidad,
+  colorear,
+}: {
+  cantidad: number;
+  colorear: boolean;
+}) {
+  if (!colorear) {
+    return <span className="tabular-nums">{cantidad}</span>;
+  }
+  return (
+    <span
+      className={`inline-flex min-w-[2.25rem] items-center justify-center rounded-md px-2 py-0.5 text-[13px] font-bold tabular-nums ${estiloLeadsPorDia(cantidad)}`}
+      title={
+        cantidad >= 30
+          ? 'Meta diaria alcanzada (30+ leads)'
+          : cantidad > 15
+            ? 'En camino (16–29 leads)'
+            : 'Por debajo de la meta (1–15 leads)'
+      }
+    >
+      {cantidad}
+    </span>
+  );
+}
+
+function LeyendaLeadsPorDia() {
+  return (
+    <p className="text-[11px] text-zinc-500 no-print mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <span>Leads del día:</span>
+      <span className="inline-flex items-center gap-1">
+        <span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-500" aria-hidden="true" />
+        1–15
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-400" aria-hidden="true" />
+        16–29
+      </span>
+      <span className="inline-flex items-center gap-1">
+        <span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" aria-hidden="true" />
+        30+
+      </span>
+    </p>
+  );
+}
+
 export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: SuperadminDashboardProps) {
   const esPeriodoFecha = /^\d{4}-\d{2}-\d{2}$/.test(periodo);
+  const colorearLeadsDia = periodo === 'hoy' || esPeriodoFecha;
   const [selectedPerson, setSelectedPerson] = useState<PersonaPijCierres | null>(null);
   const [selectedPersonReceipts, setSelectedPersonReceipts] = useState<PersonaPijCierres | null>(null);
   const [filterText, setFilterText] = useState('');
@@ -932,6 +990,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
               <div>
                 <h4 className="text-[14px] font-semibold text-zinc-900">INFORME DE OPERACIONES</h4>
                 <p className="text-[11px] text-zinc-500 no-print">Listado general de promotores y operadores con desglose de gestiones y leads tratados.</p>
+                {colorearLeadsDia && <LeyendaLeadsPorDia />}
                 <p className="hidden print:block text-[12px] text-zinc-600 mt-1 font-semibold">
                   Rango ({esPeriodoFecha ? 'Día seleccionado' : periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'}): {rango}
                 </p>
@@ -1021,7 +1080,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                     <th className="py-2.5 px-3 text-left">Promotor</th>
                     <th className="py-2.5 px-3 text-left">Equipo (Supervisor)</th>
                     <th className="py-2.5 px-3 text-center">Leads</th>
-                    <th className="py-2.5 px-3 text-center">Tratados (D/S/M)</th>
+                    <th className="py-2.5 px-3 text-center">
+                      {esPeriodoFecha ? 'Tratados Día' : periodo === 'hoy' ? 'Tratados Hoy' : periodo === 'semana' ? 'Tratados Semana' : 'Tratados Mes'}
+                    </th>
                     <th className="py-2.5 px-3 text-center">Entrevistas</th>
                     <th className="py-2.5 px-3 text-center">Cierres</th>
                     <th className="py-2.5 px-3 text-center">Terrenos 100%</th>
@@ -1046,13 +1107,17 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                           <td className="py-2.5 px-3 text-center font-medium text-zinc-400">{originalIndex + 1}</td>
                           <td className="py-2.5 px-3 font-semibold text-zinc-900">{p.promotorNombre}</td>
                           <td className="py-2.5 px-3 text-zinc-500">{p.supervisorNombre}</td>
-                          <td className="py-2.5 px-3 text-center tabular-nums">{p.leadsSemana}</td>
-                          <td className="py-2.5 px-3 text-center whitespace-nowrap tabular-nums">
-                            <span className="font-semibold text-zinc-900">{p.tratadosHoy ?? 0}</span>
-                            <span className="text-zinc-300 mx-1">/</span>
-                            <span className="text-zinc-600">{p.tratadosSemana ?? 0}</span>
-                            <span className="text-zinc-300 mx-1">/</span>
-                            <span className="text-zinc-500">{p.tratadosMes ?? 0}</span>
+                          <td className="py-2.5 px-3 text-center">
+                            <CeldaLeadsInforme cantidad={p.leadsSemana} colorear={colorearLeadsDia} />
+                          </td>
+                          <td className="py-2.5 px-3 text-center whitespace-nowrap tabular-nums font-semibold text-zinc-800">
+                            {esPeriodoFecha || periodo === 'hoy' ? (
+                              p.tratadosHoy ?? 0
+                            ) : periodo === 'semana' ? (
+                              p.tratadosSemana ?? 0
+                            ) : (
+                              p.tratadosMes ?? 0
+                            )}
                           </td>
                           <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{p.entrevistasSemana}</td>
                           <td className="py-2.5 px-3 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
@@ -1069,13 +1134,15 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                     <td colSpan={3} className="py-3 px-3 text-left text-zinc-900 font-bold">
                       {informePromotoresSeleccionados.size > 0 ? 'Total seleccionado' : 'Total Empresa'}
                     </td>
-                    <td className="py-3 px-3 text-center tabular-nums">{totalPromotoresLeads}</td>
+                    <td className="py-3 px-3 text-center tabular-nums font-extrabold">{totalPromotoresLeads}</td>
                     <td className="py-3 px-3 text-center whitespace-nowrap tabular-nums font-extrabold text-zinc-900">
-                      <span>{totalPromotoresTratadosHoy}</span>
-                      <span className="text-zinc-300 mx-1">/</span>
-                      <span>{totalPromotoresTratadosSemana}</span>
-                      <span className="text-zinc-300 mx-1">/</span>
-                      <span>{totalPromotoresTratadosMes}</span>
+                      {esPeriodoFecha || periodo === 'hoy' ? (
+                        totalPromotoresTratadosHoy
+                      ) : periodo === 'semana' ? (
+                        totalPromotoresTratadosSemana
+                      ) : (
+                        totalPromotoresTratadosMes
+                      )}
                     </td>
                     <td className="py-3 px-3 text-center tabular-nums text-brand-700">{totalPromotoresEntrevistas}</td>
                     <td className="py-3 px-3 text-center tabular-nums text-emerald-700 font-extrabold">{totalPromotoresCierres}</td>

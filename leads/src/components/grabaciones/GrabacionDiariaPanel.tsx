@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchMisGrabaciones, uploadGrabacion } from '../../api/client';
+import { fetchMisGrabaciones, fetchGrabacionAudioBlob, uploadGrabacion } from '../../api/client';
 import type { GrabacionPromotor, Lead, ResumenGrabacionesDia, ResumenTopeGrabacionesMes, TipoGrabacion } from '../../types';
 
 interface GrabacionDiariaPanelProps {
@@ -56,6 +56,51 @@ function formatDuracion(seg: number): string {
   const m = Math.floor(seg / 60);
   const s = Math.round(seg % 60);
   return m > 0 ? `${m}:${String(s).padStart(2, '0')}` : `${s}s`;
+}
+
+function AudioPromotor({ grabacionId }: { grabacionId: number }) {
+  const [src, setSrc] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [cargando, setCargando] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (src) URL.revokeObjectURL(src);
+    };
+  }, [src]);
+
+  const cargar = async () => {
+    if (src || cargando) return;
+    setCargando(true);
+    setError('');
+    try {
+      const url = await fetchGrabacionAudioBlob(grabacionId);
+      setSrc(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo cargar el audio');
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  if (error) {
+    return <p className="mt-2 text-[12px] text-red-600">{error}</p>;
+  }
+  if (!src) {
+    return (
+      <button
+        type="button"
+        onClick={() => void cargar()}
+        disabled={cargando}
+        className="mt-2 text-[12px] font-semibold text-brand-600 hover:text-brand-700"
+      >
+        {cargando ? 'Cargando…' : 'Escuchar mi audio'}
+      </button>
+    );
+  }
+  return (
+    <audio controls preload="none" src={src} className="mt-2 h-9 w-full max-w-md" />
+  );
 }
 
 const SPEECH_PROMOCION = [
@@ -390,6 +435,7 @@ export function GrabacionDiariaPanel({
                 <p className="mt-0.5 text-zinc-600">
                   {g.leadNombre ? `Lead: ${g.leadNombre}` : 'Sin lead asociado'}
                 </p>
+                <AudioPromotor grabacionId={g.id} />
                 {g.estado === 'pendiente' && (
                   <p className="mt-1 text-[12px] text-amber-700">
                     Pendiente de revisión del supervisor

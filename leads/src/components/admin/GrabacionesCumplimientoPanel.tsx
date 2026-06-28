@@ -256,7 +256,7 @@ function DetalleGrabaciones({
               Aprobado
             </span>
           )}
-          {g.estado !== 'rechazado' && <AudioPlayer grabacionId={g.id} />}
+          <AudioPlayer grabacionId={g.id} />
           {g.estado === 'pendiente' && (
             <>
               <button

@@ -454,8 +454,8 @@ export function GrabacionDiariaPanel({
                     </p>
                     <p className="mt-1.5 text-[11px] text-red-600/80">
                       {g.tipo === 'promocion'
-                        ? 'El audio se conservará 7 días y podés volver a subir uno nuevo.'
-                        : 'El audio se conservará 30 días y podés volver a subir uno nuevo.'}
+                        ? 'Este audio, al ser rechazado, solo va a durar 7 días.'
+                        : 'Este audio, al ser rechazado, solo va a durar 30 días.'}
                     </p>
                   </div>
                 )}

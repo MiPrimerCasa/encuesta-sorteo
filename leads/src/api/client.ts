@@ -822,14 +822,15 @@ export async function aprobarGrabacion(id: number): Promise<GrabacionPromotor> {
   return data.grabacion;
 }
 
-export async function rechazarGrabacion(id: number, motivo?: string): Promise<void> {
+export async function rechazarGrabacion(id: number, motivo: string): Promise<GrabacionPromotor> {
   if (_isDemoActive) throw new Error('Rechazo no disponible en demo.');
-  await apiFetch<{ ok: boolean; eliminado: boolean; id: number }>(
+  const data = await apiFetch<{ grabacion: GrabacionPromotor }>(
     `/api/grabaciones/${id}/rechazar`,
     {
       method: 'POST',
-      body: JSON.stringify({ motivo: motivo ?? '' }),
+      body: JSON.stringify({ motivo }),
     },
   );
+  return data.grabacion;
 }
 

@@ -33,6 +33,18 @@ export function getGrabacionesRetentionDays() {
   return Number.isFinite(d) && d > 0 ? d : 60;
 }
 
+/** Días que permanecen en servidor audios de promoción rechazados (motivo visible al promotor). */
+export function getGrabacionesRetentionRechazadoPromocionDays() {
+  const d = Number.parseInt(process.env.GRABACIONES_RETENTION_RECHAZADO_PROMOCION_DAYS || '7', 10);
+  return Number.isFinite(d) && d > 0 ? d : 7;
+}
+
+/** Días que permanecen en servidor audios de entrevista rechazados. */
+export function getGrabacionesRetentionRechazadoEntrevistaDays() {
+  const d = Number.parseInt(process.env.GRABACIONES_RETENTION_RECHAZADO_ENTREVISTA_DAYS || '30', 10);
+  return Number.isFinite(d) && d > 0 ? d : 30;
+}
+
 export function getGrabacionesMinDurationSec() {
   const s = Number.parseInt(process.env.GRABACIONES_MIN_DURATION_SEC || '0', 10);
   return Number.isFinite(s) && s >= 0 ? s : 0;

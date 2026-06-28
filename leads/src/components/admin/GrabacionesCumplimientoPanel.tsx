@@ -73,6 +73,108 @@ function AudioPlayer({ grabacionId }: { grabacionId: number }) {
   return <audio controls preload="none" src={src} className="h-8 max-w-[180px]" />;
 }
 
+function ModalRechazoGrabacion({
+  abierto,
+  tipo,
+  onCerrar,
+  onConfirmar,
+  procesando,
+}: {
+  abierto: boolean;
+  tipo: 'promocion' | 'entrevista';
+  onCerrar: () => void;
+  onConfirmar: (motivo: string) => void;
+  procesando: boolean;
+}) {
+  const [motivo, setMotivo] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (abierto) {
+      setMotivo('');
+      setError('');
+    }
+  }, [abierto]);
+
+  if (!abierto) return null;
+
+  const diasRetencion = tipo === 'promocion' ? 7 : 30;
+  const etiquetaTipo = tipo === 'promocion' ? 'promoción' : 'entrevista';
+
+  const confirmar = () => {
+    const texto = motivo.trim();
+    if (!texto) {
+      setError('Escribí el motivo del rechazo para que el promotor lo vea.');
+      return;
+    }
+    onConfirmar(texto);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="fixed inset-0 bg-zinc-950/50 backdrop-blur-sm"
+        onClick={onCerrar}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rechazo-grabacion-titulo"
+        className="relative z-10 w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-xl"
+      >
+        <h3 id="rechazo-grabacion-titulo" className="text-[16px] font-semibold text-zinc-900">
+          Rechazar audio de {etiquetaTipo}
+        </h3>
+        <p className="mt-1 text-[13px] text-zinc-500">
+          El promotor verá el motivo en su pantalla. El audio se conservará {diasRetencion} días
+          y luego se eliminará del servidor.
+        </p>
+        <div className="mt-4 space-y-1.5">
+          <label
+            htmlFor="motivo-rechazo-grabacion"
+            className="block text-[11px] font-semibold uppercase tracking-wide text-zinc-400"
+          >
+            Motivo del rechazo
+          </label>
+          <textarea
+            id="motivo-rechazo-grabacion"
+            value={motivo}
+            onChange={(e) => {
+              setMotivo(e.target.value);
+              if (error) setError('');
+            }}
+            rows={4}
+            maxLength={500}
+            placeholder="Ej.: audio muy corto, ruido de fondo, no se escucha el speech completo…"
+            className="w-full resize-y rounded-xl border border-zinc-200 px-3 py-2.5 text-[14px] text-zinc-900 outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"
+          />
+          {error && <p className="text-[12px] text-red-600">{error}</p>}
+        </div>
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCerrar}
+            disabled={procesando}
+            className="rounded-lg px-4 py-2 text-[13px] font-semibold text-zinc-600 hover:bg-zinc-100"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={confirmar}
+            disabled={procesando}
+            className="rounded-lg bg-red-600 px-4 py-2 text-[13px] font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+          >
+            {procesando ? 'Rechazando…' : 'Rechazar audio'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DetalleGrabaciones({
   grabaciones,
   onActualizado,
@@ -81,6 +183,7 @@ function DetalleGrabaciones({
   onActualizado: () => void;
 }) {
   const [procesandoId, setProcesandoId] = useState<number | null>(null);
+  const [rechazoModal, setRechazoModal] = useState<GrabacionPromotor | null>(null);
 
   const handleAprobar = async (id: number) => {
     setProcesandoId(id);
@@ -94,16 +197,12 @@ function DetalleGrabaciones({
     }
   };
 
-  const handleRechazar = async (id: number) => {
-    const confirmar = window.confirm(
-      '¿Rechazar este audio?\n\nSe eliminará permanentemente del servidor y no contará para el cumplimiento del día.',
-    );
-    if (!confirmar) return;
-
-    const motivo = window.prompt('Motivo del rechazo (opcional):') ?? '';
-    setProcesandoId(id);
+  const handleConfirmarRechazo = async (motivo: string) => {
+    if (!rechazoModal) return;
+    setProcesandoId(rechazoModal.id);
     try {
-      await rechazarGrabacion(id, motivo || undefined);
+      await rechazarGrabacion(rechazoModal.id, motivo);
+      setRechazoModal(null);
       onActualizado();
     } catch (err) {
       window.alert(err instanceof Error ? err.message : 'No se pudo rechazar');
@@ -117,7 +216,17 @@ function DetalleGrabaciones({
   }
 
   return (
-    <ul className="space-y-2">
+    <>
+      <ModalRechazoGrabacion
+        abierto={rechazoModal != null}
+        tipo={rechazoModal?.tipo ?? 'promocion'}
+        onCerrar={() => {
+          if (procesandoId == null) setRechazoModal(null);
+        }}
+        onConfirmar={(motivo) => void handleConfirmarRechazo(motivo)}
+        procesando={procesandoId != null}
+      />
+      <ul className="space-y-2">
       {grabaciones.map((g) => (
         <li
           key={g.id}
@@ -161,7 +270,7 @@ function DetalleGrabaciones({
               <button
                 type="button"
                 disabled={procesandoId === g.id}
-                onClick={() => void handleRechazar(g.id)}
+                onClick={() => setRechazoModal(g)}
                 className="text-[12px] font-semibold text-red-600 hover:text-red-700"
               >
                 Rechazar
@@ -175,7 +284,8 @@ function DetalleGrabaciones({
           )}
         </li>
       ))}
-    </ul>
+      </ul>
+    </>
   );
 }
 

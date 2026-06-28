@@ -9,6 +9,8 @@ import {
   getGrabacionesMaxBytes,
   getGrabacionesMinDurationSec,
   getGrabacionesPromotoresConfig,
+  getGrabacionesRetentionRechazadoEntrevistaDays,
+  getGrabacionesRetentionRechazadoPromocionDays,
   getCuotaDiaria,
   getMaxAudiosMes,
   isGrabacionesEnabled,
@@ -24,7 +26,7 @@ import {
   listPromocionesOcupanCuotaPromotorDia,
   countGrabacionesMesSubidas,
   aprobarGrabacion,
-  rechazarYEliminarGrabacion,
+  rechazarGrabacion,
   resumenPromotorDia,
   resumenTopeMesPromotor,
 } from '../db/grabaciones-store.js';
@@ -153,6 +155,8 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
       minDuracionSeg: getGrabacionesMinDurationSec(),
       formatos: ['.m4a', '.mp3', '.wav', '.ogg'],
       maxMb: Math.round(getGrabacionesMaxBytes() / (1024 * 1024)),
+      retentionRechazadoPromocionDays: getGrabacionesRetentionRechazadoPromocionDays(),
+      retentionRechazadoEntrevistaDays: getGrabacionesRetentionRechazadoEntrevistaDays(),
       resumenHoy: resumen,
       resumenTopeMes,
     });
@@ -356,12 +360,17 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
       return res.status(403).json({ error: 'Sin permiso' });
     }
     const id = Number.parseInt(String(req.params.id), 10);
-    void String(req.body?.motivo ?? '').trim();
-    const resultado = rechazarYEliminarGrabacion(id, {
+    const motivo = String(req.body?.motivo ?? '').trim();
+    if (!motivo) {
+      return res.status(400).json({ error: 'Indicá el motivo del rechazo' });
+    }
+    const grabacion = rechazarGrabacion(id, {
       rechazadoPor: usuario.nombre,
-      motivo: String(req.body?.motivo ?? '').trim() || null,
+      motivo,
     });
-    if (!resultado) return res.status(404).json({ error: 'Grabación no encontrada' });
-    res.json({ ok: true, eliminado: true, id: resultado.id });
+    if (!grabacion || grabacion.estado !== 'rechazado') {
+      return res.status(404).json({ error: 'Grabación no encontrada o ya procesada' });
+    }
+    res.json({ grabacion });
   });
 }

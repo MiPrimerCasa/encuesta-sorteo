@@ -232,7 +232,7 @@ export function GrabacionDiariaPanel({
         Promoción: 4/día (2 mañana + 2 tarde), solo audios aprobados cuentan para el objetivo.
         Entrevistas: sin cuota diaria. Tope {resumenTopeMes?.maximo ?? 20} audios/mes en total
         (promoción + entrevista). Máx. {maxMb} MB por archivo. El supervisor aprueba o rechaza cada
-        audio (rechazado se elimina del servidor).
+        audio; si se rechaza, verás el motivo indicado (promoción 7 días, entrevista 30 días).
       </p>
 
       {resumen && (
@@ -399,9 +399,19 @@ export function GrabacionDiariaPanel({
                   <p className="mt-1 text-[12px] text-emerald-700">Aprobado</p>
                 )}
                 {g.estado === 'rechazado' && (
-                  <p className="mt-1 text-[12px] text-red-600">
-                    Rechazado{g.motivoRechazo ? `: ${g.motivoRechazo}` : ''}
-                  </p>
+                  <div className="mt-2 rounded-lg border border-red-200 bg-white/80 px-3 py-2">
+                    <p className="text-[12px] font-semibold text-red-700">Rechazado por el supervisor</p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-red-800">
+                      {g.motivoRechazo?.trim()
+                        ? g.motivoRechazo
+                        : 'Sin motivo indicado.'}
+                    </p>
+                    <p className="mt-1.5 text-[11px] text-red-600/80">
+                      {g.tipo === 'promocion'
+                        ? 'El audio se conservará 7 días y podés volver a subir uno nuevo.'
+                        : 'El audio se conservará 30 días y podés volver a subir uno nuevo.'}
+                    </p>
+                  </div>
                 )}
               </li>
             ))}

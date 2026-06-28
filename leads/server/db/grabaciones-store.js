@@ -4,6 +4,8 @@ import { buildResumenCumplimiento } from '../domain/grabaciones.js';
 import {
   getGrabacionesPromotoresConfig,
   getGrabacionesRetentionDays,
+  getGrabacionesRetentionRechazadoEntrevistaDays,
+  getGrabacionesRetentionRechazadoPromocionDays,
   getMaxAudiosMes,
 } from '../config/grabaciones-config.js';
 import { fechaMesKey } from '../domain/grabaciones.js';
@@ -171,7 +173,7 @@ export function listPromocionesOcupanCuotaPromotorDia(promotorId, diaKey) {
   );
 }
 
-/** Tope mensual de subidas (promoción + entrevista). Rechazados no cuentan (se borran). */
+/** Tope mensual de subidas (promoción + entrevista). Rechazados no cuentan. */
 export function countGrabacionesMesSubidas(promotorId, mesKey) {
   ensureSchema();
   const row = getDb()
@@ -265,15 +267,27 @@ export function aprobarGrabacion(id, { aprobadoPor } = {}) {
   return getGrabacionById(id);
 }
 
-/** Elimina archivo y registro. Devuelve datos previos si existía. */
-export function rechazarYEliminarGrabacion(id, { rechazadoPor, motivo } = {}) {
+/** Marca como rechazado con motivo; conserva archivo hasta la limpieza programada. */
+export function rechazarGrabacion(id, { rechazadoPor, motivo } = {}) {
   ensureSchema();
   const grabacion = getGrabacionById(id);
-  if (!grabacion || grabacion.estado === 'rechazado') return null;
-  void rechazadoPor;
-  void motivo;
-  purgeGrabacion(grabacion);
-  return { id, eliminado: true };
+  if (!grabacion || grabacion.estado !== 'pendiente') return null;
+
+  const motivoTexto = String(motivo ?? '').trim();
+  if (!motivoTexto) return null;
+
+  getDb()
+    .prepare(
+      `UPDATE promotor_grabaciones
+       SET estado = 'rechazado',
+           rechazado_por = ?,
+           rechazado_en = datetime('now'),
+           motivo_rechazo = ?
+       WHERE id = ? AND estado = 'pendiente'`,
+    )
+    .run(String(rechazadoPor ?? '').trim() || null, motivoTexto.slice(0, 500), id);
+
+  return getGrabacionById(id);
 }
 
 export function listGrabacionesAntesDe(cutoffIso) {
@@ -282,9 +296,30 @@ export function listGrabacionesAntesDe(cutoffIso) {
     .prepare(
       `SELECT * FROM promotor_grabaciones
        WHERE creado_en < ?
+         AND estado IN ('pendiente', 'activo')
        ORDER BY creado_en ASC`,
     )
     .all(cutoffIso);
+  return rows.map(mapRow);
+}
+
+function cutoffIsoFromDays(days) {
+  const cutoff = new Date(Date.now() - Math.max(1, days) * 24 * 60 * 60 * 1000);
+  return cutoff.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+export function listGrabacionesRechazadasAntesDe(cutoffIso, tipo) {
+  ensureSchema();
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM promotor_grabaciones
+       WHERE estado = 'rechazado'
+         AND tipo = ?
+         AND rechazado_en IS NOT NULL
+         AND rechazado_en < ?
+       ORDER BY rechazado_en ASC`,
+    )
+    .all(tipo, cutoffIso);
   return rows.map(mapRow);
 }
 
@@ -309,11 +344,30 @@ export function purgeGrabacion(grabacion) {
 
 export function ejecutarLimpiezaGrabaciones(retentionDays = getGrabacionesRetentionDays()) {
   ensureSchema();
-  const dias = Math.max(1, Number(retentionDays) || getGrabacionesRetentionDays());
-  const cutoff = new Date(Date.now() - dias * 24 * 60 * 60 * 1000);
-  const cutoffIso = cutoff.toISOString().slice(0, 19).replace('T', ' ');
+  const diasAprobados = Math.max(1, Number(retentionDays) || getGrabacionesRetentionDays());
+  const diasRechazadoPromo = getGrabacionesRetentionRechazadoPromocionDays();
+  const diasRechazadoEntrevista = getGrabacionesRetentionRechazadoEntrevistaDays();
 
-  const candidatas = listGrabacionesAntesDe(cutoffIso);
+  const cutoffAprobadosIso = cutoffIsoFromDays(diasAprobados);
+  const cutoffRechazadoPromoIso = cutoffIsoFromDays(diasRechazadoPromo);
+  const cutoffRechazadoEntrevistaIso = cutoffIsoFromDays(diasRechazadoEntrevista);
+
+  const candidatasAprobadas = listGrabacionesAntesDe(cutoffAprobadosIso);
+  const candidatasRechazadasPromo = listGrabacionesRechazadasAntesDe(
+    cutoffRechazadoPromoIso,
+    'promocion',
+  );
+  const candidatasRechazadasEntrevista = listGrabacionesRechazadasAntesDe(
+    cutoffRechazadoEntrevistaIso,
+    'entrevista',
+  );
+
+  const candidatas = [
+    ...candidatasAprobadas,
+    ...candidatasRechazadasPromo,
+    ...candidatasRechazadasEntrevista,
+  ];
+
   let archivosEliminados = 0;
   let registrosEliminados = 0;
   let bytesLiberados = 0;
@@ -326,9 +380,16 @@ export function ejecutarLimpiezaGrabaciones(retentionDays = getGrabacionesRetent
   }
 
   return {
-    retentionDays: dias,
-    cutoffIso,
+    retentionDays: diasAprobados,
+    retentionRechazadoPromocionDays: diasRechazadoPromo,
+    retentionRechazadoEntrevistaDays: diasRechazadoEntrevista,
+    cutoffAprobadosIso,
+    cutoffRechazadoPromoIso,
+    cutoffRechazadoEntrevistaIso,
     candidatas: candidatas.length,
+    candidatasAprobadas: candidatasAprobadas.length,
+    candidatasRechazadasPromo: candidatasRechazadasPromo.length,
+    candidatasRechazadasEntrevista: candidatasRechazadasEntrevista.length,
     archivosEliminados,
     registrosEliminados,
     bytesLiberados,

@@ -104,11 +104,23 @@ export interface SyncPreviewItem {
   numeroRecibo: string;
   fechaActual: string;
   nuevaFecha: string;
+  /** Si true, este registro se puede aplicar con la sincronización (solo fecha). */
+  necesitaFecha: boolean;
+  /** Si true, adhesión/anexo del CRM difieren de Caja (solo informativo). */
+  necesitaRecibo: boolean;
+  reciboPropuesto?: string;
+  adhesionActual?: string;
+  anexoActual?: string;
+  adhesionExcel?: string;
+  anexoExcel?: string;
   excelRow: {
     fecha: string;
+    serie?: string;
     ordenAdh: string;
     ordenAnexo: string;
     nombreCliente: string;
+    nombreVendedor?: string;
+    concepto?: string;
   };
 }
 
@@ -118,6 +130,7 @@ export interface SyncPreviewResponse {
 
 export interface SyncCommitResponse {
   actualizados: number;
+  tipo?: 'fecha' | 'recibo';
 }
 
 export interface Producto {
@@ -332,6 +345,12 @@ export interface PromotorMetricasAdmin {
   tratadosHoy: number;
   tratadosSemana: number;
   tratadosMes: number;
+  /** Ventas PIJ del período (para detalle en informe de operaciones). */
+  detallePij?: PijCierreDetalle[];
+  /** Terrenos 100% del período. */
+  detalleTerreno100?: TerrenoCierreDetalle[];
+  /** Terrenos en seña del período. */
+  detalleTerrenoSena?: TerrenoCierreDetalle[];
 }
 
 export interface SupervisorMetricasAdmin {
@@ -512,8 +531,13 @@ export interface PersonaPijCierres {
   operadorNombre: string;
   cantidad: number;
   cierres: PijCierreDetalle[];
+  /** Total terrenos (100% + seña) */
   cantidadRecibos?: number;
   recibos?: TerrenoCierreDetalle[];
+  cantidadRecibos100?: number;
+  recibos100?: TerrenoCierreDetalle[];
+  cantidadRecibosSena?: number;
+  recibosSena?: TerrenoCierreDetalle[];
 }
 
 export type TipoGrabacion = 'promocion' | 'entrevista';

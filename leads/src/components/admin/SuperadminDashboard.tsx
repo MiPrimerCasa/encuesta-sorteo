@@ -1,6 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres, Lead, Barrio, Producto, SeguimientoLead } from '../../types';
-import { formatRangoSemana } from '../../domain/admin-metrics';
+import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres, Lead, Barrio, Producto, SeguimientoLead, PijCierreDetalle, TerrenoCierreDetalle, PromotorMetricasAdmin } from '../../types';
+import {
+  buildAdminDashboardFromLeads,
+  extraerVentasDetalleInforme,
+  fechaIsoLocal,
+  filterPijCierresPorRango,
+  formatRangoSemana,
+  inicioMesIso,
+} from '../../domain/admin-metrics';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
@@ -77,6 +84,49 @@ function RankingList({
         </ol>
       )}
     </div>
+  );
+}
+
+function formatFechaHorarioCierre(fecha: string | null | undefined) {
+  if (!fecha) return { fecha: '—', horario: '—' };
+  const d = new Date(fecha);
+  if (Number.isNaN(d.getTime())) return { fecha: String(fecha), horario: '—' };
+  return {
+    fecha: d.toLocaleDateString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }),
+    horario: d.toLocaleTimeString('es-AR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+  };
+}
+
+function CeldaVentaInforme({
+  cantidad,
+  className,
+  onClick,
+}: {
+  cantidad: number;
+  className: string;
+  onClick?: () => void;
+}) {
+  if (cantidad <= 0) {
+    return <span className={`tabular-nums text-zinc-300 ${className}`}>0</span>;
+  }
+  if (!onClick) {
+    return <span className={`tabular-nums font-semibold ${className}`}>{cantidad}</span>;
+  }
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`tabular-nums font-semibold hover:underline cursor-pointer ${className}`}
+    >
+      {cantidad}
+    </button>
   );
 }
 
@@ -160,8 +210,21 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   const esPeriodoFecha = /^\d{4}-\d{2}-\d{2}$/.test(periodo);
   const colorearLeadsDia = periodo === 'hoy' || esPeriodoFecha;
   const [selectedPerson, setSelectedPerson] = useState<PersonaPijCierres | null>(null);
-  const [selectedPersonReceipts, setSelectedPersonReceipts] = useState<PersonaPijCierres | null>(null);
+  const [selectedPersonReceipts, setSelectedPersonReceipts] = useState<{
+    person: PersonaPijCierres;
+    tipo: '100' | 'sena';
+  } | null>(null);
+  const [anexosFechaDesde, setAnexosFechaDesde] = useState(() => inicioMesIso());
+  const [anexosFechaHasta, setAnexosFechaHasta] = useState(() => fechaIsoLocal());
+  const [informeVentaDetalle, setInformeVentaDetalle] = useState<{
+    titulo: string;
+    subtitulo: string;
+    tipo: 'pij' | 'terreno100' | 'terrenosena';
+    itemsPij: PijCierreDetalle[];
+    itemsTerreno: TerrenoCierreDetalle[];
+  } | null>(null);
   const [filterText, setFilterText] = useState('');
+  const [informeDetalleCargando, setInformeDetalleCargando] = useState(false);
   const [busquedaGlobal, setBusquedaGlobal] = useState('');
   const [informePromotoresSeleccionados, setInformePromotoresSeleccionados] = useState<Set<string>>(
     () => new Set(),
@@ -250,13 +313,16 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
     }
   };
 
-  const handleCommitSync = async (aprobados: SyncPreviewItem[]) => {
+  const handleCommitSync = async (aprobados: SyncPreviewItem[], tipo: 'fecha' | 'recibo') => {
     try {
       setIsSyncLoading(true);
-      const res = await commitSyncCajaPij(aprobados);
-      alert(`Se actualizaron exitosamente ${res.actualizados} registros.`);
+      const res = await commitSyncCajaPij(aprobados, tipo);
+      if (tipo === 'fecha') {
+        alert(`Se actualizaron ${res.actualizados} fecha${res.actualizados === 1 ? '' : 's'} de cierre.`);
+      } else {
+        alert(`Se actualizaron ${res.actualizados} recibo${res.actualizados === 1 ? '' : 's'} (adhesión/anexo).`);
+      }
       setIsSyncModalOpen(false);
-      // Forzar recarga del dashboard
       window.location.reload();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error al confirmar cambios');
@@ -308,7 +374,13 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
   };
 
   useEffect(() => {
-    if ((tabActivo === 'buscador' || tabActivo === 'reasignacion') && leads.length === 0) {
+    if (
+      (tabActivo === 'buscador' ||
+        tabActivo === 'reasignacion' ||
+        tabActivo === 'informe' ||
+        tabActivo === 'metricas') &&
+      leads.length === 0
+    ) {
       setCargandoLeads(true);
       fetchAdminLeads()
         .then((data) => {
@@ -496,8 +568,106 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
     0,
   );
 
-
   const rango = formatRangoSemana(data.semanaDesde, data.semanaHasta);
+
+  type PromotorConSupervisor = PromotorMetricasAdmin & { supervisorNombre?: string };
+
+  const abrirDetalleInformeVenta = async (
+    promotor: PromotorConSupervisor | null,
+    tipo: 'pij' | 'terreno100' | 'terrenosena',
+  ) => {
+    let itemsPij =
+      tipo === 'pij'
+        ? promotor
+          ? (promotor.detallePij ?? [])
+          : promotoresFiltradosRanking.flatMap((p) => p.detallePij ?? [])
+        : [];
+    let itemsTerreno =
+      tipo === 'terreno100'
+        ? promotor
+          ? (promotor.detalleTerreno100 ?? [])
+          : promotoresFiltradosRanking.flatMap((p) => p.detalleTerreno100 ?? [])
+        : tipo === 'terrenosena'
+          ? promotor
+            ? (promotor.detalleTerrenoSena ?? [])
+            : promotoresFiltradosRanking.flatMap((p) => p.detalleTerrenoSena ?? [])
+          : [];
+
+    const countTabla = promotor
+      ? tipo === 'pij'
+        ? promotor.ventasPijSemana
+        : tipo === 'terreno100'
+          ? promotor.ventasTerrenoSemana
+          : promotor.ventasTerrenoSenaSemana ?? 0
+      : tipo === 'pij'
+        ? totalPromotoresPij
+        : tipo === 'terreno100'
+          ? totalPromotoresTerrenos
+          : totalPromotoresTerrenosSeña;
+
+    const cantidadDetalle = tipo === 'pij' ? itemsPij.length : itemsTerreno.length;
+    if (countTabla <= 0 && cantidadDetalle <= 0) return;
+
+    const etiquetaTipo =
+      tipo === 'pij' ? 'PIJ' : tipo === 'terreno100' ? 'Terrenos 100%' : 'Terrenos con seña';
+
+    const abrirModal = (pij: PijCierreDetalle[], terreno: TerrenoCierreDetalle[]) => {
+      const cantidadMostrar =
+        (tipo === 'pij' ? pij.length : terreno.length) > 0
+          ? tipo === 'pij'
+            ? pij.length
+            : terreno.length
+          : countTabla;
+      setFilterText('');
+      setInformeVentaDetalle({
+        titulo: promotor ? `${etiquetaTipo} — ${promotor.promotorNombre}` : `${etiquetaTipo} — Total`,
+        subtitulo: `${cantidadMostrar} venta${cantidadMostrar === 1 ? '' : 's'} · ${rango}`,
+        tipo,
+        itemsPij: pij,
+        itemsTerreno: terreno,
+      });
+    };
+
+    if (cantidadDetalle === 0 && countTabla > 0) {
+      abrirModal(itemsPij, itemsTerreno);
+      setInformeDetalleCargando(true);
+      try {
+        const leadsData = leads.length > 0 ? leads : await fetchAdminLeads();
+        if (leads.length === 0) setLeads(leadsData);
+        const promotorIds = promotor
+          ? [promotor.promotorId]
+          : promotoresFiltradosRanking.map((p) => p.promotorId);
+        const detalle = extraerVentasDetalleInforme(leadsData, promotorIds, periodo);
+        if (tipo === 'pij') itemsPij = detalle.detallePij;
+        else if (tipo === 'terreno100') itemsTerreno = detalle.detalleTerreno100;
+        else itemsTerreno = detalle.detalleTerrenoSena;
+        abrirModal(itemsPij, itemsTerreno);
+      } catch (err) {
+        console.error('Error al cargar detalle de ventas del informe:', err);
+      } finally {
+        setInformeDetalleCargando(false);
+      }
+      return;
+    }
+
+    abrirModal(itemsPij, itemsTerreno);
+  };
+
+  const pijCierresFuente = useMemo(() => {
+    if (leads.length > 0) {
+      return buildAdminDashboardFromLeads(leads, [], new Date()).pijCierresPorPersona ?? [];
+    }
+    return data.pijCierresPorPersona ?? [];
+  }, [leads, data.pijCierresPorPersona]);
+
+  const anexosPorPersonaFiltrados = useMemo(
+    () => filterPijCierresPorRango(pijCierresFuente, anexosFechaDesde, anexosFechaHasta),
+    [pijCierresFuente, anexosFechaDesde, anexosFechaHasta],
+  );
+  const rangoAnexosLabel = formatRangoSemana(
+    `${anexosFechaDesde}T12:00:00`,
+    `${anexosFechaHasta}T12:00:00`,
+  );
   const hoyLabel = new Date(data.hoy).toLocaleDateString('es-AR', {
     weekday: 'long',
     day: 'numeric',
@@ -772,15 +942,67 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
           </button>
         </div>
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
-          <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
-            <h4 className="text-[14px] font-semibold text-zinc-900">Historial de Anexos y Recibos Cargados por Operador</h4>
-            <p className="text-[12px] text-zinc-500">
-              Consultá la cantidad de Planes Vendidos (Anexos) y Terrenos Vendidos (Recibos) registrados por cada operador.
-            </p>
+          <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 space-y-3">
+            <div>
+              <h4 className="text-[14px] font-semibold text-zinc-900">Historial de Anexos y Recibos Cargados por Operador</h4>
+              <p className="text-[12px] text-zinc-500">
+                Filtrá por rango de fechas. Hacé clic en PIJ, terrenos 100% o seña para ver el detalle del operador.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Desde</span>
+                <input
+                  type="date"
+                  value={anexosFechaDesde}
+                  max={anexosFechaHasta}
+                  onChange={(e) => setAnexosFechaDesde(e.target.value)}
+                  className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-[13px] font-medium text-zinc-800 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">Hasta</span>
+                <input
+                  type="date"
+                  value={anexosFechaHasta}
+                  min={anexosFechaDesde}
+                  onChange={(e) => setAnexosFechaHasta(e.target.value)}
+                  className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-[13px] font-medium text-zinc-800 focus:border-brand-300 focus:outline-none focus:ring-1 focus:ring-brand-100"
+                />
+              </label>
+              <div className="flex flex-wrap items-center gap-2 pb-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAnexosFechaDesde(inicioMesIso());
+                    setAnexosFechaHasta(fechaIsoLocal());
+                  }}
+                  className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-zinc-600 hover:bg-zinc-50 cursor-pointer"
+                >
+                  Mes actual
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const hoy = new Date();
+                    const desde = new Date(hoy);
+                    desde.setDate(desde.getDate() - 6);
+                    setAnexosFechaDesde(fechaIsoLocal(desde));
+                    setAnexosFechaHasta(fechaIsoLocal(hoy));
+                  }}
+                  className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-zinc-600 hover:bg-zinc-50 cursor-pointer"
+                >
+                  Últimos 7 días
+                </button>
+              </div>
+              <p className="text-[12px] text-zinc-500 pb-1">
+                Período: <span className="font-semibold text-zinc-700">{rangoAnexosLabel}</span>
+              </p>
+            </div>
           </div>
-          {(!data.pijCierresPorPersona || data.pijCierresPorPersona.length === 0) ? (
+          {anexosPorPersonaFiltrados.length === 0 ? (
             <p className="px-4 py-6 text-center text-[13px] text-zinc-500">
-              No hay cierres registrados en el sistema.
+              No hay cierres PIJ ni terrenos en el rango seleccionado.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -789,58 +1011,66 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                   <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
                     <th className="py-2.5 px-4 text-left font-semibold">Operador</th>
                     <th className="py-2.5 px-4 text-right font-semibold">Anexos (PIJ)</th>
-                    <th className="py-2.5 px-4 text-center font-semibold">Acción</th>
-                    <th className="py-2.5 px-4 text-right font-semibold">Recibos (Terrenos)</th>
-                    <th className="py-2.5 px-4 text-center font-semibold">Acción</th>
+                    <th className="py-2.5 px-4 text-right font-semibold">Terrenos 100%</th>
+                    <th className="py-2.5 px-4 text-right font-semibold">T. Seña</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
-                  {data.pijCierresPorPersona.map((person) => (
+                  {anexosPorPersonaFiltrados.map((person) => (
                     <tr
                       key={person.operadorNombre}
                       className="text-[13px] text-zinc-700 hover:bg-zinc-50/50 transition-colors"
                     >
                       <td className="py-3 px-4 font-medium text-zinc-900">{person.operadorNombre}</td>
-                      
-                      {/* Anexos */}
-                      <td className="py-3 px-4 text-right font-semibold tabular-nums text-brand-700">
-                        {person.cantidad}
-                      </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-4 text-right">
                         {person.cantidad > 0 ? (
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            onClick={() => {
+                              setFilterText('');
                               setSelectedPerson(person);
                             }}
-                            className="text-[12px] font-semibold text-brand-600 hover:text-brand-800 hover:underline cursor-pointer"
+                            className="font-semibold tabular-nums text-brand-700 hover:text-brand-900 hover:underline cursor-pointer"
+                            title="Ver detalle de anexos PIJ"
                           >
-                            Ver anexos
+                            {person.cantidad}
                           </button>
                         ) : (
-                          <span className="text-[12px] text-zinc-300">—</span>
+                          <span className="font-semibold tabular-nums text-zinc-300">0</span>
                         )}
                       </td>
-
-                      {/* Recibos */}
-                      <td className="py-3 px-4 text-right font-semibold tabular-nums text-amber-700">
-                        {person.cantidadRecibos ?? 0}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        {person.cantidadRecibos && person.cantidadRecibos > 0 ? (
+                      <td className="py-3 px-4 text-right">
+                        {(person.cantidadRecibos100 ?? 0) > 0 ? (
                           <button
                             type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedPersonReceipts(person);
+                            onClick={() => {
+                              setFilterText('');
+                              setSelectedPersonReceipts({ person, tipo: '100' });
                             }}
-                            className="text-[12px] font-semibold text-amber-600 hover:text-amber-800 hover:underline cursor-pointer"
+                            className="font-semibold tabular-nums text-emerald-700 hover:text-emerald-900 hover:underline cursor-pointer"
+                            title="Ver detalle de terrenos 100%"
                           >
-                            Ver recibos
+                            {person.cantidadRecibos100}
                           </button>
                         ) : (
-                          <span className="text-[12px] text-zinc-300">—</span>
+                          <span className="font-semibold tabular-nums text-zinc-300">0</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        {(person.cantidadRecibosSena ?? 0) > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFilterText('');
+                              setSelectedPersonReceipts({ person, tipo: 'sena' });
+                            }}
+                            className="font-semibold tabular-nums text-amber-700 hover:text-amber-900 hover:underline cursor-pointer"
+                            title="Ver detalle de terrenos con seña"
+                          >
+                            {person.cantidadRecibosSena}
+                          </button>
+                        ) : (
+                          <span className="font-semibold tabular-nums text-zinc-300">0</span>
                         )}
                       </td>
                     </tr>
@@ -1007,7 +1237,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
             <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h4 className="text-[14px] font-semibold text-zinc-900">INFORME DE OPERACIONES</h4>
-                <p className="text-[11px] text-zinc-500 no-print">Listado general de promotores y operadores con desglose de gestiones y leads tratados.</p>
+                <p className="text-[11px] text-zinc-500 no-print">Listado general de promotores. Hacé clic en PIJ, Terrenos 100% o T. Seña para ver el detalle.</p>
                 {colorearLeadsDia && <LeyendaLeadsPorDia />}
                 <p className="hidden print:block text-[12px] text-zinc-600 mt-1 font-semibold">
                   Rango ({esPeriodoFecha ? 'Día seleccionado' : periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'}): {rango}
@@ -1139,9 +1369,27 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                           </td>
                           <td className="py-2.5 px-3 text-center tabular-nums text-brand-700">{p.entrevistasSemana}</td>
                           <td className="py-2.5 px-3 text-center tabular-nums font-bold text-emerald-700">{p.cierresSemana}</td>
-                          <td className="py-2.5 px-3 text-center tabular-nums text-amber-700 font-semibold">{p.ventasTerrenoSemana}</td>
-                          <td className="py-2.5 px-3 text-center tabular-nums text-orange-500 font-semibold">{p.ventasTerrenoSenaSemana ?? 0}</td>
-                          <td className="py-2.5 px-4 text-center tabular-nums text-indigo-600 font-semibold">{p.ventasPijSemana}</td>
+                          <td className="py-2.5 px-3 text-center">
+                            <CeldaVentaInforme
+                              cantidad={p.ventasTerrenoSemana}
+                              className="text-amber-700"
+                              onClick={() => abrirDetalleInformeVenta(p, 'terreno100')}
+                            />
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            <CeldaVentaInforme
+                              cantidad={p.ventasTerrenoSenaSemana ?? 0}
+                              className="text-orange-500"
+                              onClick={() => abrirDetalleInformeVenta(p, 'terrenosena')}
+                            />
+                          </td>
+                          <td className="py-2.5 px-4 text-center">
+                            <CeldaVentaInforme
+                              cantidad={p.ventasPijSemana}
+                              className="text-indigo-600"
+                              onClick={() => abrirDetalleInformeVenta(p, 'pij')}
+                            />
+                          </td>
                         </tr>
                       );
                     })
@@ -1164,9 +1412,27 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                     </td>
                     <td className="py-3 px-3 text-center tabular-nums text-brand-700">{totalPromotoresEntrevistas}</td>
                     <td className="py-3 px-3 text-center tabular-nums text-emerald-700 font-extrabold">{totalPromotoresCierres}</td>
-                    <td className="py-3 px-3 text-center tabular-nums text-amber-700 font-extrabold">{totalPromotoresTerrenos}</td>
-                    <td className="py-3 px-3 text-center tabular-nums text-orange-500 font-extrabold">{totalPromotoresTerrenosSeña}</td>
-                    <td className="py-3 px-4 text-center tabular-nums text-indigo-600 font-extrabold">{totalPromotoresPij}</td>
+                    <td className="py-3 px-3 text-center">
+                      <CeldaVentaInforme
+                        cantidad={totalPromotoresTerrenos}
+                        className="text-amber-700 font-extrabold"
+                        onClick={() => abrirDetalleInformeVenta(null, 'terreno100')}
+                      />
+                    </td>
+                    <td className="py-3 px-3 text-center">
+                      <CeldaVentaInforme
+                        cantidad={totalPromotoresTerrenosSeña}
+                        className="text-orange-500 font-extrabold"
+                        onClick={() => abrirDetalleInformeVenta(null, 'terrenosena')}
+                      />
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <CeldaVentaInforme
+                        cantidad={totalPromotoresPij}
+                        className="text-indigo-600 font-extrabold"
+                        onClick={() => abrirDetalleInformeVenta(null, 'pij')}
+                      />
+                    </td>
                   </tr>
                 </tfoot>
               </table>
@@ -1696,7 +1962,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                   Anexos de {selectedPerson.operadorNombre}
                 </h3>
                 <p className="text-[12px] text-zinc-500">
-                  {selectedPerson.cantidad} cierre{selectedPerson.cantidad === 1 ? '' : 's'} de Plan Inversión Joven registrados
+                  {selectedPerson.cantidad} cierre{selectedPerson.cantidad === 1 ? '' : 's'} de Plan Inversión Joven · {rangoAnexosLabel}
                 </p>
               </div>
               <button
@@ -1770,19 +2036,8 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                             </td>
                             <td className="py-3 text-right text-zinc-500 tabular-nums">
                               {(() => {
-                                try {
-                                  const d = new Date(cierre.fechaCierre);
-                                  if (isNaN(d.getTime())) return cierre.fechaCierre;
-                                  return d.toLocaleDateString('es-AR', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  });
-                                } catch {
-                                  return cierre.fechaCierre;
-                                }
+                                const { fecha, horario } = formatFechaHorarioCierre(cierre.fechaCierre);
+                                return horario !== '—' ? `${fecha} ${horario}` : fecha;
                               })()}
                             </td>
                           </tr>
@@ -1829,10 +2084,21 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
             <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
               <div>
                 <h3 className="text-base font-semibold text-zinc-900">
-                  Recibos de {selectedPersonReceipts.operadorNombre}
+                  {selectedPersonReceipts.tipo === 'sena'
+                    ? `Terrenos con seña — ${selectedPersonReceipts.person.operadorNombre}`
+                    : `Terrenos 100% — ${selectedPersonReceipts.person.operadorNombre}`}
                 </h3>
                 <p className="text-[12px] text-zinc-500">
-                  {selectedPersonReceipts.cantidadRecibos ?? 0} cierre{selectedPersonReceipts.cantidadRecibos === 1 ? '' : 's'} de Terreno registrados
+                  {(selectedPersonReceipts.tipo === 'sena'
+                    ? selectedPersonReceipts.person.cantidadRecibosSena
+                    : selectedPersonReceipts.person.cantidadRecibos100) ?? 0}{' '}
+                  cierre
+                  {((selectedPersonReceipts.tipo === 'sena'
+                    ? selectedPersonReceipts.person.cantidadRecibosSena
+                    : selectedPersonReceipts.person.cantidadRecibos100) ?? 0) === 1
+                    ? ''
+                    : 's'}{' '}
+                  · {rangoAnexosLabel}
                 </p>
               </div>
               <button
@@ -1862,7 +2128,10 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
             {/* List */}
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {(() => {
-                const recibosList = selectedPersonReceipts.recibos ?? [];
+                const recibosList =
+                  selectedPersonReceipts.tipo === 'sena'
+                    ? (selectedPersonReceipts.person.recibosSena ?? [])
+                    : (selectedPersonReceipts.person.recibos100 ?? []);
                 const filteredRecibos = recibosList.filter(r => {
                   const query = filterText.toLowerCase();
                   const barrioNombre = getBarrioNombre(r.idBarrio, barrios) || '';
@@ -1916,19 +2185,8 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                             </td>
                             <td className="py-3 text-right text-zinc-500 tabular-nums">
                               {(() => {
-                                try {
-                                  const d = new Date(recibo.fechaCierre);
-                                  if (isNaN(d.getTime())) return recibo.fechaCierre;
-                                  return d.toLocaleDateString('es-AR', {
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  });
-                                } catch {
-                                  return recibo.fechaCierre;
-                                }
+                                const { fecha, horario } = formatFechaHorarioCierre(recibo.fechaCierre);
+                                return horario !== '—' ? `${fecha} ${horario}` : fecha;
                               })()}
                             </td>
                           </tr>
@@ -2361,6 +2619,178 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         onClose={() => setSeguimientoLead(null)}
         onSave={handleGuardarSeguimiento}
       />
+
+      {/* Modal detalle ventas — Informe de Operaciones */}
+      {informeVentaDetalle && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="fixed inset-0 bg-zinc-950/60 backdrop-blur-sm"
+            onClick={() => {
+              setInformeVentaDetalle(null);
+              setInformeDetalleCargando(false);
+              setFilterText('');
+            }}
+          />
+          <div className="relative z-50 flex h-full max-h-[80vh] w-full max-w-3xl flex-col rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-zinc-900">{informeVentaDetalle.titulo}</h3>
+                <p className="text-[12px] text-zinc-500">{informeVentaDetalle.subtitulo}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setInformeVentaDetalle(null);
+                  setInformeDetalleCargando(false);
+                  setFilterText('');
+                }}
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-xl text-zinc-400 hover:bg-zinc-100"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
+            <div className="border-b border-zinc-100 px-6 py-3 bg-zinc-50/50">
+              <input
+                type="text"
+                placeholder={
+                  informeVentaDetalle.tipo === 'pij'
+                    ? 'Buscar por cliente, teléfono o anexo...'
+                    : 'Buscar por cliente, teléfono, barrio o recibo...'
+                }
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[13px] placeholder-zinc-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {informeDetalleCargando ? (
+                <p className="py-8 text-center text-[13px] text-zinc-500">Cargando detalle de ventas…</p>
+              ) : informeVentaDetalle.tipo === 'pij' ? (
+                (() => {
+                  const q = filterText.toLowerCase();
+                  const filtrados = informeVentaDetalle.itemsPij.filter(
+                    (c) =>
+                      c.leadNombre.toLowerCase().includes(q) ||
+                      c.numeroAnexo.toLowerCase().includes(q) ||
+                      c.leadTelefono.includes(filterText),
+                  );
+                  if (filtrados.length === 0) {
+                    return (
+                      <p className="py-8 text-center text-[13px] text-zinc-500">
+                        {filterText ? 'Sin resultados.' : 'Sin ventas PIJ en el período.'}
+                      </p>
+                    );
+                  }
+                  return (
+                    <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
+                      <thead>
+                        <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                          <th className="pb-2 text-left">Cliente</th>
+                          <th className="pb-2 text-left">Teléfono</th>
+                          <th className="pb-2 text-center">Anexo / Recibo</th>
+                          <th className="pb-2 text-right">Fecha</th>
+                          <th className="pb-2 text-right">Horario</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {filtrados.map((c, idx) => {
+                          const { fecha, horario } = formatFechaHorarioCierre(c.fechaCierre);
+                          return (
+                          <tr key={`${c.leadId}-${c.numeroAnexo}-${idx}`}>
+                            <td className="py-3 font-medium text-zinc-900">{c.leadNombre}</td>
+                            <td className="py-3 font-mono text-[12px] text-brand-600">
+                              {cleanTelefonoSuffix(c.leadTelefono)}
+                            </td>
+                            <td className="py-3 text-center">
+                              <span className="inline-flex rounded-md bg-indigo-50 border border-indigo-100 px-2 py-0.5 text-[12px] font-bold text-indigo-700">
+                                {c.numeroAnexo}
+                              </span>
+                            </td>
+                            <td className="py-3 text-right text-zinc-600 tabular-nums">{fecha}</td>
+                            <td className="py-3 text-right font-semibold text-zinc-800 tabular-nums">{horario}</td>
+                          </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  );
+                })()
+              ) : (
+                (() => {
+                  const q = filterText.toLowerCase();
+                  const filtrados = informeVentaDetalle.itemsTerreno.filter((r) => {
+                    const barrioNombre = getBarrioNombre(r.idBarrio, barrios) || '';
+                    return (
+                      r.leadNombre.toLowerCase().includes(q) ||
+                      r.numeroRecibo.toLowerCase().includes(q) ||
+                      r.leadTelefono.includes(filterText) ||
+                      barrioNombre.toLowerCase().includes(q)
+                    );
+                  });
+                  if (filtrados.length === 0) {
+                    return (
+                      <p className="py-8 text-center text-[13px] text-zinc-500">
+                        {filterText ? 'Sin resultados.' : 'Sin terrenos en el período.'}
+                      </p>
+                    );
+                  }
+                  return (
+                    <table className="min-w-full divide-y divide-zinc-100 text-[13px]">
+                      <thead>
+                        <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
+                          <th className="pb-2 text-left">Cliente</th>
+                          <th className="pb-2 text-left">Teléfono</th>
+                          <th className="pb-2 text-center">Barrio</th>
+                          <th className="pb-2 text-center">Recibo</th>
+                          <th className="pb-2 text-right">Fecha</th>
+                          <th className="pb-2 text-right">Horario</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-100">
+                        {filtrados.map((r, idx) => {
+                          const { fecha, horario } = formatFechaHorarioCierre(r.fechaCierre);
+                          return (
+                          <tr key={`${r.leadId}-${r.numeroRecibo}-${idx}`}>
+                            <td className="py-3 font-medium text-zinc-900">{r.leadNombre}</td>
+                            <td className="py-3 font-mono text-[12px] text-brand-600">
+                              {cleanTelefonoSuffix(r.leadTelefono)}
+                            </td>
+                            <td className="py-3 text-center text-zinc-600">
+                              {getBarrioNombre(r.idBarrio, barrios) || '—'}
+                            </td>
+                            <td className="py-3 text-center">
+                              <span className="inline-flex rounded-md bg-amber-50 border border-amber-100 px-2 py-0.5 text-[12px] font-bold text-amber-700">
+                                {r.numeroRecibo}
+                              </span>
+                            </td>
+                            <td className="py-3 text-right text-zinc-600 tabular-nums">{fecha}</td>
+                            <td className="py-3 text-right font-semibold text-zinc-800 tabular-nums">{horario}</td>
+                          </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  );
+                })()
+              )}
+            </div>
+            <div className="flex justify-end border-t border-zinc-100 px-6 py-3.5 bg-zinc-50/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setInformeVentaDetalle(null);
+                  setInformeDetalleCargando(false);
+                  setFilterText('');
+                }}
+                className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-[13px] font-semibold text-zinc-700 hover:bg-zinc-50"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <SyncCajaModal 
         isOpen={isSyncModalOpen}

@@ -510,13 +510,16 @@ export async function previewSyncCajaPij(): Promise<SyncPreviewResponse> {
   });
 }
 
-export async function commitSyncCajaPij(cambiosAprobados: SyncPreviewItem[]): Promise<SyncCommitResponse> {
+export async function commitSyncCajaPij(
+  cambiosAprobados: SyncPreviewItem[],
+  tipo: 'fecha' | 'recibo' = 'fecha',
+): Promise<SyncCommitResponse> {
   if (_isDemoActive) {
-    return { actualizados: 0 };
+    return { actualizados: 0, tipo };
   }
   return apiFetch<SyncCommitResponse>('/api/admin/sync-caja-pij/commit', {
     method: 'POST',
-    body: JSON.stringify({ cambiosAprobados }),
+    body: JSON.stringify({ cambiosAprobados, tipo }),
   });
 }
 

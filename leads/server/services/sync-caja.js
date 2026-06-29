@@ -1,5 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { parsePijRecibo } from '../domain/pij-recibo.js';
 import {
   buildOperadorHistoryMap,
   resolveOperadorCanonico,
@@ -172,6 +173,61 @@ export function extractNumbersFromCrmRecibo(recibo) {
   matches.add(clean.replace(/[^A-Z0-9\/]/g, ''));
   
   return Array.from(matches);
+}
+
+function normalizarNumeroCaja(val) {
+  const s = String(val ?? '').trim();
+  if (!s || s === '-') return '';
+  return s.replace(/\D/g, '');
+}
+
+/**
+ * Normaliza a YYYY-MM-DD (día calendario local si viene con hora).
+ */
+export function normalizarDiaComparacion(val) {
+  if (!val) return '';
+  const str = String(val).trim();
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const d = new Date(str);
+  if (Number.isNaN(d.getTime())) return '';
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${day}`;
+}
+
+/**
+ * Solo proponer corrección de fecha si la Caja tiene una fecha anterior a la del CRM.
+ * Ej.: CRM 29/06 y Caja 27/06 → sí. CRM 28/06 y Caja 29/06 → no.
+ */
+export function necesitaActualizarFechaDesdeCaja(fechaCrmStr, fechaCajaStr) {
+  const crm = normalizarDiaComparacion(fechaCrmStr);
+  const caja = normalizarDiaComparacion(fechaCajaStr);
+  if (!caja || !crm) return false;
+  return caja < crm;
+}
+
+/** Compara adhesión/anexo del CRM con la fila de Caja. */
+export function evaluarDiferenciasReciboPij(numeroRecibo, matchedRow) {
+  const parsed = parsePijRecibo(numeroRecibo);
+  const serieExcel = String(matchedRow?.serie || 'A').trim().toUpperCase() || 'A';
+  const adhExcel = normalizarNumeroCaja(matchedRow?.ordenAdh);
+  const anexoExcel = normalizarNumeroCaja(matchedRow?.ordenAnexo);
+
+  const adhesionDiff = Boolean(adhExcel && parsed.adhesion !== adhExcel);
+  const anexoDiff = Boolean(anexoExcel && parsed.anexo !== anexoExcel);
+  const serieDiff = Boolean(adhExcel && parsed.serie !== serieExcel);
+
+  return {
+    necesitaRecibo: adhesionDiff || anexoDiff || serieDiff,
+    adhesionActual: parsed.adhesion || '—',
+    anexoActual: parsed.anexo || '—',
+    adhesionExcel: adhExcel || '—',
+    anexoExcel: anexoExcel || '—',
+    serieActual: parsed.serie || 'A',
+    serieExcel,
+  };
 }
 
 export function formatReciboCaja(serie, ordenAdh, ordenAnexo) {
@@ -347,30 +403,44 @@ export async function buildSyncPreview(leadsDB, comprasAdicionalesDB) {
     const fechaCreadoStr = fechaCreado ? fechaCreado.slice(0, 10) : '';
     const fechaEffectiveStr = fechaCierreStr || fechaCreadoStr;
 
-    // Queremos sincronizar si la fechaCierre no está explícitamente guardada en la base de datos,
-    // o si el valor guardado es distinto de la fecha del Excel.
-    const necesitaActualizacion = !fechaCierreStr || (fechaCierreStr !== nuevaFecha);
+    const reciboDiff = evaluarDiferenciasReciboPij(numeroRecibo, matchedRow);
+    const reciboPropuesto = formatReciboCaja(
+      matchedRow.serie || 'A',
+      matchedRow.ordenAdh,
+      matchedRow.ordenAnexo,
+    );
 
-    if (nuevaFecha && necesitaActualizacion) {
-      cambiosPropuestos.push({
-        idUnico: isCompraAdicional ? `${leadId}_compra_${compraId}` : `${leadId}_principal`,
-        leadId: leadId,
-        isCompraAdicional: isCompraAdicional,
-        compraId: compraId,
-        nombreCliente: nombreCliente,
-        numeroRecibo: numeroRecibo,
-        fechaActual: fechaEffectiveStr,
-        nuevaFecha: nuevaFecha,
-        excelRow: {
-          fecha: matchedRow.fecha,
-          ordenAdh: matchedRow.ordenAdh,
-          ordenAnexo: matchedRow.ordenAnexo,
-          nombreCliente: matchedRow.nombreCliente,
-          nombreVendedor: matchedRow.nombreVendedor,
-          concepto: matchedRow.concepto
-        }
-      });
-    }
+    // Fecha: solo si la Caja es anterior a la fecha de cierre del CRM (no usar creadoEn).
+    const necesitaFecha = necesitaActualizarFechaDesdeCaja(fechaCierreStr, nuevaFecha);
+
+    if (!necesitaFecha && !reciboDiff.necesitaRecibo) return;
+
+    cambiosPropuestos.push({
+      idUnico: isCompraAdicional ? `${leadId}_compra_${compraId}` : `${leadId}_principal`,
+      leadId,
+      isCompraAdicional,
+      compraId,
+      nombreCliente,
+      numeroRecibo,
+      fechaActual: fechaCierreStr || fechaEffectiveStr,
+      nuevaFecha: nuevaFecha || fechaEffectiveStr,
+      necesitaFecha,
+      necesitaRecibo: reciboDiff.necesitaRecibo,
+      reciboPropuesto,
+      adhesionActual: reciboDiff.adhesionActual,
+      anexoActual: reciboDiff.anexoActual,
+      adhesionExcel: reciboDiff.adhesionExcel,
+      anexoExcel: reciboDiff.anexoExcel,
+      excelRow: {
+        fecha: matchedRow.fecha,
+        serie: matchedRow.serie,
+        ordenAdh: matchedRow.ordenAdh,
+        ordenAnexo: matchedRow.ordenAnexo,
+        nombreCliente: matchedRow.nombreCliente,
+        nombreVendedor: matchedRow.nombreVendedor,
+        concepto: matchedRow.concepto,
+      },
+    });
   };
 
   // Procesar Leads principales
@@ -408,25 +478,17 @@ export async function buildSyncPreview(leadsDB, comprasAdicionalesDB) {
   return cambiosPropuestos;
 }
 
-export async function executeSyncCommit(cambiosAprobados, usuario) {
-  if (!cambiosAprobados || cambiosAprobados.length === 0) return { actualizados: 0 };
+export async function executeSyncCommit(cambiosAprobados, usuario, tipoAplicar = 'fecha') {
+  if (!cambiosAprobados || cambiosAprobados.length === 0) return { actualizados: 0, tipo: tipoAplicar };
+  if (tipoAplicar !== 'fecha' && tipoAplicar !== 'recibo') {
+    throw new Error('tipoAplicar inválido: debe ser "fecha" o "recibo"');
+  }
   
   const { listAllLeadsFromEncuestas } = await import('../db/encuestas.js');
   const { persistirSeguimientoLead } = await import('../db/seguimiento-sql.js');
-  const { getSqlPool } = await import('../db/mssql.js');
-  const { loadOperadoresCatalogAsync } = await import('../db/operadores-catalog.js');
   
   const allLeads = await listAllLeadsFromEncuestas();
   const leadsMap = new Map(allLeads.map(l => [String(l.id), l]));
-  
-  let pool = null;
-  let catalog = null;
-  try {
-    pool = await getSqlPool();
-    catalog = await loadOperadoresCatalogAsync();
-  } catch (err) {
-    console.error('[SyncCaja] Error al conectar a la base de datos o cargar catálogo:', err);
-  }
 
   const conservarHoraOriginal = (nuevaFechaStr, fechaOriginalStr) => {
     if (!nuevaFechaStr) return null;
@@ -446,16 +508,8 @@ export async function executeSyncCommit(cambiosAprobados, usuario) {
   const listaCambiosProcesados = [];
   
   for (const cambio of cambiosAprobados) {
-    if (!cambio.nuevaFecha) continue;
     const lead = leadsMap.get(String(cambio.leadId));
     if (!lead) continue;
-
-    const targetOperator = await resolverUsuarioDeSincronizacion(cambio, lead, pool, catalog);
-    const formattedRecibo = formatReciboCaja(
-      cambio.excelRow?.ordenAdh ? (cambio.excelRow.serie || 'A') : '',
-      cambio.excelRow?.ordenAdh,
-      cambio.excelRow?.ordenAnexo
-    );
 
     let fechaOriginal = null;
     let reciboOriginal = null;
@@ -468,8 +522,25 @@ export async function executeSyncCommit(cambiosAprobados, usuario) {
       reciboOriginal = lead.seguimiento?.numeroRecibo;
     }
 
-    const nuevaFechaConHora = conservarHoraOriginal(cambio.nuevaFecha, fechaOriginal);
+    if (tipoAplicar === 'fecha') {
+      if (!cambio.necesitaFecha || !cambio.nuevaFecha) continue;
+      const nuevaFechaConHora = conservarHoraOriginal(cambio.nuevaFecha, fechaOriginal);
+      listaCambiosProcesados.push({
+        leadId: lead.id,
+        nombreCliente: lead.nombre,
+        promotorNombreCRM: lead.promotorNombre || 'Sin Vendedor',
+        isCompraAdicional: cambio.isCompraAdicional,
+        compraId: cambio.compraId,
+        reciboActual: reciboOriginal || '',
+        fechaCierreAnterior: fechaOriginal || '',
+        fechaCierreNueva: nuevaFechaConHora,
+        tipoAplicado: 'fecha',
+        excelRow: cambio.excelRow,
+      });
+      continue;
+    }
 
+    if (!cambio.necesitaRecibo || !cambio.reciboPropuesto) continue;
     listaCambiosProcesados.push({
       leadId: lead.id,
       nombreCliente: lead.nombre,
@@ -477,64 +548,67 @@ export async function executeSyncCommit(cambiosAprobados, usuario) {
       isCompraAdicional: cambio.isCompraAdicional,
       compraId: cambio.compraId,
       reciboAnterior: reciboOriginal || '',
-      reciboNuevo: formattedRecibo,
-      fechaCierreAnterior: fechaOriginal || '',
-      fechaCierreNueva: nuevaFechaConHora,
-      operadorAnterior: lead.seguimiento?.operadorNombre || 'Sin Operador',
-      operadorNuevo: {
-        id: targetOperator.id,
-        nombre: targetOperator.nombre,
-        rol: targetOperator.rol
-      },
-      excelRow: cambio.excelRow
+      reciboNuevo: cambio.reciboPropuesto,
+      fechaCierreActual: fechaOriginal || '',
+      tipoAplicado: 'recibo',
+      excelRow: cambio.excelRow,
     });
   }
 
   // Guardar backup rico y estructurado
-  const backupPath = path.join(backupDir, `pij_sync_${timestamp}.json`);
+  const backupPath = path.join(backupDir, `pij_sync_${tipoAplicar}_${timestamp}.json`);
   const backupPayload = {
     fechaEjecucion: new Date().toISOString(),
     operadorQueSincroniza: usuario?.nombre || 'Sistema',
+    tipoAplicado: tipoAplicar,
     totalRegistros: listaCambiosProcesados.length,
-    cambios: listaCambiosProcesados
+    cambios: listaCambiosProcesados,
   };
   await fs.writeFile(backupPath, JSON.stringify(backupPayload, null, 2), 'utf-8');
   console.log(`[SyncCaja] Backup rico guardado en ${backupPath}`);
 
   let actualizados = 0;
 
-  // Aplicar cambios en la Base de Datos
+  // Aplicar cambios en la Base de Datos según el tipo elegido
   for (const item of listaCambiosProcesados) {
     const lead = leadsMap.get(String(item.leadId));
     if (!lead) continue;
 
+    const operadorPersist = {
+      id: String(lead.seguimiento?.operadorId ?? lead.promotorId ?? '1'),
+      nombre: lead.seguimiento?.operadorNombre || lead.promotorNombre || 'Operador',
+      rol: lead.seguimiento?.operadorRol || 'promotor',
+    };
+
     let patch = {};
-    if (item.isCompraAdicional) {
+    if (item.tipoAplicado === 'recibo') {
+      if (item.isCompraAdicional) {
+        const compras = lead.seguimiento?.comprasAdicionales || [];
+        const updatedCompras = compras.map(c => {
+          if (String(c.id) === String(item.compraId)) {
+            return { ...c, numeroRecibo: item.reciboNuevo };
+          }
+          return c;
+        });
+        patch = { comprasAdicionales: updatedCompras };
+      } else {
+        patch = { numeroRecibo: item.reciboNuevo };
+      }
+    } else if (item.isCompraAdicional) {
       const compras = lead.seguimiento?.comprasAdicionales || [];
       const updatedCompras = compras.map(c => {
         if (String(c.id) === String(item.compraId)) {
-          return { ...c, fechaCierre: item.fechaCierreNueva, numeroRecibo: item.reciboNuevo };
+          return { ...c, fechaCierre: item.fechaCierreNueva };
         }
         return c;
       });
-      patch = {
-        comprasAdicionales: updatedCompras,
-        operadorId: item.operadorNuevo.id,
-        operadorNombre: item.operadorNuevo.nombre,
-        operadorRol: item.operadorNuevo.rol
-      };
+      patch = { comprasAdicionales: updatedCompras };
     } else {
-      patch = {
-        fechaCierre: item.fechaCierreNueva,
-        numeroRecibo: item.reciboNuevo,
-        operadorId: item.operadorNuevo.id,
-        operadorNombre: item.operadorNuevo.nombre,
-        operadorRol: item.operadorNuevo.rol
-      };
+      patch = { fechaCierre: item.fechaCierreNueva };
     }
 
     try {
-      const res = await persistirSeguimientoLead(lead.id, patch, item.operadorNuevo, lead);
+      const res = await persistirSeguimientoLead(lead.id, patch, operadorPersist, lead);
       if (res && res.saved) {
         actualizados++;
       }
@@ -543,7 +617,7 @@ export async function executeSyncCommit(cambiosAprobados, usuario) {
     }
   }
 
-  return { actualizados };
+  return { actualizados, tipo: tipoAplicar };
 }
 
 function normalizarFuzzy(str) {

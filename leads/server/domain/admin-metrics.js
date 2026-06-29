@@ -148,7 +148,50 @@ function crearBucketPromotor(lead) {
     tratadosHoy: 0,
     tratadosSemana: 0,
     tratadosMes: 0,
+    detallePij: [],
+    detalleTerreno100: [],
+    detalleTerrenoSena: [],
   };
+}
+
+function ordenarDetallePorFecha(items) {
+  return [...items].sort((a, b) => {
+    const dateA = a.fechaCierre ? new Date(a.fechaCierre).getTime() : 0;
+    const dateB = b.fechaCierre ? new Date(b.fechaCierre).getTime() : 0;
+    return dateB - dateA;
+  });
+}
+
+function fechaVentaSeguimiento(seg) {
+  return seg?.fechaCierre ?? seg?.creadoEn ?? seg?.creado_en ?? '';
+}
+
+function registrarDetallePij(bucket, lead, seg, esAdicional) {
+  bucket.detallePij.push({
+    leadId: String(lead.id),
+    leadNombre: esAdicional ? `${lead.nombre} (Adic.)` : lead.nombre,
+    leadTelefono: lead.telefono || '—',
+    numeroAnexo: seg.numeroRecibo || '—',
+    fechaCierre: fechaVentaSeguimiento(seg),
+    estadoPago: seg.estadoPago || null,
+  });
+}
+
+function registrarDetalleTerreno(bucket, lead, seg, esAdicional, esSena) {
+  const detalle = {
+    leadId: String(lead.id),
+    leadNombre: esAdicional ? `${lead.nombre} (Adic.)` : lead.nombre,
+    leadTelefono: lead.telefono || '—',
+    numeroRecibo: seg.numeroRecibo || '—',
+    idBarrio: seg.idBarrio || null,
+    fechaCierre: fechaVentaSeguimiento(seg),
+    estadoPago: seg.estadoPago || null,
+  };
+  if (esSena) {
+    bucket.detalleTerrenoSena.push(detalle);
+  } else {
+    bucket.detalleTerreno100.push(detalle);
+  }
 }
 
 function sumarBuckets(a, b) {
@@ -377,14 +420,16 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
             const esSeña = lead.seguimiento?.estadoPago === 'sena';
             if (esSeña) {
               bucket.ventasTerrenoSenaSemana += 1;
-              // Seña NO cuenta como cierre ni como terreno en el informe
+              registrarDetalleTerreno(bucket, lead, lead.seguimiento, false, true);
             } else {
               bucket.cierresSemana += 1;
               bucket.ventasTerrenoSemana += 1;
+              registrarDetalleTerreno(bucket, lead, lead.seguimiento, false, false);
             }
           } else if (lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ) {
             bucket.cierresSemana += 1;
             bucket.ventasPijSemana += 1;
+            registrarDetallePij(bucket, lead, lead.seguimiento, false);
           } else {
             bucket.cierresSemana += 1;
           }
@@ -411,7 +456,7 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
 
     const comprasAdicionales = lead.seguimiento?.comprasAdicionales ?? [];
     for (const compra of comprasAdicionales) {
-      const fechaC = parseFecha(compra.fechaCierre);
+      const fechaC = parseFecha(compra.fechaCierre ?? compra.creadoEn ?? compra.creado_en);
       if (fechaC) {
         const cierreEnSemana = enRango(fechaC, desde, hasta);
         const cierreEsHoy = esMismoDia(fechaC, hoy);
@@ -421,13 +466,16 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
             const esSeña = compra.estadoPago === 'sena';
             if (esSeña) {
               bucket.ventasTerrenoSenaSemana += 1;
+              registrarDetalleTerreno(bucket, lead, compra, true, true);
             } else {
               bucket.cierresSemana += 1;
               bucket.ventasTerrenoSemana += 1;
+              registrarDetalleTerreno(bucket, lead, compra, true, false);
             }
           } else if (compra.idProducto === ID_PRODUCTO_PIJ) {
             bucket.cierresSemana += 1;
             bucket.ventasPijSemana += 1;
+            registrarDetallePij(bucket, lead, compra, true);
           } else {
             bucket.cierresSemana += 1;
           }
@@ -496,7 +544,14 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
   }
 
   const supervisores = [...supervisoresMap.values()].map((sup) => {
-    const promotores = [...sup.promotoresMap.values()].sort((a, b) =>
+    const promotores = [...sup.promotoresMap.values()]
+      .map((p) => ({
+        ...p,
+        detallePij: ordenarDetallePorFecha(p.detallePij ?? []),
+        detalleTerreno100: ordenarDetallePorFecha(p.detalleTerreno100 ?? []),
+        detalleTerrenoSena: ordenarDetallePorFecha(p.detalleTerrenoSena ?? []),
+      }))
+      .sort((a, b) =>
       a.promotorNombre.localeCompare(b.promotorNombre, 'es'),
     );
     const totales = promotores.reduce(
@@ -597,7 +652,7 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
         leadNombre: lead.nombre,
         leadTelefono: lead.telefono || '—',
         numeroAnexo: lead.seguimiento?.numeroRecibo || '—',
-        fechaCierre: lead.seguimiento?.fechaCierre || lead.seguimiento?.creadoEn || lead.seguimiento?.creado_en || '',
+        fechaCierre: fechaVentaSeguimiento(lead.seguimiento),
         estadoPago: lead.seguimiento?.estadoPago || null,
       });
     }
@@ -612,7 +667,7 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
         leadTelefono: lead.telefono || '—',
         numeroRecibo: lead.seguimiento?.numeroRecibo || '—',
         idBarrio: lead.seguimiento?.idBarrio || null,
-        fechaCierre: lead.seguimiento?.fechaCierre || lead.seguimiento?.creadoEn || lead.seguimiento?.creado_en || '',
+        fechaCierre: fechaVentaSeguimiento(lead.seguimiento),
         estadoPago: lead.seguimiento?.estadoPago || null,
       });
     }
@@ -628,7 +683,7 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
           leadNombre: `${lead.nombre} (Adic.)`,
           leadTelefono: lead.telefono || '—',
           numeroAnexo: compra.numeroRecibo || '—',
-          fechaCierre: compra.fechaCierre || '',
+          fechaCierre: fechaVentaSeguimiento(compra),
           estadoPago: compra.estadoPago || null,
         });
       } else if (compra.idProducto === ID_PRODUCTO_TERRENO) {
@@ -641,7 +696,7 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
           leadTelefono: lead.telefono || '—',
           numeroRecibo: compra.numeroRecibo || '—',
           idBarrio: compra.idBarrio || null,
-          fechaCierre: compra.fechaCierre || '',
+          fechaCierre: fechaVentaSeguimiento(compra),
           estadoPago: compra.estadoPago || null,
         });
       }
@@ -667,6 +722,19 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
 
   const todosOperadores = new Set([...pijCierresMap.keys(), ...terrenoCierresMap.keys()]);
 
+  const adjuntarRecibosPartidos = (recibos) => {
+    const recibosSena = recibos.filter((r) => r.estadoPago === 'sena');
+    const recibos100 = recibos.filter((r) => r.estadoPago !== 'sena');
+    return {
+      cantidadRecibos: recibos.length,
+      recibos,
+      cantidadRecibos100: recibos100.length,
+      recibos100,
+      cantidadRecibosSena: recibosSena.length,
+      recibosSena,
+    };
+  };
+
   const pijCierresPorPersona = [...todosOperadores].map((operadorNombre) => {
     const cierres = pijCierresMap.get(operadorNombre) ?? [];
     const recibos = terrenoCierresMap.get(operadorNombre) ?? [];
@@ -687,8 +755,7 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
       operadorNombre,
       cantidad: cierres.length,
       cierres,
-      cantidadRecibos: recibos.length,
-      recibos,
+      ...adjuntarRecibosPartidos(recibos),
     };
   }).sort((a, b) => (b.cantidad + (b.cantidadRecibos ?? 0)) - (a.cantidad + (a.cantidadRecibos ?? 0)) || a.operadorNombre.localeCompare(b.operadorNombre, 'es'));
 

@@ -518,14 +518,17 @@ function registerApiRoutes(api) {
       });
     }
 
-    const { cambiosAprobados } = req.body;
+    const { cambiosAprobados, tipo = 'fecha' } = req.body;
     if (!cambiosAprobados || !Array.isArray(cambiosAprobados)) {
       return res.status(400).json({ message: 'Se requiere la lista de cambios aprobados.' });
+    }
+    if (tipo !== 'fecha' && tipo !== 'recibo') {
+      return res.status(400).json({ message: 'tipo inválido: debe ser "fecha" o "recibo".' });
     }
 
     try {
       const { executeSyncCommit } = await import('./services/sync-caja.js');
-      const resultado = await executeSyncCommit(cambiosAprobados, usuario);
+      const resultado = await executeSyncCommit(cambiosAprobados, usuario, tipo);
       return res.json(resultado);
     } catch (error) {
       console.error('Error al hacer commit de sync caja:', error);

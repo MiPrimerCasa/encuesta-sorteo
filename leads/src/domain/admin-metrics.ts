@@ -3,8 +3,11 @@ import type {
   AdminConocimientoLeads,
   AdminDashboardData,
   Lead,
+  PersonaPijCierres,
+  PijCierreDetalle,
   RankingAdminEntry,
   SeguimientoHistorialEntry,
+  TerrenoCierreDetalle,
 } from '../types';
 import { buildAdminProductividad } from './admin-productividad';
 
@@ -61,7 +64,23 @@ export function rangoPorPeriodo(periodo: string, hoy = new Date()) {
 function parseFecha(val: string | Date | null | undefined) {
   if (!val) return null;
   if (val instanceof Date) return Number.isNaN(val.getTime()) ? null : val;
-  const d = new Date(String(val));
+
+  const str = String(val).trim();
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}):(\d{2}))?/i);
+  if (m) {
+    const year = parseInt(m[1], 10);
+    const month = parseInt(m[2], 10) - 1;
+    const day = parseInt(m[3], 10);
+    if (m[4]) {
+      const hour = parseInt(m[4], 10);
+      const min = parseInt(m[5], 10);
+      const sec = parseInt(m[6], 10);
+      return new Date(year, month, day, hour, min, sec);
+    }
+    return new Date(year, month, day);
+  }
+
+  const d = new Date(str);
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
@@ -76,6 +95,93 @@ function enRango(fecha: string | Date, desde: Date, hasta: Date) {
   if (!d) return false;
   const t = d.getTime();
   return t >= desde.getTime() && t <= hasta.getTime();
+}
+
+/** Fecha local en formato YYYY-MM-DD (para inputs type="date"). */
+export function fechaIsoLocal(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/** Primer día del mes actual en YYYY-MM-DD. */
+export function inicioMesIso(hoy = new Date()) {
+  return fechaIsoLocal(new Date(hoy.getFullYear(), hoy.getMonth(), 1));
+}
+
+function rangoDesdeCadenasIso(desdeIso: string, hastaIso: string) {
+  const parseIso = (iso: string) => {
+    const [y, m, d] = iso.split('-').map((x) => parseInt(x, 10));
+    return startOfDay(new Date(y, m - 1, d));
+  };
+  let desde = parseIso(desdeIso);
+  let hasta = endOfDay(parseIso(hastaIso));
+  if (desde.getTime() > hasta.getTime()) {
+    const tmpDesde = parseIso(hastaIso);
+    hasta = endOfDay(parseIso(desdeIso));
+    desde = tmpDesde;
+  }
+  return { desde, hasta };
+}
+
+function esReciboTerrenoSena(r: TerrenoCierreDetalle): boolean {
+  return r.estadoPago === 'sena';
+}
+
+function adjuntarRecibosPartidos(recibos: TerrenoCierreDetalle[]) {
+  const recibosSena = recibos.filter(esReciboTerrenoSena);
+  const recibos100 = recibos.filter((r) => !esReciboTerrenoSena(r));
+  return {
+    cantidadRecibos: recibos.length,
+    recibos,
+    cantidadRecibos100: recibos100.length,
+    recibos100,
+    cantidadRecibosSena: recibosSena.length,
+    recibosSena,
+  };
+}
+
+/** Filtra anexos PIJ y recibos terreno por rango de fechas de cierre. */
+export function filterPijCierresPorRango(
+  personas: PersonaPijCierres[] | undefined,
+  desdeIso: string,
+  hastaIso: string,
+): PersonaPijCierres[] {
+  if (!personas?.length || !desdeIso || !hastaIso) return [];
+  const { desde, hasta } = rangoDesdeCadenasIso(desdeIso, hastaIso);
+
+  return personas
+    .map((person) => {
+      const cierres = (person.cierres ?? []).filter((c) =>
+        enRango(c.fechaCierre, desde, hasta),
+      );
+      const recibos = (person.recibos ?? []).filter((r) =>
+        enRango(r.fechaCierre, desde, hasta),
+      );
+      cierres.sort((a, b) => {
+        const dateA = a.fechaCierre ? new Date(a.fechaCierre).getTime() : 0;
+        const dateB = b.fechaCierre ? new Date(b.fechaCierre).getTime() : 0;
+        return dateB - dateA;
+      });
+      recibos.sort((a, b) => {
+        const dateA = a.fechaCierre ? new Date(a.fechaCierre).getTime() : 0;
+        const dateB = b.fechaCierre ? new Date(b.fechaCierre).getTime() : 0;
+        return dateB - dateA;
+      });
+      return {
+        operadorNombre: person.operadorNombre,
+        cantidad: cierres.length,
+        cierres,
+        ...adjuntarRecibosPartidos(recibos),
+      };
+    })
+    .filter((p) => p.cantidad > 0 || (p.cantidadRecibos ?? 0) > 0)
+    .sort(
+      (a, b) =>
+        b.cantidad + (b.cantidadRecibos ?? 0) - (a.cantidad + (a.cantidadRecibos ?? 0)) ||
+        a.operadorNombre.localeCompare(b.operadorNombre, 'es'),
+    );
 }
 
 function bitTrue(val: unknown) {
@@ -142,7 +248,73 @@ function crearBucketPromotor(lead: Lead): PromotorBucket {
     tratadosHoy: 0,
     tratadosSemana: 0,
     tratadosMes: 0,
+    detallePij: [],
+    detalleTerreno100: [],
+    detalleTerrenoSena: [],
   };
+}
+
+function fechaVentaSeguimiento(seg: {
+  fechaCierre?: string | null;
+  creadoEn?: string | null;
+  creado_en?: string | null;
+} | null | undefined): string {
+  if (!seg) return '';
+  return String(seg.fechaCierre ?? seg.creadoEn ?? seg.creado_en ?? '');
+}
+
+function ordenarDetallePorFecha<T extends { fechaCierre: string }>(items: T[]): T[] {
+  return [...items].sort((a, b) => {
+    const dateA = a.fechaCierre ? new Date(a.fechaCierre).getTime() : 0;
+    const dateB = b.fechaCierre ? new Date(b.fechaCierre).getTime() : 0;
+    return dateB - dateA;
+  });
+}
+
+function registrarDetallePij(
+  bucket: PromotorBucket,
+  lead: Lead,
+  seg: { numeroRecibo?: string | null; fechaCierre?: string | null; creadoEn?: string | null; creado_en?: string | null; estadoPago?: string | null },
+  esAdicional: boolean,
+) {
+  bucket.detallePij!.push({
+    leadId: String(lead.id),
+    leadNombre: esAdicional ? `${lead.nombre} (Adic.)` : lead.nombre,
+    leadTelefono: lead.telefono || '—',
+    numeroAnexo: seg.numeroRecibo || '—',
+    fechaCierre: String(seg.fechaCierre ?? seg.creadoEn ?? seg.creado_en ?? ''),
+    estadoPago: seg.estadoPago || null,
+  });
+}
+
+function registrarDetalleTerreno(
+  bucket: PromotorBucket,
+  lead: Lead,
+  seg: {
+    numeroRecibo?: string | null;
+    idBarrio?: string | null;
+    fechaCierre?: string | null;
+    creadoEn?: string | null;
+    creado_en?: string | null;
+    estadoPago?: string | null;
+  },
+  esAdicional: boolean,
+  esSena: boolean,
+) {
+  const detalle = {
+    leadId: String(lead.id),
+    leadNombre: esAdicional ? `${lead.nombre} (Adic.)` : lead.nombre,
+    leadTelefono: lead.telefono || '—',
+    numeroRecibo: seg.numeroRecibo || '—',
+    idBarrio: seg.idBarrio || null,
+    fechaCierre: String(seg.fechaCierre ?? seg.creadoEn ?? seg.creado_en ?? ''),
+    estadoPago: seg.estadoPago || null,
+  };
+  if (esSena) {
+    bucket.detalleTerrenoSena!.push(detalle);
+  } else {
+    bucket.detalleTerreno100!.push(detalle);
+  }
 }
 
 function sumarBuckets(
@@ -370,7 +542,9 @@ export function buildAdminDashboardFromLeads(
 
     const esCierre = lead.seguimiento?.resultadoEntrevista === 'compro';
     if (esCierre) {
-      const fechaCierre = parseFecha(lead.seguimiento?.creadoEn ?? lead.seguimiento?.fechaCierre);
+      const fechaCierre = parseFecha(
+        lead.seguimiento?.fechaCierre ?? lead.seguimiento?.creadoEn,
+      );
       if (fechaCierre) {
         const cierreEnSemana = enRango(fechaCierre, desde, hasta);
         const cierreEsHoy = esMismoDia(fechaCierre, hoy);
@@ -380,13 +554,16 @@ export function buildAdminDashboardFromLeads(
             const esSena = lead.seguimiento?.estadoPago === 'sena';
             if (esSena) {
               bucket.ventasTerrenoSenaSemana += 1;
+              registrarDetalleTerreno(bucket, lead, lead.seguimiento!, false, true);
             } else {
               bucket.cierresSemana += 1;
               bucket.ventasTerrenoSemana += 1;
+              registrarDetalleTerreno(bucket, lead, lead.seguimiento!, false, false);
             }
           } else if (lead.seguimiento?.idProducto === ID_PRODUCTO_PIJ) {
             bucket.cierresSemana += 1;
             bucket.ventasPijSemana += 1;
+            registrarDetallePij(bucket, lead, lead.seguimiento!, false);
           } else {
             bucket.cierresSemana += 1;
           }
@@ -423,13 +600,16 @@ export function buildAdminDashboardFromLeads(
             const esSena = compra.estadoPago === 'sena';
             if (esSena) {
               bucket.ventasTerrenoSenaSemana += 1;
+              registrarDetalleTerreno(bucket, lead, compra, true, true);
             } else {
               bucket.cierresSemana += 1;
               bucket.ventasTerrenoSemana += 1;
+              registrarDetalleTerreno(bucket, lead, compra, true, false);
             }
           } else if (compra.idProducto === ID_PRODUCTO_PIJ) {
             bucket.cierresSemana += 1;
             bucket.ventasPijSemana += 1;
+            registrarDetallePij(bucket, lead, compra, true);
           } else {
             bucket.cierresSemana += 1;
           }
@@ -513,9 +693,16 @@ export function buildAdminDashboardFromLeads(
 
   const supervisores = [...supervisoresMap.values()]
     .map((sup) => {
-      const promotores = [...sup.promotoresMap.values()].sort((a, b) =>
-        a.promotorNombre.localeCompare(b.promotorNombre, 'es'),
-      );
+      const promotores = [...sup.promotoresMap.values()]
+        .map((p) => ({
+          ...p,
+          detallePij: ordenarDetallePorFecha(p.detallePij ?? []),
+          detalleTerreno100: ordenarDetallePorFecha(p.detalleTerreno100 ?? []),
+          detalleTerrenoSena: ordenarDetallePorFecha(p.detalleTerrenoSena ?? []),
+        }))
+        .sort((a, b) =>
+          a.promotorNombre.localeCompare(b.promotorNombre, 'es'),
+        );
       const totales = promotores.reduce((acc, p) => sumarBuckets(acc, p), emptyTotales());
       return {
         supervisorId: sup.supervisorId,
@@ -575,7 +762,7 @@ export function buildAdminDashboardFromLeads(
         leadNombre: lead.nombre,
         leadTelefono: lead.telefono || '—',
         numeroAnexo: lead.seguimiento?.numeroRecibo || '—',
-        fechaCierre: lead.seguimiento?.fechaCierre || lead.seguimiento?.creadoEn || '',
+        fechaCierre: fechaVentaSeguimiento(lead.seguimiento),
         estadoPago: lead.seguimiento?.estadoPago || null,
       });
     }
@@ -590,7 +777,7 @@ export function buildAdminDashboardFromLeads(
         leadTelefono: lead.telefono || '—',
         numeroRecibo: lead.seguimiento?.numeroRecibo || '—',
         idBarrio: lead.seguimiento?.idBarrio || null,
-        fechaCierre: lead.seguimiento?.fechaCierre || lead.seguimiento?.creadoEn || '',
+        fechaCierre: fechaVentaSeguimiento(lead.seguimiento),
         estadoPago: lead.seguimiento?.estadoPago || null,
       });
     }
@@ -606,7 +793,7 @@ export function buildAdminDashboardFromLeads(
           leadNombre: `${lead.nombre} (Adic.)`,
           leadTelefono: lead.telefono || '—',
           numeroAnexo: compra.numeroRecibo || '—',
-          fechaCierre: compra.fechaCierre || '',
+          fechaCierre: fechaVentaSeguimiento(compra),
           estadoPago: compra.estadoPago || null,
         });
       } else if (compra.idProducto === ID_PRODUCTO_TERRENO) {
@@ -619,7 +806,7 @@ export function buildAdminDashboardFromLeads(
           leadTelefono: lead.telefono || '—',
           numeroRecibo: compra.numeroRecibo || '—',
           idBarrio: compra.idBarrio || null,
-          fechaCierre: compra.fechaCierre || '',
+          fechaCierre: fechaVentaSeguimiento(compra),
           estadoPago: compra.estadoPago || null,
         });
       }
@@ -648,8 +835,7 @@ export function buildAdminDashboardFromLeads(
       operadorNombre,
       cantidad: cierres.length,
       cierres,
-      cantidadRecibos: recibos.length,
-      recibos,
+      ...adjuntarRecibosPartidos(recibos),
     };
   }).sort((a, b) => (b.cantidad + (b.cantidadRecibos ?? 0)) - (a.cantidad + (a.cantidadRecibos ?? 0)) || a.operadorNombre.localeCompare(b.operadorNombre, 'es'));
 
@@ -676,6 +862,30 @@ export function buildAdminDashboardFromLeads(
     totalLeads: leads.length,
     totalSupervisores: supervisores.length,
     pijCierresPorPersona,
+  };
+}
+
+/** Reconstruye listas de ventas PIJ/terreno para el informe desde leads (fallback si el API no trae detalle). */
+export function extraerVentasDetalleInforme(
+  leads: Lead[],
+  promotorIds: string[] | null,
+  periodo: string,
+  ahora = new Date(),
+): {
+  detallePij: PijCierreDetalle[];
+  detalleTerreno100: TerrenoCierreDetalle[];
+  detalleTerrenoSena: TerrenoCierreDetalle[];
+} {
+  const dashboard = buildAdminDashboardFromLeads(leads, [], ahora, periodo);
+  const promotores = dashboard.supervisores.flatMap((s) => s.promotores);
+  const seleccionados =
+    promotorIds && promotorIds.length > 0
+      ? promotores.filter((p) => promotorIds.includes(p.promotorId))
+      : promotores;
+  return {
+    detallePij: seleccionados.flatMap((p) => p.detallePij ?? []),
+    detalleTerreno100: seleccionados.flatMap((p) => p.detalleTerreno100 ?? []),
+    detalleTerrenoSena: seleccionados.flatMap((p) => p.detalleTerrenoSena ?? []),
   };
 }
 

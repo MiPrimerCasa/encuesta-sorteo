@@ -539,6 +539,8 @@ export interface GrabacionPromotor {
   rechazadoEn: string | null;
   motivoRechazo: string | null;
   creadoEn: string;
+  /** false = el archivo no está en disco (registro huérfano en SQLite). */
+  archivoDisponible?: boolean;
 }
 
 export interface ResumenGrabacionesDia {

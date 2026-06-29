@@ -12,6 +12,7 @@ LOG_DIR="${MONOREPO_ROOT}/logs/deployments-leads"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 
 mkdir -p "$LOG_DIR"
+mkdir -p "${LEADS_DIR:-.}/data/grabaciones"
 LOG_FILE="${LOG_DIR}/${TIMESTAMP}.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
@@ -39,7 +40,11 @@ if [[ -z "${SKIP_MONOREPO_GIT_PULL:-}" ]] && [[ -d "${MONOREPO_ROOT}/.git" ]]; t
   cd "$MONOREPO_ROOT"
   git checkout -f main 2>/dev/null || git checkout -fB main origin/main
   git reset --hard HEAD
-  git clean -fd -e .env -e 'leads/.env' 2>/dev/null || true
+  git clean -fd \
+    -e .env \
+    -e 'leads/.env' \
+    -e 'leads/data/' \
+    2>/dev/null || true
   git fetch origin main
   git reset --hard origin/main
 fi

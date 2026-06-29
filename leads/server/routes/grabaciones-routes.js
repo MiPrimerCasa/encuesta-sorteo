@@ -22,6 +22,7 @@ import {
   buildCumplimientoAdmin,
   getGrabacionById,
   insertGrabacion,
+  deleteGrabacionRecord,
   listGrabacionesPromotorDia,
   listPromocionesOcupanCuotaPromotorDia,
   countGrabacionesMesSubidas,
@@ -31,11 +32,20 @@ import {
   resumenTopeMesPromotor,
 } from '../db/grabaciones-store.js';
 import { calcularFranja, fechaDiaKey, fechaMesKey } from '../domain/grabaciones.js';
+import {
+  archivoGrabacionDisponible,
+  ensureGrabacionesStorageReady,
+  getGrabacionesRoot,
+  resolveStoragePath,
+  toRelativeStoragePath,
+} from '../domain/grabaciones-storage.js';
 import { esSuperadminUsuario, esSupervisorPanelGlobal } from '../db/superadmin-auth.js';
 
-function getGrabacionesRoot() {
-  const raw = process.env.GRABACIONES_DIR || path.join(process.cwd(), 'data', 'grabaciones');
-  return path.resolve(raw);
+function toGrabacionClient(grabacion) {
+  if (!grabacion) return null;
+  const archivoDisponible = archivoGrabacionDisponible(grabacion.storagePath);
+  const { storagePath: _omit, ...pub } = grabacion;
+  return { ...pub, archivoDisponible };
 }
 
 function createUploadMiddleware() {
@@ -130,6 +140,9 @@ async function getDuracionSegundos(filePath) {
 }
 
 export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
+  if (isGrabacionesEnabled()) {
+    ensureGrabacionesStorageReady();
+  }
   api.get('/grabaciones/config', (req, res) => {
     const usuario = usuarioDesdeRequest(req);
     if (!usuario) return res.status(401).json({ error: 'No autenticado' });
@@ -177,7 +190,7 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
     const diaKey = String(req.query.fecha ?? fechaDiaKey(new Date())).slice(0, 10);
     const mesKey = diaKey.slice(0, 7);
     const promotorId = resolvePromotorIdGrabaciones(usuario);
-    const grabaciones = listGrabacionesPromotorDia(promotorId, diaKey);
+    const grabaciones = listGrabacionesPromotorDia(promotorId, diaKey).map(toGrabacionClient);
     res.json({
       diaKey,
       resumen: resumenPromotorDia(promotorId, diaKey),
@@ -282,12 +295,25 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
           diaKey,
           duracionSeg: Math.round(duracionSeg * 10) / 10,
           mimeType: req.file.mimetype || 'application/octet-stream',
-          storagePath: req.file.path,
+          storagePath: toRelativeStoragePath(req.file.path),
           tamanoBytes: req.file.size,
         });
 
+        if (!resolveStoragePath(grabacion.storagePath)) {
+          deleteGrabacionRecord(grabacion.id);
+          console.error(
+            '[grabaciones] Archivo no persistido tras upload promotor=%s path=%s root=%s',
+            promotorId,
+            grabacion.storagePath,
+            getGrabacionesRoot(),
+          );
+          return res.status(500).json({
+            error: 'El audio no quedó guardado en el servidor. Reintentá la subida.',
+          });
+        }
+
         res.json({
-          grabacion,
+          grabacion: toGrabacionClient(grabacion),
           resumen: resumenPromotorDia(promotorId, diaKey),
           resumenTopeMes: resumenTopeMesPromotor(promotorId, mesKey),
         });
@@ -310,7 +336,10 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
     if (typeof rawIds === 'string' && rawIds.trim()) {
       promotorIds = rawIds.split(',').map((s) => s.trim()).filter(Boolean);
     }
-    const filas = buildCumplimientoAdmin(diaKey, promotorIds);
+    const filas = buildCumplimientoAdmin(diaKey, promotorIds).map((fila) => ({
+      ...fila,
+      grabaciones: fila.grabaciones.map(toGrabacionClient),
+    }));
     res.json({ diaKey, filas, promotoresConfig: getGrabacionesPromotoresConfig() });
   });
 
@@ -330,15 +359,20 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
       return res.status(403).json({ error: 'Sin permiso' });
     }
 
-    try {
-      statSync(grabacion.storagePath);
-    } catch {
+    const resolved = resolveStoragePath(grabacion.storagePath);
+    if (!resolved) {
+      console.warn(
+        '[grabaciones] Archivo ausente id=%s path=%s root=%s',
+        id,
+        grabacion.storagePath,
+        getGrabacionesRoot(),
+      );
       return res.status(404).json({ error: 'Archivo no encontrado en el servidor' });
     }
 
     res.setHeader('Content-Type', grabacion.mimeType || 'audio/mpeg');
     res.setHeader('Cache-Control', 'private, max-age=3600');
-    createReadStream(grabacion.storagePath).pipe(res);
+    createReadStream(resolved).pipe(res);
   });
 
   api.post('/grabaciones/:id/aprobar', (req, res) => {
@@ -351,7 +385,7 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
     if (!actualizada || actualizada.estado !== 'activo') {
       return res.status(404).json({ error: 'Grabación no encontrada o ya procesada' });
     }
-    res.json({ grabacion: actualizada });
+    res.json({ grabacion: toGrabacionClient(actualizada) });
   });
 
   api.post('/grabaciones/:id/rechazar', (req, res) => {
@@ -371,6 +405,6 @@ export function registerGrabacionesRoutes(api, { usuarioDesdeRequest }) {
     if (!grabacion || grabacion.estado !== 'rechazado') {
       return res.status(404).json({ error: 'Grabación no encontrada o ya procesada' });
     }
-    res.json({ grabacion });
+    res.json({ grabacion: toGrabacionClient(grabacion) });
   });
 }

@@ -9,6 +9,7 @@ import {
   getMaxAudiosMes,
 } from '../config/grabaciones-config.js';
 import { fechaMesKey } from '../domain/grabaciones.js';
+import { resolveStoragePath } from '../domain/grabaciones-storage.js';
 
 const GRABACIONES_DDL = `
     CREATE TABLE IF NOT EXISTS promotor_grabaciones (
@@ -330,9 +331,10 @@ export function deleteGrabacionRecord(id) {
 
 /** Elimina archivo en disco (si existe) y fila en SQLite. */
 export function purgeGrabacion(grabacion) {
-  if (grabacion?.storagePath) {
+  const resolved = resolveStoragePath(grabacion?.storagePath);
+  if (resolved) {
     try {
-      unlinkSync(grabacion.storagePath);
+      unlinkSync(resolved);
     } catch {
       // archivo ya ausente — continuar con baja en BD
     }

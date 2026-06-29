@@ -2,6 +2,7 @@ import './load-env.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isGrabacionesEnabled } from './config/grabaciones-config.js';
+import { ensureGrabacionesStorageReady } from './domain/grabaciones-storage.js';
 import { createApp, getAppBasePath } from './create-app.js';
 import { getDb } from './db/sqlite.js';
 import { isSqlServerConfigured } from './db/mssql.js';
@@ -61,9 +62,19 @@ app.listen(PORT, () => {
     startLeadsBackupScheduler();
     startDataBackupScheduler();
     startGrabacionesCleanupScheduler();
-    console.log(
-      `  Grabaciones → ${isGrabacionesEnabled() ? 'habilitado (GRABACIONES_ENABLED=true)' : 'deshabilitado (kill switch)'}`,
-    );
+    if (isGrabacionesEnabled()) {
+      try {
+        const grabRoot = ensureGrabacionesStorageReady();
+        console.log(`  Grabaciones → habilitado, almacén: ${grabRoot}`);
+      } catch (err) {
+        console.error(
+          '  Grabaciones → ERROR al preparar almacén:',
+          err instanceof Error ? err.message : err,
+        );
+      }
+    } else {
+      console.log('  Grabaciones → deshabilitado (kill switch)');
+    }
     console.log(`  Health rápido → ${base}api/health/live`);
   } else {
     console.error('FALTA .env: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME — no hay modo demo.');

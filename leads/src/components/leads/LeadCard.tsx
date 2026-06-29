@@ -402,22 +402,44 @@ export function LeadCard({
             )}
             {lead.seguimiento?.fechaCierre && (
               <span className="ml-1 text-zinc-400">
-                · Cierre:{' '}
-                {(() => {
-                  try {
-                    const d = parseIsoLocal(lead.seguimiento.fechaCierre);
-                    if (!d || isNaN(d.getTime())) return lead.seguimiento.fechaCierre;
-                    const day = String(d.getDate()).padStart(2, '0');
-                    const month = String(d.getMonth() + 1).padStart(2, '0');
-                    const hours = String(d.getHours()).padStart(2, '0');
-                    const minutes = String(d.getMinutes()).padStart(2, '0');
-                    return `${day}/${month} ${hours}:${minutes}`;
-                  } catch {
-                    return lead.seguimiento.fechaCierre;
-                  }
-                })()}
+                · Cierre: {formatearFechaHora(lead.seguimiento.fechaCierre)}
               </span>
             )}
+          </div>
+        )}
+
+        {esArchivo && (lead.seguimiento?.comprasAdicionales?.length ?? 0) > 0 && (
+          <div className="mt-2 space-y-1.5 border-t border-zinc-300/60 pt-2">
+            {lead.seguimiento!.comprasAdicionales!.map((compra) => {
+              const prodAdic = getProductoNombre(compra.idProducto, productos);
+              const pagoAdic = etiquetaPagoProducto(
+                compra.idProducto,
+                compra.estadoPago,
+                barrios,
+                compra.idBarrio,
+                rolUsuario,
+              );
+              return (
+                <div key={compra.id} className="text-[13px]">
+                  <span className="mr-1 inline-flex rounded border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
+                    Adic.
+                  </span>
+                  <span className="text-zinc-400">Producto: </span>
+                  <span className="font-medium text-zinc-700">{prodAdic ?? compra.idProducto}</span>
+                  {pagoAdic && <span className="ml-1 text-zinc-400">· {pagoAdic}</span>}
+                  {compra.numeroRecibo && (
+                    <span className="ml-1 text-zinc-400">
+                      · {etiquetaCortaNumeroDocumentoVenta(compra.idProducto)}: {compra.numeroRecibo}
+                    </span>
+                  )}
+                  {compra.fechaCierre && (
+                    <span className="ml-1 text-zinc-400">
+                      · Cierre: {formatearFechaHora(compra.fechaCierre)}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 

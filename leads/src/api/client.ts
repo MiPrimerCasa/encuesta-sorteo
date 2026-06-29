@@ -216,22 +216,41 @@ export async function fetchLeads(): Promise<{
   };
 }
 
-export async function fetchRecibosOcupados(): Promise<
-  Record<string, { cliente: string; vendedor: string; leadId: string }>
-> {
+export async function fetchRecibosOcupados(): Promise<import('../domain/pij-recibo').IndiceVentasOcupados> {
   if (_isDemoActive) {
     return {
-      "A23/300ANEXO171/300": {
-        cliente: "Federico Ceballos Bertero",
-        vendedor: "Catherine Contreras",
-        leadId: "233"
-      }
+      adhesiones: {
+        A23: {
+          cliente: 'Federico Ceballos Bertero',
+          vendedor: 'Catherine Contreras',
+          leadId: '233',
+          esAdicional: false,
+          reciboCompleto: 'A23/300 ANEXO 171/300',
+        },
+      },
+      anexos: {
+        ANEXO171: {
+          cliente: 'Federico Ceballos Bertero',
+          vendedor: 'Catherine Contreras',
+          leadId: '233',
+          esAdicional: false,
+          reciboCompleto: 'A23/300 ANEXO 171/300',
+        },
+      },
+      recibosTerreno: {},
     };
   }
   const data = await apiFetch<{
-    recibos: Record<string, { cliente: string; vendedor: string; leadId: string }>;
+    adhesiones: import('../domain/pij-recibo').IndiceVentasOcupados['adhesiones'];
+    anexos: import('../domain/pij-recibo').IndiceVentasOcupados['anexos'];
+    recibosTerreno?: import('../domain/pij-recibo').IndiceVentasOcupados['recibosTerreno'];
+    recibos?: import('../domain/pij-recibo').IndiceVentasOcupados['adhesiones'];
   }>('/api/leads/recibos-ocupados');
-  return data.recibos || {};
+  return {
+    adhesiones: data.adhesiones ?? data.recibos ?? {},
+    anexos: data.anexos ?? {},
+    recibosTerreno: data.recibosTerreno ?? {},
+  };
 }
 
 export async function fetchNotificacionesLinksRedes(): Promise<{
@@ -808,7 +827,19 @@ export async function fetchGrabacionAudioBlob(id: number): Promise<string> {
   const res = await fetch(apiUrl(`/api/grabaciones/${id}/audio`), {
     headers: authHeadersForSession(false),
   });
-  if (!res.ok) throw new Error('No se pudo cargar el audio');
+  if (!res.ok) {
+    let detalle = '';
+    try {
+      const body = (await res.json()) as { error?: string };
+      detalle = body?.error?.trim() ?? '';
+    } catch {
+      /* respuesta no JSON */
+    }
+    if (res.status === 404 && detalle) {
+      throw new Error(detalle);
+    }
+    throw new Error(detalle || 'No se pudo cargar el audio');
+  }
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }

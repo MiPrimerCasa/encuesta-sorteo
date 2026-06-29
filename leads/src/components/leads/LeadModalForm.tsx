@@ -16,6 +16,18 @@ import {
   ETIQUETA_CIERRE_SUPERVISOR,
   ETIQUETA_SEGUIMIENTO_PIJ,
 } from '../../domain/leads';
+import {
+  buildPijRecibo,
+  parsePijRecibo,
+  buscarConflictoPij,
+  buscarConflictoTerreno,
+  mensajeConflictoVenta,
+  construirIndiceVentasDesdeLeads,
+  fusionarIndicesVentas,
+  indiceVentasDesdeComprasFormulario,
+  type IndiceVentasOcupados,
+  type ExcluirRegistroVenta,
+} from '../../domain/pij-recibo';
 import { parseIsoLocal } from '../../domain/seguimiento-historial';
 import {
   esPlanInversion,
@@ -243,106 +255,68 @@ export function LeadModalForm({
   const [adicPijAdh, setAdicPijAdh] = useState('');
   const [adicPijAnexo, setAdicPijAnexo] = useState('');
 
-  const [recibosOcupados, setRecibosOcupados] = useState<
-    Record<string, { cliente: string; vendedor: string; leadId: string }>
-  >({});
+  const [indiceVentasGlobal, setIndiceVentasGlobal] = useState<IndiceVentasOcupados>({
+    adhesiones: {},
+    anexos: {},
+    recibosTerreno: {},
+  });
 
   useEffect(() => {
     if (open) {
-      console.log('[LeadModalForm] Cargando adhesiones ocupadas globalmente...');
       fetchRecibosOcupados()
-        .then((res) => {
-          console.log('[LeadModalForm] Adhesiones ocupadas cargadas:', res);
-          setRecibosOcupados(res);
-        })
+        .then((res) => setIndiceVentasGlobal(res))
         .catch((err) => console.error('[LeadModalForm] Error al obtener recibos ocupados:', err));
     } else {
-      setRecibosOcupados({});
+      setIndiceVentasGlobal({ adhesiones: {}, anexos: {}, recibosTerreno: {} });
     }
   }, [open]);
 
-  // Ensambla el string de recibo PIJ desde los campos estructurados
-  function buildPijRecibo(serie: string, adh: string, anexo: string): string {
-    const s = serie.trim().toUpperCase();
-    const a = adh.trim().replace(/\D/g, '');
-    const x = anexo.trim().replace(/\D/g, '');
-    const parts: string[] = [];
-    if (a) parts.push(`${s}${a}/300`);
-    if (x) parts.push(`ANEXO ${x}/300`);
-    return parts.join(' ');
+  const indiceVentasCompleto = useMemo(
+    () =>
+      fusionarIndicesVentas(
+        indiceVentasGlobal,
+        construirIndiceVentasDesdeLeads(todosLosLeads),
+      ),
+    [indiceVentasGlobal, todosLosLeads],
+  );
+
+  function indiceConComprasFormulario(comprasEnFormulario?: CompraAdicional[]) {
+    if (!comprasEnFormulario?.length || !lead) {
+      return { adhesiones: {}, anexos: {}, recibosTerreno: {} };
+    }
+    return indiceVentasDesdeComprasFormulario(
+      comprasEnFormulario,
+      lead.nombre,
+      String(lead.id),
+    );
   }
 
-  // Parsea un recibo guardado tipo PIJ ("A107/300 ANEXO 278/300") en campos estructurados
-  function parsePijRecibo(recibo: string): { serie: 'A' | 'B'; adhesion: string; anexo: string } {
-    const clean = recibo.trim().toUpperCase().replace(/\s+/g, ' ');
-    const match = clean.match(/^([AB])(\d+)(?:\/300)?(?:\s+ANEXO\s+(\d+)(?:\/300)?)?$/);
-    if (match) {
-      return {
-        serie: match[1] as 'A' | 'B',
-        adhesion: match[2],
-        anexo: match[3] || '',
-      };
-    }
-    const matchFuzzy = clean.match(/^([AB])(\d+)/);
-    if (matchFuzzy) {
-      const anexoMatch = clean.match(/ANEXO\s*(\d+)/);
-      return {
-        serie: matchFuzzy[1] as 'A' | 'B',
-        adhesion: matchFuzzy[2],
-        anexo: anexoMatch ? anexoMatch[1] : '',
-      };
-    }
-    return { serie: 'A', adhesion: '', anexo: '' };
+  function buscarDuplicadoPij(
+    serie: string,
+    adhesion: string,
+    anexo: string,
+    excluir?: ExcluirRegistroVenta,
+    comprasEnFormulario?: CompraAdicional[],
+  ) {
+    const indice = fusionarIndicesVentas(
+      indiceVentasCompleto,
+      indiceConComprasFormulario(comprasEnFormulario),
+    );
+    const conflicto = buscarConflictoPij(indice, serie, adhesion, anexo, excluir);
+    return conflicto ? mensajeConflictoVenta(conflicto) : null;
   }
 
-  // Verifica si una combinación de Serie y Adhesión ya está utilizada por otro lead (tiempo real global + fallback local)
-  function buscarDuplicadoAdhesion(serie: string, adhesion: string, excluirLeadId?: string, excluirCompraId?: string): string | null {
-    const s = serie.trim().toUpperCase();
-    const a = adhesion.trim().replace(/\D/g, '');
-    if (!s || !a) return null;
-
-    const claveNorm = `${s}${a}`;
-    console.log(`[LeadModalForm] Buscando duplicado para clave: "${claveNorm}". ExcluirLeadId: ${excluirLeadId}`);
-
-    // 1. Validar contra el mapa global de adhesiones ocupadas
-    const ocupanteGlobal = recibosOcupados[claveNorm];
-    if (ocupanteGlobal) {
-      const esLeadActual = excluirLeadId && String(ocupanteGlobal.leadId) === String(excluirLeadId);
-      if (!esLeadActual) {
-        return `${ocupanteGlobal.cliente} (${ocupanteGlobal.vendedor})`;
-      }
-    }
-
-    // 2. Fallback / validación local sobre los leads en memoria
-    const cleanRecibo = (rec: string) => rec.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, '/');
-    const extraerSerieAdh = (rec: string) => {
-      const clean = cleanRecibo(rec);
-      const m = clean.match(/^([A-Z]+)(\d+)/);
-      return m ? `${m[1]}${m[2]}` : null;
-    };
-
-    for (const l of todosLosLeads) {
-      const esLeadActual = excluirLeadId && String(l.id) === String(excluirLeadId);
-      // Revisar recibo principal
-      if (l.seguimiento?.numeroRecibo) {
-        const existenteClave = extraerSerieAdh(l.seguimiento.numeroRecibo);
-        if (existenteClave === claveNorm) {
-          if (esLeadActual && !excluirCompraId) continue;
-          if (!esLeadActual) return l.nombre;
-        }
-      }
-      // Revisar compras adicionales
-      for (const compra of (l.seguimiento?.comprasAdicionales ?? [])) {
-        if (compra.numeroRecibo) {
-          const existenteClave = extraerSerieAdh(compra.numeroRecibo);
-          if (existenteClave === claveNorm) {
-            if (esLeadActual && excluirCompraId && String(compra.id) === String(excluirCompraId)) continue;
-            return l.nombre;
-          }
-        }
-      }
-    }
-    return null;
+  function buscarDuplicadoTerreno(
+    numeroRecibo: string,
+    excluir?: ExcluirRegistroVenta,
+    comprasEnFormulario?: CompraAdicional[],
+  ) {
+    const indice = fusionarIndicesVentas(
+      indiceVentasCompleto,
+      indiceConComprasFormulario(comprasEnFormulario),
+    );
+    const conflicto = buscarConflictoTerreno(indice, numeroRecibo, excluir);
+    return conflicto ? mensajeConflictoVenta(conflicto) : null;
   }
 
   const rol: RolUsuario = rolUsuario === 'promotor' ? 'promotor' : 'supervisor';
@@ -722,9 +696,26 @@ export function LeadModalForm({
         return;
       }
       if (esPlanInversion(form.idProducto) && pijAdh.trim()) {
-        const dup = buscarDuplicadoAdhesion(pijSerie, pijAdh, lead?.id ?? undefined);
+        const dup = buscarDuplicadoPij(
+          pijSerie,
+          pijAdh,
+          pijAnexo,
+          { leadId: lead?.id, esPrincipal: true },
+          form.comprasAdicionales,
+        );
         if (dup) {
-          setErrorVenta(`Este número de adhesión ya está registrado para ${dup}. Verificá el número antes de guardar.`);
+          setErrorVenta(dup);
+          return;
+        }
+      }
+      if (esTerreno(form.idProducto) && form.numeroRecibo.trim()) {
+        const dup = buscarDuplicadoTerreno(
+          form.numeroRecibo,
+          { leadId: lead?.id, esPrincipal: true },
+          form.comprasAdicionales,
+        );
+        if (dup) {
+          setErrorVenta(dup);
           return;
         }
       }
@@ -1717,8 +1708,14 @@ export function LeadModalForm({
                                   </div>
                                 </div>
                                 {/* Preview del recibo ensamblado */}
-                                {pijAdh.trim() && (() => {
-                                  const dup = buscarDuplicadoAdhesion(pijSerie, pijAdh, lead?.id ?? undefined);
+                                {(pijAdh.trim() || pijAnexo.trim()) && (() => {
+                                  const dup = buscarDuplicadoPij(
+                                    pijSerie,
+                                    pijAdh,
+                                    pijAnexo,
+                                    { leadId: lead?.id, esPrincipal: true },
+                                    form.comprasAdicionales,
+                                  );
                                   return (
                                     <>
                                       <p className={`rounded-lg border px-3 py-2 text-[13px] font-mono font-semibold ${dup
@@ -1729,7 +1726,7 @@ export function LeadModalForm({
                                       </p>
                                       {dup && (
                                         <p className="text-[12px] font-semibold text-red-600">
-                                          ⚠️ Esta adhesión ya está registrada para {dup}
+                                          ⚠️ {dup}
                                         </p>
                                       )}
                                     </>
@@ -1738,15 +1735,36 @@ export function LeadModalForm({
                               </div>
                             ) : (
                               // Terreno: texto libre
-                              <input
-                                type="text"
-                                inputMode="numeric"
-                                value={form.numeroRecibo}
-                                onChange={(e) => patch({ numeroRecibo: e.target.value })}
-                                placeholder="Ej. 001234"
-                                className="h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                                required
-                              />
+                              <div className="space-y-1.5">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  value={form.numeroRecibo}
+                                  onChange={(e) => patch({ numeroRecibo: e.target.value })}
+                                  placeholder="Ej. 001234"
+                                  className={`h-12 w-full rounded-lg border bg-white px-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-600/15 ${
+                                    form.numeroRecibo.trim() &&
+                                    buscarDuplicadoTerreno(
+                                      form.numeroRecibo,
+                                      { leadId: lead?.id, esPrincipal: true },
+                                      form.comprasAdicionales,
+                                    )
+                                      ? 'border-red-300 focus:border-red-500'
+                                      : 'border-zinc-200 focus:border-brand-600'
+                                  }`}
+                                  required
+                                />
+                                {form.numeroRecibo.trim() && (() => {
+                                  const dup = buscarDuplicadoTerreno(
+                                    form.numeroRecibo,
+                                    { leadId: lead?.id, esPrincipal: true },
+                                    form.comprasAdicionales,
+                                  );
+                                  return dup ? (
+                                    <p className="text-[12px] font-semibold text-red-600">⚠️ {dup}</p>
+                                  ) : null;
+                                })()}
+                              </div>
                             )}
                           </div>
                         )}
@@ -1975,8 +1993,14 @@ export function LeadModalForm({
                                           />
                                         </div>
                                       </div>
-                                      {adicPijAdh.trim() && (() => {
-                                        const dup = buscarDuplicadoAdhesion(adicPijSerie, adicPijAdh, lead?.id ?? undefined);
+                                      {(adicPijAdh.trim() || adicPijAnexo.trim()) && (() => {
+                                        const dup = buscarDuplicadoPij(
+                                          adicPijSerie,
+                                          adicPijAdh,
+                                          adicPijAnexo,
+                                          undefined,
+                                          form.comprasAdicionales,
+                                        );
                                         return (
                                           <>
                                             <p className={`rounded-lg border px-3 py-1.5 text-[12px] font-mono font-semibold ${dup
@@ -1987,7 +2011,7 @@ export function LeadModalForm({
                                             </p>
                                             {dup && (
                                               <p className="text-[12px] font-semibold text-red-600">
-                                                ⚠️ Esta adhesión ya está registrada para {dup}
+                                                ⚠️ {dup}
                                               </p>
                                             )}
                                           </>
@@ -1996,14 +2020,35 @@ export function LeadModalForm({
                                     </div>
                                   ) : (
                                     // Terreno: texto libre
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      value={adicionalForm.numeroRecibo}
-                                      onChange={(e) => setAdicionalForm(f => ({ ...f, numeroRecibo: e.target.value }))}
-                                      placeholder="Ej. 005678"
-                                      className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-brand-600"
-                                    />
+                                    <div className="space-y-1.5">
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={adicionalForm.numeroRecibo}
+                                        onChange={(e) => setAdicionalForm(f => ({ ...f, numeroRecibo: e.target.value }))}
+                                        placeholder="Ej. 005678"
+                                        className={`h-11 w-full rounded-lg border bg-white px-3 text-[14px] focus:outline-none focus:ring-1 focus:ring-brand-600 ${
+                                          adicionalForm.numeroRecibo.trim() &&
+                                          buscarDuplicadoTerreno(
+                                            adicionalForm.numeroRecibo,
+                                            undefined,
+                                            form.comprasAdicionales,
+                                          )
+                                            ? 'border-red-300'
+                                            : 'border-zinc-200'
+                                        }`}
+                                      />
+                                      {adicionalForm.numeroRecibo.trim() && (() => {
+                                        const dup = buscarDuplicadoTerreno(
+                                          adicionalForm.numeroRecibo,
+                                          undefined,
+                                          form.comprasAdicionales,
+                                        );
+                                        return dup ? (
+                                          <p className="text-[12px] font-semibold text-red-600">⚠️ {dup}</p>
+                                        ) : null;
+                                      })()}
+                                    </div>
                                   )}
                                 </div>
 
@@ -2029,9 +2074,34 @@ export function LeadModalForm({
                                       return;
                                     }
                                     if (showAddAdicional === 'pij') {
-                                      const dup = buscarDuplicadoAdhesion(adicPijSerie, adicPijAdh, lead?.id ?? undefined);
+                                      if (!adicPijAdh.trim()) {
+                                        setErrorVenta('Ingresá el número de adhesión adicional.');
+                                        return;
+                                      }
+                                      if (!adicPijAnexo.trim()) {
+                                        setErrorVenta('Ingresá el número de anexo adicional.');
+                                        return;
+                                      }
+                                      const dup = buscarDuplicadoPij(
+                                        adicPijSerie,
+                                        adicPijAdh,
+                                        adicPijAnexo,
+                                        undefined,
+                                        form.comprasAdicionales,
+                                      );
                                       if (dup) {
-                                        setErrorVenta(`Este número de adhesión ya está registrado para ${dup}. No se puede duplicar.`);
+                                        setErrorVenta(dup);
+                                        return;
+                                      }
+                                    }
+                                    if (showAddAdicional === 'terreno') {
+                                      const dup = buscarDuplicadoTerreno(
+                                        adicionalForm.numeroRecibo,
+                                        undefined,
+                                        form.comprasAdicionales,
+                                      );
+                                      if (dup) {
+                                        setErrorVenta(dup);
                                         return;
                                       }
                                     }

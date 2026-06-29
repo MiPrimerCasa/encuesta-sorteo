@@ -32,7 +32,13 @@ function CeldaCumplimiento({
   );
 }
 
-function AudioPlayer({ grabacionId }: { grabacionId: number }) {
+function AudioPlayer({
+  grabacionId,
+  archivoDisponible = true,
+}: {
+  grabacionId: number;
+  archivoDisponible?: boolean;
+}) {
   const [src, setSrc] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [cargando, setCargando] = useState(false);
@@ -56,6 +62,14 @@ function AudioPlayer({ grabacionId }: { grabacionId: number }) {
       setCargando(false);
     }
   };
+
+  if (!archivoDisponible) {
+    return (
+      <span className="text-[11px] font-medium text-red-600" title="El registro existe pero el archivo no está en el servidor">
+        Audio no disponible en servidor
+      </span>
+    );
+  }
 
   if (error) return <span className="text-[11px] text-red-600">{error}</span>;
   if (!src) {
@@ -256,7 +270,7 @@ function DetalleGrabaciones({
               Aprobado
             </span>
           )}
-          <AudioPlayer grabacionId={g.id} />
+          <AudioPlayer grabacionId={g.id} archivoDisponible={g.archivoDisponible !== false} />
           {g.estado === 'pendiente' && (
             <>
               <button

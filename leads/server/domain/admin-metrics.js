@@ -128,6 +128,149 @@ function fechaHistorial(row) {
   );
 }
 
+function diaIsoLocal(val) {
+  const d = parseFecha(val);
+  if (!d) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Visita presencial con entrevista en el momento (sin cita previa agendada). */
+function esEntrevistaEnElMomento(seg) {
+  return Boolean(seg?.canal === 'en_persona' && bitTrue(seg?.huboEntrevista));
+}
+
+function esModificacionTecnicaCierreEntrevista(lead, fechaHistorialVal) {
+  const seg = lead?.seguimiento;
+  if (seg?.resultadoEntrevista !== 'compro' || !seg?.fechaCierre) return false;
+  return !esMismoDia(seg.fechaCierre, fechaHistorialVal);
+}
+
+/** Parte A: entrevista real en historial (excluye filas técnicas al editar cierres). */
+function filaHistorialCuentaComoEntrevista(row, lead) {
+  if (!filaIndicaEntrevista(row)) return false;
+  const fecha = parseFecha(fechaHistorial(row));
+  if (!fecha) return false;
+  return !esModificacionTecnicaCierreEntrevista(lead, fecha);
+}
+
+function fechaNoComproMomentoEnPeriodo(lead, historialRowsLead, desde, hasta) {
+  if (lead.seguimiento?.resultadoEntrevista !== 'no_compro') return null;
+  if (!esEntrevistaEnElMomento(lead.seguimiento)) return null;
+  for (const row of historialRowsLead) {
+    const res = String(row.resultado_entrevista ?? row.resultadoEntrevista ?? '').trim();
+    if (res !== 'no_compro' || !filaIndicaEntrevista(row)) continue;
+    const snap = row.seguimiento_snapshot ?? row.seguimientoSnapshot ?? {};
+    const canal = snap.canal ?? lead.seguimiento?.canal;
+    if (canal !== 'en_persona') continue;
+    const fecha = parseFecha(fechaHistorial(row));
+    if (fecha && enRango(fecha, desde, hasta)) return fecha;
+  }
+  const creado = parseFecha(lead.seguimiento?.creadoEn ?? lead.seguimiento?.creado_en);
+  if (creado && enRango(creado, desde, hasta)) return creado;
+  return null;
+}
+
+function registrarEntrevistaEnBuckets({
+  leadId,
+  fecha,
+  bucket,
+  entrevistasPorLeadSemana,
+  entrevistasPorLeadHoy,
+  desde,
+  hasta,
+  hoy,
+  claveDedup,
+}) {
+  if (!fecha || !bucket) return;
+  const clave = claveDedup ?? `${leadId}|${diaIsoLocal(fecha)}`;
+  if (enRango(fecha, desde, hasta) && !entrevistasPorLeadSemana.has(clave)) {
+    entrevistasPorLeadSemana.add(clave);
+    bucket.entrevistasSemana += 1;
+  }
+  if (esMismoDia(fecha, hoy) && !entrevistasPorLeadHoy.has(leadId)) {
+    entrevistasPorLeadHoy.add(leadId);
+    bucket.entrevistasHoy += 1;
+  }
+}
+
+/**
+ * Parte B: entrevistas implícitas en cierres del período.
+ * - compro → siempre hubo entrevista (luego se cargan datos del cierre).
+ * - no_compro → solo si fue entrevista en el momento (presencial).
+ * No altera cierresSemana ni ventasPij/Terreno.
+ */
+function contarEntrevistasDesdeCierresPeriodo({
+  leadsConSupervisor,
+  supervisoresMap,
+  historialPorLeadRows,
+  entrevistasPorLeadSemana,
+  entrevistasPorLeadHoy,
+  desde,
+  hasta,
+  hoy,
+}) {
+  for (const item of leadsConSupervisor) {
+    const { lead, supervisorId } = item;
+    const sup = supervisoresMap.get(supervisorId);
+    if (!sup) continue;
+    if (!sup.promotoresMap.has(lead.promotorId)) {
+      sup.promotoresMap.set(lead.promotorId, crearBucketPromotor(lead));
+    }
+    const bucket = sup.promotoresMap.get(lead.promotorId);
+    const leadId = String(lead.id);
+    const histRows = historialPorLeadRows.get(leadId) ?? [];
+
+    if (lead.seguimiento?.resultadoEntrevista === 'compro') {
+      const fechaCierre = parseFecha(
+        lead.seguimiento.fechaCierre ?? lead.seguimiento.creadoEn ?? lead.seguimiento.creado_en,
+      );
+      if (fechaCierre && enRango(fechaCierre, desde, hasta)) {
+        registrarEntrevistaEnBuckets({
+          leadId,
+          fecha: fechaCierre,
+          bucket,
+          entrevistasPorLeadSemana,
+          entrevistasPorLeadHoy,
+          desde,
+          hasta,
+          hoy,
+        });
+      }
+    }
+
+    for (const compra of lead.seguimiento?.comprasAdicionales ?? []) {
+      const fechaC = parseFecha(compra.fechaCierre ?? compra.creadoEn ?? compra.creado_en);
+      if (fechaC && enRango(fechaC, desde, hasta)) {
+        registrarEntrevistaEnBuckets({
+          leadId,
+          fecha: fechaC,
+          bucket,
+          entrevistasPorLeadSemana,
+          entrevistasPorLeadHoy,
+          desde,
+          hasta,
+          hoy,
+          claveDedup: `${leadId}|${diaIsoLocal(fechaC)}|adic-${compra.id ?? compra.numeroRecibo ?? ''}`,
+        });
+      }
+    }
+
+    const fechaNoCompro = fechaNoComproMomentoEnPeriodo(lead, histRows, desde, hasta);
+    if (fechaNoCompro) {
+      registrarEntrevistaEnBuckets({
+        leadId,
+        fecha: fechaNoCompro,
+        bucket,
+        entrevistasPorLeadSemana,
+        entrevistasPorLeadHoy,
+        desde,
+        hasta,
+        hoy,
+      });
+    }
+  }
+}
+
 function crearBucketPromotor(lead) {
   return {
     promotorId: lead.promotorId,
@@ -256,18 +399,11 @@ export function buildAdminChartEvents(leadsConSupervisor, historialRows = []) {
 
     const supNombre = item.supervisorNombre;
 
-    if (filaIndicaEntrevista(row)) {
-      const esModificacionTecnicaCierre =
-        item.lead.seguimiento?.resultadoEntrevista === 'compro' &&
-        item.lead.seguimiento?.fechaCierre &&
-        !esMismoDia(item.lead.seguimiento.fechaCierre, fecha);
-
-      if (!esModificacionTecnicaCierre) {
-        const key = `${leadId}|${fecha.toISOString().slice(0, 10)}`;
-        if (!entrevistasVistas.has(key)) {
-          entrevistasVistas.add(key);
-          eventos.push({ fecha: fecha.toISOString(), tipo: 'entrevista', supervisorNombre: supNombre });
-        }
+    if (filaHistorialCuentaComoEntrevista(row, item.lead)) {
+      const key = `${leadId}|${diaIsoLocal(fecha)}`;
+      if (!entrevistasVistas.has(key)) {
+        entrevistasVistas.add(key);
+        eventos.push({ fecha: fecha.toISOString(), tipo: 'entrevista', supervisorNombre: supNombre });
       }
     }
     if (filaIndicaCierre(row)) {
@@ -339,6 +475,7 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
   const rangeMes = rangoPorPeriodo('mes', ahora);
 
   const historialPorLeadMap = new Map();
+  const historialPorLeadRows = new Map();
   for (const raw of historialRows) {
     const row = raw;
     const leadId = String(row.lead_id ?? row.leadId ?? '');
@@ -347,8 +484,10 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
     if (!fecha) continue;
     if (!historialPorLeadMap.has(leadId)) {
       historialPorLeadMap.set(leadId, []);
+      historialPorLeadRows.set(leadId, []);
     }
     historialPorLeadMap.get(leadId).push(fecha);
+    historialPorLeadRows.get(leadId).push(row);
   }
 
   const leadTieneTratamientoEnRango = (lead, desdeVal, hastaVal) => {
@@ -521,27 +660,30 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
     }
     const bucket = sup.promotoresMap.get(lead.promotorId);
 
-    const enSemana = enRango(fecha, desde, hasta);
-    const esHoy = esMismoDia(fecha, hoy);
-
-    if (filaIndicaEntrevista(row)) {
-      const esModificacionTecnicaCierre =
-        item.lead.seguimiento?.resultadoEntrevista === 'compro' &&
-        item.lead.seguimiento?.fechaCierre &&
-        !esMismoDia(item.lead.seguimiento.fechaCierre, fecha);
-
-      if (!esModificacionTecnicaCierre) {
-        if (enSemana && !entrevistasPorLeadSemana.has(`${leadId}|${fecha.toISOString().slice(0, 10)}`)) {
-          entrevistasPorLeadSemana.add(`${leadId}|${fecha.toISOString().slice(0, 10)}`);
-          bucket.entrevistasSemana += 1;
-        }
-        if (esHoy && !entrevistasPorLeadHoy.has(leadId)) {
-          entrevistasPorLeadHoy.add(leadId);
-          bucket.entrevistasHoy += 1;
-        }
-      }
+    if (filaHistorialCuentaComoEntrevista(row, lead)) {
+      registrarEntrevistaEnBuckets({
+        leadId,
+        fecha,
+        bucket,
+        entrevistasPorLeadSemana,
+        entrevistasPorLeadHoy,
+        desde,
+        hasta,
+        hoy,
+      });
     }
   }
+
+  contarEntrevistasDesdeCierresPeriodo({
+    leadsConSupervisor,
+    supervisoresMap,
+    historialPorLeadRows,
+    entrevistasPorLeadSemana,
+    entrevistasPorLeadHoy,
+    desde,
+    hasta,
+    hoy,
+  });
 
   const supervisores = [...supervisoresMap.values()].map((sup) => {
     const promotores = [...sup.promotoresMap.values()]
@@ -786,6 +928,37 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
       leadsConSupervisor.map((item) => item.lead),
       historialRows,
       ahora,
+      {
+        periodo,
+        totales: supervisores.reduce(
+          (acc, sup) => sumarBuckets(acc, sup.totales),
+          {
+            leadsTotal: 0,
+            leadsSemana: 0,
+            entrevistasSemana: 0,
+            entrevistasHoy: 0,
+            cierresSemana: 0,
+            cierresHoy: 0,
+            ventasTerrenoSemana: 0,
+            ventasTerrenoHoy: 0,
+            ventasTerrenoSenaSemana: 0,
+            ventasTerrenoSenaHoy: 0,
+            ventasPijSemana: 0,
+            ventasPijHoy: 0,
+            tratadosHoy: 0,
+            tratadosSemana: 0,
+            tratadosMes: 0,
+          },
+        ),
+        promotores: todosPromotores.map((p) => ({
+          promotorId: p.promotorId,
+          promotorNombre: p.promotorNombre,
+          supervisorNombre: p.supervisorNombre,
+          entrevistasSemana: p.entrevistasSemana,
+          cierresSemana: p.cierresSemana,
+          leadsTotal: p.leadsTotal,
+        })),
+      },
     ),
     pijCierresPorPersona,
     leadsSinTratar,

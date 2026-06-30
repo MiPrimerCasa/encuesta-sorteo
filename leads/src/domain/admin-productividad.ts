@@ -144,11 +144,25 @@ const RESULTADO_LABEL: Record<ResultadoEntrevista | 'pendiente' | 'sin_tratar', 
 
 export { RESULTADO_LABEL as ADMIN_RESULTADO_ENTREVISTA_LABEL };
 
+export type InformeAlignEmbudo = {
+  periodo: string;
+  totales: { entrevistasSemana: number; cierresSemana: number };
+  promotores: Array<{
+    promotorId: string;
+    promotorNombre: string;
+    supervisorNombre?: string;
+    entrevistasSemana: number;
+    cierresSemana: number;
+    leadsTotal?: number;
+  }>;
+};
+
 /** Métricas de embudo, eficiencia, backlog y cruce encuesta → cierre. */
 export function buildAdminProductividad(
   leads: Lead[],
   historialRows: HistorialRow[] = [],
   ahora = new Date(),
+  informeAlign: InformeAlignEmbudo | null = null,
 ): AdminProductividad {
   const historialPorLead = indexHistorial(historialRows);
 
@@ -287,23 +301,80 @@ export function buildAdminProductividad(
     'otros',
   ];
 
-  return {
-    embudoGlobal: {
+  const embudoPromotoresBase = [...promotorMap.values()].map((p) => ({
+    ...p,
+    tasaEntrevistaPct: pct(p.entrevistas, p.leads),
+    tasaCierrePct: pct(p.cierres, p.leads),
+    tasaCierreEntrevistaPct: pct(p.cierres, p.entrevistas),
+  }));
+
+  let embudoGlobalFinal: AdminProductividad['embudoGlobal'] = {
+    leads: total,
+    conEntrevista,
+    conCierre,
+    tasaEntrevistaPct: pct(conEntrevista, total),
+    tasaCierreEntrevistaPct: pct(conCierre, conEntrevista),
+    tasaCierreLeadPct: pct(conCierre, total),
+  };
+  let embudoPromotoresFinal = embudoPromotoresBase;
+
+  if (informeAlign) {
+    const entrevistasPeriodo = informeAlign.totales.entrevistasSemana ?? 0;
+    const cierresPeriodo = informeAlign.totales.cierresSemana ?? 0;
+    embudoGlobalFinal = {
       leads: total,
-      conEntrevista,
-      conCierre,
-      tasaEntrevistaPct: pct(conEntrevista, total),
-      tasaCierreEntrevistaPct: pct(conCierre, conEntrevista),
-      tasaCierreLeadPct: pct(conCierre, total),
-    },
-    embudoPromotores: [...promotorMap.values()]
-      .map((p) => ({
+      conEntrevista: entrevistasPeriodo,
+      conCierre: cierresPeriodo,
+      tasaEntrevistaPct: pct(entrevistasPeriodo, total),
+      tasaCierreEntrevistaPct: pct(cierresPeriodo, entrevistasPeriodo),
+      tasaCierreLeadPct: pct(cierresPeriodo, total),
+    };
+
+    const informePorPromotor = new Map(
+      informeAlign.promotores.map((p) => [p.promotorId, p]),
+    );
+    const vistos = new Set<string>();
+    embudoPromotoresFinal = embudoPromotoresBase.map((p) => {
+      vistos.add(p.promotorId);
+      const inf = informePorPromotor.get(p.promotorId);
+      const entrevistas = inf?.entrevistasSemana ?? 0;
+      const cierres = inf?.cierresSemana ?? 0;
+      return {
         ...p,
-        tasaEntrevistaPct: pct(p.entrevistas, p.leads),
-        tasaCierrePct: pct(p.cierres, p.leads),
-        tasaCierreEntrevistaPct: pct(p.cierres, p.entrevistas),
-      }))
-      .sort((a, b) => (b.tasaCierrePct ?? 0) - (a.tasaCierrePct ?? 0)),
+        entrevistas,
+        cierres,
+        tasaEntrevistaPct: pct(entrevistas, p.leads),
+        tasaCierrePct: pct(cierres, p.leads),
+        tasaCierreEntrevistaPct: pct(cierres, entrevistas),
+      };
+    });
+    for (const inf of informeAlign.promotores) {
+      if (vistos.has(inf.promotorId)) continue;
+      if ((inf.entrevistasSemana ?? 0) <= 0 && (inf.cierresSemana ?? 0) <= 0) continue;
+      const leadsProm = inf.leadsTotal ?? 0;
+      const entrevistas = inf.entrevistasSemana ?? 0;
+      const cierres = inf.cierresSemana ?? 0;
+      embudoPromotoresFinal.push({
+        promotorId: inf.promotorId,
+        promotorNombre: inf.promotorNombre,
+        supervisorNombre: inf.supervisorNombre ?? 'Sin supervisor',
+        leads: leadsProm,
+        entrevistas,
+        cierres,
+        tasaEntrevistaPct: pct(entrevistas, leadsProm),
+        tasaCierrePct: pct(cierres, leadsProm),
+        tasaCierreEntrevistaPct: pct(cierres, entrevistas),
+      });
+    }
+    embudoPromotoresFinal.sort((a, b) => (b.tasaCierrePct ?? 0) - (a.tasaCierrePct ?? 0));
+  } else {
+    embudoPromotoresFinal.sort((a, b) => (b.tasaCierrePct ?? 0) - (a.tasaCierrePct ?? 0));
+  }
+
+  return {
+    periodoEmbudo: informeAlign?.periodo ?? null,
+    embudoGlobal: embudoGlobalFinal,
+    embudoPromotores: embudoPromotoresFinal,
     resultadosEntrevista: {
       compro: resultados.compro,
       no_compro: resultados.no_compro,

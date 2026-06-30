@@ -1097,7 +1097,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
       )}
 
       {data.productividad && data.productividad.embudoGlobal.leads > 0 && (
-        <AdminProductividadPanel data={data.productividad} />
+        <AdminProductividadPanel data={data.productividad} periodo={periodo} />
       )}
 
       <section>

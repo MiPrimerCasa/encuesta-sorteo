@@ -15,11 +15,20 @@ import { ADMIN_RESULTADO_ENTREVISTA_LABEL } from '../../domain/admin-productivid
 
 interface AdminProductividadPanelProps {
   data: AdminProductividad;
+  periodo?: string;
 }
 
 function fmtPct(val: number | null) {
   if (val == null) return '—';
   return `${val.toFixed(1)}%`;
+}
+
+function etiquetaPeriodoEmbudo(periodo?: string | null): string {
+  if (!periodo || periodo === 'mes') return 'el mes del informe';
+  if (periodo === 'hoy') return 'hoy';
+  if (periodo === 'semana') return 'la semana del informe';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(periodo)) return `el día ${periodo}`;
+  return periodo;
 }
 
 function MiniStat({
@@ -97,8 +106,9 @@ const CANAL_COLORS: Record<string, string> = {
   otros: '#A1A1AA',
 };
 
-export function AdminProductividadPanel({ data }: AdminProductividadPanelProps) {
+export function AdminProductividadPanel({ data, periodo }: AdminProductividadPanelProps) {
   const { embudoGlobal: e } = data;
+  const periodoLabel = etiquetaPeriodoEmbudo(periodo ?? data.periodoEmbudo);
 
   const resultadosChart = (
     Object.entries(data.resultadosEntrevista) as Array<[keyof typeof data.resultadosEntrevista, number]>
@@ -128,7 +138,7 @@ export function AdminProductividadPanel({ data }: AdminProductividadPanelProps) 
             Embudo y eficiencia
           </h3>
           <p className="mt-0.5 text-[13px] text-zinc-500">
-            Tasas sobre el total de leads cargados en el sistema
+            Entrevistas y cierres de {periodoLabel} (misma lógica que el informe). Tasas sobre el total de leads en el sistema.
           </p>
         </div>
 

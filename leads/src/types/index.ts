@@ -457,6 +457,8 @@ export interface AdminReferidosMetrica {
 }
 
 export interface AdminProductividad {
+  /** Período del embudo cuando está alineado al informe (hoy | semana | mes | YYYY-MM-DD). */
+  periodoEmbudo?: string | null;
   embudoGlobal: AdminEmbudoGlobal;
   embudoPromotores: AdminEmbudoPromotor[];
   resultadosEntrevista: AdminResultadosEntrevista;

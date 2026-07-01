@@ -49,6 +49,14 @@ export function rangoPorPeriodo(periodo: string, hoy = new Date()) {
     desde.setDate(desde.getDate() - 6);
     return { desde, hasta, hoy: startOfDay(hoy) };
   }
+  if (periodo && /^\d{4}-(0[1-9]|1[0-2])$/.test(periodo)) {
+    const parts = periodo.split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const desde = new Date(year, month, 1, 0, 0, 0, 0);
+    const hasta = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    return { desde, hasta, hoy: startOfDay(hoy) };
+  }
   if (periodo && /^\d{4}-\d{2}-\d{2}$/.test(periodo)) {
     const parts = periodo.split('-');
     const parsedDate = new Date(
@@ -638,6 +646,10 @@ export function buildAdminDashboardFromLeads(
   const rangeHoy = rangoPorPeriodo('hoy', ahora);
   const rangeSemana = rangoPorPeriodo('semana', ahora);
   const rangeMes = rangoPorPeriodo('mes', ahora);
+  const rangeTratadosMes =
+    periodo === 'mes' || /^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo))
+      ? { desde, hasta }
+      : rangeMes;
 
   const historialPorLeadMap = new Map<string, Date[]>();
   const historialPorLeadRows = new Map<string, Array<Record<string, unknown>>>();
@@ -701,7 +713,7 @@ export function buildAdminDashboardFromLeads(
     if (leadTieneTratamientoEnRango(lead, rangeSemana.desde, rangeSemana.hasta)) {
       bucket.tratadosSemana += 1;
     }
-    if (leadTieneTratamientoEnRango(lead, rangeMes.desde, rangeMes.hasta)) {
+    if (leadTieneTratamientoEnRango(lead, rangeTratadosMes.desde, rangeTratadosMes.hasta)) {
       bucket.tratadosMes += 1;
     }
 
@@ -1032,10 +1044,17 @@ export function buildAdminDashboardFromLeads(
       ventasPijSemana: rankingDesdePromotores(todosPromotores, 'ventasPijSemana'),
     },
     eventos: buildAdminChartEvents(leadsConSupervisor, historialRows),
-    conocimientoLeads: buildConocimientoEncuestaStats(leads),
+    conocimientoLeads: buildConocimientoEncuestaStats(
+      leads.filter((lead) => {
+        const alta = parseFecha(lead.fechaAlta ?? lead.fechaObtencion);
+        return alta != null && enRango(alta, desde, hasta);
+      }),
+    ),
     productividad: buildAdminProductividad(leads, historialRows, ahora, {
       periodo,
+      rango: { desde, hasta },
       totales: {
+        leadsSemana: supervisores.reduce((a, s) => a + s.totales.leadsSemana, 0),
         entrevistasSemana: supervisores.reduce((a, s) => a + s.totales.entrevistasSemana, 0),
         cierresSemana: supervisores.reduce((a, s) => a + s.totales.cierresSemana, 0),
       },
@@ -1051,6 +1070,7 @@ export function buildAdminDashboardFromLeads(
     totalLeads: leads.length,
     totalSupervisores: supervisores.length,
     pijCierresPorPersona,
+    periodo,
   };
 }
 

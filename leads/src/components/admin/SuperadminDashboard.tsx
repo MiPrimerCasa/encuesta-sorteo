@@ -8,8 +8,15 @@ import {
   formatRangoSemana,
   inicioMesIso,
 } from '../../domain/admin-metrics';
+import {
+  esPeriodoDia,
+  esPeriodoMesCalendario,
+  etiquetaPeriodoCorto,
+  etiquetaTipoPeriodo,
+} from '../../domain/admin-periodo';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
+import { AdminPeriodoSelector } from './AdminPeriodoSelector';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
 import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, fetchProductos, guardarSeguimiento, duplicarLead, resetearLeadSeguimiento, modificarDatosLead, fetchGrabacionesConfig } from '../../api/client';
 import type { ModificarDatosLeadPayload, OperadorCatalogo } from '../../api/client';
@@ -29,6 +36,7 @@ interface SuperadminDashboardProps {
   data: AdminDashboardData;
   periodo: string;
   onCambiarPeriodo: (periodo: string) => void;
+  cargando?: boolean;
 }
 
 function StatCard({
@@ -206,9 +214,13 @@ function LeyendaLeadsPorDia() {
   );
 }
 
-export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: SuperadminDashboardProps) {
-  const esPeriodoFecha = /^\d{4}-\d{2}-\d{2}$/.test(periodo);
-  const colorearLeadsDia = periodo === 'hoy' || esPeriodoFecha;
+export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando = false }: SuperadminDashboardProps) {
+  const periodoActivo = data.periodo ?? periodo;
+  const esPeriodoFecha = esPeriodoDia(periodoActivo);
+  const esPeriodoMes = esPeriodoMesCalendario(periodoActivo);
+  const colorearLeadsDia = periodoActivo === 'hoy' || esPeriodoFecha;
+  const tipoPeriodoLabel = etiquetaTipoPeriodo(periodoActivo);
+  const periodoCortoLabel = etiquetaPeriodoCorto(periodoActivo);
   const [selectedPerson, setSelectedPerson] = useState<PersonaPijCierres | null>(null);
   const [selectedPersonReceipts, setSelectedPersonReceipts] = useState<{
     person: PersonaPijCierres;
@@ -818,8 +830,15 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
           Panel global de equipos
         </h2>
         <p className="mt-0.5 text-[13px] text-zinc-500">
-          {esPeriodoFecha ? 'Día seleccionado' : periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'} ({rango}) · Resultados de hoy ({hoyLabel})
+          {tipoPeriodoLabel} ({rango}) · Resultados de hoy ({hoyLabel})
         </p>
+      </div>
+
+      <div className="no-print relative">
+        <AdminPeriodoSelector periodo={periodoActivo} onCambiarPeriodo={onCambiarPeriodo} />
+        {cargando && (
+          <p className="mt-2 text-[12px] font-medium text-brand-700">Actualizando período…</p>
+        )}
       </div>
 
       {/* Selector de pestañas */}
@@ -1089,6 +1108,8 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
             supervisorId: s.supervisorId,
             supervisorNombre: s.supervisorNombre,
           }))}
+          periodo={periodoActivo}
+          onCambiarPeriodo={onCambiarPeriodo}
         />
       )}
 
@@ -1096,13 +1117,13 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
         <AdminConocimientoEncuesta data={data.conocimientoLeads} />
       )}
 
-      {data.productividad && data.productividad.embudoGlobal.leads > 0 && (
-        <AdminProductividadPanel data={data.productividad} periodo={periodo} />
+      {data.productividad && (
+        <AdminProductividadPanel data={data.productividad} periodo={periodoActivo} />
       )}
 
       <section>
         <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-          {periodo === 'hoy' ? 'Destacados de hoy' : periodo === 'semana' ? 'Destacados de la semana' : 'Destacados del mes'}
+          {periodoActivo === 'hoy' ? 'Destacados de hoy' : periodoActivo === 'semana' ? 'Destacados de la semana' : esPeriodoMes ? `Destacados de ${periodoCortoLabel}` : 'Destacados del mes'}
         </h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <RankingList title="Más entrevistas" items={data.rankings.entrevistasSemana} unidad="" />
@@ -1190,7 +1211,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                 </div>
                 <div className="flex flex-wrap gap-3 text-[12px] text-zinc-600">
                   <span>
-                    {esPeriodoFecha ? 'Día' : periodo === 'hoy' ? 'Hoy' : periodo === 'semana' ? 'Semana' : 'Mes'}: <strong>{sup.totales.entrevistasSemana}</strong> ent. ·{' '}
+                    {esPeriodoFecha ? 'Día' : periodoActivo === 'hoy' ? 'Hoy' : periodoActivo === 'semana' ? 'Semana' : periodoCortoLabel}: <strong>{sup.totales.entrevistasSemana}</strong> ent. ·{' '}
                     <strong>{sup.totales.cierresSemana}</strong> cierres
                   </span>
                   <span className="text-brand-700">
@@ -1206,9 +1227,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                     <tr className="text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
                       <th className="py-2 pr-3 text-left">Promotor</th>
                       <th className="px-2 py-2 text-center">Leads</th>
-                      <th className="px-2 py-2 text-center">Ent. {esPeriodoFecha ? 'día' : periodo === 'hoy' ? 'hoy' : periodo === 'semana' ? 'sem.' : 'mes'}</th>
+                      <th className="px-2 py-2 text-center">Ent. {periodoCortoLabel}</th>
                       <th className="px-2 py-2 text-center">Ent. hoy</th>
-                      <th className="px-2 py-2 text-center">Cierres {esPeriodoFecha ? 'día' : periodo === 'hoy' ? 'hoy' : periodo === 'semana' ? 'sem.' : 'mes'}</th>
+                      <th className="px-2 py-2 text-center">Cierres {periodoCortoLabel}</th>
                       <th className="px-2 py-2 text-center">Cierres hoy</th>
                       <th className="px-2 py-2 text-center">Terrenos</th>
                       <th className="pl-2 py-2 text-center">PIJ</th>
@@ -1231,7 +1252,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
       {tabActivo === 'informe' && (
         <section className="space-y-4 printable-ranking-section">
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400 no-print">
-            INFORME DE OPERACIONES ({esPeriodoFecha ? 'Día Seleccionado' : periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana Móvil' : 'Mes Actual'})
+            INFORME DE OPERACIONES ({tipoPeriodoLabel.toUpperCase()})
           </h3>
           <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm flex flex-col printable-ranking-card">
             <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1240,63 +1261,11 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                 <p className="text-[11px] text-zinc-500 no-print">Listado general de promotores. Hacé clic en PIJ, Terrenos 100% o T. Seña para ver el detalle.</p>
                 {colorearLeadsDia && <LeyendaLeadsPorDia />}
                 <p className="hidden print:block text-[12px] text-zinc-600 mt-1 font-semibold">
-                  Rango ({esPeriodoFecha ? 'Día seleccionado' : periodo === 'hoy' ? 'Diario' : periodo === 'semana' ? 'Semana móvil' : 'Mes actual'}): {rango}
+                  Rango ({tipoPeriodoLabel}): {rango}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto no-print">
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  {/* Selector de periodo */}
-                  <div className="flex items-center rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/50 shadow-sm shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => onCambiarPeriodo('hoy')}
-                      className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
-                        periodo === 'hoy'
-                          ? 'bg-white text-zinc-900 shadow-sm'
-                          : 'text-zinc-500 hover:text-zinc-800'
-                      }`}
-                    >
-                      Hoy
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onCambiarPeriodo('semana')}
-                      className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
-                        periodo === 'semana'
-                          ? 'bg-white text-zinc-900 shadow-sm'
-                          : 'text-zinc-500 hover:text-zinc-800'
-                      }`}
-                    >
-                      Semana
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onCambiarPeriodo('mes')}
-                      className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
-                        periodo === 'mes'
-                          ? 'bg-white text-zinc-900 shadow-sm'
-                          : 'text-zinc-500 hover:text-zinc-800'
-                      }`}
-                    >
-                      Mes
-                    </button>
-                  </div>
-
-                  {/* Calendario */}
-                  <input
-                    type="date"
-                    value={esPeriodoFecha ? periodo : ''}
-                    onChange={(e) => {
-                      onCambiarPeriodo(e.target.value || 'mes');
-                    }}
-                    className={`rounded-lg border px-2 py-1 text-[11.5px] font-semibold focus:outline-none focus:ring-1 focus:ring-brand-100 transition-all ${
-                      esPeriodoFecha
-                        ? 'border-brand-300 bg-brand-50/50 text-brand-900'
-                        : 'border-zinc-200 bg-white text-zinc-500 hover:text-zinc-800'
-                    }`}
-                  />
-                </div>
-
+                <AdminPeriodoSelector periodo={periodoActivo} onCambiarPeriodo={onCambiarPeriodo} />
                 <PromotorInformeFilter
                   promotores={todosPromotores.map((p) => ({
                     promotorId: p.promotorId,
@@ -1329,7 +1298,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                     <th className="py-2.5 px-3 text-left">Equipo (Supervisor)</th>
                     <th className="py-2.5 px-3 text-center">Leads</th>
                     <th className="py-2.5 px-3 text-center">
-                      {esPeriodoFecha ? 'Tratados Día' : periodo === 'hoy' ? 'Tratados Hoy' : periodo === 'semana' ? 'Tratados Semana' : 'Tratados Mes'}
+                      {esPeriodoFecha ? 'Tratados Día' : periodoActivo === 'hoy' ? 'Tratados Hoy' : periodoActivo === 'semana' ? 'Tratados Semana' : esPeriodoMes || periodoActivo === 'mes' ? `Tratados ${periodoCortoLabel}` : 'Tratados Mes'}
                     </th>
                     <th className="py-2.5 px-3 text-center">Entrevistas</th>
                     <th className="py-2.5 px-3 text-center">Cierres</th>
@@ -1359,9 +1328,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                             <CeldaLeadsInforme cantidad={p.leadsSemana} colorear={colorearLeadsDia} />
                           </td>
                           <td className="py-2.5 px-3 text-center whitespace-nowrap tabular-nums font-semibold text-zinc-800">
-                            {esPeriodoFecha || periodo === 'hoy' ? (
+                            {esPeriodoFecha || periodoActivo === 'hoy' ? (
                               p.tratadosHoy ?? 0
-                            ) : periodo === 'semana' ? (
+                            ) : periodoActivo === 'semana' ? (
                               p.tratadosSemana ?? 0
                             ) : (
                               p.tratadosMes ?? 0
@@ -1402,9 +1371,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo }: Superad
                     </td>
                     <td className="py-3 px-3 text-center tabular-nums font-extrabold">{totalPromotoresLeads}</td>
                     <td className="py-3 px-3 text-center whitespace-nowrap tabular-nums font-extrabold text-zinc-900">
-                      {esPeriodoFecha || periodo === 'hoy' ? (
+                      {esPeriodoFecha || periodoActivo === 'hoy' ? (
                         totalPromotoresTratadosHoy
-                      ) : periodo === 'semana' ? (
+                      ) : periodoActivo === 'semana' ? (
                         totalPromotoresTratadosSemana
                       ) : (
                         totalPromotoresTratadosMes

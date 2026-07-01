@@ -1,0 +1,89 @@
+import {
+  esPeriodoDia,
+  esPeriodoMesCalendario,
+  mesCalendarioIso,
+} from '../../domain/admin-periodo';
+
+interface AdminPeriodoSelectorProps {
+  periodo: string;
+  onCambiarPeriodo: (periodo: string) => void;
+  className?: string;
+}
+
+export function AdminPeriodoSelector({
+  periodo,
+  onCambiarPeriodo,
+  className = '',
+}: AdminPeriodoSelectorProps) {
+  const esDia = esPeriodoDia(periodo);
+  const esMes = esPeriodoMesCalendario(periodo);
+  const esMesActual = periodo === 'mes';
+
+  return (
+    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
+      <div className="flex items-center rounded-lg bg-zinc-100 p-0.5 border border-zinc-200/50 shadow-sm shrink-0">
+        <button
+          type="button"
+          onClick={() => onCambiarPeriodo('hoy')}
+          className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+            periodo === 'hoy'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800'
+          }`}
+        >
+          Hoy
+        </button>
+        <button
+          type="button"
+          onClick={() => onCambiarPeriodo('semana')}
+          className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+            periodo === 'semana'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800'
+          }`}
+        >
+          Semana
+        </button>
+        <button
+          type="button"
+          onClick={() => onCambiarPeriodo('mes')}
+          className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold transition-all cursor-pointer ${
+            periodo === 'mes'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800'
+          }`}
+        >
+          Mes actual
+        </button>
+      </div>
+
+      <input
+        type="month"
+        value={esMes ? periodo : mesCalendarioIso()}
+        onChange={(e) => {
+          onCambiarPeriodo(e.target.value || 'mes');
+        }}
+        title="Elegir mes"
+        className={`rounded-lg border px-2 py-1 text-[11.5px] font-semibold focus:outline-none focus:ring-1 focus:ring-brand-100 transition-all ${
+          esMes || esMesActual
+            ? 'border-brand-300 bg-brand-50/50 text-brand-900'
+            : 'border-zinc-200 bg-white text-zinc-500 hover:text-zinc-800'
+        }`}
+      />
+
+      <input
+        type="date"
+        value={esDia ? periodo : ''}
+        onChange={(e) => {
+          onCambiarPeriodo(e.target.value || 'mes');
+        }}
+        title="Elegir día"
+        className={`rounded-lg border px-2 py-1 text-[11.5px] font-semibold focus:outline-none focus:ring-1 focus:ring-brand-100 transition-all ${
+          esDia
+            ? 'border-brand-300 bg-brand-50/50 text-brand-900'
+            : 'border-zinc-200 bg-white text-zinc-500 hover:text-zinc-800'
+        }`}
+      />
+    </div>
+  );
+}

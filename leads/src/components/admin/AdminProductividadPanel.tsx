@@ -10,8 +10,9 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import type { AdminProductividad } from '../../types';
 import { ADMIN_RESULTADO_ENTREVISTA_LABEL } from '../../domain/admin-productividad';
+import { esPeriodoDia, esPeriodoMesCalendario, etiquetaMesCalendario } from '../../domain/admin-periodo';
+import type { AdminProductividad } from '../../types';
 
 interface AdminProductividadPanelProps {
   data: AdminProductividad;
@@ -24,10 +25,11 @@ function fmtPct(val: number | null) {
 }
 
 function etiquetaPeriodoEmbudo(periodo?: string | null): string {
-  if (!periodo || periodo === 'mes') return 'el mes del informe';
+  if (!periodo || periodo === 'mes') return 'el mes actual';
   if (periodo === 'hoy') return 'hoy';
   if (periodo === 'semana') return 'la semana del informe';
-  if (/^\d{4}-\d{2}-\d{2}$/.test(periodo)) return `el día ${periodo}`;
+  if (esPeriodoDia(periodo)) return `el día ${periodo}`;
+  if (esPeriodoMesCalendario(periodo)) return etiquetaMesCalendario(periodo).toLowerCase();
   return periodo;
 }
 
@@ -138,7 +140,7 @@ export function AdminProductividadPanel({ data, periodo }: AdminProductividadPan
             Embudo y eficiencia
           </h3>
           <p className="mt-0.5 text-[13px] text-zinc-500">
-            Entrevistas y cierres de {periodoLabel} (misma lógica que el informe). Tasas sobre el total de leads en el sistema.
+            Entrevistas y cierres de {periodoLabel} (misma lógica que el informe). Tasas sobre leads cargados en el período.
           </p>
         </div>
 
@@ -201,7 +203,7 @@ export function AdminProductividadPanel({ data, periodo }: AdminProductividadPan
             <MiniStat
               label="Cierres c/ referidos"
               value={data.referidos.cierresConReferidos}
-              sub={`${data.referidos.totalReferidos} referidos brindados`}
+              sub={`${data.referidos.totalReferidos} referidos brindados · cierres del período`}
             />
             <MiniStat
               label="Backlog +30 días"
@@ -218,7 +220,7 @@ export function AdminProductividadPanel({ data, periodo }: AdminProductividadPan
         <article className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
           <div className="border-b border-zinc-100 px-5 py-3">
             <h4 className="text-[14px] font-semibold text-zinc-900">Resultado de entrevistas</h4>
-            <p className="text-[12px] text-zinc-500">Estado actual por lead</p>
+            <p className="text-[12px] text-zinc-500">Leads ingresados en {periodoLabel}</p>
           </div>
           <div className="p-5">
             {resultadosChart.length === 0 ? (

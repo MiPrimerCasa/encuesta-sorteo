@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -9,13 +9,18 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { useAdminChartData } from '../../hooks/useAdminChartData';
+import { etiquetaTipoPeriodo } from '../../domain/admin-periodo';
+import {
+  agrupacionSugeridaChart,
+  useAdminChartData,
+  type AgrupacionChart,
+} from '../../hooks/useAdminChartData';
 import type { AdminChartEvent } from '../../types';
+import { AdminPeriodoSelector } from './AdminPeriodoSelector';
 import { SegmentedControl } from '../ui/SegmentedControl';
 
-type Agrupacion = 'semana' | 'mes' | 'anio';
-
-const AGRUPACIONES: { value: Agrupacion; label: string }[] = [
+const AGRUPACIONES: { value: AgrupacionChart; label: string }[] = [
+  { value: 'dia', label: 'Día' },
   { value: 'semana', label: 'Semana' },
   { value: 'mes', label: 'Mes' },
   { value: 'anio', label: 'Año' },
@@ -24,17 +29,42 @@ const AGRUPACIONES: { value: Agrupacion; label: string }[] = [
 interface AdminMetricsChartProps {
   eventos: AdminChartEvent[];
   supervisores: Array<{ supervisorId: string; supervisorNombre: string }>;
+  periodo: string;
+  onCambiarPeriodo: (periodo: string) => void;
 }
 
-export function AdminMetricsChart({ eventos, supervisores }: AdminMetricsChartProps) {
-  const [agrupacion, setAgrupacion] = useState<Agrupacion>('mes');
+export function AdminMetricsChart({
+  eventos,
+  supervisores,
+  periodo,
+  onCambiarPeriodo,
+}: AdminMetricsChartProps) {
+  const [agrupacion, setAgrupacion] = useState<AgrupacionChart>(() =>
+    agrupacionSugeridaChart(periodo),
+  );
   const [supervisorId, setSupervisorId] = useState('');
+
+  useEffect(() => {
+    setAgrupacion(agrupacionSugeridaChart(periodo));
+  }, [periodo]);
 
   const supervisorNombre = supervisorId
     ? supervisores.find((s) => s.supervisorId === supervisorId)?.supervisorNombre ?? null
     : null;
 
-  const { chartData, series } = useAdminChartData(eventos, agrupacion, supervisorNombre);
+  const { chartData, series } = useAdminChartData(
+    eventos,
+    agrupacion,
+    supervisorNombre,
+    periodo,
+  );
+
+  const agrupacionLabel =
+    agrupacion === 'dia'
+      ? 'día'
+      : agrupacion === 'semana'
+        ? 'semana ISO'
+        : agrupacion;
 
   return (
     <section className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
@@ -45,37 +75,40 @@ export function AdminMetricsChart({ eventos, supervisores }: AdminMetricsChartPr
         <h3 className="mt-0.5 text-[17px] font-semibold tracking-[-0.01em] text-zinc-900">
           Actividad por período
         </h3>
+        <p className="mt-1 text-[12px] text-zinc-500">
+          Período del informe: {etiquetaTipoPeriodo(periodo)}
+        </p>
       </div>
 
       <div className="space-y-5 p-5">
+        <AdminPeriodoSelector periodo={periodo} onCambiarPeriodo={onCambiarPeriodo} />
+
         <div className="flex flex-wrap items-end gap-4">
-          {supervisores.length > 1 && (
-            <div className="min-w-[180px] flex-1">
-              <label
-                htmlFor="filtro-supervisor-chart"
-                className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400"
-              >
-                Supervisor
-              </label>
-              <select
-                id="filtro-supervisor-chart"
-                value={supervisorId}
-                onChange={(e) => setSupervisorId(e.target.value)}
-                className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-[14px] text-zinc-800 transition-colors focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-              >
-                <option value="">Todos los equipos</option>
-                {supervisores.map((s) => (
-                  <option key={s.supervisorId} value={s.supervisorId}>
-                    {s.supervisorNombre}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <div className="min-w-[180px] flex-1">
+            <label
+              htmlFor="filtro-supervisor-chart"
+              className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400"
+            >
+              Equipo
+            </label>
+            <select
+              id="filtro-supervisor-chart"
+              value={supervisorId}
+              onChange={(e) => setSupervisorId(e.target.value)}
+              className="h-10 w-full rounded-lg border border-zinc-300 bg-white px-3 text-[14px] text-zinc-800 transition-colors focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+            >
+              <option value="">Total empresa</option>
+              {supervisores.map((s) => (
+                <option key={s.supervisorId} value={s.supervisorId}>
+                  {s.supervisorNombre}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div>
             <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-400">
-              Período
+              Agrupar barras por
             </p>
             <SegmentedControl
               options={AGRUPACIONES}
@@ -88,11 +121,15 @@ export function AdminMetricsChart({ eventos, supervisores }: AdminMetricsChartPr
         {chartData.length === 0 ? (
           <p className="py-12 text-center text-[13px] text-zinc-400">
             Sin datos para el período seleccionado
+            {supervisorNombre ? ` (${supervisorNombre})` : ''}
           </p>
         ) : (
           <>
             <p className="text-[13px] text-zinc-400">
-              Barras agrupadas por {agrupacion === 'semana' ? 'semana ISO' : agrupacion}.
+              {supervisorNombre
+                ? `Equipo: ${supervisorNombre} · `
+                : 'Total empresa · '}
+              Barras agrupadas por {agrupacionLabel}.
             </p>
             <div className="h-72 w-full sm:h-80">
               <ResponsiveContainer width="100%" height="100%">

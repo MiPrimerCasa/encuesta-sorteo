@@ -1,52 +1,12 @@
-import { buildAdminDashboard, rangoPorPeriodo, startOfDay } from '../domain/admin-metrics.js';
-import { listAllLeadsFromEncuestas, normalizeNombre } from './encuestas.js';
-import {
-  fetchHistorialAdminDesde,
-  fetchUltimosSeguimientoPorOperadores,
-  useSeguimientoSql,
-} from './seguimiento-sql.js';
-import { adminSupervisorOperadorIds } from './superadmin-auth.js';
-
-function getEncuestasAdminProcedureName() {
-  const raw = process.env.SP_ENCUESTAS_ADMIN || 'encuestasMuestra';
-  return raw.replace(/^\[?dbo\]?\./i, '').replace(/[\[\]]/g, '');
-}
+import { buildAdminDashboard, rangoPorPeriodo } from '../domain/admin-metrics.js';
+import { normalizeNombre } from './encuestas.js';
+import { getAdminDashboardRawData } from './admin-dashboard-cache.js';
 
 function supervisorIdDesdeLead(lead) {
   if (lead.idSupervisor != null && String(lead.idSupervisor).trim() !== '') {
     return String(lead.idSupervisor);
   }
   return normalizeNombre(lead.supervisorNombre ?? 'Sin supervisor') || 'sin-supervisor';
-}
-
-async function fetchHistorialDesde(desde) {
-  if (!useSeguimientoSql()) return [];
-
-  let rows = await fetchHistorialAdminDesde(desde);
-  if (rows.length) return rows;
-
-  const operadores = adminSupervisorOperadorIds();
-  if (operadores.length) {
-    const ultimos = await fetchUltimosSeguimientoPorOperadores(operadores);
-    return ultimos.filter((row) => {
-      const fecha = row.creado_en ?? row.creadoEn;
-      if (!fecha) return true;
-      const t = new Date(fecha).getTime();
-      return !Number.isNaN(t) && t >= desde.getTime();
-    });
-  }
-
-  console.warn(
-    '[admin] Sin historial SP — pedí al DBA SP_HistorialSeguimientoAdmin o configurá ADMIN_SUPERVISOR_IDS.',
-  );
-  return [];
-}
-
-/** Historial extendido (~13 meses) para gráficos semana/mes/año. */
-function rangoHistorialGraficos(hoy = new Date()) {
-  const desde = startOfDay(hoy);
-  desde.setDate(desde.getDate() - 400);
-  return desde;
 }
 
 function dashboardVacio(aviso, periodo = 'mes') {
@@ -105,15 +65,16 @@ function dashboardVacio(aviso, periodo = 'mes') {
 
 
 /**
- * Dashboard global: exec encuestasMuestra → agrupa por supervisor → métricas semana + hoy.
+ * Dashboard global: encuestasMuestra + historial (cacheados) → métricas por período.
+ * @param {string} periodo
+ * @param {{ forceRefresh?: boolean }} [opts]
  */
-export async function fetchAdminDashboard(periodo = 'mes') {
-  const proc = getEncuestasAdminProcedureName();
-  let leads = [];
-
+export async function fetchAdminDashboard(periodo = 'mes', opts = {}) {
+  let raw;
   try {
-    leads = await listAllLeadsFromEncuestas();
+    raw = await getAdminDashboardRawData({ forceRefresh: Boolean(opts.forceRefresh) });
   } catch (error) {
+    const proc = process.env.SP_ENCUESTAS_ADMIN || 'encuestasMuestra';
     const msg = error instanceof Error ? error.message : String(error);
     console.warn(`[admin] ${proc}:`, msg);
     return dashboardVacio(
@@ -122,27 +83,29 @@ export async function fetchAdminDashboard(periodo = 'mes') {
     );
   }
 
+  const { leads, leadsConSupervisor, historialRows, source, cacheHit } = raw;
+
   if (!leads.length) {
-    return dashboardVacio(`El SP ${proc} no devolvió encuestas.`, periodo);
+    return dashboardVacio(`El SP ${source} no devolvió encuestas.`, periodo);
   }
 
-  const leadsConSupervisor = leads.map((lead) => ({
-    lead,
-    supervisorId: supervisorIdDesdeLead(lead),
-    supervisorNombre: lead.supervisorNombre ?? 'Sin supervisor',
-  }));
-
-  const historialDesde = rangoHistorialGraficos();
-  const historialRows = await fetchHistorialDesde(historialDesde);
+  const t0 = Date.now();
   const dashboard = buildAdminDashboard(leadsConSupervisor, historialRows, new Date(), periodo);
+  const buildMs = Date.now() - t0;
 
   const supervisorIds = new Set(leadsConSupervisor.map((item) => item.supervisorId));
+
+  if (buildMs > 200) {
+    console.log(`[admin-cache] buildAdminDashboard(${periodo}) en ${buildMs} ms (cache ${cacheHit ? 'HIT' : 'MISS'})`);
+  }
 
   return {
     ...dashboard,
     totalLeads: leads.length,
     totalSupervisores: supervisorIds.size,
-    source: proc,
+    source,
+    cacheHit: Boolean(cacheHit),
+    datosCacheadosEn: raw.fetchedAt ? new Date(raw.fetchedAt).toISOString() : undefined,
   };
 }
 

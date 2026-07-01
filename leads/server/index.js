@@ -7,6 +7,7 @@ import { createApp, getAppBasePath } from './create-app.js';
 import { getDb } from './db/sqlite.js';
 import { isSqlServerConfigured } from './db/mssql.js';
 import { warmOperadoresCatalog } from './db/operadores-catalog.js';
+import { warmAdminDashboardCache } from './db/admin-dashboard-cache.js';
 import { isLinksAcortadorEnabled } from './db/links-acortador.js';
 import { startLinksInstagramScheduler } from './jobs/links-instagram-job.js';
 import { startLeadsBackupScheduler } from './jobs/leads-backup-job.js';
@@ -54,6 +55,15 @@ app.listen(PORT, () => {
           err instanceof Error ? err.message : err,
         );
       });
+    warmAdminDashboardCache()
+      .then((raw) => {
+        if (raw?.leads?.length) {
+          console.log(
+            `  Panel admin precargado: ${raw.leads.length} leads (cache ${raw.cacheHit ? 'HIT' : 'MISS'})`,
+          );
+        }
+      })
+      .catch(() => {});
     if (isLinksAcortadorEnabled()) {
       startLinksInstagramScheduler();
     } else {

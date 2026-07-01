@@ -126,6 +126,73 @@ function diasDesdeAlta(lead: Lead, ahora: Date): number {
   return Math.floor((startOfDay(ahora).getTime() - startOfDay(alta).getTime()) / 86400000);
 }
 
+function enRangoFecha(fecha: Date, desde: Date, hasta: Date) {
+  const t = fecha.getTime();
+  return t >= desde.getTime() && t <= hasta.getTime();
+}
+
+function leadIngresadoEnPeriodo(lead: Lead, desde: Date, hasta: Date) {
+  const alta = parseFecha(lead.fechaAlta ?? lead.fechaObtencion);
+  return alta != null && enRangoFecha(alta, desde, hasta);
+}
+
+function fechaCierreLead(lead: Lead) {
+  return parseFecha(
+    lead.seguimiento?.fechaCierre ??
+      lead.seguimiento?.creadoEn ??
+      (lead.seguimiento as Record<string, unknown> | undefined)?.creado_en as string | undefined,
+  );
+}
+
+function cierreEnPeriodo(lead: Lead, desde: Date, hasta: Date) {
+  if (lead.seguimiento?.resultadoEntrevista !== 'compro') return false;
+  const fc = fechaCierreLead(lead);
+  return fc != null && enRangoFecha(fc, desde, hasta);
+}
+
+/** Cierres con referidos por fecha de cierre en el rango (todos los leads). */
+function contarReferidosCierresPeriodo(leads: Lead[], desde: Date, hasta: Date) {
+  let cierresConReferidos = 0;
+  let totalReferidos = 0;
+  for (const lead of leads) {
+    if (!cierreEnPeriodo(lead, desde, hasta)) continue;
+    if (!bitTrue(lead.seguimiento?.brindoReferidos)) continue;
+    cierresConReferidos += 1;
+    totalReferidos += lead.seguimiento?.referidos?.length ?? 0;
+  }
+  return { cierresConReferidos, totalReferidos };
+}
+
+function seguimientoPijEnPeriodo(lead: Lead, hist: HistorialRow[], desde: Date, hasta: Date) {
+  if (lead.seguimiento?.seguimientoPijPromotor === true) {
+    const fc = parseFecha(lead.seguimiento?.creadoEn);
+    if (fc && enRangoFecha(fc, desde, hasta)) return true;
+  }
+  for (const row of hist) {
+    const snap = (row as Record<string, unknown>).seguimientoSnapshot ?? row;
+    const s = snap as Record<string, unknown>;
+    if (!bitTrue(s.seguimientoPijPromotor ?? s.seguimiento_pij_promotor)) continue;
+    const f = parseFecha(fechaHistorial(row));
+    if (f && enRangoFecha(f, desde, hasta)) return true;
+  }
+  return false;
+}
+
+function primeraEntrevistaEnPeriodo(lead: Lead, hist: HistorialRow[], desde: Date, hasta: Date) {
+  const fechas: number[] = [];
+  for (const row of hist) {
+    if (!filaIndicaEntrevista(row)) continue;
+    const f = parseFecha(fechaHistorial(row));
+    if (f && enRangoFecha(f, desde, hasta)) fechas.push(f.getTime());
+  }
+  if (lead.seguimiento?.huboEntrevista && lead.horarioEntrevista) {
+    const h = parseFecha(lead.horarioEntrevista);
+    if (h && enRangoFecha(h, desde, hasta)) fechas.push(h.getTime());
+  }
+  if (!fechas.length) return null;
+  return new Date(Math.min(...fechas));
+}
+
 function startOfDay(date: Date) {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
@@ -146,7 +213,12 @@ export { RESULTADO_LABEL as ADMIN_RESULTADO_ENTREVISTA_LABEL };
 
 export type InformeAlignEmbudo = {
   periodo: string;
-  totales: { entrevistasSemana: number; cierresSemana: number };
+  rango?: { desde: Date; hasta: Date };
+  totales: {
+    leadsSemana?: number;
+    entrevistasSemana: number;
+    cierresSemana: number;
+  };
   promotores: Array<{
     promotorId: string;
     promotorNombre: string;
@@ -165,9 +237,9 @@ export function buildAdminProductividad(
   informeAlign: InformeAlignEmbudo | null = null,
 ): AdminProductividad {
   const historialPorLead = indexHistorial(historialRows);
+  const rango = informeAlign?.rango ?? null;
+  const filtrarPorPeriodo = Boolean(rango?.desde && rango?.hasta);
 
-  let conEntrevista = 0;
-  let conCierre = 0;
   const resultados: Record<ResultadoEntrevista | 'pendiente' | 'sin_tratar', number> = {
     compro: 0,
     no_compro: 0,
@@ -212,10 +284,14 @@ export function buildAdminProductividad(
 
   for (const lead of leads) {
     const hist = historialPorLead.get(String(lead.id)) ?? [];
-    const entrevista = leadTuvoEntrevista(lead, hist);
-    const cierre = leadCerro(lead, hist);
-    if (entrevista) conEntrevista += 1;
-    if (cierre) conCierre += 1;
+
+    if (filtrarPorPeriodo && !leadIngresadoEnPeriodo(lead, rango!.desde, rango!.hasta)) {
+      continue;
+    }
+
+    const cierre = filtrarPorPeriodo
+      ? cierreEnPeriodo(lead, rango!.desde, rango!.hasta)
+      : leadCerro(lead, hist);
 
     const resultado = resultadoFinalLead(lead, hist);
     resultados[resultado] += 1;
@@ -227,21 +303,26 @@ export function buildAdminProductividad(
       if (dias >= 30) backlog.sinGestion30 += 1;
     }
 
-    const primeraEnt = primeraEntrevistaFecha(lead, hist);
     const alta = parseFecha(lead.fechaAlta ?? lead.fechaObtencion);
+    const primeraEnt = filtrarPorPeriodo
+      ? primeraEntrevistaEnPeriodo(lead, hist, rango!.desde, rango!.hasta)
+      : primeraEntrevistaFecha(lead, hist);
     if (primeraEnt && alta) {
       const dias = (startOfDay(primeraEnt).getTime() - startOfDay(alta).getTime()) / 86400000;
       if (dias >= 0) diasHastaEntrevista.push(Math.round(dias * 10) / 10);
     }
 
-    if (leadTuvoSeguimientoPij(lead, hist)) {
+    const tuvoPij = filtrarPorPeriodo
+      ? seguimientoPijEnPeriodo(lead, hist, rango!.desde, rango!.hasta)
+      : leadTuvoSeguimientoPij(lead, hist);
+    if (tuvoPij) {
       pijSeguimiento += 1;
       if (cierre) pijConCierre += 1;
     }
 
-    if (cierre && lead.seguimiento?.brindoReferidos === true) {
+    if (!filtrarPorPeriodo && cierre && bitTrue(lead.seguimiento?.brindoReferidos)) {
       cierresConReferidos += 1;
-      totalReferidos += lead.seguimiento.referidos?.length ?? 0;
+      totalReferidos += lead.seguimiento?.referidos?.length ?? 0;
     }
 
     const pKey = lead.promotorId;
@@ -257,8 +338,6 @@ export function buildAdminProductividad(
     }
     const pb = promotorMap.get(pKey)!;
     pb.leads += 1;
-    if (entrevista) pb.entrevistas += 1;
-    if (cierre) pb.cierres += 1;
 
     const fuente = fuenteLead(lead);
     const cb = canalMap.get(fuente) ?? { leads: 0, cierres: 0 };
@@ -283,7 +362,9 @@ export function buildAdminProductividad(
     bumpConocimiento(pijLabel, cierre);
   }
 
-  const total = leads.length;
+  const total = filtrarPorPeriodo
+    ? (informeAlign?.totales.leadsSemana ?? 0)
+    : leads.length;
   const promedioDias =
     diasHastaEntrevista.length > 0
       ? Math.round(
@@ -310,24 +391,25 @@ export function buildAdminProductividad(
 
   let embudoGlobalFinal: AdminProductividad['embudoGlobal'] = {
     leads: total,
-    conEntrevista,
-    conCierre,
-    tasaEntrevistaPct: pct(conEntrevista, total),
-    tasaCierreEntrevistaPct: pct(conCierre, conEntrevista),
-    tasaCierreLeadPct: pct(conCierre, total),
+    conEntrevista: 0,
+    conCierre: 0,
+    tasaEntrevistaPct: null,
+    tasaCierreEntrevistaPct: null,
+    tasaCierreLeadPct: null,
   };
   let embudoPromotoresFinal = embudoPromotoresBase;
 
   if (informeAlign) {
+    const leadsPeriodo = informeAlign.totales.leadsSemana ?? total;
     const entrevistasPeriodo = informeAlign.totales.entrevistasSemana ?? 0;
     const cierresPeriodo = informeAlign.totales.cierresSemana ?? 0;
     embudoGlobalFinal = {
-      leads: total,
+      leads: leadsPeriodo,
       conEntrevista: entrevistasPeriodo,
       conCierre: cierresPeriodo,
-      tasaEntrevistaPct: pct(entrevistasPeriodo, total),
+      tasaEntrevistaPct: pct(entrevistasPeriodo, leadsPeriodo),
       tasaCierreEntrevistaPct: pct(cierresPeriodo, entrevistasPeriodo),
-      tasaCierreLeadPct: pct(cierresPeriodo, total),
+      tasaCierreLeadPct: pct(cierresPeriodo, leadsPeriodo),
     };
 
     const informePorPromotor = new Map(
@@ -369,6 +451,12 @@ export function buildAdminProductividad(
     embudoPromotoresFinal.sort((a, b) => (b.tasaCierrePct ?? 0) - (a.tasaCierrePct ?? 0));
   } else {
     embudoPromotoresFinal.sort((a, b) => (b.tasaCierrePct ?? 0) - (a.tasaCierrePct ?? 0));
+  }
+
+  if (filtrarPorPeriodo && rango?.desde && rango?.hasta) {
+    const refPeriodo = contarReferidosCierresPeriodo(leads, rango.desde, rango.hasta);
+    cierresConReferidos = refPeriodo.cierresConReferidos;
+    totalReferidos = refPeriodo.totalReferidos;
   }
 
   return {

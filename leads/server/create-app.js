@@ -406,9 +406,18 @@ function registerApiRoutes(api) {
 
     try {
       const periodo = String(req.query.periodo || 'mes').trim().toLowerCase();
-      console.log(`[dashboard-debug] API /admin/dashboard llamada con periodo="${periodo}"`);
-      const dashboard = await fetchAdminDashboard(periodo);
-      console.log(`[dashboard-debug] Dashboard generado para periodo="${periodo}". Rango: ${dashboard.semanaDesde} - ${dashboard.semanaHasta}`);
+      const forceRefresh =
+        req.query.refresh === '1' ||
+        String(req.query.refresh || '').toLowerCase() === 'true';
+      const t0 = Date.now();
+      const dashboard = await fetchAdminDashboard(periodo, { forceRefresh });
+      const elapsed = Date.now() - t0;
+      if (elapsed > 500) {
+        console.log(
+          `[admin] dashboard periodo="${periodo}" en ${elapsed} ms (cache ${dashboard.cacheHit ? 'HIT' : 'MISS'})`,
+        );
+      }
+      res.setHeader('X-Admin-Cache', dashboard.cacheHit ? 'HIT' : 'MISS');
       return res.json(dashboard);
     } catch (error) {
       console.error('Error admin dashboard:', error);
@@ -434,7 +443,13 @@ function registerApiRoutes(api) {
     }
 
     try {
-      const leads = await listAllLeadsFromEncuestas();
+      const { getAdminDashboardRawData } = await import('./db/admin-dashboard-cache.js');
+      const raw = await getAdminDashboardRawData();
+      const forceReferidos = req.query.referidos === '1';
+      let leads = raw.leads;
+      if (forceReferidos) {
+        leads = await listAllLeadsFromEncuestas({ incluirReferidos: true });
+      }
       return res.json({ leads });
     } catch (error) {
       console.error('Error admin leads list:', error);
@@ -1046,6 +1061,11 @@ function registerApiRoutes(api) {
       }
       if (duplicados.length) {
         message += ` ${duplicados.length} referido(s) ya estaban registrados.`;
+      }
+
+      if (saved) {
+        const { invalidateAdminDashboardCache } = await import('./db/admin-dashboard-cache.js');
+        invalidateAdminDashboardCache();
       }
 
       return res.json({

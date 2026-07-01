@@ -478,6 +478,8 @@ export interface AdminProductividad {
 
 export interface AdminDashboardData {
   generadoEn: string;
+  /** Período activo del informe (hoy, semana, mes, YYYY-MM, YYYY-MM-DD). */
+  periodo?: string;
   semanaDesde: string;
   semanaHasta: string;
   hoy: string;
@@ -501,6 +503,9 @@ export interface AdminDashboardData {
   aviso?: string;
   totalLeads?: number;
   totalSupervisores?: number;
+  /** true si los datos crudos vinieron de caché en servidor (cambio de período rápido). */
+  cacheHit?: boolean;
+  datosCacheadosEn?: string;
   pijCierresPorPersona?: PersonaPijCierres[];
   leadsSinTratar?: LeadSinTratarDetalle[];
 }

@@ -34,6 +34,14 @@ export function rangoPorPeriodo(periodo, hoy = new Date()) {
     desde.setDate(desde.getDate() - 6);
     return { desde, hasta, hoy: startOfDay(hoy) };
   }
+  if (periodo && /^\d{4}-(0[1-9]|1[0-2])$/.test(periodo)) {
+    const parts = periodo.split('-');
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const desde = new Date(year, month, 1, 0, 0, 0, 0);
+    const hasta = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    return { desde, hasta, hoy: startOfDay(hoy) };
+  }
   if (periodo && /^\d{4}-\d{2}-\d{2}$/.test(periodo)) {
     const parts = periodo.split('-');
     const parsedDate = new Date(
@@ -473,6 +481,10 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
   const rangeHoy = rangoPorPeriodo('hoy', ahora);
   const rangeSemana = rangoPorPeriodo('semana', ahora);
   const rangeMes = rangoPorPeriodo('mes', ahora);
+  const rangeTratadosMes =
+    periodo === 'mes' || /^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo))
+      ? { desde, hasta }
+      : rangeMes;
 
   const historialPorLeadMap = new Map();
   const historialPorLeadRows = new Map();
@@ -535,7 +547,7 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
     if (leadTieneTratamientoEnRango(lead, rangeSemana.desde, rangeSemana.hasta)) {
       bucket.tratadosSemana += 1;
     }
-    if (leadTieneTratamientoEnRango(lead, rangeMes.desde, rangeMes.hasta)) {
+    if (leadTieneTratamientoEnRango(lead, rangeTratadosMes.desde, rangeTratadosMes.hasta)) {
       bucket.tratadosMes += 1;
     }
 
@@ -902,6 +914,7 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
   }).sort((a, b) => (b.cantidad + (b.cantidadRecibos ?? 0)) - (a.cantidad + (a.cantidadRecibos ?? 0)) || a.operadorNombre.localeCompare(b.operadorNombre, 'es'));
 
   return {
+    periodo,
     generadoEn: ahora.toISOString(),
     semanaDesde: desde.toISOString(),
     semanaHasta: hasta.toISOString(),
@@ -922,7 +935,12 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
     },
     eventos: buildAdminChartEvents(leadsConSupervisor, historialRows),
     conocimientoLeads: buildConocimientoEncuestaStats(
-      leadsConSupervisor.map((item) => item.lead),
+      leadsConSupervisor
+        .map((item) => item.lead)
+        .filter((lead) => {
+          const alta = parseFecha(lead.fechaAlta ?? lead.fechaObtencion);
+          return alta && enRango(alta, desde, hasta);
+        }),
     ),
     productividad: buildAdminProductividad(
       leadsConSupervisor.map((item) => item.lead),
@@ -930,6 +948,7 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
       ahora,
       {
         periodo,
+        rango: { desde, hasta },
         totales: supervisores.reduce(
           (acc, sup) => sumarBuckets(acc, sup.totales),
           {

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import {
   crearLead,
   modificarTelefonoLead,
@@ -76,16 +76,50 @@ function AppShell() {
     maxMb: number;
     formatos: string[];
   } | null>(null);
+  const dashboardPorPeriodoRef = useRef<Map<string, AdminDashboardData>>(new Map());
+  const fetchDashboardSeqRef = useRef(0);
 
-  const cargarDatos = useCallback(async (p = periodo) => {
+  const cargarDashboardAdmin = useCallback(async (p: string, opts?: { silencioso?: boolean }) => {
+    const silencioso = Boolean(opts?.silencioso);
+    const enCache = dashboardPorPeriodoRef.current.get(p);
+    if (enCache) {
+      setAdminDashboard(enCache);
+    }
+    if (!silencioso) {
+      setCargando(true);
+    }
+
+    const seq = ++fetchDashboardSeqRef.current;
+    try {
+      const dash = await fetchAdminDashboard(p);
+      if (seq !== fetchDashboardSeqRef.current) return;
+      if (!dash.cacheHit) {
+        dashboardPorPeriodoRef.current.clear();
+      }
+      dashboardPorPeriodoRef.current.set(p, dash);
+      setAdminDashboard(dash);
+    } catch (err) {
+      if (seq !== fetchDashboardSeqRef.current) return;
+      throw err;
+    } finally {
+      if (seq === fetchDashboardSeqRef.current && !silencioso) {
+        setCargando(false);
+      }
+    }
+  }, []);
+
+  const cargarDatos = useCallback(async (p = periodo, opts?: { silencioso?: boolean }) => {
     if (!usuario) return;
-    setCargando(true);
+    const silencioso = Boolean(opts?.silencioso);
     setError('');
     try {
       if (usuario.rol === 'superadmin') {
-        const dash = await fetchAdminDashboard(p);
-        setAdminDashboard(dash);
+        await cargarDashboardAdmin(p, { silencioso });
         return;
+      }
+
+      if (!silencioso) {
+        setCargando(true);
       }
 
       const esSupervisor = usuario.rol === 'supervisor';
@@ -101,24 +135,22 @@ function AppShell() {
       setProductos(prod);
       setBarrios(barr);
 
-      // Supervisor con acceso al panel global: cargar dashboard en paralelo
       if (usuario.panelGlobal) {
-        fetchAdminDashboard(p)
-          .then((dash) => setAdminDashboard(dash))
-          .catch((err) =>
-            console.warn('[panelGlobal] No se pudo cargar dashboard admin:', err),
-          );
+        await cargarDashboardAdmin(p, { silencioso: true });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar datos');
     } finally {
-      setCargando(false);
+      if (!silencioso && usuario.rol !== 'superadmin') {
+        setCargando(false);
+      }
     }
-  }, [usuario, periodo]);
+  }, [usuario, periodo, cargarDashboardAdmin]);
 
   const cambiarPeriodo = useCallback((nuevoPeriodo: string) => {
     setPeriodo(nuevoPeriodo);
-    void cargarDatos(nuevoPeriodo);
+    const enCache = dashboardPorPeriodoRef.current.has(nuevoPeriodo);
+    void cargarDatos(nuevoPeriodo, { silencioso: enCache });
   }, [cargarDatos]);
 
   useEffect(() => {
@@ -219,10 +251,10 @@ function AppShell() {
     cargando && !adminDashboard && leads.length === 0 ? (
       <VistaCargando texto="Cargando datos…" />
     ) : esSuperadmin && adminDashboard ? (
-      <SuperadminDashboard data={adminDashboard} periodo={periodo} onCambiarPeriodo={cambiarPeriodo} />
+      <SuperadminDashboard data={adminDashboard} periodo={periodo} onCambiarPeriodo={cambiarPeriodo} cargando={cargando} />
     ) : tienePanelGlobal && vistaActiva === 'admin' ? (
       adminDashboard ? (
-        <SuperadminDashboard data={adminDashboard} periodo={periodo} onCambiarPeriodo={cambiarPeriodo} />
+        <SuperadminDashboard data={adminDashboard} periodo={periodo} onCambiarPeriodo={cambiarPeriodo} cargando={cargando} />
       ) : (
         <VistaCargando texto="Cargando panel global…" />
       )

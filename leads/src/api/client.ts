@@ -315,7 +315,9 @@ export async function fetchProductos(rol: RolUsuario) {
 
 export async function fetchAdminDashboard(periodo?: string): Promise<AdminDashboardData> {
   if (_isDemoActive) return getDemoAdminDashboard(periodo);
-  const url = periodo ? `/api/admin/dashboard?periodo=${periodo}` : '/api/admin/dashboard';
+  const url = periodo
+    ? `/api/admin/dashboard?periodo=${encodeURIComponent(periodo)}`
+    : '/api/admin/dashboard';
   return apiFetch<AdminDashboardData>(url);
 }
 
@@ -323,7 +325,7 @@ export async function fetchAdminLeads(): Promise<Lead[]> {
   if (_isDemoActive) {
     return getDemoLeads();
   }
-  const data = await apiFetch<{ leads: Lead[] }>('/api/admin/leads');
+  const data = await apiFetch<{ leads: Lead[] }>('/api/admin/leads?referidos=1');
   return data.leads ?? [];
 }
 

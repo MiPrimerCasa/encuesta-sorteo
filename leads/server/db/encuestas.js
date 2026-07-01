@@ -1012,9 +1012,12 @@ export async function listLeadsFromEncuestas(usuario) {
 }
 
 /** Listado global vía encuestasMuestra — panel superadmin. */
-export async function listAllLeadsFromEncuestas() {
+export async function listAllLeadsFromEncuestas({ incluirReferidos = true } = {}) {
   const rows = await fetchEncuestasMuestraGlobalRaw();
   const leads = await mapEncuestaRowsToLeads(rows, null, null, { rol: 'superadmin' });
+
+  if (!incluirReferidos) return leads;
+
   const usuario = { rol: 'superadmin' };
 
   try {

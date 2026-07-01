@@ -1,3 +1,5 @@
+import { fechaIsoLocal, rangoPorPeriodo } from './admin-metrics';
+
 const MESES_LARGO = [
   'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
@@ -41,4 +43,13 @@ export function etiquetaPeriodoCorto(periodo: string): string {
   if (periodo === 'semana') return 'sem.';
   if (esPeriodoMesCalendario(periodo)) return etiquetaMesCalendario(periodo);
   return 'mes';
+}
+
+/** Rango YYYY-MM-DD para filtro de anexos/recibos, alineado al período del panel. */
+export function rangoFechasIsoPorPeriodo(periodo: string, hoy = new Date()) {
+  const { desde, hasta } = rangoPorPeriodo(periodo, hoy);
+  return {
+    desde: fechaIsoLocal(desde),
+    hasta: fechaIsoLocal(hasta),
+  };
 }

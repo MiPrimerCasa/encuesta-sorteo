@@ -13,6 +13,7 @@ import {
   esPeriodoMesCalendario,
   etiquetaPeriodoCorto,
   etiquetaTipoPeriodo,
+  rangoFechasIsoPorPeriodo,
 } from '../../domain/admin-periodo';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
@@ -226,8 +227,15 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
     person: PersonaPijCierres;
     tipo: '100' | 'sena';
   } | null>(null);
-  const [anexosFechaDesde, setAnexosFechaDesde] = useState(() => inicioMesIso());
-  const [anexosFechaHasta, setAnexosFechaHasta] = useState(() => fechaIsoLocal());
+  const [anexosFechaDesde, setAnexosFechaDesde] = useState(() => rangoFechasIsoPorPeriodo(periodo).desde);
+  const [anexosFechaHasta, setAnexosFechaHasta] = useState(() => rangoFechasIsoPorPeriodo(periodo).hasta);
+
+  useEffect(() => {
+    const { desde, hasta } = rangoFechasIsoPorPeriodo(periodoActivo);
+    setAnexosFechaDesde(desde);
+    setAnexosFechaHasta(hasta);
+  }, [periodoActivo]);
+
   const [informeVentaDetalle, setInformeVentaDetalle] = useState<{
     titulo: string;
     subtitulo: string;
@@ -965,7 +973,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
             <div>
               <h4 className="text-[14px] font-semibold text-zinc-900">Historial de Anexos y Recibos Cargados por Operador</h4>
               <p className="text-[12px] text-zinc-500">
-                Filtrá por rango de fechas. Hacé clic en PIJ, terrenos 100% o seña para ver el detalle del operador.
+                Sigue el período seleccionado arriba. Podés ajustar el rango manualmente. Hacé clic en PIJ, terrenos 100% o seña para ver el detalle del operador.
               </p>
             </div>
             <div className="flex flex-wrap items-end gap-3">

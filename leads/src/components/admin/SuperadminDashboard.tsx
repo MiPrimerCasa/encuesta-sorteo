@@ -1,7 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres, Lead, Barrio, Producto, SeguimientoLead, PijCierreDetalle, TerrenoCierreDetalle, PromotorMetricasAdmin } from '../../types';
 import {
-  buildAdminDashboardFromLeads,
   extraerVentasDetalleInforme,
   fechaIsoLocal,
   filterPijCierresPorRango,
@@ -15,11 +14,12 @@ import {
   etiquetaTipoPeriodo,
   rangoFechasIsoPorPeriodo,
 } from '../../domain/admin-periodo';
+import { actualizarAppQuery, leerTabDesdeUrl, type AdminTab } from '../../domain/admin-url';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
 import { AdminPeriodoSelector } from './AdminPeriodoSelector';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
-import { fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, fetchProductos, guardarSeguimiento, duplicarLead, resetearLeadSeguimiento, modificarDatosLead, fetchGrabacionesConfig } from '../../api/client';
+import { getSession, fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, fetchProductos, guardarSeguimiento, duplicarLead, resetearLeadSeguimiento, modificarDatosLead, fetchGrabacionesConfig } from '../../api/client';
 import type { ModificarDatosLeadPayload, OperadorCatalogo } from '../../api/client';
 import { getBarrioNombre } from '../../domain/venta';
 import { useAuth } from '../../context/AuthContext';
@@ -265,8 +265,26 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
       .catch(() => setModuloGrabacionesActivo(false));
   }, []);
 
-  const [tabActivo, setTabActivo] = useState<'metricas' | 'buscador' | 'sin_tratar' | 'reasignacion' | 'informe' | 'grabaciones'>('metricas');
+  const [tabActivo, setTabActivo] = useState<AdminTab>(() => leerTabDesdeUrl());
+
+  const cambiarTab = useCallback((tab: AdminTab) => {
+    setTabActivo(tab);
+    actualizarAppQuery({
+      tab,
+      esSuperadmin: getSession()?.usuario?.rol === 'superadmin',
+    });
+  }, []);
   const [moduloGrabacionesActivo, setModuloGrabacionesActivo] = useState(false);
+
+  useEffect(() => {
+    if (leerTabDesdeUrl() !== 'grabaciones') return;
+    fetchGrabacionesConfig()
+      .then((cfg) => {
+        const activo = Boolean(cfg.moduloActivo && cfg.puedeAuditar);
+        if (!activo) cambiarTab('metricas');
+      })
+      .catch(() => cambiarTab('metricas'));
+  }, [cambiarTab]);
   const [selectedOperatorUntreated, setSelectedOperatorUntreated] = useState<{ name: string; role: 'supervisor' | 'promotor'; team: string; count: number; leads: any[] } | null>(null);
   const [busquedaSinTratar, setBusquedaSinTratar] = useState('');
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -673,12 +691,10 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
     abrirModal(itemsPij, itemsTerreno);
   };
 
-  const pijCierresFuente = useMemo(() => {
-    if (leads.length > 0) {
-      return buildAdminDashboardFromLeads(leads, [], new Date()).pijCierresPorPersona ?? [];
-    }
-    return data.pijCierresPorPersona ?? [];
-  }, [leads, data.pijCierresPorPersona]);
+  const pijCierresFuente = useMemo(
+    () => data.pijCierresPorPersona ?? [],
+    [data.pijCierresPorPersona],
+  );
 
   const anexosPorPersonaFiltrados = useMemo(
     () => filterPijCierresPorRango(pijCierresFuente, anexosFechaDesde, anexosFechaHasta),
@@ -853,7 +869,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
       <div className="flex flex-wrap sm:flex-nowrap items-center rounded-xl bg-zinc-100 p-1 border border-zinc-200/50 shadow-sm self-start gap-1 sm:gap-0 no-print">
         <button
           type="button"
-          onClick={() => setTabActivo('metricas')}
+          onClick={() => cambiarTab('metricas')}
           className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
             tabActivo === 'metricas'
               ? 'bg-white text-zinc-900 shadow-sm'
@@ -864,7 +880,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
         </button>
         <button
           type="button"
-          onClick={() => setTabActivo('buscador')}
+          onClick={() => cambiarTab('buscador')}
           className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
             tabActivo === 'buscador'
               ? 'bg-white text-zinc-900 shadow-sm'
@@ -875,7 +891,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
         </button>
         <button
           type="button"
-          onClick={() => setTabActivo('sin_tratar')}
+          onClick={() => cambiarTab('sin_tratar')}
           className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
             tabActivo === 'sin_tratar'
               ? 'bg-white text-zinc-900 shadow-sm'
@@ -886,7 +902,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
         </button>
         <button
           type="button"
-          onClick={() => setTabActivo('reasignacion')}
+          onClick={() => cambiarTab('reasignacion')}
           className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
             tabActivo === 'reasignacion'
               ? 'bg-white text-zinc-900 shadow-sm'
@@ -897,7 +913,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
         </button>
         <button
           type="button"
-          onClick={() => setTabActivo('informe')}
+          onClick={() => cambiarTab('informe')}
           className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
             tabActivo === 'informe'
               ? 'bg-white text-zinc-900 shadow-sm'
@@ -909,7 +925,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
         {moduloGrabacionesActivo && (
           <button
             type="button"
-            onClick={() => setTabActivo('grabaciones')}
+            onClick={() => cambiarTab('grabaciones')}
             className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
               tabActivo === 'grabaciones'
                 ? 'bg-white text-zinc-900 shadow-sm'

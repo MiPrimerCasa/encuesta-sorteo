@@ -11,6 +11,8 @@ import {
   guardarSeguimiento,
 } from './api/client';
 import { abrirChatWhatsApp, mensajeWhatsAppLead } from './domain/whatsapp';
+import { getSession } from './api/client';
+import { leerPeriodoDesdeUrl, actualizarAppQuery, resolverVistaInicial } from './domain/admin-url';
 import { LoginPage } from './components/auth/LoginPage';
 import { NavBar } from './components/layout/NavBar';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -59,11 +61,13 @@ function AppShell() {
   const { usuario, login, logout } = useAuth();
   const esSuperadmin = usuario?.rol === 'superadmin';
   const tienePanelGlobal = !esSuperadmin && Boolean(usuario?.panelGlobal);
-  const [vistaActiva, setVistaActiva] = useState<VistaActiva>(esSuperadmin ? 'admin' : 'leads');
+  const [vistaActiva, setVistaActiva] = useState<VistaActiva>(() =>
+    resolverVistaInicial(getSession()?.usuario ?? null),
+  );
   const [leadIdSeguimiento, setLeadIdSeguimiento] = useState<string | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [adminDashboard, setAdminDashboard] = useState<AdminDashboardData | null>(null);
-  const [periodo, setPeriodo] = useState<string>('mes');
+  const [periodo, setPeriodo] = useState<string>(() => leerPeriodoDesdeUrl() ?? 'mes');
   const [direccionOficinas, setDireccionOficinas] = useState<string | undefined>();
   const [promotores, setPromotores] = useState<Promotor[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -149,9 +153,15 @@ function AppShell() {
 
   const cambiarPeriodo = useCallback((nuevoPeriodo: string) => {
     setPeriodo(nuevoPeriodo);
+    actualizarAppQuery({ periodo: nuevoPeriodo, esSuperadmin });
     const enCache = dashboardPorPeriodoRef.current.has(nuevoPeriodo);
     void cargarDatos(nuevoPeriodo, { silencioso: enCache });
-  }, [cargarDatos]);
+  }, [cargarDatos, esSuperadmin]);
+
+  const cambiarVista = useCallback((vista: VistaActiva) => {
+    setVistaActiva(vista);
+    actualizarAppQuery({ vista, esSuperadmin });
+  }, [esSuperadmin]);
 
   useEffect(() => {
     void cargarDatos();
@@ -264,10 +274,10 @@ function AppShell() {
         promotores={promotores}
         rolUsuario={usuario.rol}
         onActualizarLead={onActualizarLead}
-        onVolver={() => setVistaActiva('leads')}
+        onVolver={() => cambiarVista('leads')}
         onAbrirSeguimientoLead={(leadId) => {
           setLeadIdSeguimiento(leadId);
-          setVistaActiva('leads');
+          cambiarVista('leads');
         }}
       />
     ) : vistaActiva === 'promotores' && usuario.rol === 'supervisor' ? (
@@ -301,7 +311,7 @@ function AppShell() {
     <div vaul-drawer-wrapper="" className="min-h-svh bg-zinc-50">
       <NavBar
         vistaActiva={vistaActiva}
-        onCambiarVista={setVistaActiva}
+        onCambiarVista={cambiarVista}
         usuario={usuario}
         onLogout={logout}
         grabacionesHabilitado={grabacionesHabilitado}

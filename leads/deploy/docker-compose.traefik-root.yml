@@ -20,6 +20,7 @@ services:
       PORT: "3001"
       APP_BASE_PATH: "/leads"
       BASE_PATH: "/leads"
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
     volumes:
       - ./data:/app/data
     networks:

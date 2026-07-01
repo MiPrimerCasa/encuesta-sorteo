@@ -47,6 +47,12 @@ export interface NuevoLeadData {
   domicilioEntrevista?: string;
 }
 
+export interface NuevoLeadSaveOptions {
+  promotorNombre?: string;
+  /** Tras crear el lead, registrar contacto y abrir WhatsApp (como el botón verde en la tarjeta). */
+  contactar?: boolean;
+}
+
 export interface Promotor {
   id: string;
   nombre: string;

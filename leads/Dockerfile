@@ -27,8 +27,13 @@ RUN npm run build
 FROM node:20-bookworm-slim AS runtime
 WORKDIR /app
 
+# Informe, grabaciones y jobs usan new Date() en hora local del contenedor.
+ENV TZ=America/Argentina/Buenos_Aires
+
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
+  && apt-get install -y --no-install-recommends python3 make g++ tzdata \
+  && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
+  && echo $TZ > /etc/timezone \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./

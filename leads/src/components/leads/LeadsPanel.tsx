@@ -16,7 +16,7 @@ import { prioridadTabInicial } from '../../domain/prioridad-leads';
 
 import { useHistorialLeads } from '../../hooks/useHistorialLeads';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
-import type { Barrio, GuardarSeguimientoResult, Lead, NuevoLeadData, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
+import type { Barrio, GuardarSeguimientoResult, Lead, NuevoLeadData, NuevoLeadSaveOptions, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
 import { AlertasSinContactar } from './AlertasSinContactar';
 import { AgregarReferidosSheet } from './AgregarReferidosSheet';
 import { LeadCard } from './LeadCard';
@@ -89,7 +89,7 @@ interface LeadsPanelProps {
     leadId: string,
     seguimiento: SeguimientoLead,
   ) => void | Promise<void | GuardarSeguimientoResult>;
-  onCrearLead: (data: NuevoLeadData, promotorNombre?: string) => void | Promise<void>;
+  onCrearLead: (data: NuevoLeadData, options?: NuevoLeadSaveOptions) => void | Promise<void>;
   onModificarTelefonoLead?: (leadId: string, telefono: string) => void | Promise<void>;
   direccionOficinas?: string;
   /** Desde calendario: abrir seguimiento de este lead al montar. */

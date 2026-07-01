@@ -10,6 +10,7 @@ import {
   fetchProductos,
   guardarSeguimiento,
 } from './api/client';
+import { abrirChatWhatsApp, mensajeWhatsAppLead } from './domain/whatsapp';
 import { LoginPage } from './components/auth/LoginPage';
 import { NavBar } from './components/layout/NavBar';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -18,6 +19,7 @@ import type {
   Barrio,
   Lead,
   NuevoLeadData,
+  NuevoLeadSaveOptions,
   Producto,
   Promotor,
   SeguimientoLead,
@@ -173,17 +175,35 @@ function AppShell() {
     setLeadIdSeguimiento(null);
   }, []);
 
-  const onCrearLead = useCallback(async (data: NuevoLeadData, promotorNombre?: string) => {
+  const onCrearLead = useCallback(async (data: NuevoLeadData, options?: NuevoLeadSaveOptions) => {
     try {
-      const newLead = await crearLead(data, { promotorNombre });
-      setLeads((prev) => [...prev, newLead]);
+      const newLead = await crearLead(data, { promotorNombre: options?.promotorNombre });
+      let leadFinal = newLead;
+      if (options?.contactar) {
+        const result = await guardarSeguimiento(newLead.id, {
+          canal: 'mensaje',
+          huboEntrevista: false,
+        });
+        leadFinal = result.lead;
+      }
+      setLeads((prev) => [...prev, leadFinal]);
+      if (options?.contactar) {
+        const nombrePromotor =
+          options.promotorNombre?.trim() ||
+          data.promotorNombre?.trim() ||
+          usuario?.nombre?.trim();
+        abrirChatWhatsApp(
+          data.telefono.trim(),
+          mensajeWhatsAppLead(data.nombre.trim(), nombrePromotor, false),
+        );
+      }
       setError('');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'No se pudo crear el lead';
       setError(msg);
       throw err;
     }
-  }, []);
+  }, [usuario]);
 
   const onModificarTelefonoLead = useCallback(async (leadId: string, telefono: string) => {
     const updated = await modificarTelefonoLead(leadId, telefono);

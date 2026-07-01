@@ -13,6 +13,7 @@ import {
   parseIdEntero,
 } from './mssql.js';
 import { cierreRegistradoPorSupervisor } from '../domain/cierre-supervisor.js';
+import { leadDerivacionTerrenoSupervisorActiva } from '../domain/derivacion-terreno.js';
 import { CodigoPromotorCargaError } from './encuesta-carga.js';
 import { getSeguimientoExterno } from './sqlite.js';
 import { nombresCoinciden } from './operadores-catalog.js';
@@ -848,8 +849,16 @@ export function buildPromotoresParaCarga(usuarioSesion, leads, encuestaRows = []
 }
 
 function applyDerivacionTerrenoAlLead(lead, seguimiento) {
-  if (seguimiento?.resultadoEntrevista !== 'derivar_terreno') {
+  if (seguimiento?.resultadoEntrevista !== 'derivar_terreno' && !seguimiento?.derivacionTerrenoActiva) {
     return lead;
+  }
+  const segConFlag = {
+    ...seguimiento,
+    derivacionTerrenoActiva:
+      seguimiento?.resultadoEntrevista === 'derivar_terreno' || seguimiento?.derivacionTerrenoActiva === true,
+  };
+  if (seguimiento?.resultadoEntrevista !== 'derivar_terreno') {
+    return { ...lead, seguimiento: segConFlag };
   }
   const horario = seguimiento.horarioEntrevistaPropuesto?.trim();
   if (horario) {
@@ -858,7 +867,7 @@ function applyDerivacionTerrenoAlLead(lead, seguimiento) {
       horarioEntrevista: horario,
       quiereEntrevista: true,
       lista: 'entrevista',
-      seguimiento: { ...lead.seguimiento, ...seguimiento, fechaReagenda: null },
+      seguimiento: { ...segConFlag, fechaReagenda: null },
     };
   }
   const { horarioEntrevista: _h, ...rest } = lead;
@@ -866,7 +875,7 @@ function applyDerivacionTerrenoAlLead(lead, seguimiento) {
     ...rest,
     quiereEntrevista: false,
     lista: 'contacto',
-    seguimiento: { ...lead.seguimiento, ...seguimiento, horarioEntrevistaPropuesto: null },
+    seguimiento: { ...segConFlag, horarioEntrevistaPropuesto: null },
   };
 }
 
@@ -961,13 +970,13 @@ async function mapEncuestaRowsToLeads(rows, idOperador = null, operadorIdsBatch 
       const isLocked =
         lead.cargadoPorRol === 'promotor' &&
         !hasPassed48Hours(lead.fechaAlta) &&
-        lead.seguimiento?.resultadoEntrevista !== 'derivar_terreno' &&
+        !leadDerivacionTerrenoSupervisorActiva(lead) &&
         !esCargaPropia(lead, usuarioSesion);
 
       const hasPendingInterview =
         leadTieneCitaPrevia(lead) &&
         lead.cargadoPorRol === 'promotor' &&
-        lead.seguimiento?.resultadoEntrevista !== 'derivar_terreno' &&
+        !leadDerivacionTerrenoSupervisorActiva(lead) &&
         !esCargaPropia(lead, usuarioSesion);
 
       if (isLocked) {
@@ -1071,8 +1080,8 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     usuario?.rol === 'supervisor' &&
     base.cargadoPorRol === 'promotor' &&
     !hasPassed48Hours(base.fechaAlta) &&
-    !esCargaPropia(base, usuario) &&
-    prevSeg?.resultadoEntrevista !== 'derivar_terreno'
+    !leadDerivacionTerrenoSupervisorActiva(base) &&
+    !esCargaPropia(base, usuario)
   ) {
     const err = new Error(
       'No podés interactuar con este lead hasta que pasen 48 horas de su creación para dar prioridad al promotor.',
@@ -1085,7 +1094,7 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     usuario?.rol === 'supervisor' &&
     leadTieneCitaPrevia(base) &&
     base.cargadoPorRol === 'promotor' &&
-    prevSeg?.resultadoEntrevista !== 'derivar_terreno'
+    !leadDerivacionTerrenoSupervisorActiva({ ...base, seguimiento: { ...prevSeg, ...seguimiento } })
   ) {
     const err = new Error(
       'No podés tratar este lead hasta que el promotor lo derive por interesado en terreno.',
@@ -1094,6 +1103,20 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     throw err;
   }
   let seguimientoParaGuardar = { ...seguimiento };
+  const resultadoGuardado =
+    seguimientoParaGuardar.resultadoEntrevista ?? prevSeg?.resultadoEntrevista ?? null;
+  if (resultadoGuardado === 'derivar_terreno') {
+    seguimientoParaGuardar.derivacionTerrenoActiva = true;
+  } else if (
+    prevSeg?.derivacionTerrenoActiva === true ||
+    prevSeg?.resultadoEntrevista === 'derivar_terreno'
+  ) {
+    if (resultadoGuardado === 'compro' || resultadoGuardado === 'no_compro' || resultadoGuardado === 'sin_interes') {
+      seguimientoParaGuardar.derivacionTerrenoActiva = false;
+    } else if (seguimientoParaGuardar.derivacionTerrenoActiva !== false) {
+      seguimientoParaGuardar.derivacionTerrenoActiva = true;
+    }
+  }
   let referidosCreados = [];
   let nuevosLeads = [];
 

@@ -3,6 +3,7 @@ import type {
   LugarEntrevista,
   Producto,
   Promotor,
+  ResultadoEntrevista,
   RolUsuario,
   SeguimientoHistorialEntry,
   SeguimientoLead,
@@ -110,7 +111,7 @@ export function leadSoloLecturaSupervisor(lead: Lead) {
   if (
     leadTieneCitaPrevia(lead) &&
     lead.cargadoPorRol === 'promotor' &&
-    lead.seguimiento?.resultadoEntrevista !== 'derivar_terreno'
+    !leadDerivacionTerrenoSupervisorActiva(lead)
   ) {
     return true;
   }
@@ -172,6 +173,36 @@ export function leadDerivaSupervisorTerreno(lead: Lead) {
   return r === 'derivar_terreno';
 }
 
+/** Derivación terreno activa: pendiente o ya tomada por el supervisor (reagenda, etc.). */
+export function leadDerivacionTerrenoSupervisorActiva(lead: Lead) {
+  const seg = lead.seguimiento;
+  if (leadDerivaSupervisorTerreno(lead)) return true;
+  if (seg?.derivacionTerrenoActiva === true) return true;
+  if (lead.cargadoPorRol !== 'promotor') return false;
+  if (leadSeguimientoPijPromotor(lead)) return false;
+  if (
+    leadReagendaEntrevista(lead) &&
+    normalizarRolOperador(seg?.operadorRol) === 'supervisor'
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** Calcula si persiste la derivación terreno al guardar seguimiento. */
+export function resolverDerivacionTerrenoActiva(
+  lead: Lead,
+  resultadoEntrevista: ResultadoEntrevista | null | undefined,
+): boolean | null {
+  if (resultadoEntrevista === 'derivar_terreno') return true;
+  if (resultadoEntrevista === 'compro' || resultadoEntrevista === 'no_compro' || resultadoEntrevista === 'sin_interes') {
+    return false;
+  }
+  if (lead.seguimiento?.derivacionTerrenoActiva === true) return true;
+  if (lead.seguimiento?.resultadoEntrevista === 'derivar_terreno') return true;
+  return lead.seguimiento?.derivacionTerrenoActiva ?? null;
+}
+
 /** Lead activo derivado por interés terreno (prioridad máxima en tarjeta). */
 export function leadEsInteresTerreno(lead: Lead) {
   if (!leadDerivaSupervisorTerreno(lead)) return false;
@@ -217,6 +248,10 @@ export function sortLeadsSeguimiento(leads: Lead[]): Lead[] {
 export function applySeguimientoAlLead(lead: Lead, patch: SeguimientoLead): Lead {
   const seguimiento = { ...lead.seguimiento, ...patch };
   let next: Lead = { ...lead, seguimiento };
+
+  if (seguimiento.resultadoEntrevista !== 'derivar_terreno' && !seguimiento.derivacionTerrenoActiva) {
+    return next;
+  }
 
   if (seguimiento.resultadoEntrevista !== 'derivar_terreno') {
     return next;
@@ -415,9 +450,9 @@ export function leadSoloLecturaUltimoModificador(
     // Si no tiene operadorId de seguimiento previo, cualquiera puede gestionarlo.
     return false;
   }
-  // Si está derivado a terreno por el promotor, el supervisor lo puede tratar sin importar quién lo modificó último
+  // Derivación terreno: el supervisor puede gestionar aunque no sea el último operador
   if (
-    lead.seguimiento?.resultadoEntrevista === 'derivar_terreno' &&
+    leadDerivacionTerrenoSupervisorActiva(lead) &&
     (userRole === 'supervisor' || userRole === 'superadmin')
   ) {
     return false;

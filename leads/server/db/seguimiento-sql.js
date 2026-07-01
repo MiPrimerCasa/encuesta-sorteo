@@ -219,6 +219,7 @@ export function mapSqlRowToSeguimiento(row) {
     numeroRecibo: base.numeroRecibo ?? row.numero_recibo ?? row.numeroRecibo ?? null,
     brindoReferidos:
       base.brindoReferidos ?? bitOrNull(row.brindo_referidos ?? row.brindoReferidos),
+    derivacionTerrenoActiva: base.derivacionTerrenoActiva ?? null,
     referidos: Array.isArray(referidos) ? referidos : undefined,
     observaciones: base.observaciones ?? row.observaciones ?? undefined,
     fuente: base.fuente ?? row.fuente ?? undefined,

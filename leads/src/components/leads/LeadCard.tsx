@@ -7,6 +7,7 @@ import {
   getPromotorNombre,
   leadCompro,
   leadDerivaSupervisorTerreno,
+  leadDerivacionTerrenoSupervisorActiva,
   leadEsInteresTerreno,
   leadEnEntrevistaPendiente,
   leadPostEntrevistaSinCompra,
@@ -172,7 +173,7 @@ export function LeadCard({
     rolUsuario === 'supervisor' &&
     leadTieneCitaPrevia(lead) &&
     lead.cargadoPorRol === 'promotor' &&
-    lead.seguimiento?.resultadoEntrevista !== 'derivar_terreno' &&
+    !leadDerivacionTerrenoSupervisorActiva(lead) &&
     !compro &&
     !esCerradoNegativoLead(lead);
 

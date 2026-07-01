@@ -206,6 +206,11 @@ export interface SeguimientoLead {
   resultadoEntrevista?: ResultadoEntrevista | null;
   /** Si resultado = derivar_terreno y el cliente propuso fecha (supervisor / calendario). */
   horarioEntrevistaPropuesto?: string | null;
+  /**
+   * Derivación terreno del promotor en curso por el supervisor.
+   * Persiste tras reagenda/contacto hasta cierre o cierre negativo.
+   */
+  derivacionTerrenoActiva?: boolean | null;
   fechaReagenda?: string | null;
   /** Fecha y hora en la que se realizó el cierre (resultadoEntrevista = compro). */
   fechaCierre?: string | null;

@@ -13,6 +13,7 @@ import {
   leadSeguimientoPijPromotor,
   leadTieneCitaPrevia,
   puedeVenderProducto,
+  resolverDerivacionTerrenoActiva,
   ETIQUETA_CIERRE_SUPERVISOR,
   ETIQUETA_SEGUIMIENTO_PIJ,
 } from '../../domain/leads';
@@ -733,6 +734,14 @@ export function LeadModalForm({
       form.reagendaPijTrasNoCompro === true &&
       !entrevistaMomentoSinCitaGuardar;
 
+    const resultadoFinal = confirmoNo
+      ? esReagendaNoConfirmo
+        ? 'reagenda'
+        : form.resultadoEntrevista
+      : esReagenda
+        ? 'reagenda'
+        : form.resultadoEntrevista;
+
     const seguimiento: SeguimientoLead = {
       fuente: lead.seguimiento?.fuente,
       confirmoEntrevista: flujoSinCita ? null : form.confirmoEntrevista,
@@ -744,13 +753,7 @@ export function LeadModalForm({
           : (confirmoNo || esReagenda)
             ? false
             : form.huboEntrevista,
-      resultadoEntrevista: confirmoNo
-        ? esReagendaNoConfirmo
-          ? 'reagenda'
-          : form.resultadoEntrevista
-        : esReagenda
-          ? 'reagenda'
-          : form.resultadoEntrevista,
+      resultadoEntrevista: resultadoFinal,
       fechaReagenda: esReagenda ? form.fechaReagenda || null : null,
       fechaCierre:
         form.resultadoEntrevista === 'compro'
@@ -758,6 +761,7 @@ export function LeadModalForm({
           : null,
       seguimientoPijPromotor: esReagendaPij,
       seguimientoAgendaOperadorRol: null,
+      derivacionTerrenoActiva: resolverDerivacionTerrenoActiva(lead, resultadoFinal),
       horarioEntrevistaPropuesto:
         form.resultadoEntrevista === 'derivar_terreno' && form.proponeFechaDerivacion
           ? form.horarioDerivacion.trim()

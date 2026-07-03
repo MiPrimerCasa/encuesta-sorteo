@@ -689,6 +689,52 @@ export function updateDemoLeadTelefono(leadId: string, telefono: string): Lead {
   return { ...updated };
 }
 
+function digitsTelefonoDemo(val: string) {
+  return String(val ?? '').replace(/\D/g, '');
+}
+
+function telefonosCoincidenDemo(a: string, b: string) {
+  const d1 = digitsTelefonoDemo(a);
+  const d2 = digitsTelefonoDemo(b);
+  if (!d1 || !d2) return false;
+  if (d1 === d2) return true;
+  if (d1.length >= 8 && d2.length >= 8) return d1.slice(-8) === d2.slice(-8);
+  return false;
+}
+
+export function verificarTelefonoDemoCarga(telefono: string) {
+  const digits = digitsTelefonoDemo(telefono);
+  if (!digits || digits.length < 8) {
+    return {
+      disponible: false,
+      invalido: true,
+      mensaje: 'Ingresá un teléfono válido (mínimo 8 dígitos).',
+    };
+  }
+  const existente = demoLeads.find((l) => telefonosCoincidenDemo(l.telefono, telefono));
+  if (!existente) {
+    return {
+      disponible: true,
+      telefono: telefono.trim(),
+      mensaje: 'Número disponible — podés guardar el lead.',
+    };
+  }
+  const cargadoPor = existente.promotorNombre?.trim() || 'Operador desconocido';
+  return {
+    disponible: false,
+    telefono: telefono.trim(),
+    mensaje: `Este número ya está registrado. Cargado por ${cargadoPor}.`,
+    existente: {
+      leadId: existente.id,
+      nombreCliente: existente.nombre,
+      cargadoPor,
+      supervisorNombre: existente.supervisorNombre,
+      fechaAlta: existente.fechaAlta || existente.fechaObtencion || null,
+      origen: existente.seguimiento?.fuente === 'app' ? 'Carga manual' : 'Encuesta',
+    },
+  };
+}
+
 export function createDemoLead(data: NuevoLeadData): Lead {
   const now = new Date();
   const promotorNombre =

@@ -839,5 +839,65 @@ export async function duplicarLeadEnDb(leadId, codigoVendedorDestino, usuarioSes
   );
 }
 
+function describirOrigenCarga(lead) {
+  const raw = String(lead?.origenEncuesta ?? '').trim().toLowerCase();
+  if (raw === '2' || raw.includes('manual') || raw.includes('app')) return 'Carga manual';
+  if (raw === '1' || raw.includes('qr')) return 'QR / sorteo';
+  if (lead?.seguimiento?.fuente === 'app') return 'Carga manual';
+  if (raw) return raw;
+  return 'Encuesta';
+}
+
+/**
+ * Verifica si un teléfono ya está registrado en la campaña activa (antes de carga manual).
+ */
+export async function verificarTelefonoCargaManual(telefonoRaw) {
+  const digits = digitsTelefono(telefonoRaw);
+  if (!digits || digits.length < 8) {
+    return {
+      disponible: false,
+      invalido: true,
+      mensaje: 'Ingresá un teléfono válido (mínimo 8 dígitos).',
+    };
+  }
+
+  const telefono = normalizarTelefonoCarga(telefonoRaw) || digits;
+  const encuesta = getEncuestaCampaniaId();
+  const leads = await listAllLeadsFromEncuestas({ incluirReferidos: false });
+
+  const existente = leads.find((l) => {
+    if (!telefonosCoinciden(l.telefono, telefono)) return false;
+    const encLead = l.codigoCampania
+      ? normalizarEncuestaCargaId(l.codigoCampania)
+      : normalizarEncuestaCargaId('sorteo01');
+    return encLead === encuesta;
+  });
+
+  if (!existente) {
+    return {
+      disponible: true,
+      telefono,
+      mensaje: 'Número disponible — podés guardar el lead.',
+    };
+  }
+
+  const cargadoPor = String(existente.promotorNombre || 'Operador desconocido').trim();
+  const supervisor = existente.supervisorNombre?.trim() || undefined;
+
+  return {
+    disponible: false,
+    telefono,
+    mensaje: `Este número ya está registrado. Cargado por ${cargadoPor}.`,
+    existente: {
+      leadId: String(existente.id),
+      nombreCliente: existente.nombre,
+      cargadoPor,
+      supervisorNombre: supervisor,
+      fechaAlta: existente.fechaAlta || existente.fechaObtencion || null,
+      origen: describirOrigenCarga(existente),
+    },
+  };
+}
+
 export { MSG_CONTACTO_YA_REGISTRADO };
 

@@ -27,6 +27,7 @@ import {
   resolveCargaEncuestaContext,
   reasignarLeadManual,
   duplicarLeadEnDb,
+  verificarTelefonoCargaManual,
   execEncuestaSorteo01Update,
   buildCargaParamsFromLead,
   getEncuestaCampaniaId,
@@ -850,6 +851,32 @@ function registerApiRoutes(api) {
     } catch (error) {
       return res.status(500).json({
         message: 'Error al listar productos.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
+  api.get('/leads/verificar-telefono', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+
+    const telefono = String(req.query.telefono || '').trim();
+    if (!telefono) {
+      return res.status(400).json({ message: 'Indicá el teléfono a verificar.' });
+    }
+
+    try {
+      getDb();
+      const resultado = await verificarTelefonoCargaManual(telefono);
+      return res.json(resultado);
+    } catch (error) {
+      console.error('Error al verificar teléfono:', error);
+      return res.status(500).json({
+        message: 'No se pudo verificar el teléfono.',
         detail: error instanceof Error ? error.message : 'Error desconocido',
       });
     }

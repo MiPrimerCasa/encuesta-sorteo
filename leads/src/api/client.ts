@@ -17,6 +17,7 @@ import type {
   SeguimientoHistorialEntry,
   SeguimientoLead,
   UsuarioSesion,
+  VerificarTelefonoCargaResult,
 } from '../types';
 import { mensajeReferidosCreados } from '../domain/referidos-carga';
 import {
@@ -37,6 +38,7 @@ import {
   updateDemoLeadTelefono,
   reassignDemoLead,
   getDemoOperadores,
+  verificarTelefonoDemoCarga,
 } from './demoData';
 
 let _isDemoActive = import.meta.env.VITE_DEMO === 'true';
@@ -391,6 +393,12 @@ export async function guardarSeguimiento(
 }
 
 /** Alta manual vía dbo.encuestaCargaSorteo01 (producción) o demo local. */
+export async function verificarTelefonoCarga(telefono: string): Promise<VerificarTelefonoCargaResult> {
+  if (_isDemoActive) return verificarTelefonoDemoCarga(telefono);
+  const q = encodeURIComponent(telefono.trim());
+  return apiFetch<VerificarTelefonoCargaResult>(`/api/leads/verificar-telefono?telefono=${q}`);
+}
+
 export async function crearLead(nuevoLead: NuevoLeadData, opciones?: { promotorNombre?: string }) {
   if (_isDemoActive) return createDemoLead(nuevoLead);
   const headers: Record<string, string> = {};

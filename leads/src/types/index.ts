@@ -53,6 +53,21 @@ export interface NuevoLeadSaveOptions {
   contactar?: boolean;
 }
 
+export interface VerificarTelefonoCargaResult {
+  disponible: boolean;
+  telefono?: string;
+  mensaje?: string;
+  invalido?: boolean;
+  existente?: {
+    leadId: string;
+    nombreCliente: string;
+    cargadoPor: string;
+    supervisorNombre?: string;
+    fechaAlta?: string | null;
+    origen?: string;
+  };
+}
+
 export interface Promotor {
   id: string;
   nombre: string;

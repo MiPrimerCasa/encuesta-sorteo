@@ -1,7 +1,16 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
 import { useAuth } from '../../context/AuthContext';
-import type { LugarEntrevista, NuevoLeadData, NuevoLeadSaveOptions, Promotor, RolUsuario } from '../../types';
+import { verificarTelefonoCarga } from '../../api/client';
+import {
+  formatearTelefonoCargaDisplay,
+  normalizarTelefonoCarga,
+  sanitizarInputTelefonoCarga,
+  telefonoCargaEsValido,
+  telefonoCargaTieneLongitudMinima,
+  telefonoListoParaVerificarCarga,
+} from '../../domain/telefono-carga';
+import type { LugarEntrevista, NuevoLeadData, NuevoLeadSaveOptions, Promotor, RolUsuario, VerificarTelefonoCargaResult } from '../../types';
 import { DateTimePicker } from '../ui/DateTimePicker';
 
 interface NuevoLeadSheetProps {
@@ -92,8 +101,18 @@ export function NuevoLeadSheet({
   const [domicilioEntrevista, setDomicilioEntrevista] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [verificando, setVerificando] = useState(false);
+  const [verificacion, setVerificacion] = useState<VerificarTelefonoCargaResult | null>(null);
 
   const esSupervisor = rolUsuario === 'supervisor';
+  const telefonoDigitos = sanitizarInputTelefonoCarga(telefono);
+  const telefonoDisplay = formatearTelefonoCargaDisplay(telefonoDigitos);
+  const telefonoNormalizado = telefonoDigitos ? normalizarTelefonoCarga(telefonoDigitos) : '';
+  const telefonoVerificadoDisponible = verificacion?.disponible === true;
+  const telefonoVerificadoOcupado =
+    verificacion != null && !verificacion.disponible && !verificacion.invalido;
+  const puedeGuardar = telefonoVerificadoDisponible && !saving && !verificando;
+  const verifySeqRef = useRef(0);
 
   useEffect(() => {
     if (!open) return;
@@ -106,6 +125,8 @@ export function NuevoLeadSheet({
     setDomicilioEntrevista('');
     setError('');
     setSaving(false);
+    setVerificacion(null);
+    setVerificando(false);
     if (usuario) {
       setPromotorId(String(usuario.idOperador ?? usuario.id ?? '').trim());
     } else {
@@ -125,13 +146,65 @@ export function NuevoLeadSheet({
     }
   }, [lugarEntrevista, direccionSucursalActiva, promotorId]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    if (!telefonoListoParaVerificarCarga(telefonoDigitos)) {
+      setVerificacion(null);
+      setVerificando(false);
+      return;
+    }
+
+    setVerificacion(null);
+    setVerificando(true);
+    const seq = ++verifySeqRef.current;
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const resultado = await verificarTelefonoCarga(telefonoNormalizado);
+          if (seq !== verifySeqRef.current) return;
+          setVerificacion(resultado);
+          if (resultado.invalido) {
+            setError(resultado.mensaje || 'Teléfono inválido.');
+          } else {
+            setError((prev) =>
+              prev === 'No se pudo verificar el teléfono.' || prev.includes('verificación')
+                ? ''
+                : prev,
+            );
+          }
+        } catch (err) {
+          if (seq !== verifySeqRef.current) return;
+          setError(err instanceof Error ? err.message : 'No se pudo verificar el teléfono.');
+          setVerificacion(null);
+        } finally {
+          if (seq === verifySeqRef.current) setVerificando(false);
+        }
+      })();
+    }, 500);
+
+    return () => {
+      window.clearTimeout(timer);
+      verifySeqRef.current += 1;
+    };
+  }, [open, telefonoDigitos, telefonoNormalizado]);
+
   const handleSave = async (contactar: boolean) => {
+    if (verificando) {
+      setError('Esperá a que termine la verificación del teléfono.');
+      return;
+    }
+    if (!telefonoVerificadoDisponible) {
+      setError('El teléfono debe estar disponible para guardar.');
+      return;
+    }
     if (!nombre.trim()) {
       setError('El nombre es obligatorio.');
       return;
     }
-    if (!telefono.trim()) {
-      setError('El teléfono es obligatorio.');
+    if (!telefonoCargaTieneLongitudMinima(telefonoDigitos) || !telefonoCargaEsValido(telefonoDigitos)) {
+      setError('El teléfono es obligatorio y debe ser válido.');
       return;
     }
     if (!promotorId || !usuario) {
@@ -173,7 +246,7 @@ export function NuevoLeadSheet({
     try {
       const payload: NuevoLeadData = {
         nombre: nombre.trim(),
-        telefono: telefono.trim(),
+        telefono: telefonoNormalizado,
         lista: agendarEntrevista ? 'entrevista' : 'contacto',
         quiereEntrevista: agendarEntrevista,
         agendarEntrevista,
@@ -272,17 +345,109 @@ export function NuevoLeadSheet({
               <label htmlFor="nl-telefono" className={LABEL_CLASS}>
                 Teléfono <span className="text-brand-600">*</span>
               </label>
-              <input
-                id="nl-telefono"
-                type="tel"
-                inputMode="tel"
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-                placeholder="Ej. 3512 345678"
-                autoComplete="tel"
-                required
-                className={INPUT_CLASS}
-              />
+              <div className="relative">
+                <input
+                  id="nl-telefono"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9 ]*"
+                  value={telefonoDisplay}
+                  onChange={(e) => {
+                    setTelefono(sanitizarInputTelefonoCarga(e.target.value));
+                    setError('');
+                  }}
+                  onPaste={(e) => {
+                    e.preventDefault();
+                    const pasted = e.clipboardData.getData('text');
+                    setTelefono(sanitizarInputTelefonoCarga(pasted));
+                    setError('');
+                  }}
+                  placeholder="Ej. 3705 123456 o 5493705123456"
+                  autoComplete="tel"
+                  required
+                  aria-invalid={telefonoVerificadoOcupado || Boolean(verificacion?.invalido)}
+                  className={`${INPUT_CLASS} w-full pr-10 ${
+                    telefonoVerificadoDisponible
+                      ? 'border-emerald-400 bg-emerald-50/40 focus:border-emerald-500 focus:ring-emerald-500/15'
+                      : telefonoVerificadoOcupado
+                        ? 'border-amber-400 bg-amber-50/40 focus:border-amber-500 focus:ring-amber-500/15'
+                        : verificando
+                          ? 'border-brand-200 bg-brand-50/30'
+                          : ''
+                  }`}
+                />
+                {verificando && (
+                  <span
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] font-medium text-brand-600"
+                    aria-live="polite"
+                  >
+                    …
+                  </span>
+                )}
+                {!verificando && telefonoVerificadoDisponible && (
+                  <span
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-emerald-600"
+                    aria-hidden="true"
+                    title="Disponible"
+                  >
+                    ✓
+                  </span>
+                )}
+                {!verificando && telefonoVerificadoOcupado && (
+                  <span
+                    className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-amber-600"
+                    aria-hidden="true"
+                    title="Ya registrado"
+                  >
+                    !
+                  </span>
+                )}
+              </div>
+              {telefonoDigitos && telefonoNormalizado && telefonoNormalizado !== telefonoDigitos && (
+                <p className="text-[12px] text-zinc-500">
+                  Se normalizará como: <strong className="font-semibold text-zinc-700">{telefonoNormalizado}</strong>
+                </p>
+              )}
+              {telefonoDigitos && !telefonoListoParaVerificarCarga(telefonoDigitos) && (
+                <p className="text-[12px] text-zinc-400">
+                  {telefonoCargaTieneLongitudMinima(telefonoDigitos)
+                    ? 'Completá el número para verificar disponibilidad.'
+                    : 'Mínimo 8 dígitos (solo números).'}
+                </p>
+              )}
+              {verificando && telefonoListoParaVerificarCarga(telefonoDigitos) && (
+                <p className="text-[12px] font-medium text-brand-700">Verificando disponibilidad…</p>
+              )}
+              {verificacion?.disponible && (
+                <p className="rounded-lg bg-emerald-50 px-3 py-2 text-[13px] font-medium text-emerald-800">
+                  {verificacion.mensaje || 'Número disponible — podés guardar el lead.'}
+                </p>
+              )}
+              {verificacion && !verificacion.disponible && !verificacion.invalido && verificacion.existente && (
+                <div className="rounded-lg bg-amber-50 px-3 py-2.5 text-[13px] text-amber-950">
+                  <p className="font-semibold">Este número ya está registrado</p>
+                  <p className="mt-1">
+                    Cliente: <strong>{verificacion.existente.nombreCliente}</strong>
+                  </p>
+                  <p>
+                    Cargado por: <strong>{verificacion.existente.cargadoPor}</strong>
+                    {verificacion.existente.supervisorNombre
+                      ? ` · Equipo: ${verificacion.existente.supervisorNombre}`
+                      : ''}
+                  </p>
+                  {verificacion.existente.fechaAlta && (
+                    <p className="mt-0.5 text-[12px] text-amber-800/90">
+                      Alta:{' '}
+                      {new Date(verificacion.existente.fechaAlta).toLocaleDateString('es-AR', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                      {verificacion.existente.origen ? ` · ${verificacion.existente.origen}` : ''}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <section className={SECTION_CLASS} aria-labelledby="nl-entrevista-title">
@@ -437,7 +602,7 @@ export function NuevoLeadSheet({
               <button
                 type="submit"
                 form="nuevo-lead-form"
-                disabled={saving}
+                disabled={!puedeGuardar}
                 style={{ touchAction: 'manipulation' }}
                 className="flex h-[52px] flex-1 items-center justify-center rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:bg-brand-800 active:scale-[0.98] disabled:opacity-50"
               >
@@ -449,7 +614,7 @@ export function NuevoLeadSheet({
               </button>
               <button
                 type="button"
-                disabled={saving}
+                disabled={!puedeGuardar}
                 onClick={() => void handleSave(true)}
                 style={{ touchAction: 'manipulation' }}
                 className="flex h-[52px] flex-1 items-center justify-center gap-2 rounded-xl bg-[#25D366] text-[15px] font-semibold text-white shadow-sm transition-all duration-[120ms] ease-out active:scale-[0.98] active:bg-[#1da851] disabled:opacity-50"
@@ -459,7 +624,7 @@ export function NuevoLeadSheet({
               </button>
             </div>
             <p className="text-center text-[11px] leading-relaxed text-zinc-400">
-              «Guardar y contactar» carga el lead, lo marca como contactado y abre WhatsApp.
+              El teléfono se verifica solo al completarlo. «Guardar y contactar» carga el lead, lo marca como contactado y abre WhatsApp.
             </p>
           </div>
         </Drawer.Content>

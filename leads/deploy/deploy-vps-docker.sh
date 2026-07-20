@@ -13,6 +13,7 @@ TIMESTAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 
 mkdir -p "$LOG_DIR"
 mkdir -p "${LEADS_DIR:-.}/data/grabaciones"
+mkdir -p "${LEADS_DIR:-.}/data/cierres-pij"
 LOG_FILE="${LOG_DIR}/${TIMESTAMP}.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 

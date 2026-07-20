@@ -67,6 +67,8 @@ import { getHealthInfo, respondIfNotConfigured } from './require-production.js';
 import { formatSqlError } from './sql-errors.js';
 import { loginSchema, seguimientoSchema } from './schemas/seguimiento.js';
 import { registerGrabacionesRoutes } from './routes/grabaciones-routes.js';
+import { registerCajaSyncRoutes } from './routes/caja-sync-routes.js';
+import { publicarCierreACajaMysql } from './services/caja-publicar-cierre.js';
 
 function usuarioDesdeRequest(req) {
   const rol = req.headers['x-usuario-rol'];
@@ -1068,7 +1070,7 @@ function registerApiRoutes(api) {
       if (!result?.lead) {
         return res.status(404).json({ message: 'Lead no encontrado en tus encuestas asignadas.' });
       }
-      const { lead, saved, entradaHistorial, referidosCreados, nuevosLeads } = result;
+      let { lead, saved, entradaHistorial, referidosCreados, nuevosLeads, registroId } = result;
       const idOperador = parseInt(String(usuario.id ?? ''), 10);
       let historial = await listHistorialForLead(req.params.id, lead, {
         limit: 30,
@@ -1095,6 +1097,40 @@ function registerApiRoutes(api) {
         invalidateAdminDashboardCache();
       }
 
+      // Publicar a MySQL nube (caja) — best-effort; no deshace el cierre CRM.
+      let cajaPublicacion = null;
+      const segParaCaja = { ...data, ...(lead?.seguimiento ?? {}) };
+      const origenCaja =
+        registroId ??
+        (entradaHistorial?.id != null && Number(entradaHistorial.id) > 0
+          ? Number(entradaHistorial.id)
+          : null);
+      if (saved) {
+        try {
+          cajaPublicacion = await publicarCierreACajaMysql({
+            lead,
+            seguimiento: segParaCaja,
+            usuario,
+            origenRegistroId: origenCaja,
+          });
+          if (cajaPublicacion?.error) {
+            message +=
+              ' El cierre se guardó en SQL Server, pero falló la publicación a la caja (MySQL).';
+          } else if (cajaPublicacion && !cajaPublicacion.skipped) {
+            message += ' Publicado en cola de caja.';
+          }
+        } catch (cajaErr) {
+          console.error('[caja-mysql] sync inesperado:', cajaErr);
+          cajaPublicacion = {
+            skipped: false,
+            cierreId: null,
+            error: cajaErr instanceof Error ? cajaErr.message : 'Error MySQL caja',
+          };
+          message +=
+            ' El cierre se guardó en SQL Server, pero falló la publicación a la caja (MySQL).';
+        }
+      }
+
       return res.json({
         message,
         lead,
@@ -1102,6 +1138,7 @@ function registerApiRoutes(api) {
         entradaHistorial: saved ? entradaHistorial : null,
         referidosCreados: referidosCreados ?? [],
         nuevosLeads: nuevosLeads ?? [],
+        cajaPublicacion,
       });
     } catch (error) {
       if (
@@ -1135,6 +1172,7 @@ function registerApiRoutes(api) {
   });
 
   registerGrabacionesRoutes(api, { usuarioDesdeRequest });
+  registerCajaSyncRoutes(api);
 }
 
 function mountStaticAndSpa(app, distPath, basePath) {

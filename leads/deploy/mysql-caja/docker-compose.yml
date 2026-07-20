@@ -1,0 +1,42 @@
+# MySQL "nube" para la integración con la caja de sucursal.
+# Se despliega en el VPS como servicio hermano del CRM, en la red Docker `root_default`.
+# NO publica el puerto 3306 al host: solo es accesible desde la red interna (mysql-caja:3306).
+# Copiar .env.example como .env (chmod 600) antes de levantar.
+
+services:
+  mysql-caja:
+    image: mysql:8.0
+    container_name: mysql-caja
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${CAJA_MYSQL_DB:-caja_pij}
+      MYSQL_USER: ${CAJA_MYSQL_USER:-crm_caja}
+      MYSQL_PASSWORD: ${CAJA_MYSQL_PASSWORD}
+      TZ: ${TZ:-America/Argentina/Buenos_Aires}
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      # Datos persistentes en el volumen del VPS
+      - /opt/mysql-caja/data:/var/lib/mysql
+      # Backups (dump manual / cron)
+      - /opt/mysql-caja/backups:/backups
+      # Scripts de inicialización (solo corren si el volumen de datos está vacío)
+      - ./init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - root_default
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # Importante: sin sección "ports:" → no se expone a internet.
+
+networks:
+  root_default:
+    external: true

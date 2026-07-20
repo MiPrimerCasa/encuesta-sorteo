@@ -3,6 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isGrabacionesEnabled } from './config/grabaciones-config.js';
 import { ensureGrabacionesStorageReady } from './domain/grabaciones-storage.js';
+import { ensureCierresPijStorageReady } from './domain/cierres-pij-storage.js';
 import { createApp, getAppBasePath } from './create-app.js';
 import { getDb } from './db/sqlite.js';
 import { isSqlServerConfigured } from './db/mssql.js';
@@ -84,6 +85,15 @@ app.listen(PORT, () => {
       }
     } else {
       console.log('  Grabaciones → deshabilitado (kill switch)');
+    }
+    try {
+      const cierresRoot = ensureCierresPijStorageReady();
+      console.log(`  Imágenes cierre PIJ → almacén: ${cierresRoot}`);
+    } catch (err) {
+      console.error(
+        '  Imágenes cierre PIJ → ERROR al preparar almacén:',
+        err instanceof Error ? err.message : err,
+      );
     }
     console.log(`  Health rápido → ${base}api/health/live`);
   } else {

@@ -34,13 +34,41 @@ function numOrUndef(val) {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/** Zona horaria de negocio para fechas hacia la caja (contrato §5). */
+function cajaFechaTimeZone() {
+  const raw = String(process.env.CAJA_FECHA_TZ ?? 'America/Argentina/Buenos_Aires').trim();
+  return raw || 'America/Argentina/Buenos_Aires';
+}
+
+/**
+ * Contrato caja: ISO local sin `Z`, ej. `2026-07-18T15:30:00` (hora Argentina).
+ * Evita que Electron muestre UTC crudo o con el huso de la PC mal configurado.
+ */
+export function formatFechaCierreParaCaja(raw) {
+  const d = raw instanceof Date ? raw : new Date(String(raw ?? '').trim() || Date.now());
+  const safe = Number.isNaN(d.getTime()) ? new Date() : d;
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: cajaFechaTimeZone(),
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  });
+  const parts = Object.fromEntries(fmt.formatToParts(safe).map((p) => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
+}
+
 function fechaSoloDia(isoOrText) {
   if (!isoOrText) return undefined;
-  const s = String(isoOrText);
-  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const s = String(isoOrText).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(s);
-  if (Number.isNaN(d.getTime())) return undefined;
-  return d.toISOString().slice(0, 10);
+  if (!Number.isNaN(d.getTime())) return formatFechaCierreParaCaja(d).slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  return undefined;
 }
 
 function appBasePath() {
@@ -119,7 +147,9 @@ function buildCompraAdicional(compra, seguimiento, basePath) {
     idProducto: String(compra.idProducto),
     estadoPago: String(compra.estadoPago),
     numeroRecibo: String(compra.numeroRecibo || ''),
-    fechaCierre: String(compra.fechaCierre || seguimiento?.fechaCierre || new Date().toISOString()),
+    fechaCierre: formatFechaCierreParaCaja(
+      compra.fechaCierre || seguimiento?.fechaCierre || new Date(),
+    ),
   };
   if (compra.idBarrio) item.idBarrio = String(compra.idBarrio);
   if (compra.observaciones) item.observaciones = String(compra.observaciones).slice(0, 500);
@@ -184,7 +214,7 @@ export function buildCrmIngestPayload({ lead, seguimiento, usuario, sucursalCodi
 
   const seg = {
     resultadoEntrevista: String(seguimiento.resultadoEntrevista),
-    fechaCierre: String(seguimiento.fechaCierre || new Date().toISOString()),
+    fechaCierre: formatFechaCierreParaCaja(seguimiento.fechaCierre || new Date()),
     idProducto: String(seguimiento.idProducto),
     estadoPago: String(seguimiento.estadoPago || ''),
     numeroRecibo: String(seguimiento.numeroRecibo || ''),

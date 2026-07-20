@@ -24,14 +24,26 @@ const PRODUCTOS_CAJA = new Set(['prod-pij', 'prod-terreno']);
 const RESULTADOS_CAJA = new Set(['compro', 'derivar_terreno']);
 
 /**
- * Extrae código de equipo/sucursal y lo normaliza a ERP (`01`…) si hay mapa.
+ * Resuelve código ERP de sucursal (`01`/`02`/`03`).
+ * No usa el texto libre de domicilio/nombre de sucursal del header `x-usuario-sucursal`
+ * (ej. "SALTA E M.MORENO…"): ese valor no es el código que filtra el pull de la caja.
  * @param {object} usuario
  * @param {object} [lead]
  */
 export function resolveSucursalParaCaja(usuario, lead) {
-  const fromHdr = String(usuario?.sucursal ?? usuario?.sucursalCodigo ?? '').trim();
-  if (fromHdr) return normalizarSucursalCodigoErp(fromHdr).slice(0, 40);
+  const esCodigoErpOEquipo = (raw) => {
+    const s = String(raw ?? '').trim();
+    return /^\d{1,2}$/.test(s) || /^S\d{1,2}$/i.test(s);
+  };
 
+  // 1) Código ERP explícito (01) o equipo S##
+  for (const cand of [usuario?.sucursalCodigo, usuario?.sucursal]) {
+    if (esCodigoErpOEquipo(cand)) {
+      return normalizarSucursalCodigoErp(cand).slice(0, 40);
+    }
+  }
+
+  // 2) Extraer S## del código promotor/supervisor (SORTEO01S21P01 → S21 → 01)
   const candidatos = [
     usuario?.codigoPromotor,
     usuario?.codigoCarga,
@@ -44,6 +56,7 @@ export function resolveSucursalParaCaja(usuario, lead) {
     if (equipo) return normalizarSucursalCodigoErp(equipo).slice(0, 40);
   }
 
+  // 3) Default de entorno
   const def = String(process.env.CAJA_DEFAULT_SUCURSAL ?? '').trim();
   return def ? normalizarSucursalCodigoErp(def).slice(0, 40) : null;
 }

@@ -10,6 +10,10 @@ import {
   telefonoCargaTieneLongitudMinima,
   telefonoListoParaVerificarCarga,
 } from '../../domain/telefono-carga';
+import {
+  referidoIncompleto,
+  referidoListoParaCarga,
+} from '../../domain/referidos-carga';
 import type {
   LugarEntrevista,
   NuevoLeadData,
@@ -283,11 +287,17 @@ export function NuevoLeadSheet({
       return;
     }
     const referidosValidos = agregarReferidos
-      ? referidos.filter((r) => r.nombre.trim() || r.telefono.trim())
+      ? referidos.filter((r) => referidoListoParaCarga(r))
       : [];
-    if (agregarReferidos && referidosValidos.length === 0) {
-      setError('Ingresá al menos un referido con nombre o teléfono, o desactivá la opción.');
-      return;
+    if (agregarReferidos) {
+      if (referidos.some((r) => referidoIncompleto(r))) {
+        setError('Cada referido necesita nombre y teléfono (mín. 6 dígitos), igual que en seguimiento.');
+        return;
+      }
+      if (referidosValidos.length === 0) {
+        setError('Ingresá al menos un referido con nombre y teléfono, o desactivá la opción.');
+        return;
+      }
     }
     if (agendarEntrevista) {
       if (!horarioEntrevista.trim()) {
@@ -674,7 +684,7 @@ export function NuevoLeadSheet({
                   Referidos
                 </h3>
                 <p className="mt-0.5 text-[12px] text-zinc-500">
-                  Opcional — igual que en el tratamiento del lead; se cargan como leads nuevos
+                  Opcional — igual que en seguimiento: cada uno aparece en tu panel como lead nuevo
                 </p>
               </div>
               <div className="space-y-1.5">
@@ -690,8 +700,8 @@ export function NuevoLeadSheet({
               {agregarReferidos && (
                 <div className="space-y-3 border-t border-zinc-200/80 pt-4">
                   <p className="text-[12px] text-zinc-500">
-                    Al guardar, cada referido se carga automáticamente (si el teléfono no existe ya
-                    en la campaña).
+                    Al guardar, cada referido (nombre + teléfono) se carga como lead del mismo
+                    promotor y aparece en el panel, si el teléfono no existe ya en la campaña.
                   </p>
                   {referidos.map((ref, idx) => (
                     <div key={idx} className="space-y-2 rounded-lg border border-zinc-200 bg-white p-3">

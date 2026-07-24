@@ -4,6 +4,20 @@ function claveTelefono(raw: string) {
   return String(raw ?? '').replace(/\D/g, '') || String(raw ?? '').trim();
 }
 
+/** Mismos requisitos que el alta automática en backend (nombre + teléfono ≥ 6 dígitos). */
+export function referidoListoParaCarga(ref: Referido): boolean {
+  const nombre = ref.nombre.trim();
+  const tel = claveTelefono(ref.telefono);
+  return Boolean(nombre && tel.length >= 6);
+}
+
+/** Tiene datos parciales: no se puede cargar ni dejar pasar en silencio. */
+export function referidoIncompleto(ref: Referido): boolean {
+  const nombre = ref.nombre.trim();
+  const tel = claveTelefono(ref.telefono);
+  return Boolean((nombre || tel) && !referidoListoParaCarga(ref));
+}
+
 export function referidosPendientesDeCarga(
   referidos: Referido[],
   referidosGenerados: ReferidoProcesado[] | undefined,
@@ -16,9 +30,9 @@ export function referidosPendientesDeCarga(
   const pendientes: Referido[] = [];
 
   for (const ref of referidos) {
+    if (!referidoListoParaCarga(ref)) continue;
     const nombre = ref.nombre.trim();
     const tel = claveTelefono(ref.telefono);
-    if (!nombre || tel.length < 6) continue;
     if (telPadre && tel === telPadre) continue;
     if (vistos.has(tel)) continue;
     vistos.add(tel);

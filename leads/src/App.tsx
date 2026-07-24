@@ -13,6 +13,7 @@ import {
 import { abrirChatWhatsApp, mensajeWhatsAppLead } from './domain/whatsapp';
 import { getSession } from './api/client';
 import { leerPeriodoDesdeUrl, actualizarAppQuery, resolverVistaInicial } from './domain/admin-url';
+import { referidosPendientesDeCarga } from './domain/referidos-carga';
 import { LoginPage } from './components/auth/LoginPage';
 import { NavBar } from './components/layout/NavBar';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -230,40 +231,48 @@ function AppShell() {
     try {
       const newLead = await crearLead(data, { promotorNombre: options?.promotorNombre });
       let leadFinal = newLead;
-      const referidos = options?.referidos?.filter((r) => r.nombre.trim() || r.telefono.trim()) ?? [];
+      let nuevosLeads: Lead[] = [];
+      // Misma regla que en seguimiento: nombre + teléfono ≥ 6 dígitos.
+      const referidos = referidosPendientesDeCarga(
+        options?.referidos ?? [],
+        undefined,
+        data.telefono,
+      );
       const haySeguimientoPostAlta = Boolean(options?.contactar) || referidos.length > 0;
 
       if (haySeguimientoPostAlta) {
         const result = await guardarSeguimiento(newLead.id, {
+          fuente: 'app',
           ...(options?.contactar
             ? { canal: 'mensaje' as const, huboEntrevista: false }
             : {}),
           ...(referidos.length > 0 ? { brindoReferidos: true, referidos } : {}),
         });
         leadFinal = result.lead;
-        if (result.message?.includes('referido') || (result.referidosCreados?.length ?? 0) > 0) {
+        nuevosLeads = result.nuevosLeads ?? [];
+        if (
+          result.message?.includes('referido') ||
+          (result.referidosCreados?.length ?? 0) > 0
+        ) {
           setAviso(result.message ?? 'Referidos procesados.');
         }
-        if (result.nuevosLeads?.length) {
-          setLeads((prev) => {
-            const ids = new Set(prev.map((l) => l.id));
-            let next = ids.has(leadFinal.id)
-              ? prev.map((l) => (l.id === leadFinal.id ? leadFinal : l))
-              : [...prev, leadFinal];
-            for (const nl of result.nuevosLeads ?? []) {
-              if (!ids.has(nl.id)) {
-                next = [...next, nl];
-                ids.add(nl.id);
-              }
-            }
-            return next;
-          });
-        } else {
-          setLeads((prev) => [...prev, leadFinal]);
-        }
-      } else {
-        setLeads((prev) => [...prev, leadFinal]);
       }
+
+      // Igual que onActualizarLead: el lead padre + referidos nuevos entran al panel sin F5.
+      setLeads((prev) => {
+        const ids = new Set(prev.map((l) => l.id));
+        let next = ids.has(leadFinal.id)
+          ? prev.map((l) => (l.id === leadFinal.id ? leadFinal : l))
+          : [...prev, leadFinal];
+        if (!ids.has(leadFinal.id)) ids.add(leadFinal.id);
+        for (const nl of nuevosLeads) {
+          if (!ids.has(nl.id)) {
+            next = [...next, nl];
+            ids.add(nl.id);
+          }
+        }
+        return next;
+      });
 
       if (options?.contactar) {
         const nombrePromotor =

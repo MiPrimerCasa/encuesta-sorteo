@@ -204,14 +204,23 @@ function AppShell() {
         }
         return next;
       });
-      if (result.message?.includes('referido')) {
-        setAviso(result.message);
+      if (
+        result.message?.includes('referido') ||
+        result.message?.includes('sistema integral') ||
+        result.pijIntegral?.estado === 'error' ||
+        result.pijIntegral?.estado === 'fotos_ok'
+      ) {
+        setAviso(result.message ?? '');
         setError('');
       }
       return result;
     },
     [],
   );
+
+  const onLeadActualizado = useCallback((lead: Lead) => {
+    setLeads((prev) => prev.map((l) => (l.id === lead.id ? lead : l)));
+  }, []);
 
   const onLeadSeguimientoConsumido = useCallback(() => {
     setLeadIdSeguimiento(null);
@@ -300,6 +309,7 @@ function AppShell() {
         productos={productos}
         barrios={barrios}
         onActualizarLead={onActualizarLead}
+        onLeadActualizado={onLeadActualizado}
         onCrearLead={onCrearLead}
         onModificarTelefonoLead={onModificarTelefonoLead}
         leadIdSeguimientoInicial={leadIdSeguimiento}

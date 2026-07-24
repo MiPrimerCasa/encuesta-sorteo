@@ -29,7 +29,10 @@ export function PromotorMetricasPanel({ leads }: Props) {
       </div>
 
       {/* Stats — 4 cols en sm+ */}
-      <PromotorResumen leads={leads} />
+      <PromotorResumen
+        leads={leads}
+        operadorId={[usuario?.id, usuario?.idOperador]}
+      />
 
       {/* Origen / canal de captación + historial — 2 cols en lg */}
       <div className="mt-8 space-y-8 lg:grid lg:grid-cols-[1fr_380px] lg:gap-8 lg:space-y-0">

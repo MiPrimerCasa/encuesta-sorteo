@@ -460,8 +460,8 @@ export function buildCargaParamsFromPayload(payload, usuarioSesion, context) {
     usuario: usuarioSp,
     campo1Valor: payload.nombre.trim(),
     campo2Valor: payload.domicilio?.trim() || null,
-    campo3Valor: null,
-    campo4Valor: null,
+    campo3Valor: siNoDesdeTriState(payload.conoceMpc),
+    campo4Valor: siNoDesdeTriState(payload.sabiaPlanInversionJoven),
     campo6Valor: campo6,
     campo7Valor: campo7,
     campo8Valor: campo8,
@@ -548,7 +548,15 @@ export async function crearEncuestaManual(payload, usuarioSesion, opciones = {})
   const leads = await listLeadsFromEncuestas(usuario);
   const lead = buscarLeadTrasCarga(leads, payloadNormalizado, cargaParams.encuesta);
   if (lead) {
-    return { lead, actualizado: yaExistia };
+    return {
+      lead: {
+        ...lead,
+        conoceMpc: payloadNormalizado.conoceMpc ?? lead.conoceMpc ?? null,
+        sabiaPlanInversionJoven:
+          payloadNormalizado.sabiaPlanInversionJoven ?? lead.sabiaPlanInversionJoven ?? null,
+      },
+      actualizado: yaExistia,
+    };
   }
 
   const detalle = `SP ok @usuario=${cargaParams.usuario}, encuesta=${cargaParams.encuesta}, tel=${cargaParams.telefono}, listado @idVendedor=${idListado}, actualizado=${yaExistia}.`;

@@ -1141,22 +1141,35 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     }
   }
 
-  const { merged, saved, entradaHistorial } = await persistirSeguimientoLead(
+  const { merged, saved, entradaHistorial, registroId } = await persistirSeguimientoLead(
     leadId,
     seguimientoParaGuardar,
     usuario,
     base,
   );
+  const ahoraIso = new Date().toISOString().slice(0, 19);
+  const operadorIdStamp =
+    usuario?.id != null && String(usuario.id).trim() !== ''
+      ? String(usuario.id).trim()
+      : usuario?.idOperador != null && String(usuario.idOperador).trim() !== ''
+        ? String(usuario.idOperador).trim()
+        : merged.operadorId != null
+          ? String(merged.operadorId)
+          : null;
+
   const seguimientoConOperador = saved
     ? {
         ...merged,
+        operadorId: operadorIdStamp ?? merged.operadorId ?? null,
         operadorRol: usuario?.rol ?? merged.operadorRol ?? null,
         operadorNombre: usuario?.nombre ?? merged.operadorNombre ?? null,
+        /** Marca “gestionado ahora” para bandeja Hoy sin esperar F5. */
+        creadoEn: ahoraIso,
       }
     : merged;
   const lead = applyDerivacionTerrenoAlLead(
     { ...base, seguimiento: seguimientoConOperador },
     seguimientoConOperador,
   );
-  return { lead, saved, entradaHistorial, referidosCreados, nuevosLeads };
+  return { lead, saved, entradaHistorial, registroId: registroId ?? null, referidosCreados, nuevosLeads };
 }

@@ -673,7 +673,14 @@ export function updateDemoLead(
   const lead = demoLeads.find((l) => l.id === leadId);
   if (!lead) throw new Error('Lead no encontrado en demo');
   if (usuario) appendDemoHistorialSeguimiento(lead, seguimiento, usuario);
-  const updated = applySeguimientoAlLead(lead, seguimiento);
+  const stamp: SeguimientoLead = {
+    ...seguimiento,
+    operadorId: usuario?.id ?? usuario?.idOperador ?? seguimiento.operadorId,
+    operadorRol: usuario?.rol ?? seguimiento.operadorRol,
+    operadorNombre: usuario?.nombre ?? seguimiento.operadorNombre,
+    creadoEn: new Date().toISOString().slice(0, 19),
+  };
+  const updated = applySeguimientoAlLead(lead, stamp);
   demoLeads = demoLeads.map((l) => (l.id === leadId ? updated : l));
   return { ...updated };
 }
@@ -757,6 +764,8 @@ export function createDemoLead(data: NuevoLeadData): Lead {
     domicilioEntrevista: data.domicilioEntrevista?.trim() || undefined,
     fechaObtencion: now.toISOString().slice(0, 10),
     fechaAlta: now.toISOString(),
+    conoceMpc: data.conoceMpc,
+    sabiaPlanInversionJoven: data.sabiaPlanInversionJoven,
     seguimiento: {
       fuente,
       observaciones: data.observaciones?.trim() || undefined,
@@ -820,6 +829,8 @@ export function processDemoReferidos(leadPadre: Lead, seguimiento: SeguimientoLe
       promotorNombre: leadPadre.promotorNombre,
       origen: 'referido',
       observaciones: `Referido de ${leadPadre.nombre} (lead #${leadPadre.id}).`,
+      conoceMpc: false,
+      sabiaPlanInversionJoven: false,
     });
     const item: ReferidoProcesado = {
       nombre: ref.nombre,

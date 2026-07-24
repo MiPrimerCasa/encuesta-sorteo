@@ -66,6 +66,45 @@ function ToggleSiNo({
   );
 }
 
+/** Sí/No obligatorio: arranca sin selección (null). */
+function ToggleSiNoObligatorio({
+  value,
+  onChange,
+  name,
+}: {
+  value: boolean | null;
+  onChange: (v: boolean) => void;
+  name: string;
+}) {
+  return (
+    <div className="flex gap-2" role="radiogroup" aria-label={name}>
+      {[
+        { v: true, label: 'Sí' },
+        { v: false, label: 'No' },
+      ].map(({ v, label }) => {
+        const sel = value === v;
+        return (
+          <button
+            key={label}
+            type="button"
+            role="radio"
+            aria-checked={sel}
+            onClick={() => onChange(v)}
+            style={{ touchAction: 'manipulation' }}
+            className={`h-11 flex-1 rounded-lg border text-[14px] font-semibold transition-all duration-[120ms] active:scale-[0.98] ${
+              sel
+                ? 'border-brand-700 bg-brand-600 text-white'
+                : 'border-zinc-200 bg-white text-zinc-700 active:bg-brand-50'
+            }`}
+          >
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function IconoWhatsApp({ className = 'h-5 w-5' }: { className?: string }) {
   return (
     <svg
@@ -95,6 +134,8 @@ export function NuevoLeadSheet({
   const [telefono, setTelefono] = useState('');
   const [promotorId, setPromotorId] = useState('');
   const [domicilio, setDomicilio] = useState('');
+  const [conoceMpc, setConoceMpc] = useState<boolean | null>(null);
+  const [sabiaPlanInversionJoven, setSabiaPlanInversionJoven] = useState<boolean | null>(null);
   const [agendarEntrevista, setAgendarEntrevista] = useState(false);
   const [horarioEntrevista, setHorarioEntrevista] = useState('');
   const [lugarEntrevista, setLugarEntrevista] = useState<LugarEntrevista | ''>('');
@@ -111,7 +152,13 @@ export function NuevoLeadSheet({
   const telefonoVerificadoDisponible = verificacion?.disponible === true;
   const telefonoVerificadoOcupado =
     verificacion != null && !verificacion.disponible && !verificacion.invalido;
-  const puedeGuardar = telefonoVerificadoDisponible && !saving && !verificando;
+  const puedeGuardar =
+    telefonoVerificadoDisponible &&
+    !saving &&
+    !verificando &&
+    conoceMpc !== null &&
+    sabiaPlanInversionJoven !== null;
+
   const verifySeqRef = useRef(0);
 
   useEffect(() => {
@@ -119,6 +166,8 @@ export function NuevoLeadSheet({
     setNombre('');
     setTelefono('');
     setDomicilio('');
+    setConoceMpc(null);
+    setSabiaPlanInversionJoven(null);
     setAgendarEntrevista(false);
     setHorarioEntrevista('');
     setLugarEntrevista('');
@@ -211,6 +260,14 @@ export function NuevoLeadSheet({
       setError('No se pudo identificar tu usuario. Volvé a iniciar sesión.');
       return;
     }
+    if (conoceMpc === null) {
+      setError('Indicá si conoce la inmobiliaria Mi Primer Casa S.A.');
+      return;
+    }
+    if (sabiaPlanInversionJoven === null) {
+      setError('Indicá si sabía del plan con cuotas fijas / Plan Inversión.');
+      return;
+    }
     if (agendarEntrevista) {
       if (!horarioEntrevista.trim()) {
         setError('Indicá fecha y hora de la entrevista.');
@@ -255,6 +312,8 @@ export function NuevoLeadSheet({
         promotorNombre: usuario.nombre,
         domicilio: domicilio.trim() || undefined,
         origen: 'manual',
+        conoceMpc,
+        sabiaPlanInversionJoven,
       };
       if (agendarEntrevista) {
         payload.horarioEntrevista = horarioEntrevista;
@@ -306,7 +365,7 @@ export function NuevoLeadSheet({
                 Carga manual de lead
               </Drawer.Title>
               <p className="mt-0.5 text-[13px] text-zinc-400">
-                Datos del cliente; la entrevista es opcional
+                Datos del cliente, encuesta obligatoria; la entrevista es opcional
               </p>
             </div>
             <button
@@ -449,6 +508,39 @@ export function NuevoLeadSheet({
                 </div>
               )}
             </div>
+
+            <section className={SECTION_CLASS} aria-labelledby="nl-encuesta-title">
+              <div>
+                <h3 id="nl-encuesta-title" className="text-[13px] font-semibold text-zinc-900">
+                  Encuesta
+                </h3>
+                <p className="mt-0.5 text-[12px] text-zinc-500">
+                  Obligatorio — mismas preguntas que en la carga web / QR
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <p className={LABEL_CLASS}>
+                  ¿Conocés la inmobiliaria Mi Primer Casa S.A.?{' '}
+                  <span className="text-brand-600">*</span>
+                </p>
+                <ToggleSiNoObligatorio
+                  name="Conoce Mi Primer Casa"
+                  value={conoceMpc}
+                  onChange={setConoceMpc}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <p className={LABEL_CLASS}>
+                  ¿Sabías que con $55.000 por mes (cuotas fijas) podés pagar tu terreno…?{' '}
+                  <span className="text-brand-600">*</span>
+                </p>
+                <ToggleSiNoObligatorio
+                  name="Sabía plan cuotas fijas"
+                  value={sabiaPlanInversionJoven}
+                  onChange={setSabiaPlanInversionJoven}
+                />
+              </div>
+            </section>
 
             <section className={SECTION_CLASS} aria-labelledby="nl-entrevista-title">
               <div>

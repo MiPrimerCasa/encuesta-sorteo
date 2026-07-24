@@ -14,6 +14,27 @@ export type ResultadoEntrevista =
   | 'derivar_terreno';
 /** sena/cien = terreno; entrega_33/entrega_55 = plan inversión */
 export type EstadoPago = 'sena' | 'cien' | 'entrega_33' | 'entrega_55';
+/** Medio de cobro de la adhesión PIJ ($33.000). */
+export type FormaPago = 'efectivo' | 'transferencia' | 'mixto';
+
+/** Tipo de foto al cierre PIJ (códigos de administración: img1, img2, img5, img6, img7). */
+export type TipoImagenCierrePij = 'img1' | 'img2' | 'img5' | 'img6' | 'img7';
+
+export interface ImagenCierrePij {
+  id: string;
+  leadId: string;
+  /** 'principal' o id de CompraAdicional */
+  ventaKey: string;
+  tipo: TipoImagenCierrePij;
+  storagePath: string;
+  mimeType: string;
+  tamanoBytes: number;
+  nombreOriginal?: string | null;
+  subidoEn: string;
+  operadorId?: string | null;
+  /** false = el archivo no está en disco */
+  archivoDisponible?: boolean;
+}
 
 /** Canal de ingreso en carga manual (alineado a métricas de origen + casos habituales). */
 export type OrigenIngresoManual =
@@ -40,6 +61,10 @@ export interface NuevoLeadData {
   domicilio?: string;
   origen: OrigenIngresoManual;
   observaciones?: string;
+  /** ¿Conocés la inmobiliaria Mi Primer Casa S.A.? → SP campo3 */
+  conoceMpc: boolean;
+  /** ¿Sabías que con $55.000…? (PIJ) → SP campo4 */
+  sabiaPlanInversionJoven: boolean;
   /** Si el usuario activa agendar entrevista en el formulario. */
   agendarEntrevista: boolean;
   horarioEntrevista?: string;
@@ -122,6 +147,8 @@ export interface SyncPreviewItem {
   isCompraAdicional: boolean;
   compraId: string | null;
   nombreCliente: string;
+  /** Promotor/vendedor asignado en el CRM. */
+  promotorNombre?: string;
   numeroRecibo: string;
   fechaActual: string;
   nuevaFecha: string;
@@ -147,6 +174,10 @@ export interface SyncPreviewItem {
 
 export interface SyncPreviewResponse {
   cambiosPropuestos: SyncPreviewItem[];
+  /** Descripción de qué pestañas de Caja se usaron. */
+  fuente?: string;
+  /** true si el preview filtró ventas de julio mal cargadas contra la pestaña Junio. */
+  corregirJulioConJunio?: boolean;
 }
 
 export interface SyncCommitResponse {
@@ -181,11 +212,20 @@ export interface ReferidoProcesado {
   mensaje?: string;
 }
 
+export interface PijIntegralSyncResult {
+  skipped?: boolean;
+  reason?: string;
+  estado?: 'pendiente' | 'bloqueado' | 'fotos_ok' | 'error' | null;
+  idVentaIntegral?: number | null;
+  error?: string | null;
+}
+
 export interface GuardarSeguimientoResult {
   lead: Lead;
   referidosCreados?: ReferidoProcesado[];
   nuevosLeads?: Lead[];
   message?: string;
+  pijIntegral?: PijIntegralSyncResult | null;
 }
 
 /** Entrada del historial append-only al guardar seguimiento. */
@@ -210,6 +250,14 @@ export interface CompraAdicional {
   idBarrio?: string | null;
   numeroRecibo: string;
   fechaCierre: string;           // ISO timestamp
+  /** Serie PIJ (columna plana en compras_adicionales_json). */
+  serie?: string | null;
+  nroAdhesion?: string | null;
+  nroAnexo?: string | null;
+  formaPago?: FormaPago | null;
+  montoCierre?: number | null;
+  montoEfectivo?: number | null;
+  montoTransferencia?: number | null;
 }
 
 export interface SeguimientoLead {
@@ -237,6 +285,17 @@ export interface SeguimientoLead {
   estadoPago?: EstadoPago | null;
   idBarrio?: string | null;
   numeroRecibo?: string | null;
+  /** Serie PIJ (columna plana SQL: serie_pij). */
+  seriePij?: string | null;
+  /** Número de adhesión PIJ (columna plana SQL: nro_adhesion). */
+  nroAdhesion?: string | null;
+  /** Número de anexo PIJ (columna plana SQL: nro_anexo). */
+  nroAnexo?: string | null;
+  /** Medio de cobro PIJ (efectivo / transferencia / mixto). */
+  formaPago?: FormaPago | null;
+  montoCierre?: number | null;
+  montoEfectivo?: number | null;
+  montoTransferencia?: number | null;
   brindoReferidos?: boolean | null;
   referidos?: Referido[];
   /** Referidos ya procesados en carga automática (teléfono → lead creado o duplicado). */
@@ -247,7 +306,28 @@ export interface SeguimientoLead {
   operadorNombre?: string | null;
   /** Timestamp de creación del seguimiento en la base de datos. */
   creadoEn?: string | null;
+  /** DNI del cliente al cierre PIJ (columna plana SQL: dni_cliente). */
+  dniCliente?: string | null;
   comprasAdicionales?: CompraAdicional[] | null;
+  /** Fotos de recibo/comprobante al cierre PIJ (columna plana: imagenes_cierre_json). */
+  imagenesCierre?: ImagenCierrePij[] | null;
+  /** Id de venta del sistema integral (SOAP altaModificaPlanJoven). */
+  idVentaIntegral?: number | null;
+  pijIntegralEstado?: 'pendiente' | 'bloqueado' | 'fotos_ok' | 'error' | null;
+  pijIntegralError?: string | null;
+  pijIntegralEnviadoEn?: string | null;
+  /** Verificación del cierre en el sistema de caja de sucursal (columna plana: caja_estado). */
+  cajaEstado?: 'pendiente' | 'verificado' | 'rechazado' | null;
+  /** Timestamp ISO en que caja confirmó/rechazó (columna plana: caja_verificado_en). */
+  cajaVerificadoEn?: string | null;
+  /** ID/nro interno de comprobante que devuelve la caja (columna plana: caja_comprobante_id). */
+  cajaComprobanteId?: string | null;
+  /** Motivo del rechazo si caja no valida el cierre (columna plana: caja_motivo_rechazo). */
+  cajaMotivoRechazo?: string | null;
+  /** Sucursal que confirmó el cierre, derivada del token de sync (columna plana: caja_sucursal). */
+  cajaSucursal?: string | null;
+  /** Usuario de caja que confirmó/rechazó la venta (columna plana: caja_confirmado_por). */
+  cajaConfirmadoPor?: string | null;
 }
 
 export interface Lead {
@@ -528,6 +608,23 @@ export interface AdminDashboardData {
   datosCacheadosEn?: string;
   pijCierresPorPersona?: PersonaPijCierres[];
   leadsSinTratar?: LeadSinTratarDetalle[];
+  /** Tratados en el período activo sin cierre en ese mismo rango (para recontacto). */
+  leadsTratadosSinCierre?: LeadTratadoSinCierreDetalle[];
+}
+
+export interface LeadTratadoSinCierreDetalle {
+  id: string;
+  nombre: string;
+  telefono: string;
+  promotorId: string;
+  promotorNombre: string;
+  supervisorNombre: string;
+  origen: string;
+  fechaAlta: string;
+  ultimoContacto: string;
+  resultadoEntrevista: string;
+  canal: string;
+  observaciones: string;
 }
 
 export interface LeadSinTratarDetalle {

@@ -16,6 +16,10 @@ export const nuevoLeadSchema = z
     lugarEntrevista: z.enum(['sucursal', 'domicilio']).optional(),
     domicilioEntrevista: z.string().trim().max(200).optional(),
     origen: z.string().trim().max(32).optional(),
+    /** Encuesta carga: campo3 / conoceMpc — obligatorio */
+    conoceMpc: z.boolean(),
+    /** Encuesta carga: campo4 / sabiaPlanInversionJoven — obligatorio */
+    sabiaPlanInversionJoven: z.boolean(),
   })
   .superRefine((data, ctx) => {
     const agendar = Boolean(data.agendarEntrevista);

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { fetchLinksRedes } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { filtrarLeadsActividadHoy, leadGestionadoHoyPorOperador } from '../../domain/actividad-hoy';
 import {
   leadCompro,
   leadReagendaEntrevista,
@@ -28,7 +29,7 @@ import { PromotorResumen } from './PromotorResumen';
 import { SwipeableLeadCard } from './SwipeableLeadCard';
 
 
-type ListaKey = 'entrevistaPendiente' | 'paraContactar' | 'seguimiento' | 'compraron';
+type ListaKey = 'actividadHoy' | 'entrevistaPendiente' | 'paraContactar' | 'seguimiento' | 'compraron';
 type VarianteCard = 'activo' | 'seguimiento' | 'compro';
 
 const TABS: Array<{
@@ -40,6 +41,15 @@ const TABS: Array<{
   variante: VarianteCard;
   vacio: string;
 }> = [
+  {
+    id: 'hoy',
+    tituloTab: 'Hoy',
+    tituloTabCorto: 'Hoy',
+    tituloLargo: 'Hoy — clientes que gestionaste hoy',
+    key: 'actividadHoy',
+    variante: 'activo',
+    vacio: 'Todavía no gestionaste clientes hoy',
+  },
   {
     id: 'entrevista',
     tituloTab: 'Prioridad',
@@ -89,6 +99,8 @@ interface LeadsPanelProps {
     leadId: string,
     seguimiento: SeguimientoLead,
   ) => void | Promise<void | GuardarSeguimientoResult>;
+  /** Actualiza un lead en el estado padre (ej. tras reintento SOAP PIJ). */
+  onLeadActualizado?: (lead: Lead) => void;
   onCrearLead: (data: NuevoLeadData, options?: NuevoLeadSaveOptions) => void | Promise<void>;
   onModificarTelefonoLead?: (leadId: string, telefono: string) => void | Promise<void>;
   direccionOficinas?: string;
@@ -106,6 +118,7 @@ export function LeadsPanel({
   productos,
   barrios,
   onActualizarLead,
+  onLeadActualizado: _onLeadActualizado,
   onCrearLead,
   onModificarTelefonoLead,
   leadIdSeguimientoInicial,
@@ -150,14 +163,26 @@ export function LeadsPanel({
     compraron,
     encuestaSinContactar,
   } = useLeadsFilter(leads);
+
+  const operadorIdsSesion = useMemo(
+    () => [usuario?.id, usuario?.idOperador].filter((v) => v != null && String(v).trim() !== ''),
+    [usuario?.id, usuario?.idOperador],
+  );
+
+  const actividadHoy = useMemo(
+    () => filtrarLeadsActividadHoy(leads, operadorIdsSesion),
+    [leads, operadorIdsSesion],
+  );
+
   const listas: Record<ListaKey, Lead[]> = {
+    actividadHoy,
     entrevistaPendiente,
     paraContactar,
     seguimiento,
     compraron,
   };
 
-  const [tabActivo, setTabActivo] = useState('entrevista');
+  const [tabActivo, setTabActivo] = useState('hoy');
   const [leadSeleccionado, setLeadSeleccionado] = useState<Lead | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [agendarAbierto, setAgendarAbierto] = useState(false);
@@ -274,8 +299,20 @@ export function LeadsPanel({
   const esTabPrioridad = tabActivo === 'entrevista';
 
   const guardarSeguimientoLead = async (leadId: string, seg: SeguimientoLead) => {
-    await onActualizarLead(leadId, seg);
+    const result = await onActualizarLead(leadId, seg);
     await refrescarHistorial(leadId);
+    const leadActualizado = result && typeof result === 'object' && 'lead' in result
+      ? (result as GuardarSeguimientoResult).lead
+      : null;
+    if (leadActualizado && leadGestionadoHoyPorOperador(leadActualizado, operadorIdsSesion)) {
+      setTabActivo('hoy');
+    }
+    return result;
+  };
+
+  /** Compat: SwipeableLeadCard exige Promise<void> (no el result). */
+  const quickSaveSeguimiento = async (leadId: string, seg: SeguimientoLead) => {
+    await guardarSeguimientoLead(leadId, seg);
   };
 
   const handleWhatsAppAutoContacto = async (lead: Lead) => {
@@ -307,7 +344,7 @@ export function LeadsPanel({
         nombreUsuario={nombreUsuario}
         ocultarPromotor
         rolUsuario={rolUsuario}
-        onQuickSave={guardarSeguimientoLead}
+        onQuickSave={quickSaveSeguimiento}
         historial={historialPorLead[lead.id] ?? []}
         onModificarTelefono={abrirModificarTelefono}
         fetchHistorial={fetchHistorial}
@@ -341,9 +378,25 @@ export function LeadsPanel({
       {/* Promotor: resumen personal + alertas */}
       {esPromotor && (
         <>
-          <PromotorResumen leads={leads} />
+          <PromotorResumen leads={leads} operadorId={operadorIdsSesion} />
           <AlertasSinContactar leads={encuestaSinContactar} onClickLead={abrirLead} />
         </>
+      )}
+
+      {!esPromotor && actividadHoy.length > 0 && (
+        <div className="mb-5 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
+          <p className="text-[13px] text-sky-900">
+            Hoy gestionaste{' '}
+            <button
+              type="button"
+              onClick={() => setTabActivo('hoy')}
+              className="font-semibold text-sky-700 underline-offset-2 hover:underline"
+            >
+              {actividadHoy.length} cliente{actividadHoy.length === 1 ? '' : 's'}
+            </button>
+            .
+          </p>
+        </div>
       )}
 
       {/* Info banner */}
@@ -358,7 +411,8 @@ export function LeadsPanel({
         <p className="text-[13px] text-zinc-500">
           {esPromotor ? (
             <>
-              En <span className="font-medium text-zinc-700">Prioridad</span>: entrevistas agendadas y
+              En <span className="font-medium text-zinc-700">Hoy</span>: clientes que gestionaste hoy.
+              En <span className="font-medium text-zinc-700">Prioridad</span>: entrevistas y
               encuestas sin contactar. En <span className="font-medium text-zinc-700">Contactado</span>, el
               último contacto aparece primero.{' '}
               <span className="font-medium text-zinc-700">Reagendar</span> y{' '}
@@ -366,8 +420,9 @@ export function LeadsPanel({
             </>
           ) : (
             <>
-              En <span className="font-medium text-zinc-700">Prioridad</span>: entrevistas agendadas y
-              encuestas sin contactar. Los derivados a terreno y las reagendas van a{' '}
+              En <span className="font-medium text-zinc-700">Hoy</span>: clientes que vos gestionaste
+              hoy. En <span className="font-medium text-zinc-700">Prioridad</span>: entrevistas
+              agendadas y encuestas sin contactar. Los derivados a terreno y las reagendas van a{' '}
               <span className="font-medium text-zinc-700">En seguimiento</span>.
             </>
           )}
@@ -437,7 +492,7 @@ export function LeadsPanel({
                     nombreUsuario={nombreUsuario}
                     ocultarPromotor
                     rolUsuario={rolUsuario}
-                    onQuickSave={guardarSeguimientoLead}
+                    onQuickSave={quickSaveSeguimiento}
                     historial={historialPorLead[lead.id] ?? []}
                     onModificarTelefono={abrirModificarTelefono}
                     fetchHistorial={fetchHistorial}
@@ -589,7 +644,15 @@ export function LeadsPanel({
             </p>
           ) : (
             <div className="space-y-3">
-              {itemsVisibles.map((lead) => renderTarjetaLead(lead, tabData.variante))}
+              {itemsVisibles.map((lead) => {
+                if (tabActivo === 'hoy') {
+                  const st = estadoLead(lead);
+                  const varianteHoy: VarianteCard =
+                    st === 'compro' ? 'compro' : st === 'reagendado' ? 'seguimiento' : 'activo';
+                  return renderTarjetaLead(lead, varianteHoy);
+                }
+                return renderTarjetaLead(lead, tabData.variante);
+              })}
             </div>
           )}
         </>
@@ -616,13 +679,23 @@ export function LeadsPanel({
         }
         onClose={cerrarModal}
         onSave={async (leadId, seg) => {
-          await guardarSeguimientoLead(leadId, seg);
+          const result = await guardarSeguimientoLead(leadId, seg);
+          if (result && typeof result === 'object' && 'lead' in result && result.lead) {
+            setLeadSeleccionado(result.lead);
+          }
+          // Cierres / reagenda tienen su pestaña; el resto de gestiones del día van a Hoy.
           if (seg.resultadoEntrevista === 'compro') {
             setTabActivo('compro');
-          } else if (seg.confirmoEntrevista === true) {
+          } else if (seg.confirmoEntrevista === true || seg.resultadoEntrevista === 'reagenda') {
             setTabActivo('seguimiento');
-          } else if (seg.resultadoEntrevista === 'reagenda') {
-            setTabActivo('seguimiento');
+          } else if (
+            result &&
+            typeof result === 'object' &&
+            'lead' in result &&
+            result.lead &&
+            leadGestionadoHoyPorOperador(result.lead, operadorIdsSesion)
+          ) {
+            setTabActivo('hoy');
           } else if (seg.resultadoEntrevista === 'sin_interes') {
             setTabActivo('contacto');
           }

@@ -230,14 +230,41 @@ function AppShell() {
     try {
       const newLead = await crearLead(data, { promotorNombre: options?.promotorNombre });
       let leadFinal = newLead;
-      if (options?.contactar) {
+      const referidos = options?.referidos?.filter((r) => r.nombre.trim() || r.telefono.trim()) ?? [];
+      const haySeguimientoPostAlta = Boolean(options?.contactar) || referidos.length > 0;
+
+      if (haySeguimientoPostAlta) {
         const result = await guardarSeguimiento(newLead.id, {
-          canal: 'mensaje',
-          huboEntrevista: false,
+          ...(options?.contactar
+            ? { canal: 'mensaje' as const, huboEntrevista: false }
+            : {}),
+          ...(referidos.length > 0 ? { brindoReferidos: true, referidos } : {}),
         });
         leadFinal = result.lead;
+        if (result.message?.includes('referido') || (result.referidosCreados?.length ?? 0) > 0) {
+          setAviso(result.message ?? 'Referidos procesados.');
+        }
+        if (result.nuevosLeads?.length) {
+          setLeads((prev) => {
+            const ids = new Set(prev.map((l) => l.id));
+            let next = ids.has(leadFinal.id)
+              ? prev.map((l) => (l.id === leadFinal.id ? leadFinal : l))
+              : [...prev, leadFinal];
+            for (const nl of result.nuevosLeads ?? []) {
+              if (!ids.has(nl.id)) {
+                next = [...next, nl];
+                ids.add(nl.id);
+              }
+            }
+            return next;
+          });
+        } else {
+          setLeads((prev) => [...prev, leadFinal]);
+        }
+      } else {
+        setLeads((prev) => [...prev, leadFinal]);
       }
-      setLeads((prev) => [...prev, leadFinal]);
+
       if (options?.contactar) {
         const nombrePromotor =
           options.promotorNombre?.trim() ||

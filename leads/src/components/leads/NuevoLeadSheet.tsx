@@ -10,7 +10,15 @@ import {
   telefonoCargaTieneLongitudMinima,
   telefonoListoParaVerificarCarga,
 } from '../../domain/telefono-carga';
-import type { LugarEntrevista, NuevoLeadData, NuevoLeadSaveOptions, Promotor, RolUsuario, VerificarTelefonoCargaResult } from '../../types';
+import type {
+  LugarEntrevista,
+  NuevoLeadData,
+  NuevoLeadSaveOptions,
+  Promotor,
+  Referido,
+  RolUsuario,
+  VerificarTelefonoCargaResult,
+} from '../../types';
 import { DateTimePicker } from '../ui/DateTimePicker';
 
 interface NuevoLeadSheetProps {
@@ -31,6 +39,8 @@ const INPUT_CLASS =
 const LABEL_CLASS = 'text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500';
 
 const SECTION_CLASS = 'space-y-4 rounded-xl border border-zinc-200 bg-zinc-50/80 p-4';
+
+const emptyReferido = (): Referido => ({ nombre: '', telefono: '' });
 
 function ToggleSiNo({
   value,
@@ -136,6 +146,8 @@ export function NuevoLeadSheet({
   const [domicilio, setDomicilio] = useState('');
   const [conoceMpc, setConoceMpc] = useState<boolean | null>(null);
   const [sabiaPlanInversionJoven, setSabiaPlanInversionJoven] = useState<boolean | null>(null);
+  const [agregarReferidos, setAgregarReferidos] = useState(false);
+  const [referidos, setReferidos] = useState<Referido[]>([emptyReferido()]);
   const [agendarEntrevista, setAgendarEntrevista] = useState(false);
   const [horarioEntrevista, setHorarioEntrevista] = useState('');
   const [lugarEntrevista, setLugarEntrevista] = useState<LugarEntrevista | ''>('');
@@ -168,6 +180,8 @@ export function NuevoLeadSheet({
     setDomicilio('');
     setConoceMpc(null);
     setSabiaPlanInversionJoven(null);
+    setAgregarReferidos(false);
+    setReferidos([emptyReferido()]);
     setAgendarEntrevista(false);
     setHorarioEntrevista('');
     setLugarEntrevista('');
@@ -268,6 +282,13 @@ export function NuevoLeadSheet({
       setError('Indicá si sabía del plan con cuotas fijas / Plan Inversión.');
       return;
     }
+    const referidosValidos = agregarReferidos
+      ? referidos.filter((r) => r.nombre.trim() || r.telefono.trim())
+      : [];
+    if (agregarReferidos && referidosValidos.length === 0) {
+      setError('Ingresá al menos un referido con nombre o teléfono, o desactivá la opción.');
+      return;
+    }
     if (agendarEntrevista) {
       if (!horarioEntrevista.trim()) {
         setError('Indicá fecha y hora de la entrevista.');
@@ -326,6 +347,7 @@ export function NuevoLeadSheet({
       await onSave(payload, {
         promotorNombre: esSupervisor ? usuario.nombre : undefined,
         contactar,
+        referidos: referidosValidos.length > 0 ? referidosValidos : undefined,
       });
       onClose();
     } catch (err) {
@@ -642,6 +664,87 @@ export function NuevoLeadSheet({
                       )}
                     </div>
                   )}
+                </div>
+              )}
+            </section>
+
+            <section className={SECTION_CLASS} aria-labelledby="nl-referidos-title">
+              <div>
+                <h3 id="nl-referidos-title" className="text-[13px] font-semibold text-zinc-900">
+                  Referidos
+                </h3>
+                <p className="mt-0.5 text-[12px] text-zinc-500">
+                  Opcional — igual que en el tratamiento del lead; se cargan como leads nuevos
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <p className={LABEL_CLASS}>¿Agregar referidos ahora?</p>
+                <ToggleSiNo
+                  value={agregarReferidos}
+                  onChange={(v) => {
+                    setAgregarReferidos(v);
+                    if (v && referidos.length === 0) setReferidos([emptyReferido()]);
+                  }}
+                />
+              </div>
+              {agregarReferidos && (
+                <div className="space-y-3 border-t border-zinc-200/80 pt-4">
+                  <p className="text-[12px] text-zinc-500">
+                    Al guardar, cada referido se carga automáticamente (si el teléfono no existe ya
+                    en la campaña).
+                  </p>
+                  {referidos.map((ref, idx) => (
+                    <div key={idx} className="space-y-2 rounded-lg border border-zinc-200 bg-white p-3">
+                      <div className="flex items-center justify-between">
+                        <p className={LABEL_CLASS}>Referido {idx + 1}</p>
+                        {referidos.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setReferidos((prev) => prev.filter((_, i) => i !== idx))
+                            }
+                            style={{ touchAction: 'manipulation' }}
+                            className="text-[12px] font-medium text-red-500 hover:text-red-700"
+                          >
+                            Quitar
+                          </button>
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Nombre y apellido"
+                        value={ref.nombre}
+                        onChange={(e) => {
+                          const next = [...referidos];
+                          next[idx] = { ...next[idx], nombre: e.target.value };
+                          setReferidos(next);
+                        }}
+                        autoComplete="name"
+                        className={INPUT_CLASS}
+                      />
+                      <input
+                        type="tel"
+                        placeholder="Teléfono"
+                        value={ref.telefono}
+                        inputMode="tel"
+                        autoComplete="tel"
+                        onChange={(e) => {
+                          const next = [...referidos];
+                          next[idx] = { ...next[idx], telefono: e.target.value };
+                          setReferidos(next);
+                        }}
+                        className={INPUT_CLASS}
+                      />
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setReferidos((prev) => [...prev, emptyReferido()])}
+                    style={{ touchAction: 'manipulation' }}
+                    className="h-12 w-full rounded-lg border border-dashed border-zinc-300 text-[14px] font-medium text-zinc-500 transition-colors active:border-brand-400 active:bg-brand-50 active:text-brand-700"
+                  >
+                    + Agregar otro referido
+                  </button>
                 </div>
               )}
             </section>

@@ -76,6 +76,11 @@ export interface NuevoLeadSaveOptions {
   promotorNombre?: string;
   /** Tras crear el lead, registrar contacto y abrir WhatsApp (como el botón verde en la tarjeta). */
   contactar?: boolean;
+  /**
+   * Referidos opcionales: tras el alta se guardan vía seguimiento
+   * (`brindoReferidos` + `referidos`), igual que en el tratamiento del lead.
+   */
+  referidos?: Referido[];
 }
 
 export interface VerificarTelefonoCargaResult {

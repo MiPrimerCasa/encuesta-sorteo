@@ -375,28 +375,12 @@ export function LeadsPanel({
   return (
     <div className="mx-auto max-w-2xl px-3 py-4 pb-12 sm:px-6 sm:py-6">
 
-      {/* Promotor: resumen personal + alertas */}
-      {esPromotor && (
-        <>
-          <PromotorResumen leads={leads} operadorId={operadorIdsSesion} />
-          <AlertasSinContactar leads={encuestaSinContactar} onClickLead={abrirLead} />
-        </>
+      {/* Resumen del día (promotor y supervisor) + alertas solo promotor */}
+      {(esPromotor || rolUsuario === 'supervisor') && (
+        <PromotorResumen leads={leads} operadorId={operadorIdsSesion} />
       )}
-
-      {!esPromotor && actividadHoy.length > 0 && (
-        <div className="mb-5 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-          <p className="text-[13px] text-sky-900">
-            Hoy gestionaste{' '}
-            <button
-              type="button"
-              onClick={() => setTabActivo('hoy')}
-              className="font-semibold text-sky-700 underline-offset-2 hover:underline"
-            >
-              {actividadHoy.length} cliente{actividadHoy.length === 1 ? '' : 's'}
-            </button>
-            .
-          </p>
-        </div>
+      {esPromotor && (
+        <AlertasSinContactar leads={encuestaSinContactar} onClickLead={abrirLead} />
       )}
 
       {/* Info banner */}

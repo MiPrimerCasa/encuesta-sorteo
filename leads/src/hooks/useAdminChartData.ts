@@ -1,6 +1,10 @@
 import { useMemo } from 'react';
-import { rangoPorPeriodo } from '../domain/admin-metrics';
-import { esPeriodoDia, esPeriodoMesCalendario } from '../domain/admin-periodo';
+import { fechaEventoChartMs, rangoPorPeriodo } from '../domain/admin-metrics';
+import {
+  esPeriodoAnio,
+  esPeriodoDia,
+  esPeriodoMesCalendario,
+} from '../domain/admin-periodo';
 import type { AdminChartEvent } from '../types';
 
 export type AgrupacionChart = 'dia' | 'semana' | 'mes' | 'anio';
@@ -23,6 +27,8 @@ export function agrupacionSugeridaChart(periodo: string): AgrupacionChart {
   if (periodo === 'hoy' || esPeriodoDia(periodo)) return 'dia';
   if (periodo === 'semana') return 'dia';
   if (periodo === 'mes' || esPeriodoMesCalendario(periodo)) return 'semana';
+  // Año del informe → barras por mes (Ene…Dic) para ver la evolución anual.
+  if (esPeriodoAnio(periodo)) return 'mes';
   return 'mes';
 }
 
@@ -34,17 +40,31 @@ function getISOWeek(date: Date) {
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 }
 
+/** Agrupa por día/mes/año del calendario de la fecha (no UTC). */
 function periodKey(fechaISO: string, agrupacion: AgrupacionChart) {
-  const d = new Date(fechaISO);
-  if (Number.isNaN(d.getTime())) return '';
-  const y = d.getFullYear();
-  if (agrupacion === 'anio') return String(y);
-  if (agrupacion === 'mes') return `${MESES[d.getMonth()]} ${y}`;
-  if (agrupacion === 'dia') {
-    return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const m = String(fechaISO).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) {
+    const d = new Date(fechaISO);
+    if (Number.isNaN(d.getTime())) return '';
+    const y = d.getFullYear();
+    if (agrupacion === 'anio') return String(y);
+    if (agrupacion === 'mes') return `${MESES[d.getMonth()]} ${y}`;
+    if (agrupacion === 'dia') {
+      return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    }
+    return `Sem ${getISOWeek(d)} · ${y}`;
   }
-  const sem = getISOWeek(d);
-  return `Sem ${sem} · ${y}`;
+
+  const y = Number(m[1]);
+  const month = Number(m[2]) - 1;
+  const day = Number(m[3]);
+  if (agrupacion === 'anio') return String(y);
+  if (agrupacion === 'mes') return `${MESES[month]} ${y}`;
+  if (agrupacion === 'dia') {
+    return `${String(day).padStart(2, '0')}/${String(month + 1).padStart(2, '0')}`;
+  }
+  const d = new Date(y, month, day, 12, 0, 0);
+  return `Sem ${getISOWeek(d)} · ${y}`;
 }
 
 function sortPeriodos(periodos: Set<string>, agrupacion: AgrupacionChart) {
@@ -53,12 +73,12 @@ function sortPeriodos(periodos: Set<string>, agrupacion: AgrupacionChart) {
     const yearMatch = label.match(/\d{4}/);
     const year = yearMatch ? Number(yearMatch[0]) : 0;
     if (agrupacion === 'mes') {
-      const mesIdx = MESES.findIndex((m) => label.startsWith(m));
+      const mesIdx = MESES.findIndex((mes) => label.startsWith(mes));
       return year * 100 + (mesIdx >= 0 ? mesIdx : 0);
     }
     if (agrupacion === 'dia') {
-      const m = label.match(/^(\d{2})\/(\d{2})/);
-      if (m) return year * 10000 + Number(m[2]) * 100 + Number(m[1]);
+      const dm = label.match(/^(\d{2})\/(\d{2})/);
+      if (dm) return year * 10000 + Number(dm[2]) * 100 + Number(dm[1]);
       return 0;
     }
     const semMatch = label.match(/Sem (\d+)/);
@@ -77,10 +97,14 @@ export function useAdminChartData(
     const { desde, hasta } = rangoPorPeriodo(periodo);
     const desdeMs = desde.getTime();
     const hastaMs = hasta.getTime();
+    // Agrupar por año fuera de un informe anual: no recortar al mes del período
+    // (si no, solo aparece una barra con totales del mes actual).
+    const aplicarRangoPeriodo = !(agrupacion === 'anio' && !esPeriodoAnio(periodo));
 
     const filtrados = eventos.filter((ev) => {
-      const t = new Date(ev.fecha).getTime();
-      if (Number.isNaN(t) || t < desdeMs || t > hastaMs) return false;
+      const t = fechaEventoChartMs(ev.fecha);
+      if (Number.isNaN(t)) return false;
+      if (aplicarRangoPeriodo && (t < desdeMs || t > hastaMs)) return false;
       if (supervisorNombre && ev.supervisorNombre !== supervisorNombre) return false;
       return true;
     });

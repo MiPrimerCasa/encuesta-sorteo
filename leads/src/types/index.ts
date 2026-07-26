@@ -255,6 +255,8 @@ export interface CompraAdicional {
   idBarrio?: string | null;
   numeroRecibo: string;
   fechaCierre: string;           // ISO timestamp
+  /** Fallback de fecha si falta fechaCierre (algunos registros legados). */
+  creadoEn?: string | null;
   /** Serie PIJ (columna plana en compras_adicionales_json). */
   serie?: string | null;
   nroAdhesion?: string | null;

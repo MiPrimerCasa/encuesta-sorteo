@@ -5,7 +5,9 @@ import type {
   Lead,
   PersonaPijCierres,
   PijCierreDetalle,
+  PromotorMetricasAdmin,
   RankingAdminEntry,
+  LeadTratadoSinCierreDetalle,
   SeguimientoHistorialEntry,
   TerrenoCierreDetalle,
 } from '../types';
@@ -34,7 +36,7 @@ export function endOfDay(date = new Date()) {
   return d;
 }
 
-/** Rango de fechas por periodo: hoy, semana o mes. */
+/** Rango de fechas por periodo: hoy, semana, mes, año o fecha concreta. */
 export function rangoPorPeriodo(periodo: string, hoy = new Date()) {
   if (periodo === 'hoy') {
     return {
@@ -47,6 +49,15 @@ export function rangoPorPeriodo(periodo: string, hoy = new Date()) {
     const hasta = endOfDay(hoy);
     const desde = startOfDay(hoy);
     desde.setDate(desde.getDate() - 6);
+    return { desde, hasta, hoy: startOfDay(hoy) };
+  }
+  // Año actual (`anio`) o calendario concreto (`YYYY`). Año en curso = YTD.
+  if (periodo === 'anio' || (periodo && /^\d{4}$/.test(periodo))) {
+    const year = periodo === 'anio' ? hoy.getFullYear() : parseInt(periodo, 10);
+    const desde = new Date(year, 0, 1, 0, 0, 0, 0);
+    const hastaFinAnio = new Date(year, 11, 31, 23, 59, 59, 999);
+    const hasta =
+      year === hoy.getFullYear() ? endOfDay(hoy) : hastaFinAnio;
     return { desde, hasta, hoy: startOfDay(hoy) };
   }
   if (periodo && /^\d{4}-(0[1-9]|1[0-2])$/.test(periodo)) {
@@ -231,7 +242,159 @@ function fechaHistorial(row: Record<string, unknown>) {
       row.fecha_registro ??
       row.fechaRegistro ??
       row.registrado_en) as string | undefined
-  );
+  ) ?? null;
+}
+
+const RESULTADO_ENTREVISTA_LABEL: Record<string, string> = {
+  compro: 'Compró',
+  no_compro: 'No compró',
+  reagenda: 'Reagenda',
+  sin_interes: 'Sin interés',
+  derivar_terreno: 'Derivar terreno',
+};
+
+const CANAL_CONTACTO_LABEL: Record<string, string> = {
+  llamada: 'Llamada',
+  mensaje: 'Mensaje',
+  en_persona: 'En persona',
+};
+
+function buildHistorialFechasPorLead(
+  historialRows: Array<SeguimientoHistorialEntry | Record<string, unknown>>,
+): Map<string, Date[]> {
+  const map = new Map<string, Date[]>();
+  for (const raw of historialRows) {
+    const row = raw as Record<string, unknown>;
+    const leadId = String(row.lead_id ?? row.leadId ?? '');
+    if (!leadId) continue;
+    const fecha = parseFecha(fechaHistorial(row) ?? (raw as SeguimientoHistorialEntry).creadoEn);
+    if (!fecha) continue;
+    if (!map.has(leadId)) map.set(leadId, []);
+    map.get(leadId)!.push(fecha);
+  }
+  return map;
+}
+
+/** Lead con actividad de seguimiento/contacto dentro del rango (historial o seguimiento actual). */
+export function leadTieneTratamientoEnRango(
+  lead: Lead,
+  historialPorLeadMap: Map<string, Date[]>,
+  desde: Date,
+  hasta: Date,
+): boolean {
+  const fechasHistorial = historialPorLeadMap.get(String(lead.id)) ?? [];
+  for (const f of fechasHistorial) {
+    if (f.getTime() >= desde.getTime() && f.getTime() <= hasta.getTime()) {
+      return true;
+    }
+  }
+  const seg = lead.seguimiento;
+  if (seg && (seg.canal != null || seg.huboEntrevista != null)) {
+    const fechaSeg =
+      parseFecha(seg.creadoEn ?? seg.fechaCierre) ?? parseFecha(lead.fechaAlta ?? lead.fechaObtencion);
+    if (fechaSeg && fechaSeg.getTime() >= desde.getTime() && fechaSeg.getTime() <= hasta.getTime()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Venta concretada (compro o compra adicional) con fecha de cierre en el rango. */
+export function leadTieneCierreEnRango(lead: Lead, desde: Date, hasta: Date): boolean {
+  const seg = lead.seguimiento;
+  if (seg?.resultadoEntrevista === 'compro') {
+    const fechaCierre = parseFecha(seg.fechaCierre ?? seg.creadoEn);
+    if (fechaCierre && enRango(fechaCierre, desde, hasta)) return true;
+  }
+  for (const compra of seg?.comprasAdicionales ?? []) {
+    const fecha = parseFecha(compra.fechaCierre ?? compra.creadoEn);
+    if (fecha && enRango(fecha, desde, hasta)) return true;
+  }
+  return false;
+}
+
+function ultimaFechaTratamientoEnRango(
+  lead: Lead,
+  historialPorLeadMap: Map<string, Date[]>,
+  desde: Date,
+  hasta: Date,
+): Date | null {
+  let max: Date | null = null;
+  for (const f of historialPorLeadMap.get(String(lead.id)) ?? []) {
+    if (f.getTime() >= desde.getTime() && f.getTime() <= hasta.getTime()) {
+      if (!max || f.getTime() > max.getTime()) max = f;
+    }
+  }
+  const seg = lead.seguimiento;
+  if (seg && (seg.canal != null || seg.huboEntrevista != null)) {
+    const fechaSeg =
+      parseFecha(seg.creadoEn ?? seg.fechaCierre) ?? parseFecha(lead.fechaAlta ?? lead.fechaObtencion);
+    if (fechaSeg && fechaSeg.getTime() >= desde.getTime() && fechaSeg.getTime() <= hasta.getTime()) {
+      if (!max || fechaSeg.getTime() > max.getTime()) max = fechaSeg;
+    }
+  }
+  return max;
+}
+
+function etiquetaResultadoEntrevista(val: string | null | undefined) {
+  if (!val?.trim()) return 'Pendiente';
+  return RESULTADO_ENTREVISTA_LABEL[val] ?? val;
+}
+
+function etiquetaCanalContacto(val: string | null | undefined) {
+  if (!val?.trim()) return '';
+  return CANAL_CONTACTO_LABEL[val] ?? val;
+}
+
+/** Leads gestionados en el período sin venta concretada en ese mismo rango. */
+export function recolectarLeadsTratadosSinCierre(
+  leads: Lead[],
+  historialRows: Array<SeguimientoHistorialEntry | Record<string, unknown>> = [],
+  periodo: string,
+  ahora = new Date(),
+): LeadTratadoSinCierreDetalle[] {
+  const { desde, hasta } = rangoPorPeriodo(periodo, ahora);
+  const historialPorLeadMap = buildHistorialFechasPorLead(historialRows);
+  const resultado: LeadTratadoSinCierreDetalle[] = [];
+
+  for (const lead of leads) {
+    if (!leadTieneTratamientoEnRango(lead, historialPorLeadMap, desde, hasta)) continue;
+    if (leadTieneCierreEnRango(lead, desde, hasta)) continue;
+
+    const ultimo = ultimaFechaTratamientoEnRango(lead, historialPorLeadMap, desde, hasta);
+    resultado.push({
+      id: String(lead.id),
+      nombre: lead.nombre,
+      telefono: lead.telefono || '—',
+      promotorId: lead.promotorId,
+      promotorNombre: lead.promotorNombre || 'Sin promotor',
+      supervisorNombre: lead.supervisorNombre || 'Sin supervisor',
+      origen: lead.origenEncuesta || '—',
+      fechaAlta: lead.fechaAlta || lead.fechaObtencion || '',
+      ultimoContacto: ultimo?.toISOString() ?? '',
+      resultadoEntrevista: etiquetaResultadoEntrevista(lead.seguimiento?.resultadoEntrevista),
+      canal: etiquetaCanalContacto(lead.seguimiento?.canal),
+      observaciones: (lead.seguimiento?.observaciones ?? '').trim(),
+    });
+  }
+
+  resultado.sort((a, b) => {
+    const ta = a.ultimoContacto ? new Date(a.ultimoContacto).getTime() : 0;
+    const tb = b.ultimoContacto ? new Date(b.ultimoContacto).getTime() : 0;
+    return tb - ta || a.nombre.localeCompare(b.nombre, 'es');
+  });
+  return resultado;
+}
+
+export function filtrarLeadsTratadosSinCierrePorPromotor(
+  leads: LeadTratadoSinCierreDetalle[],
+  promotorIds: Set<string> | string[] | null,
+): LeadTratadoSinCierreDetalle[] {
+  if (!promotorIds || (promotorIds instanceof Set ? promotorIds.size === 0 : promotorIds.length === 0)) {
+    return leads;
+  }
+  const ids = promotorIds instanceof Set ? promotorIds : new Set(promotorIds);
+  return leads.filter((l) => ids.has(l.promotorId));
 }
 
 function diaIsoLocal(val: string | Date | null | undefined) {
@@ -367,7 +530,7 @@ function contarEntrevistasDesdeCierresPeriodo({
     }
 
     for (const compra of lead.seguimiento?.comprasAdicionales ?? []) {
-      const fechaC = parseFecha(compra.fechaCierre);
+      const fechaC = parseFecha(compra.fechaCierre ?? compra.creadoEn);
       if (fechaC && enRango(fechaC, desde, hasta)) {
         registrarEntrevistaEnBuckets({
           leadId,
@@ -536,7 +699,67 @@ function rankingDesdePromotores(
     }));
 }
 
-/** Eventos para gráficos temporales (leads + historial). */
+/**
+ * Serializa la fecha del evento en calendario local (sin Z).
+ * Evita que toISOString() mueva cierres de un mes a otro en el gráfico.
+ */
+export function fechaParaEventoChart(fecha: Date) {
+  const y = fecha.getFullYear();
+  const m = String(fecha.getMonth() + 1).padStart(2, '0');
+  const d = String(fecha.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}T12:00:00`;
+}
+
+/** Parseo local de fecha de evento del gráfico (alineado a parseFecha / informe). */
+export function fechaEventoChartMs(fechaISO: string) {
+  const m = String(fechaISO).match(
+    /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}):(\d{2}))?/,
+  );
+  if (m) {
+    return new Date(
+      Number(m[1]),
+      Number(m[2]) - 1,
+      Number(m[3]),
+      m[4] ? Number(m[4]) : 12,
+      m[5] ? Number(m[5]) : 0,
+      m[6] ? Number(m[6]) : 0,
+    ).getTime();
+  }
+  const t = new Date(fechaISO).getTime();
+  return Number.isNaN(t) ? NaN : t;
+}
+
+/** Emite cierre/producto con la misma regla que el informe (seña no cuenta como cierre). */
+function pushEventosVentaChart(
+  eventos: AdminChartEvent[],
+  fecha: Date,
+  venta: { idProducto?: string | null; estadoPago?: string | null },
+  supervisorNombre: string,
+) {
+  const idProducto = String(venta?.idProducto ?? '').trim();
+  const esSena = idProducto === ID_PRODUCTO_TERRENO && venta?.estadoPago === 'sena';
+  const fechaIso = fechaParaEventoChart(fecha);
+
+  if (!esSena) {
+    eventos.push({ fecha: fechaIso, tipo: 'cierre', supervisorNombre });
+  }
+  if (idProducto === ID_PRODUCTO_TERRENO) {
+    eventos.push({
+      fecha: fechaIso,
+      tipo: esSena ? 'terreno_sena' : 'terreno',
+      supervisorNombre,
+    });
+  } else if (idProducto === ID_PRODUCTO_PIJ) {
+    eventos.push({ fecha: fechaIso, tipo: 'pij', supervisorNombre });
+  }
+}
+
+/**
+ * Eventos del gráfico alineados al informe:
+ * - leads: fecha de alta
+ * - entrevistas: historial
+ * - cierres / PIJ / terrenos: estado actual + compras adicionales (fechaCierre)
+ */
 export function buildAdminChartEvents(
   leadsConSupervisor: LeadConSupervisor[],
   historialRows: Array<SeguimientoHistorialEntry | Record<string, unknown>> = [],
@@ -544,20 +767,33 @@ export function buildAdminChartEvents(
   const eventos: AdminChartEvent[] = [];
   const leadPorId = new Map<string, LeadConSupervisor>();
   const entrevistasVistas = new Set<string>();
-  const cierresVistas = new Set<string>();
-  const terrenosVistas = new Set<string>();
-  const terrenosSenaVistas = new Set<string>();
-  const pijVistas = new Set<string>();
 
   for (const item of leadsConSupervisor) {
     leadPorId.set(String(item.lead.id), item);
     const alta = parseFecha(item.lead.fechaAlta ?? item.lead.fechaObtencion);
     if (alta) {
       eventos.push({
-        fecha: alta.toISOString(),
+        fecha: fechaParaEventoChart(alta),
         tipo: 'lead',
         supervisorNombre: item.supervisorNombre,
       });
+    }
+
+    const seg = item.lead.seguimiento;
+    const supNombre = item.supervisorNombre;
+
+    // Misma fuente que el informe: cierre principal + compras adicionales.
+    if (seg?.resultadoEntrevista === 'compro') {
+      const fechaCierre = parseFecha(seg.fechaCierre ?? seg.creadoEn);
+      if (fechaCierre) {
+        pushEventosVentaChart(eventos, fechaCierre, seg, supNombre);
+      }
+    }
+    for (const compra of seg?.comprasAdicionales ?? []) {
+      const fechaC = parseFecha(compra.fechaCierre ?? compra.creadoEn);
+      if (fechaC) {
+        pushEventosVentaChart(eventos, fechaC, compra, supNombre);
+      }
     }
   }
 
@@ -568,44 +804,15 @@ export function buildAdminChartEvents(
     const fecha = parseFecha(fechaHistorial(row) ?? (raw as SeguimientoHistorialEntry).creadoEn);
     if (!item || !fecha) continue;
 
-    const supNombre = item.supervisorNombre;
-
     if (filaHistorialCuentaComoEntrevista(row, item.lead)) {
       const key = `${leadId}|${diaIsoLocal(fecha)}`;
       if (!entrevistasVistas.has(key)) {
         entrevistasVistas.add(key);
-        eventos.push({ fecha: fecha.toISOString(), tipo: 'entrevista', supervisorNombre: supNombre });
-      }
-    }
-    if (filaIndicaCierre(row)) {
-      const esCierreActual = item.lead.seguimiento?.resultadoEntrevista === 'compro';
-      if (esCierreActual && !cierresVistas.has(leadId)) {
-        cierresVistas.add(leadId);
-        eventos.push({ fecha: fecha.toISOString(), tipo: 'cierre', supervisorNombre: supNombre });
-      }
-    }
-    if (esVentaTerreno(row)) {
-      const esTerrenoActual =
-        item.lead.seguimiento?.resultadoEntrevista === 'compro' &&
-        item.lead.seguimiento?.idProducto === 'prod-terreno';
-      if (esTerrenoActual && !terrenosVistas.has(leadId) && !terrenosSenaVistas.has(leadId)) {
-        const esSena = item.lead.seguimiento?.estadoPago === 'sena';
-        if (esSena) {
-          terrenosSenaVistas.add(leadId);
-          eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno_sena', supervisorNombre: supNombre });
-        } else {
-          terrenosVistas.add(leadId);
-          eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno', supervisorNombre: supNombre });
-        }
-      }
-    }
-    if (esVentaPij(row)) {
-      const esPijActual =
-        item.lead.seguimiento?.resultadoEntrevista === 'compro' &&
-        item.lead.seguimiento?.idProducto === 'prod-pij';
-      if (esPijActual && !pijVistas.has(leadId)) {
-        pijVistas.add(leadId);
-        eventos.push({ fecha: fecha.toISOString(), tipo: 'pij', supervisorNombre: supNombre });
+        eventos.push({
+          fecha: fechaParaEventoChart(fecha),
+          tipo: 'entrevista',
+          supervisorNombre: item.supervisorNombre,
+        });
       }
     }
   }
@@ -647,7 +854,10 @@ export function buildAdminDashboardFromLeads(
   const rangeSemana = rangoPorPeriodo('semana', ahora);
   const rangeMes = rangoPorPeriodo('mes', ahora);
   const rangeTratadosMes =
-    periodo === 'mes' || /^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo))
+    periodo === 'mes' ||
+    periodo === 'anio' ||
+    /^\d{4}$/.test(String(periodo)) ||
+    /^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo))
       ? { desde, hasta }
       : rangeMes;
 
@@ -771,7 +981,7 @@ export function buildAdminDashboardFromLeads(
 
     const comprasAdicionales = lead.seguimiento?.comprasAdicionales ?? [];
     for (const compra of comprasAdicionales) {
-      const fechaC = parseFecha(compra.fechaCierre);
+      const fechaC = parseFecha(compra.fechaCierre ?? compra.creadoEn);
       if (fechaC) {
         const cierreEnSemana = enRango(fechaC, desde, hasta);
         const cierreEsHoy = esMismoDia(fechaC, hoy);
@@ -1070,6 +1280,7 @@ export function buildAdminDashboardFromLeads(
     totalLeads: leads.length,
     totalSupervisores: supervisores.length,
     pijCierresPorPersona,
+    leadsTratadosSinCierre: recolectarLeadsTratadosSinCierre(leads, historialRows, periodo, ahora),
     periodo,
   };
 }
@@ -1080,21 +1291,74 @@ export function extraerVentasDetalleInforme(
   promotorIds: string[] | null,
   periodo: string,
   ahora = new Date(),
-): {
-  detallePij: PijCierreDetalle[];
-  detalleTerreno100: TerrenoCierreDetalle[];
-  detalleTerrenoSena: TerrenoCierreDetalle[];
-} {
+) {
   const dashboard = buildAdminDashboardFromLeads(leads, [], ahora, periodo);
-  const promotores = dashboard.supervisores.flatMap((s) => s.promotores);
+  const promotores = dashboard.supervisores.flatMap((s) =>
+    s.promotores.map((p) => ({ ...p, supervisorNombre: s.supervisorNombre })),
+  );
   const seleccionados =
     promotorIds && promotorIds.length > 0
       ? promotores.filter((p) => promotorIds.includes(p.promotorId))
       : promotores;
+  return recolectarDetalleInformePromotores(seleccionados);
+}
+
+type PromotorConSupervisor = PromotorMetricasAdmin & { supervisorNombre?: string };
+
+export type DetalleInformeExport = {
+  pij: Array<PijCierreDetalle & { promotorNombre: string; supervisorNombre: string }>;
+  terreno100: Array<TerrenoCierreDetalle & { promotorNombre: string; supervisorNombre: string }>;
+  terrenoSena: Array<TerrenoCierreDetalle & { promotorNombre: string; supervisorNombre: string }>;
+};
+
+/** Agrupa detalle de ventas por promotor (informe de operaciones). */
+export function recolectarDetalleInformePromotores(promotores: PromotorConSupervisor[]): DetalleInformeExport {
   return {
-    detallePij: seleccionados.flatMap((p) => p.detallePij ?? []),
-    detalleTerreno100: seleccionados.flatMap((p) => p.detalleTerreno100 ?? []),
-    detalleTerrenoSena: seleccionados.flatMap((p) => p.detalleTerrenoSena ?? []),
+    pij: promotores.flatMap((p) =>
+      (p.detallePij ?? []).map((item) => ({
+        ...item,
+        promotorNombre: p.promotorNombre,
+        supervisorNombre: p.supervisorNombre ?? '',
+      })),
+    ),
+    terreno100: promotores.flatMap((p) =>
+      (p.detalleTerreno100 ?? []).map((item) => ({
+        ...item,
+        promotorNombre: p.promotorNombre,
+        supervisorNombre: p.supervisorNombre ?? '',
+      })),
+    ),
+    terrenoSena: promotores.flatMap((p) =>
+      (p.detalleTerrenoSena ?? []).map((item) => ({
+        ...item,
+        promotorNombre: p.promotorNombre,
+        supervisorNombre: p.supervisorNombre ?? '',
+      })),
+    ),
+  };
+}
+
+/** Agrupa detalle de anexos/recibos por operador (historial con rango manual). */
+export function recolectarDetalleAnexosPersonas(personas: PersonaPijCierres[]) {
+  return {
+    pij: personas.flatMap((p) =>
+      p.cierres.map((item) => ({
+        ...item,
+        operadorNombre: p.operadorNombre,
+      })),
+    ),
+    terreno100: personas.flatMap((p) =>
+      (p.recibos100 ?? []).map((item) => ({
+        ...item,
+        operadorNombre: p.operadorNombre,
+      })),
+    ),
+    terrenoSena: personas.flatMap((p) =>
+      (p.recibosSena ?? []).map((item) => ({
+        ...item,
+        operadorNombre: p.operadorNombre,
+      })),
+    ),
   };
 }
 

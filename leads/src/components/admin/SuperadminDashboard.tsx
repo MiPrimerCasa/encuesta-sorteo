@@ -8,6 +8,7 @@ import {
   inicioMesIso,
 } from '../../domain/admin-metrics';
 import {
+  esPeriodoAnio,
   esPeriodoDia,
   esPeriodoMesCalendario,
   etiquetaPeriodoCorto,
@@ -219,6 +220,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
   const periodoActivo = data.periodo ?? periodo;
   const esPeriodoFecha = esPeriodoDia(periodoActivo);
   const esPeriodoMes = esPeriodoMesCalendario(periodoActivo);
+  const esPeriodoAnual = esPeriodoAnio(periodoActivo);
   const colorearLeadsDia = periodoActivo === 'hoy' || esPeriodoFecha;
   const tipoPeriodoLabel = etiquetaTipoPeriodo(periodoActivo);
   const periodoCortoLabel = etiquetaPeriodoCorto(periodoActivo);
@@ -676,9 +678,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
           ? [promotor.promotorId]
           : promotoresFiltradosRanking.map((p) => p.promotorId);
         const detalle = extraerVentasDetalleInforme(leadsData, promotorIds, periodo);
-        if (tipo === 'pij') itemsPij = detalle.detallePij;
-        else if (tipo === 'terreno100') itemsTerreno = detalle.detalleTerreno100;
-        else itemsTerreno = detalle.detalleTerrenoSena;
+        if (tipo === 'pij') itemsPij = detalle.pij;
+        else if (tipo === 'terreno100') itemsTerreno = detalle.terreno100;
+        else itemsTerreno = detalle.terrenoSena;
         abrirModal(itemsPij, itemsTerreno);
       } catch (err) {
         console.error('Error al cargar detalle de ventas del informe:', err);
@@ -1147,7 +1149,15 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
 
       <section>
         <h3 className="mb-3 text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
-          {periodoActivo === 'hoy' ? 'Destacados de hoy' : periodoActivo === 'semana' ? 'Destacados de la semana' : esPeriodoMes ? `Destacados de ${periodoCortoLabel}` : 'Destacados del mes'}
+          {periodoActivo === 'hoy'
+            ? 'Destacados de hoy'
+            : periodoActivo === 'semana'
+              ? 'Destacados de la semana'
+              : esPeriodoAnual
+                ? `Destacados de ${periodoCortoLabel}`
+                : esPeriodoMes
+                  ? `Destacados de ${periodoCortoLabel}`
+                  : 'Destacados del mes'}
         </h3>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <RankingList title="Más entrevistas" items={data.rankings.entrevistasSemana} unidad="" />
@@ -1322,7 +1332,15 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
                     <th className="py-2.5 px-3 text-left">Equipo (Supervisor)</th>
                     <th className="py-2.5 px-3 text-center">Leads</th>
                     <th className="py-2.5 px-3 text-center">
-                      {esPeriodoFecha ? 'Tratados Día' : periodoActivo === 'hoy' ? 'Tratados Hoy' : periodoActivo === 'semana' ? 'Tratados Semana' : esPeriodoMes || periodoActivo === 'mes' ? `Tratados ${periodoCortoLabel}` : 'Tratados Mes'}
+                      {esPeriodoFecha
+                        ? 'Tratados Día'
+                        : periodoActivo === 'hoy'
+                          ? 'Tratados Hoy'
+                          : periodoActivo === 'semana'
+                            ? 'Tratados Semana'
+                            : esPeriodoAnual || esPeriodoMes || periodoActivo === 'mes'
+                              ? `Tratados ${periodoCortoLabel}`
+                              : 'Tratados Mes'}
                     </th>
                     <th className="py-2.5 px-3 text-center">Entrevistas</th>
                     <th className="py-2.5 px-3 text-center">Cierres</th>

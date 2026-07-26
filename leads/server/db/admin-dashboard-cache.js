@@ -48,10 +48,10 @@ async function fetchHistorialDesde(desde) {
   return [];
 }
 
-/** Historial extendido (~13 meses) para gráficos semana/mes/año. */
+/** Historial desde el 1 ene de hace 2 años — cubre informe anual y años anteriores. */
 function rangoHistorialGraficos(hoy = new Date()) {
   const desde = startOfDay(hoy);
-  desde.setDate(desde.getDate() - 400);
+  desde.setFullYear(hoy.getFullYear() - 2, 0, 1);
   return desde;
 }
 

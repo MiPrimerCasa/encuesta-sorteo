@@ -34,6 +34,15 @@ export function rangoPorPeriodo(periodo, hoy = new Date()) {
     desde.setDate(desde.getDate() - 6);
     return { desde, hasta, hoy: startOfDay(hoy) };
   }
+  // Año actual (`anio`) o calendario concreto (`YYYY`). Año en curso = YTD.
+  if (periodo === 'anio' || (periodo && /^\d{4}$/.test(periodo))) {
+    const year = periodo === 'anio' ? hoy.getFullYear() : parseInt(periodo, 10);
+    const desde = new Date(year, 0, 1, 0, 0, 0, 0);
+    const hastaFinAnio = new Date(year, 11, 31, 23, 59, 59, 999);
+    const hasta =
+      year === hoy.getFullYear() ? endOfDay(hoy) : hastaFinAnio;
+    return { desde, hasta, hoy: startOfDay(hoy) };
+  }
   if (periodo && /^\d{4}-(0[1-9]|1[0-2])$/.test(periodo)) {
     const parts = periodo.split('-');
     const year = parseInt(parts[0], 10);
@@ -134,6 +143,127 @@ function fechaHistorial(row) {
     row.registrado_en ??
     null
   );
+}
+
+const RESULTADO_ENTREVISTA_LABEL = {
+  compro: 'Compró',
+  no_compro: 'No compró',
+  reagenda: 'Reagenda',
+  sin_interes: 'Sin interés',
+  derivar_terreno: 'Derivar terreno',
+};
+
+const CANAL_CONTACTO_LABEL = {
+  llamada: 'Llamada',
+  mensaje: 'Mensaje',
+  en_persona: 'En persona',
+};
+
+function buildHistorialFechasPorLead(historialRows) {
+  const map = new Map();
+  for (const raw of historialRows) {
+    const row = raw;
+    const leadId = String(row.lead_id ?? row.leadId ?? '');
+    if (!leadId) continue;
+    const fecha = parseFecha(fechaHistorial(row) ?? raw.creadoEn);
+    if (!fecha) continue;
+    if (!map.has(leadId)) map.set(leadId, []);
+    map.get(leadId).push(fecha);
+  }
+  return map;
+}
+
+export function leadTieneTratamientoEnRango(lead, historialPorLeadMap, desde, hasta) {
+  const fechasHistorial = historialPorLeadMap.get(String(lead.id)) ?? [];
+  for (const f of fechasHistorial) {
+    if (f.getTime() >= desde.getTime() && f.getTime() <= hasta.getTime()) {
+      return true;
+    }
+  }
+  const seg = lead.seguimiento;
+  if (seg && (seg.canal != null || seg.huboEntrevista != null)) {
+    const fechaSeg =
+      parseFecha(seg.creadoEn ?? seg.fechaCierre) ?? parseFecha(lead.fechaAlta ?? lead.fechaObtencion);
+    if (fechaSeg && fechaSeg.getTime() >= desde.getTime() && fechaSeg.getTime() <= hasta.getTime()) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function leadTieneCierreEnRango(lead, desde, hasta) {
+  const seg = lead.seguimiento;
+  if (seg?.resultadoEntrevista === 'compro') {
+    const fechaCierre = parseFecha(seg.fechaCierre ?? seg.creadoEn);
+    if (fechaCierre && enRango(fechaCierre, desde, hasta)) return true;
+  }
+  for (const compra of seg?.comprasAdicionales ?? []) {
+    const fecha = parseFecha(compra.fechaCierre ?? compra.creadoEn ?? compra.creado_en);
+    if (fecha && enRango(fecha, desde, hasta)) return true;
+  }
+  return false;
+}
+
+function ultimaFechaTratamientoEnRango(lead, historialPorLeadMap, desde, hasta) {
+  let max = null;
+  for (const f of historialPorLeadMap.get(String(lead.id)) ?? []) {
+    if (f.getTime() >= desde.getTime() && f.getTime() <= hasta.getTime()) {
+      if (!max || f.getTime() > max.getTime()) max = f;
+    }
+  }
+  const seg = lead.seguimiento;
+  if (seg && (seg.canal != null || seg.huboEntrevista != null)) {
+    const fechaSeg =
+      parseFecha(seg.creadoEn ?? seg.fechaCierre) ?? parseFecha(lead.fechaAlta ?? lead.fechaObtencion);
+    if (fechaSeg && fechaSeg.getTime() >= desde.getTime() && fechaSeg.getTime() <= hasta.getTime()) {
+      if (!max || fechaSeg.getTime() > max.getTime()) max = fechaSeg;
+    }
+  }
+  return max;
+}
+
+function etiquetaResultadoEntrevista(val) {
+  if (!val || !String(val).trim()) return 'Pendiente';
+  return RESULTADO_ENTREVISTA_LABEL[val] ?? val;
+}
+
+function etiquetaCanalContacto(val) {
+  if (!val || !String(val).trim()) return '';
+  return CANAL_CONTACTO_LABEL[val] ?? val;
+}
+
+export function recolectarLeadsTratadosSinCierre(leads, historialRows = [], periodo, ahora = new Date()) {
+  const { desde, hasta } = rangoPorPeriodo(periodo, ahora);
+  const historialPorLeadMap = buildHistorialFechasPorLead(historialRows);
+  const resultado = [];
+
+  for (const lead of leads) {
+    if (!leadTieneTratamientoEnRango(lead, historialPorLeadMap, desde, hasta)) continue;
+    if (leadTieneCierreEnRango(lead, desde, hasta)) continue;
+
+    const ultimo = ultimaFechaTratamientoEnRango(lead, historialPorLeadMap, desde, hasta);
+    resultado.push({
+      id: String(lead.id),
+      nombre: lead.nombre,
+      telefono: lead.telefono || '—',
+      promotorId: lead.promotorId,
+      promotorNombre: lead.promotorNombre || 'Sin promotor',
+      supervisorNombre: lead.supervisorNombre || 'Sin supervisor',
+      origen: lead.origenEncuesta || '—',
+      fechaAlta: lead.fechaAlta || lead.fechaObtencion || '',
+      ultimoContacto: ultimo ? ultimo.toISOString() : '',
+      resultadoEntrevista: etiquetaResultadoEntrevista(lead.seguimiento?.resultadoEntrevista),
+      canal: etiquetaCanalContacto(lead.seguimiento?.canal),
+      observaciones: String(lead.seguimiento?.observaciones ?? '').trim(),
+    });
+  }
+
+  resultado.sort((a, b) => {
+    const ta = a.ultimoContacto ? new Date(a.ultimoContacto).getTime() : 0;
+    const tb = b.ultimoContacto ? new Date(b.ultimoContacto).getTime() : 0;
+    return tb - ta || a.nombre.localeCompare(b.nombre, 'es');
+  });
+  return resultado;
 }
 
 function diaIsoLocal(val) {
@@ -378,24 +508,74 @@ function rankingDesdePromotores(promotores, campo, limite = 5) {
     }));
 }
 
+/**
+ * Serializa la fecha del evento en calendario local (sin Z).
+ * Evita que toISOString() mueva cierres de un mes a otro en el gráfico.
+ */
+function fechaParaEventoChart(fecha) {
+  const y = fecha.getFullYear();
+  const m = String(fecha.getMonth() + 1).padStart(2, '0');
+  const d = String(fecha.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}T12:00:00`;
+}
+
+/** Emite cierre/producto con la misma regla que el informe (seña no cuenta como cierre). */
+function pushEventosVentaChart(eventos, fecha, venta, supervisorNombre) {
+  const idProducto = String(venta?.idProducto ?? '').trim();
+  const esSena = idProducto === ID_PRODUCTO_TERRENO && venta?.estadoPago === 'sena';
+  const fechaIso = fechaParaEventoChart(fecha);
+
+  if (!esSena) {
+    eventos.push({ fecha: fechaIso, tipo: 'cierre', supervisorNombre });
+  }
+  if (idProducto === ID_PRODUCTO_TERRENO) {
+    eventos.push({
+      fecha: fechaIso,
+      tipo: esSena ? 'terreno_sena' : 'terreno',
+      supervisorNombre,
+    });
+  } else if (idProducto === ID_PRODUCTO_PIJ) {
+    eventos.push({ fecha: fechaIso, tipo: 'pij', supervisorNombre });
+  }
+}
+
+/**
+ * Eventos del gráfico alineados al informe:
+ * - leads: fecha de alta
+ * - entrevistas: historial
+ * - cierres / PIJ / terrenos: estado actual + compras adicionales (fechaCierre)
+ */
 export function buildAdminChartEvents(leadsConSupervisor, historialRows = []) {
   const eventos = [];
   const leadPorId = new Map();
   const entrevistasVistas = new Set();
-  const cierresVistas = new Set();
-  const terrenosVistas = new Set();
-  const terrenosSenaVistas = new Set();
-  const pijVistas = new Set();
 
   for (const item of leadsConSupervisor) {
     leadPorId.set(String(item.lead.id), item);
     const alta = parseFecha(item.lead.fechaAlta ?? item.lead.fechaObtencion);
     if (alta) {
       eventos.push({
-        fecha: alta.toISOString(),
+        fecha: fechaParaEventoChart(alta),
         tipo: 'lead',
         supervisorNombre: item.supervisorNombre,
       });
+    }
+
+    const seg = item.lead.seguimiento;
+    const supNombre = item.supervisorNombre;
+
+    // Misma fuente que el informe: cierre principal + compras adicionales.
+    if (seg?.resultadoEntrevista === 'compro') {
+      const fechaCierre = parseFecha(seg.fechaCierre ?? seg.creadoEn ?? seg.creado_en);
+      if (fechaCierre) {
+        pushEventosVentaChart(eventos, fechaCierre, seg, supNombre);
+      }
+    }
+    for (const compra of seg?.comprasAdicionales ?? []) {
+      const fechaC = parseFecha(compra.fechaCierre ?? compra.creadoEn ?? compra.creado_en);
+      if (fechaC) {
+        pushEventosVentaChart(eventos, fechaC, compra, supNombre);
+      }
     }
   }
 
@@ -405,44 +585,15 @@ export function buildAdminChartEvents(leadsConSupervisor, historialRows = []) {
     const fecha = parseFecha(fechaHistorial(row));
     if (!item || !fecha) continue;
 
-    const supNombre = item.supervisorNombre;
-
     if (filaHistorialCuentaComoEntrevista(row, item.lead)) {
       const key = `${leadId}|${diaIsoLocal(fecha)}`;
       if (!entrevistasVistas.has(key)) {
         entrevistasVistas.add(key);
-        eventos.push({ fecha: fecha.toISOString(), tipo: 'entrevista', supervisorNombre: supNombre });
-      }
-    }
-    if (filaIndicaCierre(row)) {
-      const esCierreActual = item.lead.seguimiento?.resultadoEntrevista === 'compro';
-      if (esCierreActual && !cierresVistas.has(leadId)) {
-        cierresVistas.add(leadId);
-        eventos.push({ fecha: fecha.toISOString(), tipo: 'cierre', supervisorNombre: supNombre });
-      }
-    }
-    if (esVentaTerreno(row)) {
-      const esTerrenoActual =
-        item.lead.seguimiento?.resultadoEntrevista === 'compro' &&
-        item.lead.seguimiento?.idProducto === 'prod-terreno';
-      if (esTerrenoActual && !terrenosVistas.has(leadId) && !terrenosSenaVistas.has(leadId)) {
-        const esSena = item.lead.seguimiento?.estadoPago === 'sena';
-        if (esSena) {
-          terrenosSenaVistas.add(leadId);
-          eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno_sena', supervisorNombre: supNombre });
-        } else {
-          terrenosVistas.add(leadId);
-          eventos.push({ fecha: fecha.toISOString(), tipo: 'terreno', supervisorNombre: supNombre });
-        }
-      }
-    }
-    if (esVentaPij(row)) {
-      const esPijActual =
-        item.lead.seguimiento?.resultadoEntrevista === 'compro' &&
-        item.lead.seguimiento?.idProducto === 'prod-pij';
-      if (esPijActual && !pijVistas.has(leadId)) {
-        pijVistas.add(leadId);
-        eventos.push({ fecha: fecha.toISOString(), tipo: 'pij', supervisorNombre: supNombre });
+        eventos.push({
+          fecha: fechaParaEventoChart(fecha),
+          tipo: 'entrevista',
+          supervisorNombre: item.supervisorNombre,
+        });
       }
     }
   }
@@ -482,7 +633,10 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
   const rangeSemana = rangoPorPeriodo('semana', ahora);
   const rangeMes = rangoPorPeriodo('mes', ahora);
   const rangeTratadosMes =
-    periodo === 'mes' || /^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo))
+    periodo === 'mes' ||
+    periodo === 'anio' ||
+    /^\d{4}$/.test(String(periodo)) ||
+    /^\d{4}-(0[1-9]|1[0-2])$/.test(String(periodo))
       ? { desde, hasta }
       : rangeMes;
 
@@ -981,5 +1135,11 @@ export function buildAdminDashboard(leadsConSupervisor, historialRows = [], ahor
     ),
     pijCierresPorPersona,
     leadsSinTratar,
+    leadsTratadosSinCierre: recolectarLeadsTratadosSinCierre(
+      leadsConSupervisor.map((item) => item.lead),
+      historialRows,
+      periodo,
+      ahora,
+    ),
   };
 }

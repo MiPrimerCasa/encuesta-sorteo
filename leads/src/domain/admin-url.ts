@@ -1,4 +1,4 @@
-import { esPeriodoDia, esPeriodoMesCalendario } from './admin-periodo';
+import { esPeriodoAnio, esPeriodoDia, esPeriodoMesCalendario } from './admin-periodo';
 import type { UsuarioSesion, VistaActiva } from '../types';
 
 export const ADMIN_TABS = [
@@ -31,6 +31,8 @@ export function esPeriodoAdminUrl(val: string | null | undefined): val is string
     val === 'hoy'
     || val === 'semana'
     || val === 'mes'
+    || val === 'anio'
+    || esPeriodoAnio(val)
     || esPeriodoMesCalendario(val)
     || esPeriodoDia(val)
   );

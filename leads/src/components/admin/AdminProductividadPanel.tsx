@@ -28,7 +28,9 @@ function etiquetaPeriodoEmbudo(periodo?: string | null): string {
   if (!periodo || periodo === 'mes') return 'el mes actual';
   if (periodo === 'hoy') return 'hoy';
   if (periodo === 'semana') return 'la semana del informe';
+  if (periodo === 'anio') return 'el año en curso';
   if (esPeriodoDia(periodo)) return `el día ${periodo}`;
+  if (/^\d{4}$/.test(periodo)) return `el año ${periodo}`;
   if (esPeriodoMesCalendario(periodo)) return etiquetaMesCalendario(periodo).toLowerCase();
   return periodo;
 }

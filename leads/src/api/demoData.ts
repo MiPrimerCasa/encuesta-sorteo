@@ -145,6 +145,7 @@ export const DEMO_BARRIOS: Barrio[] = [
   { id: 'b1', nombre: 'Cecotto' },
   { id: 'b5', nombre: 'Doña Valentina I' },
   { id: 'b6', nombre: 'Doña Valentina II' },
+  { id: 'b8', nombre: 'Jardines de San Antonio' },
   { id: 'b3', nombre: 'Los Bufalos' },
   { id: 'b2', nombre: 'Los Elfos' },
   { id: 'b4', nombre: 'Palmares' },

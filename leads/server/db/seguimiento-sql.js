@@ -8,6 +8,45 @@ import {
 } from './seguimiento-historial.js';
 import { getSqlPoolEncuestas, isSqlServerConfigured } from './mssql.js';
 import { getDb, getSeguimientoExterno, listSeguimientoHistorial, upsertSeguimientoExterno } from './sqlite.js';
+import { parsePijRecibo } from '../domain/pij-recibo.js';
+
+const ID_PIJ = 'prod-pij';
+
+/** Desglosa solicitud (serie+adhesión) y anexo — son datos distintos. */
+function partesReciboPij(idProducto, numeroRecibo) {
+  if (idProducto !== ID_PIJ || !String(numeroRecibo ?? '').trim()) {
+    return { serie: null, nroAdhesion: null, nroAnexo: null };
+  }
+  const parsed = parsePijRecibo(numeroRecibo);
+  return {
+    serie: parsed.serie || null,
+    nroAdhesion: parsed.adhesion || null,
+    nroAnexo: parsed.anexo || null,
+  };
+}
+
+/**
+ * JSON para tabla hija de compras adicionales.
+ * Incluye serie / nroAdhesion / nroAnexo parseados del recibo PIJ.
+ */
+function buildComprasAdicionalesJson(compras) {
+  if (!Array.isArray(compras) || compras.length === 0) return null;
+  const rows = compras.map((c) => {
+    const partes = partesReciboPij(c.idProducto, c.numeroRecibo);
+    return {
+      id: c.id,
+      idProducto: c.idProducto,
+      estadoPago: c.estadoPago,
+      idBarrio: c.idBarrio ?? null,
+      numeroRecibo: String(c.numeroRecibo ?? '').trim(),
+      fechaCierre: c.fechaCierre,
+      serie: partes.serie,
+      nroAdhesion: partes.nroAdhesion,
+      nroAnexo: partes.nroAnexo,
+    };
+  });
+  return JSON.stringify(rows);
+}
 
 export class SeguimientoRegistroError extends Error {
   constructor(message, code = 'SEGUIMIENTO_SQL') {
@@ -229,6 +268,10 @@ export function mapSqlRowToSeguimiento(row) {
       row.operador_nombre ?? row.operadorNombre ?? base.operadorNombre ?? null,
     creadoEn: formatCreadoEn(row) ?? base.creadoEn ?? null,
     comprasAdicionales: base.comprasAdicionales ?? null,
+    // Planas PIJ: solicitud (serie + adhesión) y anexo son campos separados
+    seriePij: base.seriePij ?? row.serie_pij ?? row.seriePij ?? null,
+    nroAdhesion: base.nroAdhesion ?? row.nro_adhesion ?? row.nroAdhesion ?? null,
+    nroAnexo: base.nroAnexo ?? row.nro_anexo ?? row.nroAnexo ?? null,
   };
 }
 
@@ -347,6 +390,18 @@ export async function execRegistrarSeguimientoLead(lead, merged, usuario) {
     operadorNombre: usuario?.nombre ?? undefined,
   };
   request.input('seguimiento_json', sql.NVarChar(sql.MAX), JSON.stringify(payloadToStore));
+
+  // Columnas planas PIJ (frontend prod ya captura vía numeroRecibo):
+  // serie_pij + nro_adhesion = solicitud; nro_anexo = anexo (dato distinto).
+  const partesPij = partesReciboPij(merged.idProducto, merged.numeroRecibo);
+  request.input('serie_pij', sql.NVarChar(1), partesPij.serie?.slice(0, 1) ?? null);
+  request.input('nro_adhesion', sql.NVarChar(10), partesPij.nroAdhesion?.slice(0, 10) ?? null);
+  request.input('nro_anexo', sql.NVarChar(10), partesPij.nroAnexo?.slice(0, 10) ?? null);
+  request.input(
+    'compras_adicionales_json',
+    sql.NVarChar(sql.MAX),
+    buildComprasAdicionalesJson(merged.comprasAdicionales),
+  );
 
   const result = await request.execute(proc);
   const fila = result.recordset?.[0];

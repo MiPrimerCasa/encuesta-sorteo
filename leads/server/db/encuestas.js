@@ -977,7 +977,8 @@ async function mapEncuestaRowsToLeads(rows, idOperador = null, operadorIdsBatch 
         leadTieneCitaPrevia(lead) &&
         lead.cargadoPorRol === 'promotor' &&
         !leadDerivacionTerrenoSupervisorActiva(lead) &&
-        !esCargaPropia(lead, usuarioSesion);
+        !esCargaPropia(lead, usuarioSesion) &&
+        lead.seguimiento?.resultadoEntrevista !== 'compro';
 
       if (isLocked) {
         lead = {

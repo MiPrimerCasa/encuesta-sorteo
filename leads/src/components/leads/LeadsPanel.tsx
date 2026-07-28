@@ -657,7 +657,6 @@ export function LeadsPanel({
             leadSeleccionado,
             usuario?.idOperador ?? usuario?.id,
             rolUsuario,
-            operadorIdsSesion,
             historialPorLead[leadSeleccionado.id] ?? [],
           ) ||
             (esPromotor

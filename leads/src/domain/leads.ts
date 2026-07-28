@@ -448,19 +448,29 @@ export function leadSoloLecturaUltimoModificador(
   lead: Lead | null | undefined,
   currentUserId: string | number | undefined | null,
   userRole?: string | null,
+  /** ids alternativos de la sesión (id / idOperador / idVendedor) */
+  currentUserIds: Array<string | number | null | undefined> = [],
 ): boolean {
   if (!lead?.seguimiento?.operadorId) {
     // Si no tiene operadorId de seguimiento previo, cualquiera puede gestionarlo.
     return false;
   }
+  const esSupervisor =
+    userRole === 'supervisor' || userRole === 'superadmin';
   // Derivación terreno: el supervisor puede gestionar aunque no sea el último operador
-  if (
-    leadDerivacionTerrenoSupervisorActiva(lead) &&
-    (userRole === 'supervisor' || userRole === 'superadmin')
-  ) {
+  if (leadDerivacionTerrenoSupervisorActiva(lead) && esSupervisor) {
     return false;
   }
-  if (!currentUserId) return false;
-  return String(lead.seguimiento.operadorId) !== String(currentUserId);
+  // Post-venta: el supervisor completa docs de caja aunque el cierre haya
+  // quedado atribuido al promotor (operadorId / nombre del vendedor).
+  if (leadCompro(lead) && esSupervisor) {
+    return false;
+  }
+  const idsSesion = [currentUserId, ...currentUserIds]
+    .map((v) => String(v ?? '').trim())
+    .filter(Boolean);
+  if (idsSesion.length === 0) return false;
+  const ultimo = String(lead.seguimiento.operadorId).trim();
+  return !idsSesion.includes(ultimo);
 }
 

@@ -564,26 +564,38 @@ export async function commitSyncCajaPij(
   });
 }
 
+/** Evita cabeceras HTTP rotas (saltos de línea / no-Latin1). */
+function headerSafe(value: string | number | null | undefined): string {
+  const s = String(value ?? '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .trim()
+    .slice(0, 200);
+  for (let i = 0; i < s.length; i++) {
+    if (s.charCodeAt(i) > 255) return encodeURIComponent(s).slice(0, 400);
+  }
+  return s;
+}
+
 function authHeadersForSession(contentTypeJson = true): Record<string, string> {
   const session = getSession();
   const headers: Record<string, string> = {};
   if (contentTypeJson) headers['Content-Type'] = 'application/json';
   if (!session) return headers;
-  headers['x-usuario-id'] = session.usuario.id;
-  headers['x-usuario-rol'] = session.usuario.rol;
-  headers['x-usuario-nombre'] = session.usuario.nombre;
-  if (session.usuario.loginId) headers['x-usuario-login-id'] = session.usuario.loginId;
-  if (session.usuario.codigoCarga) headers['x-usuario-codigo-carga'] = session.usuario.codigoCarga;
+  headers['x-usuario-id'] = String(session.usuario.id ?? '');
+  headers['x-usuario-rol'] = String(session.usuario.rol ?? '');
+  headers['x-usuario-nombre'] = headerSafe(session.usuario.nombre);
+  if (session.usuario.loginId) headers['x-usuario-login-id'] = headerSafe(session.usuario.loginId);
+  if (session.usuario.codigoCarga) headers['x-usuario-codigo-carga'] = headerSafe(session.usuario.codigoCarga);
   if (session.usuario.codigoPromotor) {
-    headers['x-usuario-codigo-promotor'] = session.usuario.codigoPromotor;
+    headers['x-usuario-codigo-promotor'] = headerSafe(session.usuario.codigoPromotor);
   }
   if (session.usuario.codigoSupervisor) {
-    headers['x-usuario-codigo-supervisor'] = session.usuario.codigoSupervisor;
+    headers['x-usuario-codigo-supervisor'] = headerSafe(session.usuario.codigoSupervisor);
   }
-  if (session.usuario.idVendedor) headers['x-usuario-id-vendedor'] = session.usuario.idVendedor;
-  if (session.usuario.idSupervisor) headers['x-usuario-id-supervisor'] = session.usuario.idSupervisor;
-  if (session.usuario.idOperador) headers['x-usuario-id-operador'] = session.usuario.idOperador;
-  if (session.usuario.sucursal) headers['x-usuario-sucursal'] = session.usuario.sucursal;
+  if (session.usuario.idVendedor) headers['x-usuario-id-vendedor'] = String(session.usuario.idVendedor);
+  if (session.usuario.idSupervisor) headers['x-usuario-id-supervisor'] = String(session.usuario.idSupervisor);
+  if (session.usuario.idOperador) headers['x-usuario-id-operador'] = String(session.usuario.idOperador);
+  if (session.usuario.sucursal) headers['x-usuario-sucursal'] = headerSafe(session.usuario.sucursal);
   if (session.usuario.panelGlobal) headers['x-usuario-panel-global'] = 'true';
   return headers;
 }
@@ -935,24 +947,46 @@ export async function uploadImagenCierrePij(
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url);
-    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
+    try {
+      for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
+    } catch {
+      reject(new Error('No se pudo armar la petición (revisá la sesión e intentá de nuevo).'));
+      return;
+    }
 
     xhr.upload.onprogress = (ev) => {
-      if (ev.lengthComputable && onProgress) {
-        onProgress(Math.round((ev.loaded / ev.total) * 100));
+      if (!onProgress) return;
+      if (ev.lengthComputable && ev.total > 0) {
+        onProgress(Math.min(99, Math.round((ev.loaded / ev.total) * 100)));
+      } else if (ev.loaded > 0) {
+        onProgress(50);
       }
     };
 
     xhr.onload = () => {
+      onProgress?.(100);
+      const raw = String(xhr.responseText ?? '');
       let data: Record<string, unknown> = {};
       try {
-        data = xhr.responseText ? (JSON.parse(xhr.responseText) as Record<string, unknown>) : {};
+        data = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
       } catch {
-        reject(new Error('Respuesta inválida del servidor'));
+        const esHtml = /^\s*</.test(raw) || /text\/html/i.test(xhr.getResponseHeader('content-type') ?? '');
+        reject(
+          new Error(
+            esHtml
+              ? `El servidor no respondió JSON (${xhr.status}). Probá recargar la página (Ctrl+F5). Si sigue, el deploy de /leads puede estar desactualizado.`
+              : `Respuesta inválida del servidor (${xhr.status}).`,
+          ),
+        );
         return;
       }
       if (xhr.status >= 200 && xhr.status < 300) {
-        resolve(data as { imagen: ImagenCierrePij });
+        const imagen = data.imagen as ImagenCierrePij | undefined;
+        if (!imagen?.id || !imagen?.storagePath) {
+          reject(new Error('El servidor no devolvió los datos de la imagen.'));
+          return;
+        }
+        resolve({ imagen });
         return;
       }
       const msg =
@@ -965,6 +999,8 @@ export async function uploadImagenCierrePij(
     };
 
     xhr.onerror = () => reject(new Error('No se pudo subir. Reintentá cuando tengas señal.'));
+    xhr.ontimeout = () => reject(new Error('La subida tardó demasiado. Probá una foto más liviana.'));
+    xhr.timeout = 120_000;
     xhr.send(form);
   });
 }

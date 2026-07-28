@@ -6,6 +6,7 @@ import {
   esImagenCierrePijObligatoria,
   slotImagenCierrePijVisible,
 } from '../../domain/imagenes-cierre-pij';
+import { prepararImagenCierreParaSubida } from '../../domain/preparar-imagen-cierre';
 import type { FormaPago, ImagenCierrePij, TipoImagenCierrePij } from '../../types';
 
 function ImagenMiniatura({
@@ -29,6 +30,22 @@ function ImagenMiniatura({
           Cargando…
         </div>
       )}
+    </div>
+  );
+}
+
+function BarraProgresoSubida({ progreso, fase }: { progreso: number; fase: string }) {
+  return (
+    <div className="w-full space-y-1 px-1">
+      <div className="h-2 overflow-hidden rounded-full bg-brand-100">
+        <div
+          className="h-full rounded-full bg-brand-600 transition-all duration-200 ease-out"
+          style={{ width: `${Math.max(2, Math.min(100, progreso))}%` }}
+        />
+      </div>
+      <p className="text-[11px] font-medium tabular-nums text-brand-800">
+        {fase} {progreso}%
+      </p>
     </div>
   );
 }
@@ -60,6 +77,8 @@ function SlotImagen({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [subiendo, setSubiendo] = useState(false);
+  const [progreso, setProgreso] = useState(0);
+  const [fase, setFase] = useState('Subiendo');
   const [error, setError] = useState('');
   const [url, setUrl] = useState<string | null>(null);
   const [cargaError, setCargaError] = useState(false);
@@ -93,17 +112,28 @@ function SlotImagen({
     if (!file || disabled || !editable) return;
     setError('');
     setSubiendo(true);
+    setProgreso(0);
+    setFase('Preparando');
     try {
-      const { imagen: nueva } = await uploadImagenCierrePij(file, {
-        leadId,
-        ventaKey,
-        tipo,
-      });
+      const listo = await prepararImagenCierreParaSubida(file);
+      setFase('Subiendo');
+      setProgreso(1);
+      const { imagen: nueva } = await uploadImagenCierrePij(
+        listo,
+        { leadId, ventaKey, tipo },
+        (pct) => {
+          setFase('Subiendo');
+          setProgreso(pct);
+        },
+      );
+      setProgreso(100);
       onSubida(nueva);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al subir la imagen');
     } finally {
       setSubiendo(false);
+      setProgreso(0);
+      setFase('Subiendo');
       if (inputRef.current) inputRef.current.value = '';
     }
   }
@@ -140,35 +170,44 @@ function SlotImagen({
             <ImagenMiniatura imagen={imagen} url={url} />
           )}
           {editable && (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={disabled || subiendo}
-                onClick={() => inputRef.current?.click()}
-                className="h-9 flex-1 rounded-lg border border-brand-200 bg-white text-[12px] font-semibold text-brand-800 disabled:opacity-50"
-              >
-                {subiendo ? 'Subiendo…' : 'Cambiar'}
-              </button>
-              <button
-                type="button"
-                disabled={disabled || subiendo}
-                onClick={onQuitar}
-                className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-[12px] font-semibold text-zinc-600 disabled:opacity-50"
-              >
-                Quitar
-              </button>
+            <div className="space-y-2">
+              {subiendo && <BarraProgresoSubida progreso={progreso} fase={fase} />}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={disabled || subiendo}
+                  onClick={() => inputRef.current?.click()}
+                  className="h-9 flex-1 rounded-lg border border-brand-200 bg-white text-[12px] font-semibold text-brand-800 disabled:opacity-50"
+                >
+                  {subiendo ? `${fase}…` : 'Cambiar'}
+                </button>
+                <button
+                  type="button"
+                  disabled={disabled || subiendo}
+                  onClick={onQuitar}
+                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-[12px] font-semibold text-zinc-600 disabled:opacity-50"
+                >
+                  Quitar
+                </button>
+              </div>
             </div>
           )}
         </div>
       ) : editable ? (
-        <button
-          type="button"
-          disabled={disabled || subiendo}
-          onClick={() => inputRef.current?.click()}
-          className="flex min-h-[72px] w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 px-3 py-3 text-center text-[13px] font-medium text-brand-800 disabled:opacity-50"
-        >
-          {subiendo ? 'Subiendo…' : 'Tomar foto o elegir imagen'}
-        </button>
+        <div className="space-y-2">
+          <button
+            type="button"
+            disabled={disabled || subiendo}
+            onClick={() => inputRef.current?.click()}
+            className="flex min-h-[72px] w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 px-3 py-3 text-center text-[13px] font-medium text-brand-800 disabled:opacity-50"
+          >
+            {subiendo ? (
+              <BarraProgresoSubida progreso={progreso} fase={fase} />
+            ) : (
+              'Tomar foto o elegir imagen'
+            )}
+          </button>
+        </div>
       ) : (
         <p className="text-[12px] text-zinc-400">Sin foto</p>
       )}

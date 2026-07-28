@@ -83,18 +83,29 @@ async function runPijIntegralSync(lead, seguimiento, usuario) {
   });
 }
 
+function headerFromRequest(req, name) {
+  const raw = String(req.headers[name] || '').trim();
+  if (!raw) return '';
+  if (!/%[0-9A-Fa-f]{2}/.test(raw)) return raw;
+  try {
+    return decodeURIComponent(raw);
+  } catch {
+    return raw;
+  }
+}
+
 function usuarioDesdeRequest(req) {
   const rol = req.headers['x-usuario-rol'];
-  const nombre = String(req.headers['x-usuario-nombre'] || '').trim();
+  const nombre = headerFromRequest(req, 'x-usuario-nombre');
   const id = String(req.headers['x-usuario-id'] || '').trim();
-  const loginId = String(req.headers['x-usuario-login-id'] || '').trim();
-  const codigoCarga = String(req.headers['x-usuario-codigo-carga'] || '').trim();
-  const codigoPromotor = String(req.headers['x-usuario-codigo-promotor'] || '').trim();
-  const codigoSupervisor = String(req.headers['x-usuario-codigo-supervisor'] || '').trim();
+  const loginId = headerFromRequest(req, 'x-usuario-login-id');
+  const codigoCarga = headerFromRequest(req, 'x-usuario-codigo-carga');
+  const codigoPromotor = headerFromRequest(req, 'x-usuario-codigo-promotor');
+  const codigoSupervisor = headerFromRequest(req, 'x-usuario-codigo-supervisor');
   const idVendedorHdr = String(req.headers['x-usuario-id-vendedor'] || '').trim();
   const idSupervisorHdr = String(req.headers['x-usuario-id-supervisor'] || '').trim();
   const idOperadorHdr = String(req.headers['x-usuario-id-operador'] || '').trim();
-  const sucursalHdr = String(req.headers['x-usuario-sucursal'] || '').trim();
+  const sucursalHdr = headerFromRequest(req, 'x-usuario-sucursal');
   if (rol !== 'promotor' && rol !== 'supervisor' && rol !== 'superadmin') return null;
   if (!nombre || !id) return null;
   const panelGlobalHdr = String(req.headers['x-usuario-panel-global'] || '').trim().toLowerCase();

@@ -73,8 +73,12 @@ export function registerCierresPijRoutes(api, { usuarioDesdeRequest }) {
   api.post('/cierres-pij/imagenes', (req, res) => {
     upload.single('imagen')(req, res, async (err) => {
       if (err) {
-        const msg = err instanceof Error ? err.message : 'Error al subir imagen';
-        const status = /formato|tamaño|file too large/i.test(msg) ? 400 : 500;
+        const code = err && typeof err === 'object' && 'code' in err ? String(err.code) : '';
+        let msg = err instanceof Error ? err.message : 'Error al subir imagen';
+        if (code === 'LIMIT_FILE_SIZE' || /file too large/i.test(msg)) {
+          msg = `La imagen supera el máximo (${Math.round(getCierresPijMaxBytes() / (1024 * 1024))} MB). Sacá la foto de nuevo o elegí una más liviana.`;
+        }
+        const status = /formato|tamaño|file too large|supera el máximo/i.test(msg) ? 400 : 500;
         return res.status(status).json({ error: msg });
       }
 

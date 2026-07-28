@@ -450,6 +450,7 @@ export function leadSoloLecturaUltimoModificador(
   userRole?: string | null,
   /** ids alternativos de la sesión (id / idOperador / idVendedor) */
   currentUserIds: Array<string | number | null | undefined> = [],
+  historial: SeguimientoHistorialEntry[] = [],
 ): boolean {
   if (!lead?.seguimiento?.operadorId) {
     // Si no tiene operadorId de seguimiento previo, cualquiera puede gestionarlo.
@@ -461,9 +462,12 @@ export function leadSoloLecturaUltimoModificador(
   if (leadDerivacionTerrenoSupervisorActiva(lead) && esSupervisor) {
     return false;
   }
-  // Post-venta: el supervisor completa docs de caja aunque el cierre haya
-  // quedado atribuido al promotor (operadorId / nombre del vendedor).
-  if (leadCompro(lead) && esSupervisor) {
+  // Cierre hecho por supervisor: puede volver a editarlo (fotos/DNI/pago) aunque
+  // el último operadorId guardado sea el del promotor del lead.
+  if (
+    esSupervisor &&
+    leadCierreRegistradoSupervisor(lead, historial)
+  ) {
     return false;
   }
   const idsSesion = [currentUserId, ...currentUserIds]

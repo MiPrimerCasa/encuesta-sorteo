@@ -658,6 +658,7 @@ export function LeadsPanel({
             usuario?.idOperador ?? usuario?.id,
             rolUsuario,
             operadorIdsSesion,
+            historialPorLead[leadSeleccionado.id] ?? [],
           ) ||
             (esPromotor
               ? leadSoloLecturaPromotor(

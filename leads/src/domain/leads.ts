@@ -107,6 +107,9 @@ export function etiquetaSeguimientoAgendaOtroRol(
 
 export function leadSoloLecturaSupervisor(lead: Lead) {
   if (lead.bloqueadoSupervisor48h) return true;
+  // Tras el cierre, el supervisor puede abrir el lead (completar fotos/DNI/medio de pago para caja).
+  // La protección de cita del promotor aplica al pipeline previo, no al post-venta.
+  if (leadCompro(lead)) return false;
   if (leadSeguimientoPijPromotor(lead)) return true;
   if (
     leadTieneCitaPrevia(lead) &&

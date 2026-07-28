@@ -20,8 +20,10 @@ import {
 } from './caja-payload.js';
 import { equipoDesdeCodigo, upsertOperadoresCaja } from './caja-operadores.js';
 
-const PRODUCTOS_CAJA = new Set(['prod-pij', 'prod-terreno']);
-const RESULTADOS_CAJA = new Set(['compro', 'derivar_terreno']);
+/** Caja (SistemaCajaPIJ) solo acepta PIJ por ahora; terreno no se publica. */
+const PRODUCTOS_CAJA = new Set(['prod-pij']);
+/** Contrato vigente 2026-07-27: solo `compro` encola en POS (no derivar_terreno). */
+const RESULTADOS_CAJA = new Set(['compro']);
 
 /**
  * Resuelve código ERP de sucursal (`01`/`02`/`03`).
@@ -43,7 +45,7 @@ export function resolveSucursalParaCaja(usuario, lead) {
     }
   }
 
-  // 2) Extraer S## del código promotor/supervisor (SORTEO01S21P01 → S21 → 01)
+  // 2) Extraer S## del código promotor/supervisor (SORTEO01S21P01 → S21 → 01 vía mapa)
   const candidatos = [
     usuario?.codigoPromotor,
     usuario?.codigoCarga,
@@ -53,7 +55,10 @@ export function resolveSucursalParaCaja(usuario, lead) {
   ];
   for (const c of candidatos) {
     const equipo = equipoDesdeCodigo(c);
-    if (equipo) return normalizarSucursalCodigoErp(equipo).slice(0, 40);
+    if (!equipo) continue;
+    const norm = normalizarSucursalCodigoErp(equipo);
+    // Solo aceptar código ERP numérico; si el mapa no está, seguir al default.
+    if (/^\d{1,2}$/.test(norm)) return norm.padStart(2, '0').slice(0, 40);
   }
 
   // 3) Default de entorno
@@ -63,6 +68,11 @@ export function resolveSucursalParaCaja(usuario, lead) {
 
 export function debePublicarCierreACaja(seguimiento) {
   if (!isCajaMysqlEnabled()) return false;
+  return esCierrePublicableACaja(seguimiento);
+}
+
+/** Cierre que debe ir a caja (MySQL nube o ingest HTTP), sin mirar flags de transporte. */
+export function esCierrePublicableACaja(seguimiento) {
   if (!seguimiento) return false;
   return (
     RESULTADOS_CAJA.has(String(seguimiento.resultadoEntrevista ?? '')) &&
@@ -241,7 +251,7 @@ export async function publicarCierreACajaMysql({
     };
   }
 
-  const payload = buildCrmIngestPayload({
+  const payload = await buildCrmIngestPayload({
     lead,
     seguimiento,
     usuario,
@@ -421,6 +431,7 @@ export async function publicarCierreACajaMysql({
       pendienteId,
       pendienteUuid,
       cierreId: imgResult.cierreId,
+      sucursalCodigo,
       error: null,
     };
   } catch (err) {

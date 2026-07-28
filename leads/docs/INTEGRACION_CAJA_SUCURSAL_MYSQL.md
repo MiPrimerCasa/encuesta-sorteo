@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-07-18  
 **Estado:** alineado al contrato SistemaCajaPIJ  
-**Productos:** Plan Inversión Joven (`prod-pij`) y Terreno (`prod-terreno`)
+**Productos:** Plan Inversión Joven (`prod-pij`) únicamente (terreno no se publica a caja por ahora)
 
 ## Fuente de verdad del contrato
 
@@ -102,11 +102,11 @@ Auth: `Authorization: Bearer <token>` (`CAJA_SYNC_TOKENS`).
 | Método | Ruta | Uso |
 |--------|------|-----|
 | `GET` | `/caja/health` | Ping + MySQL |
-| `GET` | `/caja/cierres` o `/caja/pendientes?desde=&limit=` | Pull incremental (`payload` completo) |
+| `GET` | `/caja/cierres` o `/caja/pendientes?desde=&limit=&updatedSince=` | Pull: nuevos + re-publicados |
 | `GET` | `/caja/imagenes/:idImagen` | Descarga binaria (contrato) |
 | `GET` | `/caja/cierres/:id/imagenes/:imgId` | Compat |
 | `GET` | `/caja/operadores?equipo=&rol=&refresh=` | Catálogo |
-| `POST` | `/caja/ack` | `{ ultimoId }` → marca `DESCARGADA` |
+| `POST` | `/caja/ack` | `{ ultimoId, idsProcesados? }` → marca `DESCARGADA` |
 | `POST` | `/caja/confirmaciones` | Push confirmación/rechazo |
 
 Confirmación preferida:
@@ -139,6 +139,21 @@ CAJA_SYNC_TOKENS={"01":"token-largo-secreto"}
 CAJA_ERP_SUCURSAL_MAP={"S21":"01"}
 CAJA_DEFAULT_SUCURSAL=01
 ```
+
+### Piloto local (mismo PC: CRM + Electron)
+
+Sin MySQL VPS. El CRM hace `POST` al ingest embebido de Electron:
+
+```env
+ERP_CAJA_INGEST_URL=http://127.0.0.1:3847
+ERP_CAJA_API_KEY=dev-crm-key-local
+ERP_CAJA_ADJUNTOS_BASE64=true
+CAJA_DEFAULT_SUCURSAL=01
+CAJA_ERP_SUCURSAL_MAP={"S21":"01"}
+CRM_PUBLIC_BASE_URL=http://127.0.0.1:3001
+```
+
+Electron debe tener `CRM_INGEST_EMBEDDED=true`, `CRM_INGEST_ENABLED=true` y la misma API key. Las fotos van como `contenidoBase64` (o `rutaLocal` si el archivo es grande).
 
 ---
 

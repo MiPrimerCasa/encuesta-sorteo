@@ -7,6 +7,8 @@ interface Props {
   cambiosPropuestos: SyncPreviewItem[];
   onCommit: (aprobados: SyncPreviewItem[], tipo: 'fecha' | 'recibo') => Promise<void>;
   isLoading: boolean;
+  /** Texto opcional: qué pestaña(s) de Caja se usaron. */
+  fuenteCaja?: string;
 }
 
 function normalizarDiaIso(fecha: string | null | undefined): string {
@@ -20,14 +22,6 @@ function normalizarDiaIso(fecha: string | null | undefined): string {
   const mo = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${mo}-${day}`;
-}
-
-/** Solo mostrar si la fecha de Caja es anterior a la del CRM. */
-function cajaAnteriorACrm(fechaCrm: string, fechaCaja: string): boolean {
-  const crm = normalizarDiaIso(fechaCrm);
-  const caja = normalizarDiaIso(fechaCaja);
-  if (!crm || !caja) return false;
-  return caja < crm;
 }
 
 function formatFechaCorta(fecha: string | null | undefined) {
@@ -55,6 +49,29 @@ function formatFechaCorta(fecha: string | null | undefined) {
   }
 }
 
+function textoVendedor(cambio: SyncPreviewItem): { principal: string; caja?: string } {
+  const crm = cambio.promotorNombre?.trim() || '';
+  const caja = cambio.excelRow.nombreVendedor?.trim() || '';
+  if (crm) {
+    const mismo =
+      crm.toLowerCase() === caja.toLowerCase() ||
+      crm.toLowerCase().includes(caja.toLowerCase()) ||
+      caja.toLowerCase().includes(crm.toLowerCase());
+    return mismo || !caja ? { principal: crm } : { principal: crm, caja };
+  }
+  return { principal: caja || '—' };
+}
+
+function CeldaVendedor({ cambio }: { cambio: SyncPreviewItem }) {
+  const { principal, caja } = textoVendedor(cambio);
+  return (
+    <td className="p-3 text-xs max-w-[140px]">
+      <span className="text-gray-200 font-medium">{principal}</span>
+      {caja ? <span className="block text-[11px] text-gray-500 mt-0.5">Caja: {caja}</span> : null}
+    </td>
+  );
+}
+
 function CheckIcon({ checked, colorClass = 'text-yellow-500' }: { checked: boolean; colorClass?: string }) {
   if (checked) {
     return (
@@ -71,12 +88,9 @@ function CheckIcon({ checked, colorClass = 'text-yellow-500' }: { checked: boole
   );
 }
 
-export function SyncCajaModal({ isOpen, onClose, cambiosPropuestos, onCommit, isLoading }: Props) {
+export function SyncCajaModal({ isOpen, onClose, cambiosPropuestos, onCommit, isLoading, fuenteCaja }: Props) {
   const cambiosFecha = useMemo(
-    () =>
-      cambiosPropuestos.filter(
-        (c) => c.necesitaFecha && cajaAnteriorACrm(c.fechaActual, c.nuevaFecha),
-      ),
+    () => cambiosPropuestos.filter((c) => c.necesitaFecha),
     [cambiosPropuestos],
   );
   const cambiosRecibo = useMemo(
@@ -155,6 +169,7 @@ export function SyncCajaModal({ isOpen, onClose, cambiosPropuestos, onCommit, is
           <div>
             <h2 className="text-xl font-bold text-white tracking-tight">Sincronización PIJ con Caja</h2>
             <p className="text-sm text-gray-400">
+              {fuenteCaja ? <span className="block text-emerald-300/90 mb-1">{fuenteCaja}</span> : null}
               {totalDiferencias === 0
                 ? 'Sin diferencias detectadas'
                 : `${cambiosFecha.length} fecha(s) · ${cambiosRecibo.length} anexo(s)/adhesión`}
@@ -198,6 +213,7 @@ export function SyncCajaModal({ isOpen, onClose, cambiosPropuestos, onCommit, is
                             </button>
                           </th>
                           <th className="p-3 font-semibold">Cliente</th>
+                          <th className="p-3 font-semibold">Vendedor</th>
                           <th className="p-3 font-semibold">Recibo actual</th>
                           <th className="p-3 font-semibold">F. CRM</th>
                           <th className="p-3 font-semibold text-yellow-300">F. Caja</th>
@@ -222,6 +238,7 @@ export function SyncCajaModal({ isOpen, onClose, cambiosPropuestos, onCommit, is
                                   <span className="ml-2 text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">Adic.</span>
                                 )}
                               </td>
+                              <CeldaVendedor cambio={cambio} />
                               <td className="p-3 font-mono text-xs text-gray-300 max-w-[200px] truncate" title={cambio.numeroRecibo}>
                                 {cambio.numeroRecibo}
                               </td>
@@ -259,6 +276,7 @@ export function SyncCajaModal({ isOpen, onClose, cambiosPropuestos, onCommit, is
                             </button>
                           </th>
                           <th className="p-3 font-semibold">Cliente</th>
+                          <th className="p-3 font-semibold">Vendedor</th>
                           <th className="p-3 font-semibold">Recibo CRM</th>
                           <th className="p-3 font-semibold">Adhesión CRM → Caja</th>
                           <th className="p-3 font-semibold">Anexo CRM → Caja</th>
@@ -284,6 +302,7 @@ export function SyncCajaModal({ isOpen, onClose, cambiosPropuestos, onCommit, is
                                   <span className="ml-2 text-xs bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded">Adic.</span>
                                 )}
                               </td>
+                              <CeldaVendedor cambio={cambio} />
                               <td className="p-3 font-mono text-xs text-gray-400 max-w-[160px] truncate" title={cambio.numeroRecibo}>
                                 {cambio.numeroRecibo}
                               </td>

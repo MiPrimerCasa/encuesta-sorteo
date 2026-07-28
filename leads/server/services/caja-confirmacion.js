@@ -28,6 +28,11 @@ export function mapEstadoCajaACrm(estadoCaja) {
   return null;
 }
 
+function parsePositiveInt(val) {
+  const n = Number(val);
+  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : null;
+}
+
 /**
  * @param {{
  *   cierreId?: number,
@@ -38,6 +43,21 @@ export function mapEstadoCajaACrm(estadoCaja) {
  *   contratoUuid?: string|null,
  *   motivoRechazo?: string|null,
  *   confirmadoPor: string,
+ *   verificadoPor?: string,
+ *   verificadoPorUsuarioId?: number,
+ *   verificadoEn?: string,
+ *   idVentaIntegral?: number,
+ *   idLoteVenta?: number,
+ *   idVentasIntegral?: Array<{ ventaKey: string, idVentaIntegral: number, esPrincipal?: boolean }>,
+ *   pijIntegralEstado?: 'pendiente'|'bloqueado'|'fotos_ok'|'error',
+ *   pijIntegralError?: string|null,
+ *   clienteDocumento?: string|null,
+ *   solicitud?: string|null,
+ *   adhesionGrupo?: string|null,
+ *   adhesionNumero?: number|null,
+ *   adhesionNotacion?: string|null,
+ *   anexoNumero?: number|null,
+ *   anexoNotacion?: string|null,
  * }} body
  * @param {string} sucursal
  */
@@ -58,7 +78,9 @@ export async function aplicarConfirmacionCaja(body, sucursal) {
   }
 
   const cajaEstado = mapEstadoCajaACrm(estadoCaja);
-  const confirmadoPor = String(body?.confirmadoPor ?? body?.verificadoPor ?? '')
+  const confirmadoPor = String(
+    body?.confirmadoPor ?? body?.verificadoPor ?? '',
+  )
     .trim()
     .slice(0, 200);
   if (!confirmadoPor) {
@@ -207,7 +229,44 @@ export async function aplicarConfirmacionCaja(body, sucursal) {
   }
 
   const leadId = String(pendiente.crm_lead_external_id);
-  const verificadoEn = new Date().toISOString();
+  const verificadoEn =
+    body?.verificadoEn && !Number.isNaN(Date.parse(String(body.verificadoEn)))
+      ? new Date(String(body.verificadoEn)).toISOString()
+      : new Date().toISOString();
+
+  const idVentasIntegral = Array.isArray(body?.idVentasIntegral)
+    ? body.idVentasIntegral
+        .map((item) => ({
+          ventaKey: String(item?.ventaKey ?? '').trim(),
+          idVentaIntegral: parsePositiveInt(item?.idVentaIntegral),
+          esPrincipal: Boolean(item?.esPrincipal),
+        }))
+        .filter((i) => i.ventaKey && i.idVentaIntegral)
+    : [];
+
+  const principalFromArray = idVentasIntegral.find((i) => i.esPrincipal || i.ventaKey === 'principal');
+  const idVentaIntegral =
+    parsePositiveInt(body?.idVentaIntegral ?? body?.idLoteVenta) ||
+    principalFromArray?.idVentaIntegral ||
+    idVentasIntegral[0]?.idVentaIntegral ||
+    null;
+
+  // Doble chequeo opcional DNI / adhesión vs payload publicado
+  const clienteDocumento = body?.clienteDocumento
+    ? String(body.clienteDocumento).replace(/\D/g, '')
+    : null;
+  if (clienteDocumento && payload?.lead?.documentoNumero) {
+    const esperado = String(payload.lead.documentoNumero).replace(/\D/g, '');
+    if (esperado && esperado !== clienteDocumento) {
+      console.warn(
+        '[caja-confirmacion] DNI distinto al del pendiente lead=%s esperado=%s recibido=%s',
+        leadId,
+        esperado,
+        clienteDocumento,
+      );
+    }
+  }
+
   const patch = {
     cajaEstado,
     cajaVerificadoEn: verificadoEn,
@@ -216,6 +275,46 @@ export async function aplicarConfirmacionCaja(body, sucursal) {
     cajaSucursal: String(sucursal).slice(0, 32),
     cajaConfirmadoPor: confirmadoPor,
   };
+
+  if (estadoCaja === 'CONFIRMADA' && idVentaIntegral) {
+    patch.idVentaIntegral = idVentaIntegral;
+    patch.pijIntegralEstado = body?.pijIntegralEstado || 'bloqueado';
+    patch.pijIntegralError = null;
+    patch.pijIntegralEnviadoEn = verificadoEn;
+  } else if (estadoCaja === 'CONFIRMADA' && body?.pijIntegralEstado === 'error') {
+    patch.pijIntegralEstado = 'error';
+    patch.pijIntegralError = String(
+      body?.pijIntegralError ?? motivoRechazo ?? 'Error bloqueo PIJ en caja',
+    ).slice(0, 500);
+    patch.pijIntegralEnviadoEn = verificadoEn;
+  } else if (estadoCaja === 'CONFIRMADA' && body?.pijIntegralEstado) {
+    patch.pijIntegralEstado = body.pijIntegralEstado;
+    patch.pijIntegralEnviadoEn = verificadoEn;
+    if (body.pijIntegralError) {
+      patch.pijIntegralError = String(body.pijIntegralError).slice(0, 500);
+    }
+  }
+
+  // Multi-PIJ: propagar idVentaIntegral a comprasAdicionales por ventaKey
+  if (estadoCaja === 'CONFIRMADA' && idVentasIntegral.length) {
+    const segActual = (await getLatestSeguimientoSql(leadId, null)) || {};
+    const extras = Array.isArray(segActual.comprasAdicionales)
+      ? segActual.comprasAdicionales.map((c) => ({ ...c }))
+      : [];
+    let extrasChanged = false;
+    for (const item of idVentasIntegral) {
+      if (item.ventaKey === 'principal' || item.esPrincipal) {
+        if (!patch.idVentaIntegral) patch.idVentaIntegral = item.idVentaIntegral;
+        continue;
+      }
+      const idx = extras.findIndex((c) => String(c.id) === item.ventaKey);
+      if (idx >= 0) {
+        extras[idx] = { ...extras[idx], idVentaIntegral: item.idVentaIntegral };
+        extrasChanged = true;
+      }
+    }
+    if (extrasChanged) patch.comprasAdicionales = extras;
+  }
 
   const usuarioSistema = {
     id: payload?.operador?.usuarioId != null ? String(payload.operador.usuarioId) : '0',
@@ -282,6 +381,10 @@ export async function aplicarConfirmacionCaja(body, sucursal) {
     cajaVerificadoEn: verificadoEn,
     cajaComprobanteId: idCaja || reciboNumero,
     cajaConfirmadoPor: confirmadoPor,
+    verificadoPorUsuarioId: parsePositiveInt(body?.verificadoPorUsuarioId),
+    idVentaIntegral,
+    idVentasIntegral,
+    pijIntegralEstado: patch.pijIntegralEstado ?? null,
     saved,
   };
 }

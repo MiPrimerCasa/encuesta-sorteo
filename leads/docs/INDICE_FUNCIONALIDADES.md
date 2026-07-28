@@ -25,6 +25,8 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | Calendario supervisor | [FUNCIONALIDAD_CALENDARIO_SUPERVISOR.md](./FUNCIONALIDAD_CALENDARIO_SUPERVISOR.md) | Supervisor | `CalendarioView.tsx`, `NavBar.tsx` |
 | Conexión SP_RegistrarSeguimientoLead | [FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md](./FUNCIONALIDAD_CONEXION_SP_SEGUIMIENTO.md) | Ambos | `seguimiento-sql.js`, `.env SP_SEGUIMIENTO` |
 | Historial de estados al guardar seguimiento | [FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md](./FUNCIONALIDAD_HISTORIAL_SEGUIMIENTO.md) | Ambos | Tabla `registrarSeguimientoLead` + SP lectura |
+| **Despliegue columnas planas seguimiento (DBA)** | [DESPLIEGUE_COLUMNAS_PLANAS_SEGUIMIENTO.md](./DESPLIEGUE_COLUMNAS_PLANAS_SEGUIMIENTO.md) | DBA + dev | `sql/registrarSeguimientoLead-columnas-planas-completas.sql`, migración historial |
+| **Almacén fotos cierre PIJ (VPS por lead)** | [ALMACEN_IMAGENES_CIERRE_PIJ.md](./ALMACEN_IMAGENES_CIERRE_PIJ.md) | Dev / ops | `data/cierres-pij/{leadId}/` |
 | Historial inline en tarjeta de lead | [DOCUMENTACION_SISTEMA.md](./DOCUMENTACION_SISTEMA.md) §15.2.1 | Ambos | `useHistorialLeads.ts`, `LeadHistorialInline.tsx` |
 | Modelo SQL seguimiento (análisis parámetros SP) | [FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md](./FUNCIONALIDAD_MODELO_SEGUIMIENTO_SQL.md) | DBA + dev | Propuesta `@lead_id`, `@resultado_entrevista`, etc. |
 | Multisorteo / participantes | [SORTEOS_Y_PARTICIPANTES.md](./SORTEOS_Y_PARTICIPANTES.md) | Ambos | `encuesta-carga.js`, SP |
@@ -34,6 +36,9 @@ Cada cambio de negocio tiene su propio archivo en `docs/`, siguiendo la [plantil
 | Panel superadmin (métricas empresa) | [FUNCIONALIDAD_PANEL_SUPERADMIN.md](./FUNCIONALIDAD_PANEL_SUPERADMIN.md) | Superadmin | `SuperadminDashboard`, `admin-dashboard.js` |
 | Login y rol desde `Categoria` | [LOGIN_SP.md](./LOGIN_SP.md) | Ambos | `mssql.js`, `encuestas.js` |
 | Integración Adhesiones Facturación SP | [PROPUESTA_INTEGRACION_ADHESIONES.md](./PROPUESTA_INTEGRACION_ADHESIONES.md) | Promotor, supervisor, superadmin | `adhesionesPorVendedorGestion` SP |
+| **Requisitos CRM ↔ Caja sucursal PIJ (stock adhesión/anexo)** | [REQUISITOS_INTEGRACION_CAJA_SUCURSAL_PIJ.md](./REQUISITOS_INTEGRACION_CAJA_SUCURSAL_PIJ.md) | Promotor, supervisor, caja, DBA | Pendiente implementación |
+| **SOAP PIJ sistema integral (`altaModificaPlanJoven`)** | [INTEGRACION_SOAP_PIJ_SISTEMA_INTEGRAL.md](./INTEGRACION_SOAP_PIJ_SISTEMA_INTEGRAL.md) | Dev + ingeniero | Implementado (`PIJ_SOAP_ENABLED`) |
+| **Plan subida parcial PIJ / Caja (ramas a prod)** | [PLAN_SUBIDA_PARCIAL_PIJ_CAJA.md](./PLAN_SUBIDA_PARCIAL_PIJ_CAJA.md) | Dev + DBA + ops | Orden 1→7: SQL → UI → fotos → payload → bloqueo → Excel → docs |
 | Deploy y monorepo | [MONOREPO.md](./MONOREPO.md), [DEPLOY_VPS.md](./DEPLOY_VPS.md) | — | `deploy/` |
 
 

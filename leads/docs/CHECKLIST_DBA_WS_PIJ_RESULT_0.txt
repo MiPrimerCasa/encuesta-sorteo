@@ -1,0 +1,151 @@
+================================================================================
+  CHECKLIST DBA / IIS — Por qué localhost da 14047 y el SOAP público da 0
+================================================================================
+Fecha: 2026-07-20
+
+Hecho verificado:
+  - Prueba en localhost (formulario ASMX) con A200/300 → devolvió 14047 (OK)
+  - Misma data por SOAP a https://www.miprimercasa.ar/pij/pij.asmx → 0
+  - El CRM ya NO envía imágenes en el XML
+
+Conclusión: el fix anda en el server local; el endpoint PÚBLICO
+que consume el CRM no está igual o el camino SOAP falla en silencio.
+
+
+--------------------------------------------------------------------------------
+1) PUBLICAR LO MISMO QUE ANDUVO EN LOCALHOST
+--------------------------------------------------------------------------------
+[ ] Copiar / publicar el sitio PIJ (pij.asmx + bin/DLL) al sitio de
+    www.miprimercasa.ar (no dejar solo la prueba en localhost).
+[ ] Confirmar que el Application Pool recicló después de publicar.
+[ ] Abrir en el SERVER:
+      https://www.miprimercasa.ar/pij/pij.asmx?op=altaModificaPlanJoven
+    y mirar si el formulario lista campos imgDocumentoAnverso, etc.
+      - Si en localhost NO aparecen imgs y en público SÍ →
+        el público es una versión VIEJA (no publicada).
+[ ] Comparar fecha/hora del archivo DLL / pij.asmx en:
+      - carpeta localhost que dio 14047
+      - carpeta del sitio público
+
+
+--------------------------------------------------------------------------------
+2) HABILITAR / VER PROTOCOLOS SOAP (web.config del sitio PIJ)
+--------------------------------------------------------------------------------
+En el web.config del sitio, dentro de <system.web> / webServices:
+
+  <webServices>
+    <protocols>
+      <add name="HttpSoap" />
+      <add name="HttpSoap12" />
+      <!-- HttpGet/HttpPost solo para prueba local; el CRM usa SOAP -->
+      <add name="Documentation" />
+    </protocols>
+  </webServices>
+
+[ ] Verificar que HttpSoap (y si usan 1.2, HttpSoap12) estén habilitados.
+[ ] Si hubo un <remove name="HttpSoap" />, eso rompería el CRM.
+
+
+--------------------------------------------------------------------------------
+3) DEJAR DE TRAGAR ERRORES EN EL Catch (crítico para diagnosticar)
+--------------------------------------------------------------------------------
+Hoy el ASMX hace:
+  Catch ex As Exception
+      retorno = 0          ← el CRM solo ve 0
+      cadena = ex.Message  ← no se usa
+
+Cambiar TEMPORALMENTE a una de estas:
+
+  A) Log a archivo:
+      System.IO.File.AppendAllText(
+        "C:\temp\pij-soap-error.log",
+        DateTime.Now & " | " & ex.ToString() & Environment.NewLine)
+
+  B) O SoapException para ver el fault en el CRM:
+      Throw New SoapException(ex.Message, SoapException.ServerFaultCode)
+
+[ ] Reproducir UNA llamada SOAP desde afuera.
+[ ] Pegar el contenido de pij-soap-error.log (o el fault).
+    Ahí va a aparecer la causa real (columna, SQL, Char, etc.).
+
+
+--------------------------------------------------------------------------------
+4) PARÁMETROS SQL CORRECTOS (no Char sin tamaño)
+--------------------------------------------------------------------------------
+[ ] @solicitud → SqlDbType.NVarChar, Size 100  (NO Char)
+[ ] @anexo → SqlDbType.Int                   (NO Char)
+[ ] nombres / DNI / domicilio / teléfono → NVarChar con Size
+[ ] Publicar de nuevo después del cambio
+
+Char sin Size puede truncar "A200/300" y el SP no encuentra la parcela.
+
+
+--------------------------------------------------------------------------------
+5) LECTURA DEL RESULT SET (alineado con el SP)
+--------------------------------------------------------------------------------
+SP debe devolver SIEMPRE (también en alta nueva):
+
+  SELECT
+    1 AS gestionCodigo,
+    '...' AS gestionDescripcion,
+    @idVenta AS idVenta          -- alias idVenta (opción B)
+
+ASMX debe leer:
+
+  retorno = CInt(reader("idVenta"))
+
+[ ] Confirmar en el SP PUBLICADO en STRSYSTEM el alias (idVenta vs idLoteVenta).
+[ ] Confirmar en el DLL publicado que lee el mismo nombre.
+
+
+--------------------------------------------------------------------------------
+6) CONNECTION STRING Y Using
+--------------------------------------------------------------------------------
+[ ] No usar "Using connection" sobre un campo SqlConnection compartido
+    de la clase. Crear uno nuevo por request:
+
+      Using connection As New SqlConnection(connectionString)
+          ...
+      End Using
+
+[ ] Probar que la connection string del sitio público apunta a la misma
+    base STRSYSTEM donde probaron el SP a mano.
+
+
+--------------------------------------------------------------------------------
+7) PRUEBA DE ACEPTACIÓN (cuando digan "ya publiqué")
+--------------------------------------------------------------------------------
+Desde afuera (SoapUI / CRM / script) a:
+  https://www.miprimercasa.ar/pij/pij.asmx
+
+Misma data que localhost:
+
+  idVenta=0
+  idVendedor=132
+  solicitud=A200/300
+  anexo=2000
+  montoEfectivo=20000
+  montoTransferencia=13000
+  fechaAnexo=2026-07-20
+  nombreCliente=CAJAL LEONEL
+  numeroDocumentoCliente=25874565
+  domicilioCliente=BARRIO OBRERO A LA VUELTA DEL JEFE
+  numeroTelefonoCliente=37047898755
+  (SIN imágenes)
+
+Esperado:
+  <altaModificaPlanJovenResult>14047</altaModificaPlanJovenResult>
+  (o cualquier id > 0; no 0)
+
+Si sigue en 0 → mirar el log del Catch (paso 3).
+
+
+--------------------------------------------------------------------------------
+8) RESUMEN EN UNA FRASE
+--------------------------------------------------------------------------------
+Publicar el mismo ASMX/SP que anduvo en localhost al sitio público,
+arreglar Char→NVarChar, leer reader("idVenta"), y LOGUEAR el Catch
+para no devolver 0 a ciegas.
+
+El CRM no necesita otra configuración: ya llama por SOAP sin imágenes.
+================================================================================

@@ -6,7 +6,23 @@ import {
   resolveOperadorCanonico,
 } from '../domain/operador-canonical.js';
 
-const CAJA_URL = 'https://docs.google.com/spreadsheets/d/1jOxw0FXv_HDNkkh9vwQR9T5PoAPk5rcErUJEVjvayBA/export?format=csv&gid=288750825';
+const CAJA_SPREADSHEET_ID = '1jOxw0FXv_HDNkkh9vwQR9T5PoAPk5rcErUJEVjvayBA';
+
+/** Pestañas conocidas del registro PIJ mensual en Google Sheets. */
+export const CAJA_SHEETS = {
+  junio: { gid: '288750825', label: 'Junio 2026', mes: '06' },
+  julio: { gid: '95957770', label: 'Julio 2026', mes: '07' },
+};
+
+/** Pestañas mensuales del registro PIJ (Junio, Julio, …). Override: CAJA_SHEET_GIDS=288750825,95957770 */
+const CAJA_SHEET_GIDS = (process.env.CAJA_SHEET_GIDS || `${CAJA_SHEETS.junio.gid},${CAJA_SHEETS.julio.gid}`)
+  .split(',')
+  .map((g) => g.trim())
+  .filter(Boolean);
+
+function cajaCsvUrl(gid) {
+  return `https://docs.google.com/spreadsheets/d/${CAJA_SPREADSHEET_ID}/export?format=csv&gid=${gid}`;
+}
 
 function parseCSVLine(line) {
   const result = [];
@@ -40,22 +56,14 @@ function parseCSVLine(line) {
   return result;
 }
 
-export async function fetchCajaData() {
-  const response = await fetch(CAJA_URL);
-  if (!response.ok) {
-    throw new Error(`Error fetching Google Sheets CSV: ${response.statusText}`);
-  }
-  const csvText = await response.text();
+/**
+ * Parsea el CSV exportado de una pestaña del registro PIJ.
+ * Detecta la fila de cabecera buscando FECHA + ORDEN ANEXO (Junio fila 9, Julio fila 1, etc.).
+ */
+export function parseCajaCsvText(csvText, sheetGid = '') {
   const lines = csvText.split(/\r?\n/);
-  
-  // Primera fila como cabeceras
-  const headers = parseCSVLine(lines[8] || '').map(h => h.toUpperCase().trim());
-  // El CSV mostrado tenía las cabeceras en la línea 9 (index 8), vemos que hay metadatos antes o está vacío?
-  // Espera, el CSV que vi tenía las cabeceras en la línea 9 del log, pero en el archivo real:
-  // línea 1 es: ,FECHA,SERIE,ORDEN ADH,ORDEN ANEXO,NOMBRE CLIENTE...
-  // Vamos a buscar la línea que contenga "FECHA" y "ORDEN ANEXO" para usarla como header
-  
-  let headerIndex = 0;
+
+  let headerIndex = -1;
   for (let i = 0; i < lines.length; i++) {
     if (lines[i].includes('FECHA') && lines[i].includes('ORDEN ANEXO')) {
       headerIndex = i;
@@ -63,8 +71,16 @@ export async function fetchCajaData() {
     }
   }
 
-  const keys = parseCSVLine(lines[headerIndex]).map(h => h.toUpperCase().trim());
-  
+  if (headerIndex === -1) {
+    throw new Error(
+      sheetGid
+        ? `Formato de CSV inválido (gid ${sheetGid}): no se encontró la fila de cabecera`
+        : 'Formato de CSV inválido: no se encontró la fila de cabecera',
+    );
+  }
+
+  const keys = parseCSVLine(lines[headerIndex]).map((h) => h.toUpperCase().trim());
+
   const fechaIdx = keys.indexOf('FECHA');
   const serieIdx = keys.indexOf('SERIE');
   const adhIdx = keys.indexOf('ORDEN ADH');
@@ -74,7 +90,11 @@ export async function fetchCajaData() {
   const conceptoIdx = keys.indexOf('CONCEPTO');
 
   if (fechaIdx === -1 || anexoIdx === -1) {
-    throw new Error('Formato de CSV inválido: No se encontraron las columnas FECHA o ORDEN ANEXO');
+    throw new Error(
+      sheetGid
+        ? `Formato de CSV inválido (gid ${sheetGid}): faltan columnas FECHA u ORDEN ANEXO`
+        : 'Formato de CSV inválido: faltan columnas FECHA u ORDEN ANEXO',
+    );
   }
 
   const rows = [];
@@ -82,8 +102,7 @@ export async function fetchCajaData() {
     const line = lines[i];
     if (!line.trim()) continue;
     const values = parseCSVLine(line);
-    
-    // Ignorar filas sin número de anexo ni adh
+
     const anexo = values[anexoIdx] || '';
     const adh = values[adhIdx] || '';
     if (!anexo && !adh) continue;
@@ -96,10 +115,34 @@ export async function fetchCajaData() {
       nombreCliente: values[nombreIdx] || '',
       nombreVendedor: vendedorIdx !== -1 ? (values[vendedorIdx] || '') : '',
       concepto: conceptoIdx !== -1 ? (values[conceptoIdx] || '') : '',
+      sheetGid: sheetGid || undefined,
     });
   }
 
   return rows;
+}
+
+async function fetchCajaSheetRows(gid) {
+  const response = await fetch(cajaCsvUrl(gid));
+  if (!response.ok) {
+    throw new Error(`Error fetching Google Sheets CSV (gid ${gid}): ${response.statusText}`);
+  }
+  const csvText = await response.text();
+  return parseCajaCsvText(csvText, gid);
+}
+
+/**
+ * @param {{ sheetGids?: string[] }} [options]
+ * @returns {Promise<Array<ReturnType<typeof parseCajaCsvText>[number]>>}
+ */
+export async function fetchCajaData(options = {}) {
+  const gids = options.sheetGids?.length ? options.sheetGids : CAJA_SHEET_GIDS;
+  if (gids.length === 0) {
+    throw new Error('No hay pestañas de Caja configuradas (CAJA_SHEET_GIDS vacío)');
+  }
+
+  const results = await Promise.all(gids.map((gid) => fetchCajaSheetRows(gid)));
+  return results.flat();
 }
 
 function normalizar(texto) {
@@ -206,6 +249,29 @@ export function necesitaActualizarFechaDesdeCaja(fechaCrmStr, fechaCajaStr) {
   const caja = normalizarDiaComparacion(fechaCajaStr);
   if (!caja || !crm) return false;
   return caja < crm;
+}
+
+function mesCalendarioDeIso(isoStr) {
+  const d = normalizarDiaComparacion(isoStr);
+  return d ? d.slice(5, 7) : '';
+}
+
+/**
+ * Modo corrección: ventas de junio mal cargadas en el CRM con fecha de julio.
+ * Usa solo la pestaña Junio de Caja como fuente y propone la fecha de junio si difiere.
+ */
+export function necesitaCorreccionJulioConJunio(fechaCrmStr, fechaCajaStr) {
+  const crm = normalizarDiaComparacion(fechaCrmStr);
+  const caja = normalizarDiaComparacion(fechaCajaStr);
+  if (!caja) return false;
+  if (!crm) return true;
+  if (crm === caja) return false;
+
+  const mesCrm = mesCalendarioDeIso(crm);
+  const mesCaja = mesCalendarioDeIso(caja);
+  if (mesCrm === '07' && mesCaja === '06') return true;
+
+  return necesitaActualizarFechaDesdeCaja(fechaCrmStr, fechaCajaStr);
 }
 
 /** Compara adhesión/anexo del CRM con la fila de Caja. */
@@ -316,8 +382,13 @@ function vendedoresCoinciden(vendedorCrm, vendedorExcel) {
   return false;
 }
 
-export async function buildSyncPreview(leadsDB, comprasAdicionalesDB) {
-  const excelRows = await fetchCajaData();
+/**
+ * @param {unknown[]} leadsDB
+ * @param {{ sheetGids?: string[], corregirJulioConJunio?: boolean }} [options]
+ */
+export async function buildSyncPreview(leadsDB, options = {}) {
+  const { sheetGids, corregirJulioConJunio = false } = options;
+  const excelRows = await fetchCajaData({ sheetGids });
   
   // Mapear cada variante generada a las filas de excel que son ADHESION (cierres/ventas nuevas).
   // Una fila es adhesión si:
@@ -403,6 +474,12 @@ export async function buildSyncPreview(leadsDB, comprasAdicionalesDB) {
     const fechaCreadoStr = fechaCreado ? fechaCreado.slice(0, 10) : '';
     const fechaEffectiveStr = fechaCierreStr || fechaCreadoStr;
 
+    if (corregirJulioConJunio) {
+      const refCrm = fechaCierreStr || fechaCreadoStr;
+      if (mesCalendarioDeIso(refCrm) !== '07') return;
+      if (mesCalendarioDeIso(nuevaFecha) !== '06') return;
+    }
+
     const reciboDiff = evaluarDiferenciasReciboPij(numeroRecibo, matchedRow);
     const reciboPropuesto = formatReciboCaja(
       matchedRow.serie || 'A',
@@ -410,8 +487,9 @@ export async function buildSyncPreview(leadsDB, comprasAdicionalesDB) {
       matchedRow.ordenAnexo,
     );
 
-    // Fecha: solo si la Caja es anterior a la fecha de cierre del CRM (no usar creadoEn).
-    const necesitaFecha = necesitaActualizarFechaDesdeCaja(fechaCierreStr, nuevaFecha);
+    const necesitaFecha = corregirJulioConJunio
+      ? necesitaCorreccionJulioConJunio(fechaCierreStr || fechaCreadoStr, nuevaFecha)
+      : necesitaActualizarFechaDesdeCaja(fechaCierreStr, nuevaFecha);
 
     if (!necesitaFecha && !reciboDiff.necesitaRecibo) return;
 
@@ -421,6 +499,7 @@ export async function buildSyncPreview(leadsDB, comprasAdicionalesDB) {
       isCompraAdicional,
       compraId,
       nombreCliente,
+      promotorNombre: promotorNombre || '',
       numeroRecibo,
       fechaActual: fechaCierreStr || fechaEffectiveStr,
       nuevaFecha: nuevaFecha || fechaEffectiveStr,

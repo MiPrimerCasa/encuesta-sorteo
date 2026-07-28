@@ -60,8 +60,11 @@ function mapPendienteRow(row, { basePath = '' } = {}) {
 
 /**
  * Pull incremental de pendientes para la sucursal del token.
+ * Incluye filas nuevas (`id > desde`) y re-publicaciones (`estado=PENDIENTE` con
+ * `updated_at > updatedSince`) aunque el id ya haya pasado el cursor.
+ *
  * @param {string} sucursalCodigo
- * @param {{ desde?: number, limit?: number, basePath?: string }} opts
+ * @param {{ desde?: number, limit?: number, basePath?: string, updatedSince?: string|Date|null }} opts
  */
 export async function listarCierresParaCaja(sucursalCodigo, opts = {}) {
   if (!isCajaMysqlEnabled()) {
@@ -76,21 +79,49 @@ export async function listarCierresParaCaja(sucursalCodigo, opts = {}) {
   if (!Number.isFinite(limit) || limit < 1) limit = 50;
   if (limit > 200) limit = 200;
 
+  const updatedSinceRaw = opts.updatedSince;
+  let updatedSince = null;
+  if (updatedSinceRaw != null && String(updatedSinceRaw).trim()) {
+    const d = new Date(updatedSinceRaw);
+    if (!Number.isNaN(d.getTime())) updatedSince = d;
+  }
+
   const pool = getCajaMysqlPool();
   const suc = String(sucursalCodigo);
-  const [rows] = await pool.query(
-    `SELECT *
-     FROM crm_venta_pendiente
-     WHERE id > ?
-       AND sucursal_codigo = ?
-       AND estado IN ('PENDIENTE', 'DESCARGADA')
-     ORDER BY id ASC
-     LIMIT ?`,
-    [desdeSafe, suc, limit],
-  );
+
+  /** @type {any[]} */
+  let rows;
+  if (updatedSince) {
+    const [r] = await pool.query(
+      `SELECT *
+       FROM crm_venta_pendiente
+       WHERE sucursal_codigo = ?
+         AND (
+           (id > ? AND estado IN ('PENDIENTE', 'DESCARGADA'))
+           OR (estado = 'PENDIENTE' AND updated_at > ? AND id <= ?)
+         )
+       ORDER BY id ASC
+       LIMIT ?`,
+      [suc, desdeSafe, updatedSince, desdeSafe, limit],
+    );
+    rows = r;
+  } else {
+    const [r] = await pool.query(
+      `SELECT *
+       FROM crm_venta_pendiente
+       WHERE id > ?
+         AND sucursal_codigo = ?
+         AND estado IN ('PENDIENTE', 'DESCARGADA')
+       ORDER BY id ASC
+       LIMIT ?`,
+      [desdeSafe, suc, limit],
+    );
+    rows = r;
+  }
 
   const cierres = (rows || []).map((r) => mapPendienteRow(r, { basePath: opts.basePath || '' }));
-  const ultimoId = cierres.length > 0 ? cierres[cierres.length - 1].id : desdeSafe;
+  const maxId = cierres.reduce((m, c) => Math.max(m, Number(c.id) || 0), desdeSafe);
+  const ultimoId = maxId;
 
   return {
     sucursal: suc,
@@ -236,42 +267,90 @@ export async function resolverImagenPorIdImagen(imgId, sucursal) {
 
 /**
  * Avanza el cursor de pull y marca pendientes como DESCARGADA.
+ * @param {string} sucursal
+ * @param {number|{ ultimoId: number, idsProcesados?: number[] }} ultimoIdOrOpts
+ *   - number (legacy): marca todos `id <= ultimoId` en PENDIENTE
+ *   - objeto: marca rango nuevo + `idsProcesados` (re-publicaciones ya bajadas)
  */
-export async function ackPullCaja(sucursal, ultimoId) {
+export async function ackPullCaja(sucursal, ultimoIdOrOpts) {
   if (!isCajaMysqlEnabled()) {
     const err = new Error('MySQL de caja deshabilitada (CAJA_MYSQL_ENABLED).');
     err.code = 'CAJA_MYSQL_DISABLED';
     throw err;
   }
 
-  const id = Number(ultimoId);
+  const opts =
+    typeof ultimoIdOrOpts === 'object' && ultimoIdOrOpts != null
+      ? ultimoIdOrOpts
+      : { ultimoId: ultimoIdOrOpts };
+  const id = Number(opts.ultimoId);
   if (!Number.isFinite(id) || id < 0) {
     const err = new Error('ultimoId inválido.');
     err.code = 'VALIDATION';
     throw err;
   }
+  const idsProcesados = Array.isArray(opts.idsProcesados)
+    ? [...new Set(opts.idsProcesados.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0))]
+    : [];
 
   const pool = getCajaMysqlPool();
   const suc = String(sucursal).slice(0, 64);
+
+  const [curRows] = await pool.query(
+    `SELECT ultimo_id FROM sync_cursor WHERE cliente = ? LIMIT 1`,
+    [suc],
+  );
+  const oldCursor = Number(curRows?.[0]?.ultimo_id ?? 0) || 0;
+  const nuevoCursor = Math.max(oldCursor, Math.floor(id));
+
   await pool.query(
     `INSERT INTO sync_cursor (cliente, ultimo_id, ultimo_pull)
      VALUES (?, ?, UTC_TIMESTAMP())
      ON DUPLICATE KEY UPDATE
        ultimo_id = GREATEST(ultimo_id, VALUES(ultimo_id)),
        ultimo_pull = UTC_TIMESTAMP()`,
-    [suc, Math.floor(id)],
+    [suc, nuevoCursor],
   );
 
-  await pool.query(
-    `UPDATE crm_venta_pendiente
-     SET estado = 'DESCARGADA',
-         pulled_at = COALESCE(pulled_at, CURRENT_TIMESTAMP(3)),
-         updated_at = CURRENT_TIMESTAMP(3)
-     WHERE id <= ?
-       AND sucursal_codigo = ?
-       AND estado = 'PENDIENTE'`,
-    [Math.floor(id), suc],
-  );
+  // Rango nuevo (ids que avanzan el cursor)
+  if (nuevoCursor > oldCursor) {
+    await pool.query(
+      `UPDATE crm_venta_pendiente
+       SET estado = 'DESCARGADA',
+           pulled_at = COALESCE(pulled_at, CURRENT_TIMESTAMP(3)),
+           updated_at = CURRENT_TIMESTAMP(3)
+       WHERE id > ? AND id <= ?
+         AND sucursal_codigo = ?
+         AND estado = 'PENDIENTE'`,
+      [oldCursor, nuevoCursor, suc],
+    );
+  }
+
+  // Re-publicaciones ya conocidas (mismo id, payload nuevo)
+  if (idsProcesados.length) {
+    await pool.query(
+      `UPDATE crm_venta_pendiente
+       SET estado = 'DESCARGADA',
+           pulled_at = COALESCE(pulled_at, CURRENT_TIMESTAMP(3)),
+           updated_at = CURRENT_TIMESTAMP(3)
+       WHERE id IN (?)
+         AND sucursal_codigo = ?
+         AND estado = 'PENDIENTE'`,
+      [idsProcesados, suc],
+    );
+  } else if (!opts.idsProcesados && Number.isFinite(id)) {
+    // Compat clientes viejos: marca amplio id <= ultimoId
+    await pool.query(
+      `UPDATE crm_venta_pendiente
+       SET estado = 'DESCARGADA',
+           pulled_at = COALESCE(pulled_at, CURRENT_TIMESTAMP(3)),
+           updated_at = CURRENT_TIMESTAMP(3)
+       WHERE id <= ?
+         AND sucursal_codigo = ?
+         AND estado = 'PENDIENTE'`,
+      [Math.floor(id), suc],
+    );
+  }
 
   await pool.query(
     `UPDATE caja_cierre c
@@ -281,12 +360,29 @@ export async function ackPullCaja(sucursal, ultimoId) {
      SET c.estado = 'DESCARGADA',
          c.pulled_at = COALESCE(c.pulled_at, CURRENT_TIMESTAMP(3)),
          c.updated_at = CURRENT_TIMESTAMP(3)
-     WHERE p.id <= ?
-       AND p.sucursal_codigo = ?
+     WHERE p.sucursal_codigo = ?
        AND c.estado = 'PENDIENTE'
-       AND c.venta_key = 'principal'`,
-    [Math.floor(id), suc],
+       AND c.venta_key = 'principal'
+       AND p.id > ? AND p.id <= ?`,
+    [suc, oldCursor, nuevoCursor],
   );
 
-  return { sucursal: suc, ultimoId: Math.floor(id), ok: true };
+  if (idsProcesados.length) {
+    await pool.query(
+      `UPDATE caja_cierre c
+       INNER JOIN crm_venta_pendiente p
+         ON CAST(p.crm_lead_external_id AS UNSIGNED) = c.lead_id
+        AND p.sucursal_codigo = c.sucursal_codigo
+       SET c.estado = 'DESCARGADA',
+           c.pulled_at = COALESCE(c.pulled_at, CURRENT_TIMESTAMP(3)),
+           c.updated_at = CURRENT_TIMESTAMP(3)
+       WHERE p.sucursal_codigo = ?
+         AND c.estado = 'PENDIENTE'
+         AND c.venta_key = 'principal'
+         AND p.id IN (?)`,
+      [suc, idsProcesados],
+    );
+  }
+
+  return { sucursal: suc, ultimoId: nuevoCursor, ok: true };
 }

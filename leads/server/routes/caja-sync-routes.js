@@ -6,6 +6,7 @@ import {
 } from '../config/caja-mysql-config.js';
 import { pingCajaMysql } from '../db/caja-mysql.js';
 import { aplicarConfirmacionCaja } from '../services/caja-confirmacion.js';
+import { recibirReciboCaja } from '../services/caja-recibos.js';
 import {
   ackPullCaja,
   listarCierresParaCaja,
@@ -17,6 +18,12 @@ import {
   listarOperadoresParaCaja,
   sincronizarCatalogoOperadoresDesdeCrm,
 } from '../services/caja-operadores.js';
+
+const idVentaIntegralItemSchema = z.object({
+  ventaKey: z.string().trim().min(1).max(80),
+  idVentaIntegral: z.coerce.number().int().positive(),
+  esPrincipal: z.boolean().optional(),
+});
 
 const confirmacionSchema = z
   .object({
@@ -32,6 +39,23 @@ const confirmacionSchema = z
     motivoRechazo: z.string().trim().max(500).nullable().optional(),
     confirmadoPor: z.string().trim().min(1).max(200).optional(),
     verificadoPor: z.string().trim().min(1).max(200).optional(),
+    verificadoPorUsuarioId: z.coerce.number().int().positive().optional(),
+    verificadoEn: z.string().trim().max(40).optional(),
+    /** idLoteVenta del SP loteVentaBloqueoVendedorPIJ (ejecutado en caja) */
+    idVentaIntegral: z.coerce.number().int().positive().optional(),
+    idLoteVenta: z.coerce.number().int().positive().optional(),
+    idVentasIntegral: z.array(idVentaIntegralItemSchema).optional(),
+    pijIntegralEstado: z
+      .enum(['pendiente', 'bloqueado', 'fotos_ok', 'error'])
+      .optional(),
+    pijIntegralError: z.string().trim().max(500).nullable().optional(),
+    clienteDocumento: z.string().trim().max(20).nullable().optional(),
+    solicitud: z.string().trim().max(40).nullable().optional(),
+    adhesionGrupo: z.string().trim().max(4).nullable().optional(),
+    adhesionNumero: z.coerce.number().int().nonnegative().optional(),
+    adhesionNotacion: z.string().trim().max(40).nullable().optional(),
+    anexoNumero: z.coerce.number().int().nonnegative().optional(),
+    anexoNotacion: z.string().trim().max(40).nullable().optional(),
   })
   .refine((d) => d.cierreId || d.pendienteUuid, {
     message: 'Indicá cierreId o pendienteUuid.',
@@ -40,8 +64,22 @@ const confirmacionSchema = z
     message: 'confirmadoPor (o verificadoPor) es obligatorio.',
   });
 
+const reciboSchema = z.object({
+  pendienteUuid: z.string().uuid().optional(),
+  clienteDocumento: z.string().trim().min(5).max(20),
+  clienteIdLocal: z.coerce.number().int().positive().optional(),
+  nroRecibo: z.string().trim().min(1).max(40),
+  mimeType: z.string().trim().min(1).max(64).default('application/pdf'),
+  pdfBase64: z.string().min(32),
+  nombreArchivo: z.string().trim().max(260).nullable().optional(),
+  montoTotal: z.coerce.number().nonnegative().nullable().optional(),
+  sucursalCodigo: z.string().trim().max(40).optional(),
+});
+
 const ackSchema = z.object({
   ultimoId: z.coerce.number().int().nonnegative(),
+  /** Ids re-publicados (mismo pendiente ya bajado) procesados en este ciclo. */
+  idsProcesados: z.array(z.coerce.number().int().positive()).optional(),
 });
 
 function appBasePath() {
@@ -139,7 +177,7 @@ export function registerCajaSyncRoutes(api) {
         ok: true,
         sucursal: req.cajaSucursal,
         mysql,
-        contrato: 'crm_venta_pendiente+caja_cierre_imagen',
+        contrato: 'crm_venta_pendiente+caja_cierre_imagen+recibos',
       });
     } catch (error) {
       console.error('[caja-sync] health:', error);
@@ -154,13 +192,14 @@ export function registerCajaSyncRoutes(api) {
 
   /**
    * Pull VPS → caja: pendientes incremental (payload_json completo).
-   * Query: ?desde=<id>&limit=<n>
+   * Query: ?desde=<id>&limit=<n>&updatedSince=<ISO>
    */
   api.get('/caja/cierres', requireCajaSyncToken, async (req, res) => {
     try {
       const result = await listarCierresParaCaja(req.cajaSucursal, {
         desde: req.query?.desde,
         limit: req.query?.limit,
+        updatedSince: req.query?.updatedSince,
         basePath: appBasePath(),
       });
       return res.json(result);
@@ -175,6 +214,7 @@ export function registerCajaSyncRoutes(api) {
       const result = await listarCierresParaCaja(req.cajaSucursal, {
         desde: req.query?.desde,
         limit: req.query?.limit,
+        updatedSince: req.query?.updatedSince,
         basePath: appBasePath(),
       });
       return res.json(result);
@@ -184,7 +224,7 @@ export function registerCajaSyncRoutes(api) {
   });
 
   /**
-   * Catálogo de promotores/supervisores.
+   * Catálogo de promotores/supervisores (CRM_OPERADORES_ENVIAMOS.md).
    * Query: ?rol=promotor|supervisor&equipo=S21&refresh=1
    */
   api.get('/caja/operadores', requireCajaSyncToken, async (req, res) => {
@@ -271,7 +311,10 @@ export function registerCajaSyncRoutes(api) {
       });
     }
     try {
-      const result = await ackPullCaja(req.cajaSucursal, parsed.data.ultimoId);
+      const result = await ackPullCaja(req.cajaSucursal, {
+        ultimoId: parsed.data.ultimoId,
+        idsProcesados: parsed.data.idsProcesados,
+      });
       return res.json({ message: 'Cursor de sync actualizado.', ...result });
     } catch (error) {
       return respondCajaError(res, error);
@@ -303,6 +346,28 @@ export function registerCajaSyncRoutes(api) {
           result.cajaEstado === 'verificado'
             ? 'Cierre verificado en caja y actualizado en el CRM.'
             : 'Cierre rechazado por caja y actualizado en el CRM.',
+        ...result,
+      });
+    } catch (error) {
+      return respondCajaError(res, error);
+    }
+  });
+
+  /**
+   * PDF recibo de caja → VPS (contrato §11.1).
+   */
+  api.post('/caja/recibos', requireCajaSyncToken, async (req, res) => {
+    const parsed = reciboSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: 'Datos de recibo inválidos.',
+        details: parsed.error.flatten(),
+      });
+    }
+    try {
+      const result = await recibirReciboCaja(parsed.data, req.cajaSucursal);
+      return res.json({
+        message: 'Recibo PDF recibido y almacenado.',
         ...result,
       });
     } catch (error) {

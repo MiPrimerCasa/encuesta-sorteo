@@ -1,4 +1,5 @@
 import { tabIdListaLead } from './leads';
+import { esPlanInversion, esTerreno, etiquetaMedioPagoPij } from './venta';
 import type { Lead, RolUsuario, SeguimientoLead } from '../types';
 
 const RESULTADO_LABEL: Record<string, string> = {
@@ -40,6 +41,22 @@ export function etiquetaEstadoHistorial(seguimiento: SeguimientoLead, lead: Lead
 
   if (seguimiento.fechaReagenda) {
     partes.push(`próx. ${seguimiento.fechaReagenda.replace('T', ' ')}`);
+  }
+
+  if (r === 'compro' && seguimiento.idProducto) {
+    const prod = esPlanInversion(seguimiento.idProducto)
+      ? 'PIJ'
+      : esTerreno(seguimiento.idProducto)
+        ? 'Terreno'
+        : seguimiento.idProducto;
+    partes.push(prod);
+    const medioPago = etiquetaMedioPagoPij(
+      seguimiento.formaPago,
+      seguimiento.montoCierre,
+      seguimiento.montoEfectivo,
+      seguimiento.montoTransferencia,
+    );
+    if (medioPago) partes.push(medioPago);
   }
 
   const pestana = tabIdListaLead({ ...lead, seguimiento });

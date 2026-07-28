@@ -40,6 +40,43 @@ const CANAL_LABEL = {
   en_persona: 'visita presencial',
 };
 
+const ETIQUETA_PRODUCTO = {
+  'prod-pij': 'PIJ',
+  'prod-terreno': 'Terreno',
+};
+
+const ETIQUETA_FORMA_PAGO = {
+  efectivo: 'Efectivo',
+  transferencia: 'Transferencia',
+  mixto: 'Mixto',
+};
+
+function formatearMontoHistorial(monto) {
+  if (monto == null || !Number.isFinite(Number(monto))) return null;
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0,
+  }).format(Number(monto));
+}
+
+function etiquetaMedioPagoHistorial(seguimiento) {
+  const formaPago = seguimiento?.formaPago;
+  if (!formaPago) return null;
+
+  const base = ETIQUETA_FORMA_PAGO[formaPago] ?? formaPago;
+  if (formaPago === 'mixto') {
+    const ef = formatearMontoHistorial(seguimiento.montoEfectivo);
+    const tr = formatearMontoHistorial(seguimiento.montoTransferencia);
+    if (ef && tr) return `${base} (${ef} + ${tr})`;
+  }
+
+  const monto = formatearMontoHistorial(
+    seguimiento.montoCierre ?? seguimiento.montoEfectivo ?? seguimiento.montoTransferencia,
+  );
+  return monto ? `${base} ${monto}` : base;
+}
+
 export function etiquetaEstadoSeguimiento(seguimiento, lead = {}) {
   const partes = [];
   const r = seguimiento?.resultadoEntrevista;
@@ -76,8 +113,11 @@ export function etiquetaEstadoSeguimiento(seguimiento, lead = {}) {
     partes.push(`cita terreno ${seguimiento.horarioEntrevistaPropuesto.replace('T', ' ')}`);
   }
   if (r === 'compro' && seguimiento?.idProducto) {
-    partes.push(seguimiento.idProducto);
-    if (seguimiento.estadoPago) partes.push(seguimiento.estadoPago);
+    const prod = ETIQUETA_PRODUCTO[seguimiento.idProducto] ?? seguimiento.idProducto;
+    partes.push(prod);
+    const medioPago = etiquetaMedioPagoHistorial(seguimiento);
+    if (medioPago) partes.push(medioPago);
+    else if (seguimiento.estadoPago) partes.push(seguimiento.estadoPago);
   }
 
   const pestana = pestanaDesdeSeguimiento(seguimiento, lead);

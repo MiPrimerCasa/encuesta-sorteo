@@ -1,4 +1,5 @@
 import sql from 'mssql';
+import { readFileSync } from 'node:fs';
 import { normalizarEncuestaCargaId } from './codigo-promotor.js';
 import {
   etiquetaEstadoSeguimiento,
@@ -9,44 +10,10 @@ import {
 import { getSqlPoolEncuestas, isSqlServerConfigured } from './mssql.js';
 import { getDb, getSeguimientoExterno, listSeguimientoHistorial, upsertSeguimientoExterno } from './sqlite.js';
 import { parsePijRecibo } from '../domain/pij-recibo.js';
+import { normalizarDniCliente } from '../domain/dni-cliente.js';
+import { resolveCierrePijPath } from '../domain/cierres-pij-storage.js';
 
 const ID_PIJ = 'prod-pij';
-
-/** Desglosa solicitud (serie+adhesión) y anexo — son datos distintos. */
-function partesReciboPij(idProducto, numeroRecibo) {
-  if (idProducto !== ID_PIJ || !String(numeroRecibo ?? '').trim()) {
-    return { serie: null, nroAdhesion: null, nroAnexo: null };
-  }
-  const parsed = parsePijRecibo(numeroRecibo);
-  return {
-    serie: parsed.serie || null,
-    nroAdhesion: parsed.adhesion || null,
-    nroAnexo: parsed.anexo || null,
-  };
-}
-
-/**
- * JSON para tabla hija de compras adicionales.
- * Incluye serie / nroAdhesion / nroAnexo parseados del recibo PIJ.
- */
-function buildComprasAdicionalesJson(compras) {
-  if (!Array.isArray(compras) || compras.length === 0) return null;
-  const rows = compras.map((c) => {
-    const partes = partesReciboPij(c.idProducto, c.numeroRecibo);
-    return {
-      id: c.id,
-      idProducto: c.idProducto,
-      estadoPago: c.estadoPago,
-      idBarrio: c.idBarrio ?? null,
-      numeroRecibo: String(c.numeroRecibo ?? '').trim(),
-      fechaCierre: c.fechaCierre,
-      serie: partes.serie,
-      nroAdhesion: partes.nroAdhesion,
-      nroAnexo: partes.nroAnexo,
-    };
-  });
-  return JSON.stringify(rows);
-}
 
 export class SeguimientoRegistroError extends Error {
   constructor(message, code = 'SEGUIMIENTO_SQL') {
@@ -169,10 +136,22 @@ function parseOperadorId(usuario) {
   return Number.isFinite(n) ? n : null;
 }
 
+function parseDecimalOrNull(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 function bitOrNull(value) {
   if (value === true) return true;
   if (value === false) return false;
   return null;
+}
+
+function parseFechaCierreForSql(iso) {
+  if (iso == null || String(iso).trim() === '') return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 function formatCreadoEn(row) {
@@ -200,8 +179,189 @@ function formatCreadoEn(row) {
   return null;
 }
 
+function partesReciboPij(idProducto, numeroRecibo) {
+  if (idProducto !== ID_PIJ || !String(numeroRecibo ?? '').trim()) {
+    return { serie: null, nroAdhesion: null, nroAnexo: null };
+  }
+  const parsed = parsePijRecibo(numeroRecibo);
+  return {
+    serie: parsed.serie || null,
+    nroAdhesion: parsed.adhesion || null,
+    nroAnexo: parsed.anexo || null,
+  };
+}
+
+/** JSON plano para el DBA: compras adicionales con adhesión/anexo desglosados. */
+function buildComprasAdicionalesJson(compras) {
+  if (!Array.isArray(compras) || compras.length === 0) return null;
+  const rows = compras.map((c) => {
+    const partes = partesReciboPij(c.idProducto, c.numeroRecibo);
+    return {
+      id: c.id,
+      idProducto: c.idProducto,
+      estadoPago: c.estadoPago,
+      idBarrio: c.idBarrio ?? null,
+      numeroRecibo: String(c.numeroRecibo ?? '').trim(),
+      fechaCierre: c.fechaCierre,
+      formaPago: c.formaPago ?? null,
+      montoCierre: c.montoCierre ?? null,
+      montoEfectivo: c.montoEfectivo ?? null,
+      montoTransferencia: c.montoTransferencia ?? null,
+      titularTransferencia: c.titularTransferencia ?? null,
+      bancoTransferencia: c.bancoTransferencia ?? null,
+      referenciaTransferencia: c.referenciaTransferencia ?? null,
+      idVentaIntegral:
+        c.idVentaIntegral != null && Number.isFinite(Number(c.idVentaIntegral))
+          ? Math.trunc(Number(c.idVentaIntegral))
+          : null,
+      serie: partes.serie,
+      nroAdhesion: partes.nroAdhesion,
+      nroAnexo: partes.nroAnexo,
+    };
+  });
+  return JSON.stringify(rows);
+}
+
+function buildImagenesCierreJson(imagenes) {
+  if (!Array.isArray(imagenes) || imagenes.length === 0) return null;
+  const legacyMap = { recibo: 'img6', comprobante_transferencia: 'img7' };
+  const rows = imagenes.map((img) => ({
+    id: img.id,
+    leadId: img.leadId,
+    ventaKey: img.ventaKey,
+    tipo: legacyMap[img.tipo] ?? img.tipo,
+    storagePath: img.storagePath,
+    mimeType: img.mimeType,
+    tamanoBytes: img.tamanoBytes,
+    nombreOriginal: img.nombreOriginal ?? null,
+    subidoEn: img.subidoEn,
+    operadorId: img.operadorId ?? null,
+  }));
+  return JSON.stringify(rows);
+}
+
+function isChildTablesMissingError(error) {
+  const raw = seguimientoErrorText(error);
+  return (
+    /invalid object name/i.test(raw) &&
+    (/registrarSeguimientoLead_compra/i.test(raw) || /registrarSeguimientoLead_imagen/i.test(raw))
+  );
+}
+
+function mapCompraSqlRowToApp(row) {
+  const fecha = row.fecha_cierre ?? row.fechaCierre;
+  return {
+    id: row.id_compra ?? row.idCompra,
+    idProducto: row.id_producto ?? row.idProducto,
+    estadoPago: row.estado_pago ?? row.estadoPago,
+    idBarrio: row.id_barrio ?? row.idBarrio ?? null,
+    numeroRecibo: String(row.numero_recibo ?? row.numeroRecibo ?? '').trim(),
+    fechaCierre: fecha instanceof Date ? fecha.toISOString() : (fecha ?? ''),
+    formaPago: row.forma_pago ?? row.formaPago ?? null,
+    montoCierre: parseDecimalOrNull(row.monto_cierre ?? row.montoCierre),
+    montoEfectivo: parseDecimalOrNull(row.monto_efectivo ?? row.montoEfectivo),
+    montoTransferencia: parseDecimalOrNull(row.monto_transferencia ?? row.montoTransferencia),
+    serie: row.serie_pij ?? row.seriePij ?? null,
+    nroAdhesion: row.nro_adhesion ?? row.nroAdhesion ?? null,
+    nroAnexo: row.nro_anexo ?? row.nroAnexo ?? null,
+  };
+}
+
+function mapImagenSqlRowToApp(row) {
+  const subido = row.subido_en ?? row.subidoEn;
+  const legacyMap = { recibo: 'img6', comprobante_transferencia: 'img7' };
+  const tipoRaw = row.tipo_imagen ?? row.tipoImagen ?? '';
+  return {
+    id: row.id_imagen ?? row.idImagen,
+    leadId: String(row.lead_id ?? row.leadId ?? ''),
+    ventaKey: row.venta_key ?? row.ventaKey,
+    tipo: legacyMap[tipoRaw] ?? tipoRaw,
+    storagePath: row.storage_path ?? row.storagePath ?? '',
+    mimeType: row.mime_type ?? row.mimeType ?? 'image/jpeg',
+    tamanoBytes: Number(row.tamano_bytes ?? row.tamanoBytes ?? 0),
+    nombreOriginal: row.nombre_original ?? row.nombreOriginal ?? null,
+    subidoEn: subido instanceof Date ? subido.toISOString() : (subido ?? new Date().toISOString()),
+    operadorId: row.operador_id != null ? String(row.operador_id) : null,
+    archivoDisponible:
+      row.tiene_contenido === 1 ||
+      row.contenido != null ||
+      Boolean(row.storage_path ?? row.storagePath),
+  };
+}
+
+async function fetchChildDataBySeguimientoIds(seguimientoIds) {
+  const ids = [
+    ...new Set(
+      seguimientoIds.map((id) => Number.parseInt(String(id), 10)).filter(Number.isFinite),
+    ),
+  ];
+  const compras = new Map();
+  const imagenes = new Map();
+  if (!ids.length || !useSeguimientoSql()) return { compras, imagenes };
+
+  const pool = await getSqlPoolEncuestas();
+  const idList = ids.join(',');
+
+  try {
+    const comprasRes = await pool.request().query(
+      `SELECT *
+       FROM dbo.registrarSeguimientoLead_compra
+       WHERE id_seguimiento IN (${idList})
+       ORDER BY id_seguimiento, orden, id`,
+    );
+    for (const row of comprasRes.recordset ?? []) {
+      const sid = Number(row.id_seguimiento ?? row.idSeguimiento);
+      if (!compras.has(sid)) compras.set(sid, []);
+      compras.get(sid).push(mapCompraSqlRowToApp(row));
+    }
+
+    const imgRes = await pool.request().query(
+      `SELECT
+          id_seguimiento, lead_id, id_imagen, venta_key, tipo_imagen,
+          mime_type, nombre_original, tamano_bytes, storage_path,
+          operador_id, subido_en,
+          tiene_contenido = CASE WHEN contenido IS NOT NULL THEN 1 ELSE 0 END
+       FROM dbo.registrarSeguimientoLead_imagen
+       WHERE id_seguimiento IN (${idList})
+       ORDER BY id_seguimiento, venta_key, tipo_imagen`,
+    );
+    for (const row of imgRes.recordset ?? []) {
+      const sid = Number(row.id_seguimiento ?? row.idSeguimiento);
+      if (!imagenes.has(sid)) imagenes.set(sid, []);
+      imagenes.get(sid).push(mapImagenSqlRowToApp(row));
+    }
+  } catch (error) {
+    if (isChildTablesMissingError(error)) return { compras, imagenes };
+    throw error;
+  }
+
+  return { compras, imagenes };
+}
+
+function childDataForRow(row, childMaps) {
+  const sid = Number(row?.id ?? row?.idRegistrarSeguimientoLead);
+  if (!Number.isFinite(sid)) return {};
+  return {
+    comprasAdicionales: childMaps.compras.get(sid) ?? null,
+    imagenesCierre: childMaps.imagenes.get(sid) ?? null,
+  };
+}
+
+async function enrichRawRowMap(rawByLeadId) {
+  const entries = Object.entries(rawByLeadId);
+  if (!entries.length) return {};
+  const childMaps = await fetchChildDataBySeguimientoIds(
+    entries.map(([, row]) => row.id ?? row.idRegistrarSeguimientoLead),
+  );
+  const out = {};
+  for (const [key, row] of entries) {
+    out[key] = mapSqlRowToSeguimiento(row, childDataForRow(row, childMaps));
+  }
+  return out;
+}
+
 /** Normaliza fila SQL o JSON del SP → objeto seguimiento (camelCase) de la app. */
-export function mapSqlRowToSeguimiento(row) {
+export function mapSqlRowToSeguimiento(row, child = {}) {
   if (!row) return {};
 
   let base = {};
@@ -226,6 +386,52 @@ export function mapSqlRowToSeguimiento(row) {
       referidos = referidos ?? undefined;
     }
   }
+
+  let comprasAdicionales = base.comprasAdicionales;
+  const comprasFlat = row.compras_adicionales_json ?? row.comprasAdicionalesJson;
+  if (comprasFlat) {
+    try {
+      const parsed = typeof comprasFlat === 'string' ? JSON.parse(comprasFlat) : comprasFlat;
+      if (Array.isArray(parsed) && parsed.length > 0) comprasAdicionales = parsed;
+    } catch {
+      comprasAdicionales = comprasAdicionales ?? undefined;
+    }
+  }
+
+  let imagenesCierre = base.imagenesCierre;
+  const imagenesFlat = row.imagenes_cierre_json ?? row.imagenesCierreJson;
+  if (imagenesFlat) {
+    try {
+      const parsed = typeof imagenesFlat === 'string' ? JSON.parse(imagenesFlat) : imagenesFlat;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        const legacyMap = { recibo: 'img6', comprobante_transferencia: 'img7' };
+        imagenesCierre = parsed.map((img) => ({
+          ...img,
+          tipo: legacyMap[img.tipo] ?? img.tipo,
+        }));
+      }
+    } catch {
+      imagenesCierre = imagenesCierre ?? undefined;
+    }
+  }
+
+  if (Array.isArray(child.comprasAdicionales) && child.comprasAdicionales.length > 0) {
+    comprasAdicionales = child.comprasAdicionales;
+  }
+  if (Array.isArray(child.imagenesCierre) && child.imagenesCierre.length > 0) {
+    imagenesCierre = child.imagenesCierre;
+  }
+
+  const idProducto = base.idProducto ?? row.id_producto ?? row.idProducto ?? null;
+  const numeroRecibo = base.numeroRecibo ?? row.numero_recibo ?? row.numeroRecibo ?? null;
+  const partesPij =
+    row.serie_pij != null || row.nro_adhesion != null || row.nro_anexo != null
+      ? {
+          serie: row.serie_pij ?? row.seriePij ?? null,
+          nroAdhesion: row.nro_adhesion ?? row.nroAdhesion ?? null,
+          nroAnexo: row.nro_anexo ?? row.nroAnexo ?? null,
+        }
+      : partesReciboPij(idProducto, numeroRecibo);
 
   return {
     ...base,
@@ -252,10 +458,22 @@ export function mapSqlRowToSeguimiento(row) {
       row.seguimiento_agenda_operador_rol ??
       row.seguimientoAgendaOperadorRol ??
       null,
-    idProducto: base.idProducto ?? row.id_producto ?? row.idProducto ?? null,
+    idProducto,
     estadoPago: base.estadoPago ?? row.estado_pago ?? row.estadoPago ?? null,
     idBarrio: base.idBarrio ?? row.id_barrio ?? row.idBarrio ?? null,
-    numeroRecibo: base.numeroRecibo ?? row.numero_recibo ?? row.numeroRecibo ?? null,
+    numeroRecibo,
+    seriePij: base.seriePij ?? partesPij.serie ?? null,
+    nroAdhesion: base.nroAdhesion ?? partesPij.nroAdhesion ?? null,
+    nroAnexo: base.nroAnexo ?? partesPij.nroAnexo ?? null,
+    formaPago: base.formaPago ?? row.forma_pago ?? row.formaPago ?? null,
+    montoCierre: base.montoCierre ?? parseDecimalOrNull(row.monto_cierre ?? row.montoCierre),
+    montoEfectivo:
+      base.montoEfectivo ?? parseDecimalOrNull(row.monto_efectivo ?? row.montoEfectivo),
+    montoTransferencia:
+      base.montoTransferencia ??
+      parseDecimalOrNull(row.monto_transferencia ?? row.montoTransferencia),
+    dniCliente:
+      normalizarDniCliente(base.dniCliente ?? row.dni_cliente ?? row.dniCliente) || null,
     brindoReferidos:
       base.brindoReferidos ?? bitOrNull(row.brindo_referidos ?? row.brindoReferidos),
     derivacionTerrenoActiva: base.derivacionTerrenoActiva ?? null,
@@ -267,16 +485,47 @@ export function mapSqlRowToSeguimiento(row) {
     operadorNombre:
       row.operador_nombre ?? row.operadorNombre ?? base.operadorNombre ?? null,
     creadoEn: formatCreadoEn(row) ?? base.creadoEn ?? null,
-    comprasAdicionales: base.comprasAdicionales ?? null,
-    // Planas PIJ: solicitud (serie + adhesión) y anexo son campos separados
-    seriePij: base.seriePij ?? row.serie_pij ?? row.seriePij ?? null,
-    nroAdhesion: base.nroAdhesion ?? row.nro_adhesion ?? row.nroAdhesion ?? null,
-    nroAnexo: base.nroAnexo ?? row.nro_anexo ?? row.nroAnexo ?? null,
+    comprasAdicionales: comprasAdicionales ?? null,
+    imagenesCierre: Array.isArray(imagenesCierre)
+      ? imagenesCierre.map((img) => {
+          const legacyMap = { recibo: 'img6', comprobante_transferencia: 'img7' };
+          return { ...img, tipo: legacyMap[img.tipo] ?? img.tipo };
+        })
+      : null,
+    idVentaIntegral: (() => {
+      const fromCol = row.id_venta_integral ?? row.idVentaIntegral;
+      if (fromCol != null && Number.isFinite(Number(fromCol)) && Number(fromCol) > 0) {
+        return Number(fromCol);
+      }
+      if (base.idVentaIntegral != null && Number.isFinite(Number(base.idVentaIntegral))) {
+        return Number(base.idVentaIntegral);
+      }
+      return null;
+    })(),
+    pijIntegralEstado:
+      base.pijIntegralEstado ?? row.pij_integral_estado ?? row.pijIntegralEstado ?? null,
+    pijIntegralError:
+      base.pijIntegralError ?? row.pij_integral_error ?? row.pijIntegralError ?? null,
+    pijIntegralEnviadoEn:
+      base.pijIntegralEnviadoEn ??
+      row.pij_integral_enviado_en ??
+      row.pijIntegralEnviadoEn ??
+      null,
+    cajaEstado: base.cajaEstado ?? row.caja_estado ?? row.cajaEstado ?? null,
+    cajaVerificadoEn:
+      base.cajaVerificadoEn ?? row.caja_verificado_en ?? row.cajaVerificadoEn ?? null,
+    cajaComprobanteId:
+      base.cajaComprobanteId ?? row.caja_comprobante_id ?? row.cajaComprobanteId ?? null,
+    cajaMotivoRechazo:
+      base.cajaMotivoRechazo ?? row.caja_motivo_rechazo ?? row.cajaMotivoRechazo ?? null,
+    cajaSucursal: base.cajaSucursal ?? row.caja_sucursal ?? row.cajaSucursal ?? null,
+    cajaConfirmadoPor:
+      base.cajaConfirmadoPor ?? row.caja_confirmado_por ?? row.cajaConfirmadoPor ?? null,
   };
 }
 
-function mapSqlRowToHistorialEntry(row, lead = {}) {
-  const snapshot = mapSqlRowToSeguimiento(row);
+function mapSqlRowToHistorialEntry(row, lead = {}, child = {}) {
+  const snapshot = mapSqlRowToSeguimiento(row, child);
   const id = row.id ?? row.idRegistrarSeguimientoLead;
 
   return {
@@ -391,8 +640,13 @@ export async function execRegistrarSeguimientoLead(lead, merged, usuario) {
   };
   request.input('seguimiento_json', sql.NVarChar(sql.MAX), JSON.stringify(payloadToStore));
 
-  // Columnas planas PIJ (frontend prod ya captura vía numeroRecibo):
-  // serie_pij + nro_adhesion = solicitud; nro_anexo = anexo (dato distinto).
+  request.input('forma_pago', sql.NVarChar(16), merged.formaPago ?? null);
+  request.input('monto_cierre', sql.Decimal(12, 2), merged.montoCierre ?? null);
+  request.input('monto_efectivo', sql.Decimal(12, 2), merged.montoEfectivo ?? null);
+  request.input('monto_transferencia', sql.Decimal(12, 2), merged.montoTransferencia ?? null);
+  request.input('fecha_cierre', sql.DateTime2, parseFechaCierreForSql(merged.fechaCierre));
+  request.input('fuente', sql.NVarChar(16), merged.fuente?.slice(0, 16) ?? null);
+
   const partesPij = partesReciboPij(merged.idProducto, merged.numeroRecibo);
   request.input('serie_pij', sql.NVarChar(1), partesPij.serie?.slice(0, 1) ?? null);
   request.input('nro_adhesion', sql.NVarChar(10), partesPij.nroAdhesion?.slice(0, 10) ?? null);
@@ -401,6 +655,67 @@ export async function execRegistrarSeguimientoLead(lead, merged, usuario) {
     'compras_adicionales_json',
     sql.NVarChar(sql.MAX),
     buildComprasAdicionalesJson(merged.comprasAdicionales),
+  );
+  request.input(
+    'imagenes_cierre_json',
+    sql.NVarChar(sql.MAX),
+    buildImagenesCierreJson(merged.imagenesCierre),
+  );
+  const dniPlano = normalizarDniCliente(merged.dniCliente);
+  request.input('dni_cliente', sql.NVarChar(16), dniPlano || null);
+
+  // Verificación del cierre en el sistema de caja de sucursal (push caja → CRM).
+  request.input('caja_estado', sql.NVarChar(16), merged.cajaEstado ?? null);
+  request.input(
+    'caja_verificado_en',
+    sql.DateTime2,
+    parseFechaCierreForSql(merged.cajaVerificadoEn),
+  );
+  request.input(
+    'caja_comprobante_id',
+    sql.NVarChar(64),
+    merged.cajaComprobanteId?.trim()?.slice(0, 64) ?? null,
+  );
+  request.input(
+    'caja_motivo_rechazo',
+    sql.NVarChar(300),
+    merged.cajaMotivoRechazo?.trim()?.slice(0, 300) ?? null,
+  );
+  request.input(
+    'caja_sucursal',
+    sql.NVarChar(32),
+    merged.cajaSucursal?.trim()?.slice(0, 32) ?? null,
+  );
+  request.input(
+    'caja_confirmado_por',
+    sql.NVarChar(200),
+    merged.cajaConfirmadoPor?.trim()?.slice(0, 200) ?? null,
+  );
+
+  // Bloqueo PIJ → idLoteVenta del sistema integral
+  const idVentaIntegral =
+    merged.idVentaIntegral != null && Number.isFinite(Number(merged.idVentaIntegral))
+      ? Math.trunc(Number(merged.idVentaIntegral))
+      : null;
+  request.input(
+    'id_venta_integral',
+    sql.Int,
+    idVentaIntegral != null && idVentaIntegral > 0 ? idVentaIntegral : null,
+  );
+  request.input(
+    'pij_integral_estado',
+    sql.NVarChar(16),
+    merged.pijIntegralEstado?.trim()?.slice(0, 16) ?? null,
+  );
+  request.input(
+    'pij_integral_error',
+    sql.NVarChar(500),
+    merged.pijIntegralError?.trim()?.slice(0, 500) ?? null,
+  );
+  request.input(
+    'pij_integral_enviado_en',
+    sql.DateTime2,
+    parseFechaCierreForSql(merged.pijIntegralEnviadoEn),
   );
 
   const result = await request.execute(proc);
@@ -416,6 +731,66 @@ export async function execRegistrarSeguimientoLead(lead, merged, usuario) {
     id: fila.idRegistrarSeguimientoLead ?? fila.id ?? null,
     mensaje: fila.mensaje,
   };
+}
+
+/**
+ * Envía bytes de imágenes PIJ a STRSYSTEM (SP_RegistrarImagenCierrePij).
+ * Best-effort: no revierte el seguimiento si falla una imagen.
+ */
+async function sincronizarImagenesBytesSql(leadId, idSeguimiento, imagenes, operadorId) {
+  const segId = Number.parseInt(String(idSeguimiento), 10);
+  const leadIdNum = Number.parseInt(String(leadId), 10);
+  if (!Number.isFinite(segId) || !Number.isFinite(leadIdNum)) return;
+  if (!Array.isArray(imagenes) || imagenes.length === 0) return;
+
+  const pool = await getSqlPoolEncuestas();
+  const proc = 'dbo.SP_RegistrarImagenCierrePij';
+
+  for (const img of imagenes) {
+    const absPath = resolveCierrePijPath(img.storagePath);
+    if (!absPath) continue;
+
+    let buffer;
+    try {
+      buffer = readFileSync(absPath);
+    } catch {
+      continue;
+    }
+    if (!buffer?.length) continue;
+
+    const legacyMap = { recibo: 'img6', comprobante_transferencia: 'img7' };
+    const tipo = legacyMap[img.tipo] ?? img.tipo;
+    if (!tipo || !img.ventaKey || !img.id) continue;
+
+    try {
+      const request = pool.request();
+      request.input('id_seguimiento', sql.Int, segId);
+      request.input('lead_id', sql.Int, leadIdNum);
+      request.input('id_imagen', sql.NVarChar(36), String(img.id).slice(0, 36));
+      request.input('venta_key', sql.NVarChar(36), String(img.ventaKey).slice(0, 36));
+      request.input('tipo_imagen', sql.NVarChar(16), String(tipo).slice(0, 16));
+      request.input('mime_type', sql.NVarChar(32), (img.mimeType ?? 'image/jpeg').slice(0, 32));
+      request.input(
+        'nombre_original',
+        sql.NVarChar(260),
+        img.nombreOriginal?.slice(0, 260) ?? null,
+      );
+      request.input('tamano_bytes', sql.Int, buffer.length);
+      request.input('storage_path', sql.NVarChar(500), img.storagePath?.slice(0, 500) ?? null);
+      request.input('contenido', sql.VarBinary(sql.MAX), buffer);
+      request.input('operador_id', sql.Int, operadorId ?? null);
+      request.input('subido_en', sql.DateTime2, img.subidoEn ? new Date(img.subidoEn) : new Date());
+
+      const result = await request.execute(proc);
+      const fila = result.recordset?.[0];
+      if (fila?.codigo !== 1) {
+        console.warn('[seguimiento] imagen bytes SQL:', fila?.mensaje ?? tipo);
+      }
+    } catch (error) {
+      if (isSpMissing(error)) return;
+      console.warn('[seguimiento] imagen bytes SQL error:', seguimientoErrorText(error));
+    }
+  }
 }
 
 async function queryHistorialRows(leadId, limit = 50, idOperador = null) {
@@ -544,7 +919,11 @@ export async function fetchUltimosSeguimientoPorOperadores(idOperadores = []) {
 export async function getLatestSeguimientoSql(leadId, idOperador = null) {
   try {
     const rows = await queryHistorialRows(leadId, 1, idOperador);
-    return rows.length ? mapSqlRowToSeguimiento(rows[0]) : {};
+    if (!rows.length) return {};
+    const childMaps = await fetchChildDataBySeguimientoIds([
+      rows[0].id ?? rows[0].idRegistrarSeguimientoLead,
+    ]);
+    return mapSqlRowToSeguimiento(rows[0], childDataForRow(rows[0], childMaps));
   } catch (error) {
     if (isSeguimientoDegraded(error)) {
       warnSeguimientoLecturaDegradada(error);
@@ -563,7 +942,7 @@ export async function batchLatestSeguimientoSql(
   if (!ids.length) return {};
 
   const idSet = new Set(ids.map(String));
-  const map = {};
+  const rawMap = {};
 
   try {
     if (idOperador == null) {
@@ -571,9 +950,9 @@ export async function batchLatestSeguimientoSql(
       if (globalRows != null) {
         for (const row of globalRows) {
           const key = String(row.lead_id ?? row.leadId);
-          if (idSet.has(key)) map[key] = mapSqlRowToSeguimiento(row);
+          if (idSet.has(key)) rawMap[key] = row;
         }
-        return map;
+        return enrichRawRowMap(rawMap);
       }
     }
 
@@ -581,23 +960,21 @@ export async function batchLatestSeguimientoSql(
       const ultimosRows = await fetchUltimosSeguimientoPorOperadores(idOperadoresExtra);
       for (const row of ultimosRows) {
         const key = String(row.lead_id ?? row.leadId);
-        if (idSet.has(key)) map[key] = mapSqlRowToSeguimiento(row);
+        if (idSet.has(key)) rawMap[key] = row;
       }
-      if (Object.keys(map).length) return map;
+      if (Object.keys(rawMap).length) return enrichRawRowMap(rawMap);
     }
 
     const ultimosRows = await queryUltimosRows(idOperador);
     if (ultimosRows != null) {
       for (const row of ultimosRows) {
         const key = String(row.lead_id ?? row.leadId);
-        if (idSet.has(key)) {
-          map[key] = mapSqlRowToSeguimiento(row);
-        }
+        if (idSet.has(key)) rawMap[key] = row;
       }
-      return map;
+      return enrichRawRowMap(rawMap);
     }
 
-    if (seguimientoSoloSp()) return map;
+    if (seguimientoSoloSp()) return {};
 
     const pool = await getSqlPoolEncuestas();
     const table = getSeguimientoTableName();
@@ -619,9 +996,10 @@ export async function batchLatestSeguimientoSql(
          SELECT * FROM ranked WHERE rn = 1`,
       );
       for (const row of result.recordset ?? []) {
-        map[String(row.lead_id)] = mapSqlRowToSeguimiento(row);
+        rawMap[String(row.lead_id)] = row;
       }
     }
+    return enrichRawRowMap(rawMap);
   } catch (error) {
     if (isSeguimientoDegraded(error)) {
       warnSeguimientoLecturaDegradada(error);
@@ -629,13 +1007,17 @@ export async function batchLatestSeguimientoSql(
     }
     throw error;
   }
-  return map;
 }
 
 export async function listHistorialSeguimientoSql(leadId, lead = {}, { limit = 50, idOperador = null } = {}) {
   try {
     const rows = await queryHistorialRows(leadId, limit, idOperador);
-    return rows.map((row) => mapSqlRowToHistorialEntry(row, lead));
+    const childMaps = await fetchChildDataBySeguimientoIds(
+      rows.map((row) => row.id ?? row.idRegistrarSeguimientoLead),
+    );
+    return rows.map((row) =>
+      mapSqlRowToHistorialEntry(row, lead, childDataForRow(row, childMaps)),
+    );
   } catch (error) {
     if (isSeguimientoDegraded(error)) {
       warnSeguimientoLecturaDegradada(error);
@@ -673,6 +1055,12 @@ export async function persistirSeguimientoLead(leadId, patch, usuario, leadConte
 
   if (useSeguimientoSql()) {
     const reg = await execRegistrarSeguimientoLead(leadContext, merged, usuario);
+    await sincronizarImagenesBytesSql(
+      leadId,
+      reg.id,
+      merged.imagenesCierre,
+      parseOperadorId(usuario),
+    );
     return {
       merged,
       saved: true,
@@ -703,6 +1091,10 @@ export async function resetearSeguimientoLead(leadId, leadContext) {
     estadoPago: null,
     idBarrio: null,
     numeroRecibo: null,
+    formaPago: null,
+    montoCierre: null,
+    montoEfectivo: null,
+    montoTransferencia: null,
     brindoReferidos: null,
     referidos: null,
     observaciones: null,

@@ -59,6 +59,7 @@ function dashboardVacio(aviso, periodo = 'mes') {
     },
     pijCierresPorPersona: [],
     leadsSinTratar: [],
+    leadsTratadosSinCierre: [],
     aviso,
   };
 }

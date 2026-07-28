@@ -6,6 +6,7 @@ import type {
   GrabacionesMiasResponse,
   GrabacionPromotor,
   GuardarSeguimientoResult,
+  ImagenCierrePij,
   Lead,
   LinksRedes,
   NotificacionLinkRed,
@@ -380,6 +381,7 @@ export async function guardarSeguimiento(
     aviso?: string;
     referidosCreados?: ReferidoProcesado[];
     nuevosLeads?: Lead[];
+    pijIntegral?: GuardarSeguimientoResult['pijIntegral'];
   }>(`/api/leads/${leadId}/seguimiento`, {
     method: 'PATCH',
     body: JSON.stringify(seguimiento),
@@ -389,6 +391,27 @@ export async function guardarSeguimiento(
     message: data.message,
     referidosCreados: data.referidosCreados,
     nuevosLeads: data.nuevosLeads,
+    pijIntegral: data.pijIntegral ?? null,
+  };
+}
+
+/** Reenvía bloqueo/fotos PIJ al sistema integral (SOAP). */
+export async function reintentarPijIntegral(leadId: string): Promise<GuardarSeguimientoResult> {
+  if (_isDemoActive) {
+    throw new Error('Envío al sistema integral no disponible en modo demo.');
+  }
+  const data = await apiFetch<{
+    lead: Lead;
+    message: string;
+    pijIntegral?: GuardarSeguimientoResult['pijIntegral'];
+  }>(`/api/leads/${leadId}/pij-integral/reintentar`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  return {
+    lead: data.lead,
+    message: data.message,
+    pijIntegral: data.pijIntegral ?? null,
   };
 }
 
@@ -511,12 +534,20 @@ export async function modificarDatosLead(
 
 import type { SyncPreviewResponse, SyncCommitResponse, SyncPreviewItem } from '../types';
 
-export async function previewSyncCajaPij(): Promise<SyncPreviewResponse> {
+export interface SyncPreviewOptions {
+  /** gids de pestañas de Google Sheets (ej. solo Junio: ['288750825']). */
+  sheetGids?: string[];
+  /** Corregir en CRM ventas con fecha julio usando la pestaña Junio de Caja. */
+  corregirJulioConJunio?: boolean;
+}
+
+export async function previewSyncCajaPij(options: SyncPreviewOptions = {}): Promise<SyncPreviewResponse> {
   if (_isDemoActive) {
     return { cambiosPropuestos: [] };
   }
   return apiFetch<SyncPreviewResponse>('/api/admin/sync-caja-pij/preview', {
     method: 'POST',
+    body: JSON.stringify(options),
   });
 }
 
@@ -876,5 +907,92 @@ export async function rechazarGrabacion(id: number, motivo: string): Promise<Gra
     },
   );
   return data.grabacion;
+}
+
+export async function uploadImagenCierrePij(
+  file: File,
+  payload: {
+    leadId: string;
+    ventaKey: string;
+    tipo: 'img1' | 'img2' | 'img5' | 'img6' | 'img7';
+  },
+  onProgress?: (pct: number) => void,
+): Promise<{ imagen: ImagenCierrePij }> {
+  if (_isDemoActive) {
+    throw new Error('Subida de imágenes no disponible en modo demo.');
+  }
+
+  const form = new FormData();
+  // Campos antes del archivo (multer / depuración); el servidor mueve a carpeta del lead.
+  form.append('leadId', payload.leadId);
+  form.append('ventaKey', payload.ventaKey);
+  form.append('tipo', payload.tipo);
+  form.append('imagen', file);
+
+  const url = apiUrl('/api/cierres-pij/imagenes');
+  const headers = authHeadersForSession(false);
+
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
+
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable && onProgress) {
+        onProgress(Math.round((ev.loaded / ev.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      let data: Record<string, unknown> = {};
+      try {
+        data = xhr.responseText ? (JSON.parse(xhr.responseText) as Record<string, unknown>) : {};
+      } catch {
+        reject(new Error('Respuesta inválida del servidor'));
+        return;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(data as { imagen: ImagenCierrePij });
+        return;
+      }
+      const msg =
+        typeof data.error === 'string'
+          ? data.error
+          : typeof data.message === 'string'
+            ? data.message
+            : `Error al subir (${xhr.status})`;
+      reject(new Error(msg));
+    };
+
+    xhr.onerror = () => reject(new Error('No se pudo subir. Reintentá cuando tengas señal.'));
+    xhr.send(form);
+  });
+}
+
+export async function fetchImagenCierrePijBlob(
+  imageId: string,
+  storagePath: string,
+  mimeType?: string,
+): Promise<string> {
+  if (_isDemoActive) throw new Error('Imagen no disponible en demo.');
+  const q = new URLSearchParams({
+    path: storagePath,
+    ...(mimeType ? { mime: mimeType } : {}),
+  });
+  const res = await fetch(apiUrl(`/api/cierres-pij/imagenes/${encodeURIComponent(imageId)}?${q}`), {
+    headers: authHeadersForSession(false),
+  });
+  if (!res.ok) {
+    let detalle = '';
+    try {
+      const body = (await res.json()) as { error?: string };
+      detalle = body?.error?.trim() ?? '';
+    } catch {
+      /* respuesta no JSON */
+    }
+    throw new Error(detalle || 'No se pudo cargar la imagen');
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
 }
 

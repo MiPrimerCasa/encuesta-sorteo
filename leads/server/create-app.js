@@ -53,12 +53,15 @@ import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
 import {
   getDb,
+  getSeguimientoExterno,
   listBarrios,
   listProductos,
   productoPermitidoParaRol,
 } from './db/sqlite.js';
 import {
+  getLatestSeguimientoSql,
   listHistorialForLead,
+  persistirSeguimientoLead,
   SeguimientoRegistroError,
   useSeguimientoSql,
   resetearSeguimientoLead,
@@ -67,8 +70,18 @@ import { getHealthInfo, respondIfNotConfigured } from './require-production.js';
 import { formatSqlError } from './sql-errors.js';
 import { loginSchema, seguimientoSchema } from './schemas/seguimiento.js';
 import { registerGrabacionesRoutes } from './routes/grabaciones-routes.js';
+import { registerCierresPijRoutes } from './routes/cierres-pij-routes.js';
 import { registerCajaSyncRoutes } from './routes/caja-sync-routes.js';
+import { syncPijSistemaIntegral } from './services/pij-integral-sync.js';
 import { publicarCierreACajaMysql } from './services/caja-publicar-cierre.js';
+import { publicarCierreAIngestHttp } from './services/caja-ingest-http.js';
+
+async function runPijIntegralSync(lead, seguimiento, usuario) {
+  return syncPijSistemaIntegral(lead, seguimiento, usuario, {
+    persistPatch: async (leadId, patch, user, leadCtx) =>
+      persistirSeguimientoLead(leadId, patch, user, leadCtx),
+  });
+}
 
 function usuarioDesdeRequest(req) {
   const rol = req.headers['x-usuario-rol'];
@@ -509,10 +522,19 @@ function registerApiRoutes(api) {
     }
 
     try {
-      const { buildSyncPreview } = await import('./services/sync-caja.js');
+      const { buildSyncPreview, CAJA_SHEETS } = await import('./services/sync-caja.js');
       const leads = await listAllLeadsFromEncuestas();
-      const cambiosPropuestos = await buildSyncPreview(leads);
-      return res.json({ cambiosPropuestos });
+      const sheetGids = Array.isArray(req.body?.sheetGids)
+        ? req.body.sheetGids.map((g) => String(g).trim()).filter(Boolean)
+        : undefined;
+      const corregirJulioConJunio = Boolean(req.body?.corregirJulioConJunio);
+      const cambiosPropuestos = await buildSyncPreview(leads, { sheetGids, corregirJulioConJunio });
+      const fuente = corregirJulioConJunio
+        ? `Solo ${CAJA_SHEETS.junio.label} (corrección de ventas con fecha en julio)`
+        : sheetGids?.length
+          ? `Pestañas: ${sheetGids.join(', ')}`
+          : 'Junio + Julio';
+      return res.json({ cambiosPropuestos, fuente, corregirJulioConJunio });
     } catch (error) {
       console.error('Error en previsualización de sync caja:', error);
       return res.status(500).json({
@@ -1032,13 +1054,70 @@ function registerApiRoutes(api) {
     }
   });
 
+  api.post('/leads/:id/pij-integral/reintentar', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    try {
+      const leadsList = await listLeadsFromEncuestas(usuario);
+      const lead = (Array.isArray(leadsList) ? leadsList : []).find(
+        (l) => String(l.id) === String(req.params.id),
+      );
+      if (!lead) {
+        return res.status(404).json({ message: 'Lead no encontrado en tus encuestas asignadas.' });
+      }
+      const idOp = parseInt(String(usuario.id ?? ''), 10);
+      const seg = useSeguimientoSql()
+        ? await getLatestSeguimientoSql(req.params.id, Number.isFinite(idOp) ? idOp : null)
+        : getSeguimientoExterno(req.params.id);
+      const seguimiento = { ...(lead.seguimiento ?? {}), ...(seg ?? {}) };
+      const pijIntegral = await runPijIntegralSync(
+        { ...lead, seguimiento },
+        seguimiento,
+        usuario,
+      );
+      const segFinal = useSeguimientoSql()
+        ? await getLatestSeguimientoSql(req.params.id, Number.isFinite(idOp) ? idOp : null)
+        : getSeguimientoExterno(req.params.id);
+      const leadOut = {
+        ...lead,
+        seguimiento: { ...seguimiento, ...(segFinal ?? {}) },
+      };
+      let message = 'Reintento de envío al sistema integral.';
+      if (pijIntegral?.estado === 'fotos_ok') message = 'Enviado al sistema integral PIJ.';
+      else if (pijIntegral?.estado === 'error') {
+        message = pijIntegral.error || 'Falló el reenvío al sistema integral.';
+      } else if (pijIntegral?.skipped && pijIntegral.reason === 'disabled') {
+        message = 'El bloqueo PIJ está deshabilitado (PIJ_BLOQUEO_ENABLED / PIJ_SOAP_ENABLED).';
+      } else if (pijIntegral?.skipped && pijIntegral.reason === 'ya_enviado') {
+        message = 'Este cierre ya estaba enviado al sistema integral.';
+      } else if (pijIntegral?.skipped && pijIntegral.reason === 'ya_bloqueado') {
+        message = 'Este cierre ya tiene idVentaIntegral (bloqueo OK).';
+      } else if (pijIntegral?.estado === 'bloqueado') {
+        message = `Bloqueo PIJ OK. idVenta=${pijIntegral.idVentaIntegral}.`;
+      }
+      return res.json({ message, lead: leadOut, pijIntegral });
+    } catch (error) {
+      console.error('[pij-bloqueo] reintentar:', error);
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : 'Error al reintentar envío PIJ.',
+      });
+    }
+  });
+
   api.patch('/leads/:id/seguimiento', async (req, res) => {
     if (!respondIfNotConfigured(res)) return;
 
     const parsed = seguimientoSchema.safeParse(req.body);
     if (!parsed.success) {
+      const first =
+        parsed.error.issues?.[0]?.message ||
+        parsed.error.flatten()?.formErrors?.[0] ||
+        null;
       return res.status(400).json({
-        message: 'Datos de seguimiento inválidos.',
+        message: first || 'Datos de seguimiento inválidos.',
         details: parsed.error.flatten(),
       });
     }
@@ -1097,8 +1176,11 @@ function registerApiRoutes(api) {
         invalidateAdminDashboardCache();
       }
 
-      // Publicar a MySQL nube (caja) — best-effort; no deshace el cierre CRM.
+      // 1) SQL Server ya persistió vía SP_RegistrarSeguimientoLead.
+      // 2a) Publicar a MySQL nube (caja) — best-effort; no deshace el cierre CRM.
+      // 2b) Ingest HTTP local (Electron :3847) — piloto same-PC.
       let cajaPublicacion = null;
+      let cajaIngest = null;
       const segParaCaja = { ...data, ...(lead?.seguimiento ?? {}) };
       const origenCaja =
         registroId ??
@@ -1129,6 +1211,111 @@ function registerApiRoutes(api) {
           message +=
             ' El cierre se guardó en SQL Server, pero falló la publicación a la caja (MySQL).';
         }
+
+        try {
+          cajaIngest = await publicarCierreAIngestHttp({
+            lead,
+            seguimiento: segParaCaja,
+            usuario,
+            origenRegistroId: origenCaja,
+          });
+          if (cajaIngest?.error) {
+            message +=
+              ' Falló el envío al ingest local de caja (¿Electron en :3847?).';
+          } else if (cajaIngest && !cajaIngest.skipped && cajaIngest.ok) {
+            message += ' Enviado al ingest local de caja.';
+          }
+        } catch (ingestErr) {
+          console.error('[caja-ingest] sync inesperado:', ingestErr);
+          cajaIngest = {
+            skipped: false,
+            ok: false,
+            error: ingestErr instanceof Error ? ingestErr.message : 'Error ingest caja',
+          };
+          message += ' Falló el envío al ingest local de caja (¿Electron en :3847?).';
+        }
+
+        // Marcar pendiente si llegó a MySQL nube o al ingest local.
+        const publicadoCaja =
+          (cajaPublicacion && !cajaPublicacion.skipped && !cajaPublicacion.error) ||
+          (cajaIngest && !cajaIngest.skipped && cajaIngest.ok);
+        if (publicadoCaja) {
+          try {
+            const patchCaja = {
+              cajaEstado: 'pendiente',
+              cajaSucursal:
+                (cajaPublicacion?.sucursalCodigo
+                  ? String(cajaPublicacion.sucursalCodigo)
+                  : null) ||
+                String(process.env.CAJA_DEFAULT_SUCURSAL || '').trim().slice(0, 32) ||
+                null,
+              cajaMotivoRechazo: null,
+            };
+            await persistirSeguimientoLead(req.params.id, patchCaja, usuario, {
+              ...lead,
+              seguimiento: { ...(lead?.seguimiento ?? {}), ...segParaCaja },
+            });
+            lead = {
+              ...lead,
+              seguimiento: {
+                ...(lead?.seguimiento ?? {}),
+                ...segParaCaja,
+                ...patchCaja,
+              },
+            };
+          } catch (patchErr) {
+            console.warn(
+              '[caja] publicado OK pero no se pudo marcar cajaEstado=pendiente:',
+              patchErr instanceof Error ? patchErr.message : patchErr,
+            );
+          }
+        }
+      }
+
+      // 3) Bloqueo PIJ en sistema integral (SP directo o SOAP según PIJ_BLOQUEO_MODE).
+      let pijIntegral = null;
+      const segParaPij = { ...data, ...(lead?.seguimiento ?? {}) };
+      if (saved) {
+        try {
+          pijIntegral = await runPijIntegralSync(lead, segParaPij, usuario);
+          if (pijIntegral?.skipped) {
+            console.info(
+              '[pij-bloqueo] sync omitido lead=%s reason=%s enabled=%s mode=%s',
+              req.params.id,
+              pijIntegral.reason,
+              String(process.env.PIJ_BLOQUEO_ENABLED || process.env.PIJ_SOAP_ENABLED || ''),
+              String(process.env.PIJ_BLOQUEO_MODE || 'sp'),
+            );
+          }
+          if (pijIntegral && !pijIntegral.skipped) {
+            const idOp = parseInt(String(usuario.id ?? ''), 10);
+            const segActualizado = useSeguimientoSql()
+              ? await getLatestSeguimientoSql(
+                  req.params.id,
+                  Number.isFinite(idOp) ? idOp : null,
+                )
+              : getSeguimientoExterno(req.params.id);
+            if (segActualizado && Object.keys(segActualizado).length > 0) {
+              lead = { ...lead, seguimiento: { ...lead.seguimiento, ...segActualizado } };
+            }
+            if (pijIntegral.estado === 'fotos_ok' || pijIntegral.estado === 'bloqueado') {
+              message += ` Bloqueo PIJ OK (idVenta=${pijIntegral.idVentaIntegral}).`;
+            } else if (pijIntegral.estado === 'error') {
+              message +=
+                ' El cierre se guardó, pero falló el bloqueo PIJ. Podés reintentar.';
+            }
+          }
+        } catch (pijErr) {
+          console.error('[pij-bloqueo] sync inesperado:', pijErr);
+          pijIntegral = {
+            skipped: false,
+            estado: 'error',
+            idVentaIntegral: segParaPij?.idVentaIntegral ?? null,
+            error: pijErr instanceof Error ? pijErr.message : 'Error bloqueo PIJ',
+          };
+          message +=
+            ' El cierre se guardó, pero falló el envío al sistema integral. Podés reintentar.';
+        }
       }
 
       return res.json({
@@ -1138,7 +1325,9 @@ function registerApiRoutes(api) {
         entradaHistorial: saved ? entradaHistorial : null,
         referidosCreados: referidosCreados ?? [],
         nuevosLeads: nuevosLeads ?? [],
+        pijIntegral,
         cajaPublicacion,
+        cajaIngest,
       });
     } catch (error) {
       if (
@@ -1172,6 +1361,7 @@ function registerApiRoutes(api) {
   });
 
   registerGrabacionesRoutes(api, { usuarioDesdeRequest });
+  registerCierresPijRoutes(api, { usuarioDesdeRequest });
   registerCajaSyncRoutes(api);
 }
 

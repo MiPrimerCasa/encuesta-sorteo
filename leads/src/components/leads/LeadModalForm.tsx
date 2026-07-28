@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
 import { cleanTelefonoSuffix } from '../../domain/whatsapp';
-import { fetchRecibosOcupados } from '../../api/client';
+import { fetchRecibosOcupados, reintentarPijIntegral } from '../../api/client';
 import {
   formatEntrevistaCalendario,
   getHorarioEntrevistaLead,
@@ -47,12 +47,24 @@ import {
   requiereNumeroRecibo,
   resetCamposAlCambiarProducto,
   resetCamposVenta,
+  validarMedioPagoPij,
+  montosPijDesdeEntrada,
+  etiquetaMedioPagoPij,
 } from '../../domain/venta';
+import { validarImagenesCierrePij } from '../../domain/imagenes-cierre-pij';
+import { normalizarDniCliente, validarDniCliente } from '../../domain/dni-cliente';
+import { etiquetaCajaEstadoUi, variantCajaEstado, detalleCajaEstado } from '../../domain/caja-estado';
+import { StatusPill } from '../ui/StatusPill';
+import { MedioPagoPijFields } from './MedioPagoPijFields';
+import { ImagenesCierrePijFields } from './ImagenesCierrePijFields';
+import { resumenFotosCierrePij } from '../../domain/imagenes-cierre-pij';
 import type {
   Barrio,
   CanalContacto,
   CompraAdicional,
   EstadoPago,
+  FormaPago,
+  ImagenCierrePij,
   Lead,
   Producto,
   Referido,
@@ -64,6 +76,25 @@ import { ButtonGroup, FormSection, RadioOption } from '../ui/ButtonGroup';
 import { DateTimePicker } from '../ui/DateTimePicker';
 
 const emptyReferido = (): Referido => ({ nombre: '', telefono: '' });
+
+function cierreComproCompleto(
+  idProducto: string,
+  estadoPago: EstadoPago | null,
+  idBarrio: string,
+  numeroRecibo: string,
+  formaPago: FormaPago | null,
+  montoEfectivo: string,
+  montoTransferencia: string,
+): boolean {
+  if (!idProducto || !estadoPago) return false;
+  if (esTerreno(idProducto) && !idBarrio) return false;
+  if (requiereNumeroRecibo(idProducto, estadoPago) && !numeroRecibo.trim()) return false;
+  if (esPlanInversion(idProducto) && estadoPago === 'entrega_33') {
+    if (!formaPago) return false;
+    if (validarMedioPagoPij(formaPago, montoEfectivo, montoTransferencia)) return false;
+  }
+  return true;
+}
 
 interface FormState {
   confirmoEntrevista: boolean | null;
@@ -82,6 +113,13 @@ interface FormState {
   estadoPago: SeguimientoLead['estadoPago'];
   idBarrio: string;
   numeroRecibo: string;
+  formaPago: FormaPago | null;
+  montoEfectivo: string;
+  montoTransferencia: string;
+  titularTransferencia: string;
+  bancoTransferencia: string;
+  referenciaTransferencia: string;
+  dniCliente: string;
   brindoReferidos: boolean | null;
   referidos: Referido[];
   observaciones: string;
@@ -91,6 +129,7 @@ interface FormState {
   /** Sin cita + canal en persona + entrevista en el momento + no compró. */
   reagendaTrasNoComproEnPersona: boolean | null;
   comprasAdicionales: CompraAdicional[];
+  imagenesCierre: ImagenCierrePij[];
 }
 
 const OPCIONES_CANAL_BASE: { value: CanalContacto; label: string }[] = [
@@ -154,6 +193,13 @@ function buildInitialForm(lead: Lead | null): FormState {
     estadoPago,
     idBarrio: s.idBarrio ?? '',
     numeroRecibo: s.numeroRecibo ?? '',
+    formaPago: s.formaPago ?? null,
+    montoEfectivo: s.montoEfectivo != null ? String(s.montoEfectivo) : '',
+    montoTransferencia: s.montoTransferencia != null ? String(s.montoTransferencia) : '',
+    titularTransferencia: s.titularTransferencia ?? '',
+    bancoTransferencia: s.bancoTransferencia ?? '',
+    referenciaTransferencia: s.referenciaTransferencia ?? '',
+    dniCliente: s.dniCliente ?? '',
     brindoReferidos: s.brindoReferidos ?? null,
     referidos: s.referidos?.length ? [...s.referidos] : [emptyReferido()],
     observaciones: s.observaciones ?? '',
@@ -161,6 +207,7 @@ function buildInitialForm(lead: Lead | null): FormState {
     horarioDerivacion: horarioDeriv,
     reagendaTrasNoComproEnPersona,
     comprasAdicionales: s.comprasAdicionales ?? [],
+    imagenesCierre: s.imagenesCierre ?? [],
   };
 }
 
@@ -218,6 +265,8 @@ interface LeadModalFormProps {
   soloLectura?: boolean;
   onClose: () => void;
   onSave: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
+  /** Actualiza el lead en el listado tras reintento SOAP PIJ. */
+  onLeadUpdated?: (lead: Lead) => void;
 }
 
 export function LeadModalForm({
@@ -230,10 +279,13 @@ export function LeadModalForm({
   soloLectura = false,
   onClose,
   onSave,
+  onLeadUpdated,
 }: LeadModalFormProps) {
   const [form, setForm] = useState<FormState>(() => buildInitialForm(lead));
   const [errorVenta, setErrorVenta] = useState('');
   const [errorForm, setErrorForm] = useState('');
+  const [pijRetryLoading, setPijRetryLoading] = useState(false);
+  const [pijRetryMsg, setPijRetryMsg] = useState('');
   const [barrioPickerOpen, setBarrioPickerOpen] = useState(false);
   const [showAddAdicional, setShowAddAdicional] = useState<'pij' | 'terreno' | null>(null);
   const [adicionalForm, setAdicionalForm] = useState<{
@@ -241,11 +293,17 @@ export function LeadModalForm({
     estadoPago: SeguimientoLead['estadoPago'];
     idBarrio: string;
     numeroRecibo: string;
+    formaPago: FormaPago | null;
+    montoEfectivo: string;
+    montoTransferencia: string;
   }>({
     idProducto: '',
     estadoPago: null,
     idBarrio: '',
     numeroRecibo: '',
+    formaPago: null,
+    montoEfectivo: '',
+    montoTransferencia: '',
   });
   // Campos estructurados para número de anexo PIJ (principal)
   const [pijSerie, setPijSerie] = useState<'A' | 'B'>('A');
@@ -255,6 +313,7 @@ export function LeadModalForm({
   const [adicPijSerie, setAdicPijSerie] = useState<'A' | 'B'>('A');
   const [adicPijAdh, setAdicPijAdh] = useState('');
   const [adicPijAnexo, setAdicPijAnexo] = useState('');
+  const [adicionalDraftId, setAdicionalDraftId] = useState('');
 
   const [indiceVentasGlobal, setIndiceVentasGlobal] = useState<IndiceVentasOcupados>({
     adhesiones: {},
@@ -720,6 +779,49 @@ export function LeadModalForm({
           return;
         }
       }
+      if (esPlanInversion(form.idProducto) && form.estadoPago === 'entrega_33') {
+        const errDni = validarDniCliente(form.dniCliente);
+        if (errDni) {
+          setErrorVenta(errDni);
+          return;
+        }
+        const errPago = validarMedioPagoPij(
+          form.formaPago,
+          form.montoEfectivo,
+          form.montoTransferencia,
+        );
+        if (errPago) {
+          setErrorVenta(errPago);
+          return;
+        }
+        const errImg = validarImagenesCierrePij('principal', form.formaPago, form.imagenesCierre);
+        if (errImg) {
+          setErrorVenta(errImg);
+          return;
+        }
+      }
+      for (const compra of form.comprasAdicionales) {
+        if (esPlanInversion(compra.idProducto) && compra.estadoPago === 'entrega_33') {
+          const errAdic = validarMedioPagoPij(
+            compra.formaPago,
+            compra.montoEfectivo,
+            compra.montoTransferencia,
+          );
+          if (errAdic) {
+            setErrorVenta(`Compra adicional: ${errAdic}`);
+            return;
+          }
+          const errImgAdic = validarImagenesCierrePij(
+            compra.id,
+            compra.formaPago,
+            form.imagenesCierre,
+          );
+          if (errImgAdic) {
+            setErrorVenta(`Compra adicional: ${errImgAdic}`);
+            return;
+          }
+        }
+      }
     }
 
     setErrorVenta('');
@@ -741,6 +843,14 @@ export function LeadModalForm({
       : esReagenda
         ? 'reagenda'
         : form.resultadoEntrevista;
+
+    const montosPrincipal =
+      form.resultadoEntrevista === 'compro' &&
+      esPlanInversion(form.idProducto) &&
+      form.estadoPago === 'entrega_33' &&
+      form.formaPago
+        ? montosPijDesdeEntrada(form.formaPago, form.montoEfectivo, form.montoTransferencia)
+        : null;
 
     const seguimiento: SeguimientoLead = {
       fuente: lead.seguimiento?.fuente,
@@ -777,6 +887,34 @@ export function LeadModalForm({
           requiereNumeroRecibo(form.idProducto, form.estadoPago)
           ? form.numeroRecibo.trim()
           : null,
+      formaPago: montosPrincipal ? form.formaPago : null,
+      montoCierre: montosPrincipal?.montoCierre ?? null,
+      montoEfectivo: montosPrincipal?.montoEfectivo ?? null,
+      montoTransferencia: montosPrincipal?.montoTransferencia ?? null,
+      titularTransferencia:
+        montosPrincipal &&
+        (form.formaPago === 'transferencia' || form.formaPago === 'mixto') &&
+        form.titularTransferencia.trim()
+          ? form.titularTransferencia.trim()
+          : null,
+      bancoTransferencia:
+        montosPrincipal &&
+        (form.formaPago === 'transferencia' || form.formaPago === 'mixto') &&
+        form.bancoTransferencia.trim()
+          ? form.bancoTransferencia.trim()
+          : null,
+      referenciaTransferencia:
+        montosPrincipal &&
+        (form.formaPago === 'transferencia' || form.formaPago === 'mixto') &&
+        form.referenciaTransferencia.trim()
+          ? form.referenciaTransferencia.trim()
+          : null,
+      dniCliente:
+        form.resultadoEntrevista === 'compro' &&
+        esPlanInversion(form.idProducto) &&
+        form.estadoPago === 'entrega_33'
+          ? normalizarDniCliente(form.dniCliente) || null
+          : null,
       brindoReferidos: form.brindoReferidos,
       referidos:
         form.brindoReferidos === true
@@ -786,6 +924,10 @@ export function LeadModalForm({
       comprasAdicionales:
         form.resultadoEntrevista === 'compro'
           ? form.comprasAdicionales
+          : null,
+      imagenesCierre:
+        form.resultadoEntrevista === 'compro' && form.imagenesCierre.length > 0
+          ? form.imagenesCierre
           : null,
     };
     void (async () => {
@@ -896,10 +1038,15 @@ export function LeadModalForm({
     entrevistaEnElMomento &&
     form.resultadoEntrevista != null &&
     (form.resultadoEntrevista === 'compro'
-      ? Boolean(form.idProducto && form.estadoPago) &&
-      (!esTerreno(form.idProducto) || Boolean(form.idBarrio)) &&
-      (!requiereNumeroRecibo(form.idProducto, form.estadoPago) ||
-        Boolean(form.numeroRecibo.trim()))
+      ? cierreComproCompleto(
+          form.idProducto,
+          form.estadoPago ?? null,
+          form.idBarrio,
+          form.numeroRecibo,
+          form.formaPago,
+          form.montoEfectivo,
+          form.montoTransferencia,
+        )
       : form.resultadoEntrevista === 'no_compro'
         ? form.reagendaTrasNoComproEnPersona !== null &&
         (form.reagendaTrasNoComproEnPersona === false ||
@@ -949,6 +1096,14 @@ export function LeadModalForm({
   const idBarrioCierre = form.idBarrio || lead.seguimiento?.idBarrio || '';
   const estadoPagoCierre = form.estadoPago ?? lead.seguimiento?.estadoPago ?? null;
   const numeroReciboCierre = form.numeroRecibo || lead.seguimiento?.numeroRecibo || '';
+  const formaPagoCierre = form.formaPago ?? lead.seguimiento?.formaPago ?? null;
+  const dniClienteCierre = form.dniCliente || lead.seguimiento?.dniCliente || '';
+  const etiquetaMedioPagoCierre = etiquetaMedioPagoPij(
+    formaPagoCierre,
+    lead.seguimiento?.montoCierre,
+    lead.seguimiento?.montoEfectivo,
+    lead.seguimiento?.montoTransferencia,
+  );
   const productoEsPij = esPlanInversion(idProductoCierre);
   const productoEsTerreno = esTerreno(idProductoCierre);
   const opcionesPago = opcionesPagoParaRol(rol, idProductoCierre);
@@ -959,6 +1114,54 @@ export function LeadModalForm({
       : null;
   const muestraRecibo = requiereNumeroRecibo(form.idProducto, form.estadoPago);
   const showReferidos = showReferidosObs && form.brindoReferidos === true;
+  const mostrarImagenesCierrePij =
+    showCompro && productoEsPij && estadoPagoCierre === 'entrega_33' && Boolean(lead);
+
+  async function guardarSoloImagenesCierre() {
+    if (!lead || !mostrarImagenesCierrePij) return;
+
+    const errPrincipal = validarImagenesCierrePij(
+      'principal',
+      formaPagoCierre,
+      form.imagenesCierre,
+    );
+    if (errPrincipal) {
+      setErrorForm(errPrincipal);
+      return;
+    }
+    for (const compra of form.comprasAdicionales) {
+      if (!esPlanInversion(compra.idProducto) || compra.estadoPago !== 'entrega_33') continue;
+      const errAdic = validarImagenesCierrePij(compra.id, compra.formaPago, form.imagenesCierre);
+      if (errAdic) {
+        setErrorForm(`Compra adicional: ${errAdic}`);
+        return;
+      }
+    }
+
+    const base = lead.seguimiento ?? {};
+    const seguimiento: SeguimientoLead = {
+      ...base,
+      resultadoEntrevista: 'compro',
+      idProducto: base.idProducto ?? form.idProducto ?? ID_PRODUCTO_PIJ,
+      estadoPago: base.estadoPago ?? form.estadoPago ?? 'entrega_33',
+      numeroRecibo: base.numeroRecibo ?? form.numeroRecibo ?? null,
+      formaPago: base.formaPago ?? form.formaPago ?? null,
+      dniCliente: (base.dniCliente ?? normalizarDniCliente(form.dniCliente)) || null,
+      montoCierre: base.montoCierre ?? null,
+      montoEfectivo: base.montoEfectivo ?? null,
+      montoTransferencia: base.montoTransferencia ?? null,
+      fechaCierre: base.fechaCierre ?? null,
+      comprasAdicionales: base.comprasAdicionales ?? form.comprasAdicionales ?? null,
+      imagenesCierre: form.imagenesCierre.length > 0 ? form.imagenesCierre : null,
+    };
+    setErrorForm('');
+    try {
+      await onSave(lead.id, seguimiento);
+      onClose();
+    } catch (err) {
+      setErrorForm(err instanceof Error ? err.message : 'Error al guardar las fotos.');
+    }
+  }
 
   return (
     <Drawer.Root
@@ -1453,6 +1656,26 @@ export function LeadModalForm({
                             </p>
                           </div>
                         )}
+                        {productoEsPij && etiquetaMedioPagoCierre && (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                              Medio de pago
+                            </p>
+                            <p className="mt-1 text-[15px] font-medium text-zinc-900">
+                              {etiquetaMedioPagoCierre}
+                            </p>
+                          </div>
+                        )}
+                        {productoEsPij && dniClienteCierre && (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                              DNI del cliente
+                            </p>
+                            <p className="mt-1 text-[15px] font-medium tabular-nums text-zinc-900">
+                              {dniClienteCierre}
+                            </p>
+                          </div>
+                        )}
                         {numeroReciboCierre.trim() && (
                           <div>
                             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
@@ -1486,8 +1709,153 @@ export function LeadModalForm({
                             </p>
                           </div>
                         )}
+                        {productoEsPij && lead.seguimiento?.idVentaIntegral != null && (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                              Id venta integral
+                            </p>
+                            <p className="mt-1 text-[15px] font-medium tabular-nums text-zinc-900">
+                              {lead.seguimiento.idVentaIntegral}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     )}
+
+                    {productoEsPij &&
+                      lead.seguimiento?.resultadoEntrevista === 'compro' && (
+                        <div
+                          className={`rounded-lg border px-3 py-2 text-[13px] ${
+                            lead.seguimiento.cajaEstado === 'rechazado'
+                              ? 'border-rose-200 bg-rose-50 text-rose-950'
+                              : lead.seguimiento.cajaEstado === 'verificado'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                                : lead.seguimiento.cajaEstado === 'pendiente'
+                                  ? 'border-sky-200 bg-sky-50 text-sky-950'
+                                  : 'border-zinc-200 bg-zinc-50 text-zinc-800'
+                          }`}
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <StatusPill
+                              variant={variantCajaEstado(lead.seguimiento.cajaEstado)}
+                              dot
+                            >
+                              {etiquetaCajaEstadoUi(lead.seguimiento.cajaEstado)}
+                            </StatusPill>
+                          </div>
+                          {detalleCajaEstado(lead.seguimiento) && (
+                            <p className="mt-1.5 text-[12px] opacity-90">
+                              {detalleCajaEstado(lead.seguimiento)}
+                            </p>
+                          )}
+                          {!lead.seguimiento.cajaEstado && (
+                            <p className="mt-1 text-[12px] opacity-80">
+                              El cierre aún no se publicó a la cola de caja (MySQL VPS o ingest
+                              local). En este entorno local hace falta{' '}
+                              <code className="text-[11px]">CAJA_MYSQL_ENABLED=true</code> o
+                              Electron en :3847.
+                            </p>
+                          )}
+                          {lead.seguimiento.cajaEstado === 'pendiente' && (
+                            <p className="mt-1 text-[12px] opacity-80">
+                              Esperando validación y cobro en la caja de sucursal.
+                            </p>
+                          )}
+                          {(() => {
+                            const fotos = resumenFotosCierrePij(
+                              'principal',
+                              lead.seguimiento.formaPago ?? form.formaPago,
+                              lead.seguimiento.imagenesCierre ?? form.imagenesCierre,
+                            );
+                            return (
+                              <p className="mt-1.5 text-[12px]">
+                                <span className="font-semibold">Fotos para caja:</span>{' '}
+                                {fotos.completo ? (
+                                  <span className="text-emerald-700">completas</span>
+                                ) : (
+                                  <span className="text-rose-700">
+                                    faltan: {fotos.etiquetasFaltantes.join(' · ')}
+                                  </span>
+                                )}
+                              </p>
+                            );
+                          })()}
+                          {lead.seguimiento.idVentaIntegral != null &&
+                            lead.seguimiento.cajaEstado === 'verificado' && (
+                              <p className="mt-1 text-[12px]">
+                                Id venta integral (caja): {lead.seguimiento.idVentaIntegral}
+                                {lead.seguimiento.pijIntegralEstado
+                                  ? ` · fotos: ${lead.seguimiento.pijIntegralEstado}`
+                                  : ''}
+                              </p>
+                            )}
+                        </div>
+                      )}
+
+                    {productoEsPij &&
+                      lead.seguimiento?.resultadoEntrevista === 'compro' &&
+                      (lead.seguimiento.pijIntegralEstado === 'error' ||
+                        lead.seguimiento.pijIntegralEstado === 'bloqueado' ||
+                        lead.seguimiento.pijIntegralEstado === 'fotos_ok' ||
+                        pijRetryMsg) && (
+                        <div
+                          className={`rounded-lg border px-3 py-2 text-[13px] ${
+                            lead.seguimiento.pijIntegralEstado === 'error'
+                              ? 'border-amber-200 bg-amber-50 text-amber-950'
+                              : lead.seguimiento.pijIntegralEstado === 'fotos_ok'
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                                : 'border-zinc-200 bg-zinc-50 text-zinc-800'
+                          }`}
+                        >
+                          {lead.seguimiento.pijIntegralEstado === 'fotos_ok' && (
+                            <p>Enviado al sistema integral PIJ.</p>
+                          )}
+                          {lead.seguimiento.pijIntegralEstado === 'bloqueado' && (
+                            <p>
+                              Bloqueo OK (id {lead.seguimiento.idVentaIntegral ?? '—'}). Falta confirmar
+                              fotos en el integral.
+                            </p>
+                          )}
+                          {lead.seguimiento.pijIntegralEstado === 'error' && (
+                            <p>
+                              Falló el envío al sistema integral
+                              {lead.seguimiento.pijIntegralError
+                                ? `: ${lead.seguimiento.pijIntegralError}`
+                                : '.'}
+                            </p>
+                          )}
+                          {pijRetryMsg && <p className="mt-1">{pijRetryMsg}</p>}
+                          {(lead.seguimiento.pijIntegralEstado === 'error' ||
+                            lead.seguimiento.pijIntegralEstado === 'bloqueado') && (
+                            <button
+                              type="button"
+                              disabled={pijRetryLoading}
+                              onClick={() => {
+                                setPijRetryMsg('');
+                                setPijRetryLoading(true);
+                                void (async () => {
+                                  try {
+                                    const res = await reintentarPijIntegral(lead.id);
+                                    onLeadUpdated?.(res.lead);
+                                    setPijRetryMsg(res.message ?? 'Listo.');
+                                  } catch (err) {
+                                    setPijRetryMsg(
+                                      err instanceof Error
+                                        ? err.message
+                                        : 'No se pudo reenviar al sistema integral.',
+                                    );
+                                  } finally {
+                                    setPijRetryLoading(false);
+                                  }
+                                })();
+                              }}
+                              className="mt-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-[12px] font-semibold text-amber-950 active:bg-amber-100 disabled:opacity-60"
+                            >
+                              {pijRetryLoading ? 'Reenviando…' : 'Reenviar al sistema integral'}
+                            </button>
+                          )}
+                        </div>
+                      )}
 
                     {showCompro && !soloLectura && (
                       <div className="space-y-5 rounded-xl border border-brand-100 bg-brand-50 p-4">
@@ -1651,6 +2019,58 @@ export function LeadModalForm({
                           </div>
                         )}
 
+                        {productoEsPij && form.estadoPago === 'entrega_33' && (
+                          <div className="space-y-1.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                              DNI del cliente
+                            </p>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              autoComplete="off"
+                              value={form.dniCliente}
+                              onChange={(e) => {
+                                setErrorVenta('');
+                                patch({ dniCliente: normalizarDniCliente(e.target.value) });
+                              }}
+                              placeholder="Ej. 30123456"
+                              maxLength={8}
+                              className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                            />
+                            <p className="text-[12px] text-zinc-500">7 u 8 dígitos, sin puntos.</p>
+                          </div>
+                        )}
+
+                        {productoEsPij && form.estadoPago === 'entrega_33' && (
+                          <MedioPagoPijFields
+                            formaPago={form.formaPago}
+                            montoEfectivo={form.montoEfectivo}
+                            montoTransferencia={form.montoTransferencia}
+                            titularTransferencia={form.titularTransferencia}
+                            bancoTransferencia={form.bancoTransferencia}
+                            referenciaTransferencia={form.referenciaTransferencia}
+                            onFormaPago={(value) => {
+                              setErrorVenta('');
+                              patch({ formaPago: value });
+                            }}
+                            onMontoEfectivo={(value) => {
+                              setErrorVenta('');
+                              patch({ montoEfectivo: value });
+                            }}
+                            onMontoTransferencia={(value) => {
+                              setErrorVenta('');
+                              patch({ montoTransferencia: value });
+                            }}
+                            onTitularTransferencia={(value) =>
+                              patch({ titularTransferencia: value })
+                            }
+                            onBancoTransferencia={(value) => patch({ bancoTransferencia: value })}
+                            onReferenciaTransferencia={(value) =>
+                              patch({ referenciaTransferencia: value })
+                            }
+                          />
+                        )}
+
                         {muestraRecibo && (
                           <div className="space-y-2">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
@@ -1795,6 +2215,12 @@ export function LeadModalForm({
                                 const pagoLabel = etiquetaEstadoPagoVisible(rol, compra.estadoPago, compra.idProducto);
                                 const barrioNombre = compra.idBarrio ? (getBarrioNombre(compra.idBarrio, barrios) ?? '') : '';
                                 const docLabel = esPlanInversion(compra.idProducto) ? 'Anexo' : 'Recibo';
+                                const medioPagoAdic = etiquetaMedioPagoPij(
+                                  compra.formaPago,
+                                  compra.montoCierre,
+                                  compra.montoEfectivo,
+                                  compra.montoTransferencia,
+                                );
                                 return (
                                   <div key={compra.id} className="relative flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
                                     <div className="space-y-0.5">
@@ -1804,6 +2230,9 @@ export function LeadModalForm({
                                       <div className="text-[12px] text-zinc-500 font-medium">
                                         {pagoLabel} {barrioNombre ? `· ${barrioNombre}` : ''}
                                       </div>
+                                      {medioPagoAdic && (
+                                        <div className="text-[12px] text-zinc-500">{medioPagoAdic}</div>
+                                      )}
                                       <div className="text-[12px] tabular-nums font-semibold text-brand-600">
                                         {docLabel}: {compra.numeroRecibo}
                                       </div>
@@ -1838,12 +2267,19 @@ export function LeadModalForm({
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      const draftId = crypto.randomUUID
+                                        ? crypto.randomUUID()
+                                        : Math.random().toString(36).substring(2, 11);
+                                      setAdicionalDraftId(draftId);
                                       setShowAddAdicional('pij');
                                       setAdicionalForm({
                                         idProducto: ID_PRODUCTO_PIJ,
                                         estadoPago: 'entrega_33',
                                         idBarrio: '',
                                         numeroRecibo: '',
+                                        formaPago: null,
+                                        montoEfectivo: '',
+                                        montoTransferencia: '',
                                       });
                                       setErrorVenta('');
                                     }}
@@ -1863,6 +2299,9 @@ export function LeadModalForm({
                                         estadoPago: null,
                                         idBarrio: '',
                                         numeroRecibo: '',
+                                        formaPago: null,
+                                        montoEfectivo: '',
+                                        montoTransferencia: '',
                                       });
                                       setErrorVenta('');
                                     }}
@@ -1883,7 +2322,17 @@ export function LeadModalForm({
                                   </h5>
                                   <button
                                     type="button"
-                                    onClick={() => setShowAddAdicional(null)}
+                                    onClick={() => {
+                                      if (adicionalDraftId) {
+                                        patch({
+                                          imagenesCierre: form.imagenesCierre.filter(
+                                            (img) => img.ventaKey !== adicionalDraftId,
+                                          ),
+                                        });
+                                      }
+                                      setAdicionalDraftId('');
+                                      setShowAddAdicional(null);
+                                    }}
                                     className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-600"
                                   >
                                     Cancelar
@@ -1935,6 +2384,42 @@ export function LeadModalForm({
                                       </div>
                                     </div>
                                   </>
+                                )}
+
+                                {showAddAdicional === 'pij' && (
+                                  <MedioPagoPijFields
+                                    compact
+                                    formaPago={adicionalForm.formaPago}
+                                    montoEfectivo={adicionalForm.montoEfectivo}
+                                    montoTransferencia={adicionalForm.montoTransferencia}
+                                    onFormaPago={(value) => {
+                                      setErrorVenta('');
+                                      setAdicionalForm((f) => ({ ...f, formaPago: value }));
+                                    }}
+                                    onMontoEfectivo={(value) => {
+                                      setErrorVenta('');
+                                      setAdicionalForm((f) => ({ ...f, montoEfectivo: value }));
+                                    }}
+                                    onMontoTransferencia={(value) => {
+                                      setErrorVenta('');
+                                      setAdicionalForm((f) => ({ ...f, montoTransferencia: value }));
+                                    }}
+                                  />
+                                )}
+
+                                {showAddAdicional === 'pij' && lead && adicionalDraftId && (
+                                  <ImagenesCierrePijFields
+                                    compact
+                                    leadId={lead.id}
+                                    ventaKey={adicionalDraftId}
+                                    formaPago={adicionalForm.formaPago}
+                                    imagenes={form.imagenesCierre}
+                                    editable
+                                    onChange={(imagenesCierre) => {
+                                      setErrorVenta('');
+                                      patch({ imagenesCierre });
+                                    }}
+                                  />
                                 )}
 
                                 <div className="space-y-1.5">
@@ -2078,6 +2563,15 @@ export function LeadModalForm({
                                       return;
                                     }
                                     if (showAddAdicional === 'pij') {
+                                      const errPago = validarMedioPagoPij(
+                                        adicionalForm.formaPago,
+                                        adicionalForm.montoEfectivo,
+                                        adicionalForm.montoTransferencia,
+                                      );
+                                      if (errPago) {
+                                        setErrorVenta(errPago);
+                                        return;
+                                      }
                                       if (!adicPijAdh.trim()) {
                                         setErrorVenta('Ingresá el número de adhesión adicional.');
                                         return;
@@ -2111,6 +2605,14 @@ export function LeadModalForm({
                                     }
 
                                     setErrorVenta('');
+                                    const montosAdic =
+                                      showAddAdicional === 'pij' && adicionalForm.formaPago
+                                        ? montosPijDesdeEntrada(
+                                            adicionalForm.formaPago,
+                                            adicionalForm.montoEfectivo,
+                                            adicionalForm.montoTransferencia,
+                                          )
+                                        : null;
                                     const newCompra: CompraAdicional = {
                                       id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
                                       idProducto: adicionalForm.idProducto,
@@ -2118,18 +2620,36 @@ export function LeadModalForm({
                                       idBarrio: adicionalForm.idBarrio || null,
                                       numeroRecibo: adicionalForm.numeroRecibo.trim(),
                                       fechaCierre: new Date().toISOString(),
+                                      formaPago: montosAdic ? adicionalForm.formaPago : null,
+                                      montoCierre: montosAdic?.montoCierre ?? null,
+                                      montoEfectivo: montosAdic?.montoEfectivo ?? null,
+                                      montoTransferencia: montosAdic?.montoTransferencia ?? null,
                                     };
 
+                                    const imagenesRemapeadas =
+                                      showAddAdicional === 'pij' && adicionalDraftId
+                                        ? form.imagenesCierre.map((img) =>
+                                            img.ventaKey === adicionalDraftId
+                                              ? { ...img, ventaKey: newCompra.id }
+                                              : img,
+                                          )
+                                        : form.imagenesCierre;
+
                                     patch({
-                                      comprasAdicionales: [...(form.comprasAdicionales || []), newCompra]
+                                      comprasAdicionales: [...(form.comprasAdicionales || []), newCompra],
+                                      imagenesCierre: imagenesRemapeadas,
                                     });
 
                                     setShowAddAdicional(null);
+                                    setAdicionalDraftId('');
                                     setAdicionalForm({
                                       idProducto: '',
                                       estadoPago: null,
                                       idBarrio: '',
                                       numeroRecibo: '',
+                                      formaPago: null,
+                                      montoEfectivo: '',
+                                      montoTransferencia: '',
                                     });
                                     setAdicPijSerie('A');
                                     setAdicPijAdh('');
@@ -2289,6 +2809,45 @@ export function LeadModalForm({
               )}
               <div className="h-4" aria-hidden="true" />
             </fieldset>
+
+            {mostrarImagenesCierrePij && lead && (
+              <div className="px-0 pt-4">
+                <ImagenesCierrePijFields
+                  leadId={lead.id}
+                  ventaKey="principal"
+                  formaPago={formaPagoCierre}
+                  imagenes={form.imagenesCierre}
+                  editable
+                  onChange={(imagenesCierre) => {
+                    setErrorForm('');
+                    setErrorVenta('');
+                    patch({ imagenesCierre });
+                  }}
+                />
+                {form.comprasAdicionales
+                  .filter((c) => esPlanInversion(c.idProducto) && c.estadoPago === 'entrega_33')
+                  .map((compra) => (
+                    <div key={compra.id} className="mt-4">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                        Fotos — anexo adicional {compra.numeroRecibo}
+                      </p>
+                      <ImagenesCierrePijFields
+                        compact
+                        leadId={lead.id}
+                        ventaKey={compra.id}
+                        formaPago={compra.formaPago ?? null}
+                        imagenes={form.imagenesCierre}
+                        editable
+                        onChange={(imagenesCierre) => {
+                          setErrorForm('');
+                          setErrorVenta('');
+                          patch({ imagenesCierre });
+                        }}
+                      />
+                    </div>
+                  ))}
+              </div>
+            )}
           </form>
 
           {/* Footer sticky con safe area */}
@@ -2297,14 +2856,26 @@ export function LeadModalForm({
             style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
           >
             {soloLectura ? (
-              <button
-                type="button"
-                onClick={onClose}
-                style={{ touchAction: 'manipulation' }}
-                className="h-[52px] w-full rounded-xl border border-zinc-200 bg-white text-[15px] font-semibold text-zinc-700 transition-all duration-[120ms] ease-out active:bg-zinc-50 active:scale-[0.98]"
-              >
-                Cerrar
-              </button>
+              <div className="flex flex-col gap-2">
+                {mostrarImagenesCierrePij && (
+                  <button
+                    type="button"
+                    onClick={() => void guardarSoloImagenesCierre()}
+                    style={{ touchAction: 'manipulation' }}
+                    className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:bg-brand-800 active:scale-[0.98]"
+                  >
+                    Guardar fotos
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  style={{ touchAction: 'manipulation' }}
+                  className="h-[52px] w-full rounded-xl border border-zinc-200 bg-white text-[15px] font-semibold text-zinc-700 transition-all duration-[120ms] ease-out active:bg-zinc-50 active:scale-[0.98]"
+                >
+                  Cerrar
+                </button>
+              </div>
             ) : (
               <button
                 type="submit"

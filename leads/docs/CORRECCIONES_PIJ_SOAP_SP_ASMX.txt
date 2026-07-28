@@ -1,0 +1,356 @@
+================================================================================
+  CORRECCIONES PIJ — Web Service + Stored Procedure
+  Para: DBA / responsable del sistema integral
+  Fecha: 20/07/2026
+  Origen: CRM Seguimiento Leads → https://www.miprimercasa.ar/pij/pij.asmx
+================================================================================
+
+El CRM ya llama al Web Service con los datos correctos.
+La respuesta sigue siendo 0 porque hay errores en el SP y en el ASMX
+al devolver el idLoteVenta.
+
+Este documento muestra, punto por punto:
+  - CÓMO ESTÁ HOY
+  - CÓMO DEBERÍA ESTAR
+  - POR QUÉ IMPORTA
+
+
+================================================================================
+1) PARÁMETRO "solicitud" (parcela / adhesión)
+================================================================================
+
+CÓMO ESTÁ HOY (mal en pruebas viejas del CRM; ya corregido del lado CRM):
+  solicitud = "200"
+
+CÓMO DEBERÍA ESTAR:
+  solicitud = "A200/300"
+
+EXPLICACIÓN:
+  El SP busca el lote así:
+    SELECT ... FROM barrioLote WHERE barrioLoteParcela = @solicitud
+
+  La parcela en el sistema integral no es solo el número "200".
+  Es el código completo, con serie y sufijo, por ejemplo: A200/300
+
+  Ejemplo de prueba válida que ustedes usan en SQL:
+    0, 132, 'A200/300', 2000, 20000, 13000,
+    '27/07/2026 11:22:33', 'PRUEBA CAJAL STRAUSS ', '16367898', 'DPTO 3', '3246578-8787'
+
+  El CRM ahora envía ese formato (serie + número + /300).
+
+
+================================================================================
+2) STORED PROCEDURE loteVentaBloqueoVendedorPIJ — resultado del INSERT
+================================================================================
+
+CÓMO ESTÁ HOY:
+
+  IF no existe loteVenta para ese barrioLote
+  BEGIN
+      INSERT INTO loteVenta (...)
+      SET @idVenta = SCOPE_IDENTITY()
+      -- ⚠️ ACA TERMINA. NO HAY SELECT.
+  END
+  ELSE
+  BEGIN
+      UPDATE loteVenta ...
+      UPDATE recibo ...
+      SELECT
+          1 AS gestionCodigo,
+          'El bloqueo...' AS gestionDescripcion,
+          @idVenta AS idLoteVenta     -- solo en el ELSE
+  END
+
+
+CÓMO DEBERÍA ESTAR:
+
+  IF no existe loteVenta ...
+  BEGIN
+      INSERT INTO loteVenta (...)
+      SET @idVenta = SCOPE_IDENTITY()
+  END
+  ELSE
+  BEGIN
+      SELECT @idVenta = idLoteVenta FROM loteVenta WHERE ...
+      UPDATE loteVenta ...
+      UPDATE recibo ...
+  END
+
+  -- SIEMPRE, al final, en ambas ramas:
+  SELECT
+      1 AS gestionCodigo,
+      'El bloqueo del lote ha sido registrado correctamente.' AS gestionDescripcion,
+      @idVenta AS idLoteVenta
+
+
+EXPLICACIÓN:
+  El Web Service hace ExecuteReader y solo toma un valor si hay filas.
+
+  - Si es ALTA NUEVA (INSERT): hoy no hay filas → el ASMX deja retorno = 0
+    → el CRM recibe altaModificaPlanJovenResult = 0
+
+  - Si es UPDATE (ELSE): hay filas, pero el ASMX lee mal la columna
+    (ver punto 3).
+
+  Sin el SELECT al final del INSERT, es imposible atrapar el id en un alta nueva.
+
+
+================================================================================
+3) WEB SERVICE altaModificaPlanJoven — qué columna lee del reader
+================================================================================
+
+CÓMO ESTÁ HOY (código VB del ASMX):
+
+  reader = cmd.ExecuteReader
+
+  If reader.HasRows Then
+      While reader.Read
+          retorno = reader.Item(0)    ' ⚠️ primera columna
+      End While
+  End If
+
+  Return retorno
+
+
+  El SELECT del SP devuelve ESTE orden de columnas:
+
+    Columna índice 0  →  gestionCodigo     = 1
+    Columna índice 1  →  gestionDescripcion = texto
+    Columna índice 2  →  idLoteVenta       = el ID REAL
+
+
+CÓMO DEBERÍA ESTAR:
+
+  reader = cmd.ExecuteReader()
+
+  If reader.Read() Then
+      retorno = CInt(reader("idLoteVenta"))
+      ' o bien: retorno = CInt(reader.Item(2))
+  Else
+      retorno = 0
+  End If
+
+  Return retorno
+
+
+EXPLICACIÓN:
+  Hoy, aunque el SP funcione y haya filas, el Web Service devuelve 1
+  (gestionCodigo), NO el idLoteVenta.
+
+  El CRM necesita el id real de loteVenta (> 0) para guardarlo como
+  idVentaIntegral y poder actualizar / agregar fotos después.
+
+  Si algún día arreglan solo el SELECT del SP y no este reader,
+  el CRM podría guardar "1" como si fuera el id de venta: incorrecto.
+
+
+================================================================================
+4) WEB SERVICE — errores silenciados
+================================================================================
+
+CÓMO ESTÁ HOY:
+
+  Catch ex As Exception
+      retorno = 0
+      cadena = ex.Message   ' se guarda en variable local y no se usa
+  End Try
+
+  Return retorno   ' siempre 0 ante cualquier error
+
+
+CÓMO DEBERÍA ESTAR (cualquiera de estas opciones):
+
+  Opción A — SOAP Fault (recomendado):
+      Catch ex As Exception
+          Throw New SoapException(ex.Message, SoapException.ServerFaultCode)
+
+  Opción B — devolver código negativo documentado y loguear en el servidor:
+      Catch ex As Exception
+          ' Log en archivo / Event Viewer
+          Return -1   ' o relanzar
+
+
+EXPLICACIÓN:
+  Hoy, si el SP falla (parcela inexistente, NULL, constraint, etc.),
+  el CRM solo ve result=0 y no sabe por qué.
+  Hay que poder ver el mensaje de error del lado del integral.
+
+
+================================================================================
+5) FECHA (fechaAnexo) — SOAP vs SQL
+================================================================================
+
+CÓMO SE USA EN SQL (SSMS) — válido para probar el SP a mano:
+  '27/07/2026 11:22:33'
+
+
+CÓMO DEBE IR EN EL SOAP (XML del Web Service):
+  2026-07-20T19:45:08
+
+
+EXPLICACIÓN:
+  El parámetro del WebMethod es Date / xsd:dateTime.
+  Si llega "20/07/2026 19:38:09", ASP.NET responde fault:
+    "La cadena ... no es un valor AllXsd válido"
+
+  Eso NO es un bug del SP.
+  El CRM ya envía formato ISO.
+  Cuando prueben el SP en SQL pueden seguir usando dd/MM/yyyy.
+
+
+================================================================================
+6) DOMICILIO VACÍO
+================================================================================
+
+CÓMO ESTÁ A VECES EN EL CRM:
+  <domicilioCliente></domicilioCliente>
+
+EXPLICACIÓN:
+  No es la causa del result=0.
+  El SP en la rama INSERT casi no usa el domicilio;
+  en el UPDATE sí lo guarda en cliente01Domicilio.
+
+  Si el lead no tiene domicilio en la encuesta, llega vacío.
+  Conviene igual aceptar string vacío o completar datos en el INSERT
+  cuando existan (ver punto 7).
+
+
+================================================================================
+7) DATOS DEL CLIENTE EN EL INSERT (mejora recomendada)
+================================================================================
+
+CÓMO ESTÁ HOY:
+  En el INSERT solo se graban código, barrio, vendedor, fecha visita.
+  Nombre, DNI, domicilio, teléfono y montos se escriben solo en el UPDATE
+  del ELSE.
+
+CÓMO DEBERÍA ESTAR:
+  En el alta nueva, completar también:
+    cliente01Nombre, cliente01DNI, cliente01Domicilio, cliente01Telefono,
+    montos / adhesion, etc. (mismos campos que ya actualizan en el ELSE)
+
+EXPLICACIÓN:
+  Si el primer llamado es siempre un INSERT, hoy el cliente queda
+  incompleto hasta un segundo llamado (UPDATE).
+  Mejor grabar todo en el primer bloqueo.
+
+
+================================================================================
+8) IMÁGENES EN EL WEB SERVICE
+================================================================================
+
+CÓMO ESTÁ HOY:
+  El WebMethod altaModificaPlanJoven que revisamos NO declara parámetros
+  de imágenes (imgDocumentoAnverso, etc.).
+  Hay un comentario de “cargar imágenes si idVenta <> 0” pero vacío.
+
+  El CRM puede enviar tags de imagen en el XML; si no están en la firma,
+  el ASMX los ignora.
+
+CÓMO DEBERÍA ESTAR (cuando implementen fotos):
+  1. Agregar los Byte() a la firma del WebMethod y republicar el WSDL, o
+  2. Confirmar otro método / flujo para las imágenes.
+
+EXPLICACIÓN:
+  El bloqueo actual es solo: datos → SP → devolver idLoteVenta.
+  Las fotos son un paso posterior; primero hay que devolver bien el id.
+
+
+================================================================================
+9) TIPOS DE PARÁMETROS EN EL ASMX (recomendación)
+================================================================================
+
+CÓMO ESTÁ HOY (ejemplo):
+  @solicitud  → SqlDbType.Char   (sin Size claro)
+  @anexo      → SqlDbType.Char   aunque el SP lo tiene como int
+  nombres/DNI → SqlDbType.Char
+
+CÓMO DEBERÍA ESTAR:
+  @idVenta, @idVendedor, @anexo     → Int
+  @solicitud, nombre, DNI, etc.     → NVarChar con Size (100 / 20)
+  @montoEfectivo / Transferencia    → Decimal o Float según el SP
+  @fechaAnexo                       → DateTime
+
+EXPLICACIÓN:
+  Char sin tamaño puede truncar strings.
+  Mejor alinear tipos con la firma del SP.
+
+
+================================================================================
+10) RESPUESTA QUE ESPERA EL CRM
+================================================================================
+
+CÓMO ESTÁ HOY:
+  <altaModificaPlanJovenResult>0</altaModificaPlanJovenResult>
+
+
+CÓMO DEBERÍA ESTAR (éxito):
+  <altaModificaPlanJovenResult>12345</altaModificaPlanJovenResult>
+
+  donde 12345 es el idLoteVenta REAL de la tabla loteVenta
+  (un entero mayor que 0).
+
+
+NO DEBE DEVOLVER:
+  - 0  → el CRM lo interpreta como rechazo / error
+  - 1  → si ese 1 es solo gestionCodigo (salvo que el id real sea 1)
+
+
+================================================================================
+11) EJEMPLO XML QUE ENVÍA EL CRM (bloqueo)
+================================================================================
+
+  URL:        https://www.miprimercasa.ar/pij/pij.asmx
+  Operación:  altaModificaPlanJoven
+  Namespace:  http://190.106.131.63/MPC/PIJ
+
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+               xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <altaModificaPlanJoven xmlns="http://190.106.131.63/MPC/PIJ">
+      <idVenta>0</idVenta>
+      <idVendedor>132</idVendedor>
+      <solicitud>A200/300</solicitud>
+      <anexo>2000</anexo>
+      <montoEfectivo>0</montoEfectivo>
+      <montoTransferencia>33000</montoTransferencia>
+      <fechaAnexo>2026-07-20T19:45:08</fechaAnexo>
+      <nombreCliente>Pablo García</nombreCliente>
+      <numeroDocumentoCliente>2203030</numeroDocumentoCliente>
+      <domicilioCliente></domicilioCliente>
+      <numeroTelefonoCliente>5493705390110</numeroTelefonoCliente>
+    </altaModificaPlanJoven>
+  </soap:Body>
+</soap:Envelope>
+
+
+================================================================================
+12) CHECKLIST DE PRUEBA (lado integral)
+================================================================================
+
+  [ ] 1. Ejecutar el SP a mano con solicitud = 'A200/300' (parcela que exista).
+  [ ] 2. Verificar que el result set traiga idLoteVenta > 0 también en ALTA NUEVA.
+  [ ] 3. Corregir el ASMX para leer reader("idLoteVenta"), no Item(0).
+  [ ] 4. Publicar / reiniciar el sitio del Web Service.
+  [ ] 5. Llamar al ASMX con el XML de arriba.
+  [ ] 6. Confirmar que altaModificaPlanJovenResult sea el id real (no 0 ni "1" falso).
+  [ ] 7. Reintentar desde el CRM: debe aparecer en log
+         [pij-soap] bloqueo OK lead=... idVenta=<número>
+
+
+================================================================================
+13) RESUMEN EN UNA FRASE
+================================================================================
+
+  HOY:     el SP no devuelve filas en el INSERT, y el ASMX lee la columna
+           equivocada (gestionCodigo) → el CRM recibe 0.
+
+  DEBE:    el SP SIEMPRE devolver idLoteVenta en un SELECT, y el ASMX
+           devolver ese id en altaModificaPlanJovenResult.
+
+
+================================================================================
+Fin del documento
+================================================================================

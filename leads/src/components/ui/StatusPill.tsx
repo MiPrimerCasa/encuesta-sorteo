@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { TerrenoFlameIcon } from './TerrenoFlameIcon';
 
-type Variant =
+export type StatusPillVariant =
   | 'in-progress'
   | 'reagendado'
   | 'pending'
@@ -12,7 +12,12 @@ type Variant =
   | 'nuevo'
   | 'contactado'
   | 'post-entrevista'
-  | 'terreno';
+  | 'terreno'
+  | 'caja-pendiente'
+  | 'caja-ok'
+  | 'caja-rechazo';
+
+type Variant = StatusPillVariant;
 
 const VARIANTS: Record<Variant, string> = {
   'in-progress': 'bg-brand-50 text-brand-700 border border-brand-100',
@@ -26,6 +31,9 @@ const VARIANTS: Record<Variant, string> = {
   'contactado':  'bg-amber-50 text-amber-700 border border-amber-200',
   'post-entrevista': 'bg-orange-50 text-orange-700 border border-orange-200',
   'terreno':     'bg-red-50 text-red-700 border border-red-300 shadow-sm shadow-red-100/80',
+  'caja-pendiente': 'bg-sky-50 text-sky-800 border border-sky-200',
+  'caja-ok':        'bg-emerald-50 text-emerald-800 border border-emerald-200',
+  'caja-rechazo':   'bg-rose-50 text-rose-800 border border-rose-200',
 };
 
 const DOT_COLORS: Record<Variant, string> = {
@@ -40,6 +48,9 @@ const DOT_COLORS: Record<Variant, string> = {
   'contactado':  'bg-amber-500',
   'post-entrevista': 'bg-orange-500',
   'terreno':     'bg-red-500',
+  'caja-pendiente': 'bg-sky-500',
+  'caja-ok':        'bg-emerald-500',
+  'caja-rechazo':   'bg-rose-500',
 };
 
 interface StatusPillProps {

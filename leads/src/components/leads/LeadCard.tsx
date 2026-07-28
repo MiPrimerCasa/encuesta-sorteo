@@ -20,9 +20,12 @@ import {
   esCerradoNegativoLead,
   leadCierreRegistradoSupervisor,
   leadTieneCitaPrevia,
+  getHorarioEntrevistaLead,
 } from '../../domain/leads';
 import { prioridadTabInicial } from '../../domain/prioridad-leads';
-import { etiquetaCortaNumeroDocumentoVenta, etiquetaPagoProducto } from '../../domain/venta';
+import { etiquetaCortaNumeroDocumentoVenta, etiquetaMedioPagoPij, etiquetaPagoProducto, esPlanInversion } from '../../domain/venta';
+import { etiquetaCajaEstadoUi, variantCajaEstado } from '../../domain/caja-estado';
+import { resumenFotosCierrePij } from '../../domain/imagenes-cierre-pij';
 import { etiquetaCampania } from '../../domain/campania';
 import { FUENTE_LABEL } from '../../domain/fuenteLabels';
 import type { Barrio, Lead, Producto, Promotor, RolUsuario, SeguimientoHistorialEntry } from '../../types';
@@ -159,6 +162,23 @@ export function LeadCard({
   const cierreSupervisor = leadSoloLecturaPromotor(lead, historial);
   const soloLecturaSupervisor =
     rolUsuario === 'supervisor' && leadSoloLecturaSupervisor(lead);
+  const esCierrePij =
+    esArchivo && esPlanInversion(lead.seguimiento?.idProducto);
+  const medioPagoEtiqueta = etiquetaMedioPagoPij(
+    lead.seguimiento?.formaPago,
+    lead.seguimiento?.montoCierre,
+    lead.seguimiento?.montoEfectivo,
+    lead.seguimiento?.montoTransferencia,
+  );
+  const fotosCierre = esCierrePij
+    ? resumenFotosCierrePij(
+        'principal',
+        lead.seguimiento?.formaPago,
+        lead.seguimiento?.imagenesCierre,
+      )
+    : null;
+  const teniaCitaProgramada = esCierrePij && leadTieneCitaPrevia(lead);
+  const horarioCita = teniaCitaProgramada ? getHorarioEntrevistaLead(lead) : null;
   const soloLecturaPromotor =
     rolUsuario === 'promotor' && cierreSupervisor;
   const soloLectura = soloLecturaSupervisor || soloLecturaPromotor;
@@ -290,8 +310,13 @@ export function LeadCard({
               </div>
             )}
           </div>
-          <div className="shrink-0">
+          <div className="flex shrink-0 flex-col items-end gap-1">
             {esArchivo && <StatusPill variant="compro" dot>Cierre</StatusPill>}
+            {esCierrePij && (
+              <StatusPill variant={variantCajaEstado(lead.seguimiento?.cajaEstado)} dot>
+                {etiquetaCajaEstadoUi(lead.seguimiento?.cajaEstado)}
+              </StatusPill>
+            )}
             {esSeguimiento && !esArchivo && (
               <StatusPill variant="reagendado" dot>En seguimiento</StatusPill>
             )}
@@ -401,10 +426,74 @@ export function LeadCard({
                 {lead.seguimiento.numeroRecibo}
               </span>
             )}
+            {lead.seguimiento?.dniCliente && (
+              <span className="ml-1 text-zinc-400">· DNI: {lead.seguimiento.dniCliente}</span>
+            )}
+            {lead.seguimiento?.cajaEstado === 'rechazado' && lead.seguimiento.cajaMotivoRechazo && (
+              <span className="ml-1 text-rose-600">
+                · Rechazo caja: {lead.seguimiento.cajaMotivoRechazo}
+              </span>
+            )}
+            {lead.seguimiento?.cajaEstado === 'verificado' && lead.seguimiento.cajaComprobanteId && (
+              <span className="ml-1 text-zinc-400">
+                · Comp. caja: {lead.seguimiento.cajaComprobanteId}
+              </span>
+            )}
             {lead.seguimiento?.fechaCierre && (
               <span className="ml-1 text-zinc-400">
                 · Cierre: {formatearFechaHora(lead.seguimiento.fechaCierre)}
               </span>
+            )}
+          </div>
+        )}
+
+        {esCierrePij && (
+          <div className="mt-2 space-y-1.5 rounded-lg border border-zinc-200 bg-zinc-50/80 px-3 py-2 text-[12px] text-zinc-700">
+            {teniaCitaProgramada && (
+              <p>
+                <span className="font-semibold text-zinc-800">Cita programada</span>
+                {horarioCita ? `: ${formatearFechaHora(horarioCita)}` : ''}
+              </p>
+            )}
+            {medioPagoEtiqueta ? (
+              <p>
+                <span className="font-semibold text-zinc-800">Medio de pago:</span>{' '}
+                <span
+                  className={
+                    lead.seguimiento?.formaPago === 'transferencia' ||
+                    lead.seguimiento?.formaPago === 'mixto'
+                      ? 'font-semibold text-amber-800'
+                      : 'font-medium text-zinc-800'
+                  }
+                >
+                  {medioPagoEtiqueta}
+                </span>
+                {(lead.seguimiento?.formaPago === 'transferencia' ||
+                  lead.seguimiento?.formaPago === 'mixto') &&
+                  lead.seguimiento?.titularTransferencia && (
+                    <span className="text-zinc-500">
+                      {' '}
+                      · Titular: {lead.seguimiento.titularTransferencia}
+                    </span>
+                  )}
+              </p>
+            ) : (
+              <p className="text-amber-800">
+                <span className="font-semibold">Medio de pago:</span> sin indicar
+              </p>
+            )}
+            {fotosCierre && (
+              <p>
+                <span className="font-semibold text-zinc-800">Fotos para caja:</span>{' '}
+                {fotosCierre.completo ? (
+                  <span className="font-medium text-emerald-700">completas</span>
+                ) : (
+                  <span className="text-rose-700">
+                    faltan {fotosCierre.faltantes.length}:{' '}
+                    {fotosCierre.etiquetasFaltantes.join(' · ')}
+                  </span>
+                )}
+              </p>
             )}
           </div>
         )}
@@ -431,6 +520,22 @@ export function LeadCard({
                   {compra.numeroRecibo && (
                     <span className="ml-1 text-zinc-400">
                       · {etiquetaCortaNumeroDocumentoVenta(compra.idProducto)}: {compra.numeroRecibo}
+                    </span>
+                  )}
+                  {etiquetaMedioPagoPij(
+                    compra.formaPago,
+                    compra.montoCierre,
+                    compra.montoEfectivo,
+                    compra.montoTransferencia,
+                  ) && (
+                    <span className="ml-1 text-zinc-400">
+                      ·{' '}
+                      {etiquetaMedioPagoPij(
+                        compra.formaPago,
+                        compra.montoCierre,
+                        compra.montoEfectivo,
+                        compra.montoTransferencia,
+                      )}
                     </span>
                   )}
                   {compra.fechaCierre && (

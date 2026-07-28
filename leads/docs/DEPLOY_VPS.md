@@ -108,7 +108,9 @@ La landing sigue funcionando.
 |------|----------------|
 | Login / rol | SQL `operadorAccesoCategoria` |
 | Listado leads | SQL `encuestasMuestraOperador` |
-| Seguimiento modal | Caché local `data/app-cache.db` (volumen Docker) |
+| Seguimiento modal | SQL `SP_RegistrarSeguimientoLead` (+ caché SQLite si aplica) |
+| Fotos cierre PIJ | Volumen Docker `./data` → `data/cierres-pij/{leadId}/` (ver [ALMACEN_IMAGENES_CIERRE_PIJ.md](./ALMACEN_IMAGENES_CIERRE_PIJ.md)) |
+| Grabaciones audio | `data/grabaciones/` (mismo volumen) |
 
 Migración SQL para seguimiento en servidor: `sql/migrations/001_lead_seguimiento_crm.sql` (pendiente conectar en la app cuando el DBA apruebe).
 

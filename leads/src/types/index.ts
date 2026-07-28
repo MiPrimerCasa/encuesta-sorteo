@@ -265,6 +265,12 @@ export interface CompraAdicional {
   montoCierre?: number | null;
   montoEfectivo?: number | null;
   montoTransferencia?: number | null;
+  /** Titular cuenta TRF (conciliación caja). */
+  titularTransferencia?: string | null;
+  bancoTransferencia?: string | null;
+  referenciaTransferencia?: string | null;
+  /** Id venta integral por PIJ adicional (confirmación multi-PIJ desde caja). */
+  idVentaIntegral?: number | null;
 }
 
 export interface SeguimientoLead {
@@ -303,6 +309,10 @@ export interface SeguimientoLead {
   montoCierre?: number | null;
   montoEfectivo?: number | null;
   montoTransferencia?: number | null;
+  /** Datos TRF para conciliación en caja. */
+  titularTransferencia?: string | null;
+  bancoTransferencia?: string | null;
+  referenciaTransferencia?: string | null;
   brindoReferidos?: boolean | null;
   referidos?: Referido[];
   /** Referidos ya procesados en carga automática (teléfono → lead creado o duplicado). */

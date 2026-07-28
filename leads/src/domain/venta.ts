@@ -1,7 +1,139 @@
-import type { Barrio, EstadoPago, RolUsuario } from '../types';
+import type { Barrio, EstadoPago, FormaPago, RolUsuario } from '../types';
 
 export const ID_PRODUCTO_PIJ = 'prod-pij';
 export const ID_PRODUCTO_TERRENO = 'prod-terreno';
+export const MONTO_ADHESION_PIJ = 33000;
+
+export const ETIQUETA_FORMA_PAGO: Record<FormaPago, string> = {
+  efectivo: 'Efectivo',
+  transferencia: 'Transferencia',
+  mixto: 'Mixto',
+};
+
+export function opcionesFormaPago(): { value: FormaPago; label: string }[] {
+  return [
+    { value: 'efectivo', label: 'Efectivo' },
+    { value: 'transferencia', label: 'Transferencia' },
+    { value: 'mixto', label: 'Mixto' },
+  ];
+}
+
+function parseMontoInput(value: string | number | null | undefined): number | null {
+  if (value == null || String(value).trim() === '') return null;
+  const n = Number(String(value).replace(/\./g, '').replace(',', '.'));
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+export function formatearMontoArs(monto: number | null | undefined): string {
+  if (monto == null || !Number.isFinite(monto)) return '—';
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0,
+  }).format(monto);
+}
+
+/** Recorta el input numérico para que no supere el total PIJ ($33.000). */
+export function limitarMontoPijInput(
+  raw: string,
+  montoTotal = MONTO_ADHESION_PIJ,
+): string {
+  const digits = String(raw).replace(/[^\d]/g, '');
+  if (!digits) return '';
+  const n = Number(digits);
+  if (!Number.isFinite(n)) return '';
+  if (n > montoTotal) return String(montoTotal);
+  return digits;
+}
+
+/** Diferencia para cerrar el total PIJ en pago mixto (ej. 20000 → "13000"). */
+export function complementoMontoMixtoPij(
+  montoIngresado: string,
+  montoTotal = MONTO_ADHESION_PIJ,
+): string {
+  if (!montoIngresado.trim()) return '';
+  const n = parseMontoInput(montoIngresado);
+  if (n == null) return '';
+  return String(Math.max(0, montoTotal - Math.min(n, montoTotal)));
+}
+
+/** Valida medio de pago PIJ; devuelve mensaje de error o null si OK. */
+export function validarMedioPagoPij(
+  formaPago: FormaPago | null | undefined,
+  montoEfectivoInput: string | number | null | undefined,
+  montoTransferenciaInput: string | number | null | undefined,
+  montoTotal = MONTO_ADHESION_PIJ,
+): string | null {
+  if (!formaPago) return 'Indicá si el pago fue en efectivo, transferencia o mixto.';
+
+  if (formaPago === 'efectivo') {
+    const monto = parseMontoInput(montoEfectivoInput) ?? montoTotal;
+    if (monto <= 0) return 'Ingresá el monto en efectivo.';
+    if (monto > montoTotal) {
+      return `El monto no puede superar ${formatearMontoArs(montoTotal)}.`;
+    }
+    return null;
+  }
+
+  if (formaPago === 'transferencia') {
+    const monto = parseMontoInput(montoTransferenciaInput) ?? montoTotal;
+    if (monto <= 0) return 'Ingresá el monto transferido.';
+    if (monto > montoTotal) {
+      return `El monto no puede superar ${formatearMontoArs(montoTotal)}.`;
+    }
+    return null;
+  }
+
+  const ef = parseMontoInput(montoEfectivoInput);
+  const tr = parseMontoInput(montoTransferenciaInput);
+  if (ef == null || ef <= 0) return 'Ingresá el monto en efectivo.';
+  if (tr == null || tr <= 0) return 'Ingresá el monto transferido.';
+  if (ef > montoTotal || tr > montoTotal) {
+    return `Ningún monto puede superar ${formatearMontoArs(montoTotal)}.`;
+  }
+  if (ef + tr !== montoTotal) {
+    return `En pago mixto, efectivo + transferencia deben sumar ${formatearMontoArs(montoTotal)}.`;
+  }
+  return null;
+}
+
+/** Convierte entradas del formulario a montos numéricos para guardar. */
+export function montosPijDesdeEntrada(
+  formaPago: FormaPago,
+  montoEfectivoInput: string | number | null | undefined,
+  montoTransferenciaInput: string | number | null | undefined,
+  montoTotal = MONTO_ADHESION_PIJ,
+): { montoCierre: number; montoEfectivo: number | null; montoTransferencia: number | null } {
+  if (formaPago === 'efectivo') {
+    const monto = parseMontoInput(montoEfectivoInput) ?? montoTotal;
+    return { montoCierre: monto, montoEfectivo: monto, montoTransferencia: null };
+  }
+  if (formaPago === 'transferencia') {
+    const monto = parseMontoInput(montoTransferenciaInput) ?? montoTotal;
+    return { montoCierre: monto, montoEfectivo: null, montoTransferencia: monto };
+  }
+  const ef = parseMontoInput(montoEfectivoInput) ?? 0;
+  const tr = parseMontoInput(montoTransferenciaInput) ?? 0;
+  return { montoCierre: montoTotal, montoEfectivo: ef, montoTransferencia: tr };
+}
+
+export function etiquetaMedioPagoPij(
+  formaPago: FormaPago | null | undefined,
+  montoCierre?: number | null,
+  montoEfectivo?: number | null,
+  montoTransferencia?: number | null,
+): string | null {
+  if (!formaPago) return null;
+  const base = ETIQUETA_FORMA_PAGO[formaPago];
+  if (formaPago === 'mixto') {
+    return `${base} (${formatearMontoArs(montoEfectivo)} + ${formatearMontoArs(montoTransferencia)})`;
+  }
+  return `${base} · ${formatearMontoArs(montoCierre ?? montoEfectivo ?? montoTransferencia)}`;
+}
+
+export function requiereComprobanteTransferenciaPij(formaPago: FormaPago | null | undefined): boolean {
+  return formaPago === 'transferencia' || formaPago === 'mixto';
+}
 
 export const ETIQUETA_ESTADO_PAGO: Record<EstadoPago, string> = {
   sena: 'Seña',
@@ -144,10 +276,32 @@ export function resetCamposVenta(): {
   estadoPago: null;
   idBarrio: string;
   numeroRecibo: string;
+  formaPago: null;
+  montoEfectivo: string;
+  montoTransferencia: string;
+  dniCliente: string;
 } {
-  return { idProducto: '', estadoPago: null, idBarrio: '', numeroRecibo: '' };
+  return {
+    idProducto: '',
+    estadoPago: null,
+    idBarrio: '',
+    numeroRecibo: '',
+    formaPago: null,
+    montoEfectivo: '',
+    montoTransferencia: '',
+    dniCliente: '',
+  };
 }
 
 export function resetCamposAlCambiarProducto(idProducto: string) {
-  return { idProducto, estadoPago: null, idBarrio: '', numeroRecibo: '' };
+  return {
+    idProducto,
+    estadoPago: null,
+    idBarrio: '',
+    numeroRecibo: '',
+    formaPago: null,
+    montoEfectivo: '',
+    montoTransferencia: '',
+    dniCliente: '',
+  };
 }

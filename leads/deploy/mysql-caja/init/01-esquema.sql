@@ -142,10 +142,34 @@ CREATE TABLE IF NOT EXISTS operador (
   rol               VARCHAR(16)  NOT NULL,
   equipo            VARCHAR(8)   NULL,
   id_sql            INT          NULL,
+  observacion       VARCHAR(200) NULL,
+  telefono          VARCHAR(40)  NULL,
+  correo            VARCHAR(120) NULL,
   activo            TINYINT      NOT NULL DEFAULT 1,
   actualizado_en    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY ix_operador_rol (rol),
   KEY ix_operador_equipo (equipo)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- PDF recibos enviados por la caja (POST /api/caja/recibos)
+CREATE TABLE IF NOT EXISTS caja_recibo (
+  id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  uuid              CHAR(36)        NOT NULL,
+  pendiente_uuid    CHAR(36)        NULL,
+  cliente_documento VARCHAR(20)     NOT NULL,
+  nro_recibo        VARCHAR(40)     NOT NULL,
+  mime_type         VARCHAR(64)     NOT NULL,
+  nombre_archivo    VARCHAR(260)    NULL,
+  monto_total       DECIMAL(14,2)   NULL,
+  sucursal_codigo   VARCHAR(40)     NOT NULL,
+  storage_path      VARCHAR(500)    NOT NULL,
+  lead_id           INT             NULL,
+  created_at        DATETIME(3)     NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_caja_recibo_uuid (uuid),
+  KEY idx_caja_recibo_pendiente (pendiente_uuid),
+  KEY idx_caja_recibo_dni (cliente_documento),
+  KEY idx_caja_recibo_nro (sucursal_codigo, nro_recibo)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS sync_cursor (

@@ -590,6 +590,57 @@ function registerApiRoutes(api) {
     }
   });
 
+  /** Adhesiones del Excel/Sheets (ej. Julio) que no tienen cierre PIJ en el CRM. */
+  api.post('/admin/reconciliar-pij/faltantes', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso = esSuperadminUsuario(usuario) || esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message: 'Panel de administración solo disponible para superadmin o supervisores con acceso global.',
+      });
+    }
+
+    try {
+      const { buildFaltantesDesdeCaja, CAJA_SHEETS } = await import('./services/sync-caja.js');
+      const leads = await listAllLeadsFromEncuestas({ incluirReferidos: false });
+      const mesRaw = String(req.body?.mes ?? 'julio').trim().toLowerCase();
+      const mes = mesRaw === 'junio' ? 'junio' : 'julio';
+      const sheetGids = Array.isArray(req.body?.sheetGids)
+        ? req.body.sheetGids.map((g) => String(g).trim()).filter(Boolean)
+        : undefined;
+      const csvText =
+        typeof req.body?.csvText === 'string' && req.body.csvText.trim()
+          ? req.body.csvText
+          : undefined;
+
+      const resultado = await buildFaltantesDesdeCaja(leads, {
+        mes: csvText || sheetGids?.length ? undefined : mes,
+        sheetGids,
+        csvText,
+      });
+
+      return res.json({
+        ...resultado,
+        mesConsultado: csvText ? null : mes,
+        sheetsDisponibles: {
+          junio: CAJA_SHEETS.junio,
+          julio: CAJA_SHEETS.julio,
+        },
+      });
+    } catch (error) {
+      console.error('Error en reconciliar PIJ faltantes:', error);
+      return res.status(500).json({
+        message: 'Error al cruzar Excel de Caja con cierres PIJ del CRM.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
   api.post('/admin/leads/:id/reasignar', async (req, res) => {
     if (!respondIfNotConfigured(res)) return;
 

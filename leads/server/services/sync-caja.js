@@ -905,3 +905,258 @@ async function resolverUsuarioDeSincronizacion(cambio, lead, pool, catalog) {
   };
 }
 
+/** Fila de adhesión (cierre nuevo), no cuota de plan existente. */
+export function esFilaAdhesionCaja(row) {
+  const concepto = String(row?.concepto ?? '').trim().toUpperCase();
+  if (concepto.includes('ADHESION')) return true;
+  if (
+    !concepto &&
+    row?.ordenAnexo &&
+    String(row.ordenAnexo).trim() &&
+    String(row.ordenAnexo).trim() !== '-'
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Índice CRM: variante de recibo → cierres PIJ (principal + adicionales).
+ * @param {unknown[]} leadsDB
+ */
+function construirIndiceCierresPijCrm(leadsDB) {
+  /** @type {Map<string, Array<{ leadId: string, nombreCliente: string, promotorNombre: string, operadorNombre: string, numeroRecibo: string, fechaCierre: string|null, isCompraAdicional: boolean }>>} */
+  const byVariant = new Map();
+
+  const push = (variantes, meta) => {
+    for (const v of variantes) {
+      if (!v) continue;
+      if (!byVariant.has(v)) byVariant.set(v, []);
+      byVariant.get(v).push(meta);
+    }
+  };
+
+  for (const lead of leadsDB || []) {
+    const seg = lead?.seguimiento;
+    if (!seg) continue;
+    const baseMeta = {
+      leadId: String(lead.id),
+      nombreCliente: String(lead.nombre || ''),
+      promotorNombre: String(lead.promotorNombre || ''),
+      operadorNombre: String(seg.operadorNombre || ''),
+    };
+
+    if (
+      seg.resultadoEntrevista === 'compro' &&
+      seg.idProducto === 'prod-pij' &&
+      seg.numeroRecibo &&
+      String(seg.numeroRecibo).trim() !== '-'
+    ) {
+      push(extractNumbersFromCrmRecibo(seg.numeroRecibo), {
+        ...baseMeta,
+        numeroRecibo: String(seg.numeroRecibo),
+        fechaCierre: seg.fechaCierre || null,
+        isCompraAdicional: false,
+      });
+    }
+
+    const adicionales = Array.isArray(seg.comprasAdicionales) ? seg.comprasAdicionales : [];
+    for (const compra of adicionales) {
+      if (String(compra?.idProducto) !== 'prod-pij') continue;
+      if (!compra?.numeroRecibo || String(compra.numeroRecibo).trim() === '-') continue;
+      push(extractNumbersFromCrmRecibo(compra.numeroRecibo), {
+        ...baseMeta,
+        numeroRecibo: String(compra.numeroRecibo),
+        fechaCierre: compra.fechaCierre || seg.fechaCierre || null,
+        isCompraAdicional: true,
+      });
+    }
+  }
+
+  return byVariant;
+}
+
+function filaCajaKey(row) {
+  return [
+    normalizar(row.serie),
+    normalizar(row.ordenAdh),
+    normalizar(row.ordenAnexo),
+    normalizeName(row.nombreCliente),
+    normalizarDiaComparacion(parseFechaCaja(row.fecha) || row.fecha),
+  ].join('|');
+}
+
+/**
+ * Cruza adhesiones del Excel/Sheets de Caja vs cierres PIJ del CRM.
+ * Devuelve filas de Caja que NO tienen match en el sistema (clientes no cargados).
+ *
+ * @param {unknown[]} leadsDB
+ * @param {{ sheetGids?: string[], mes?: 'junio'|'julio', csvText?: string }} [options]
+ */
+export async function buildFaltantesDesdeCaja(leadsDB, options = {}) {
+  const { sheetGids, mes, csvText } = options;
+
+  let excelRows;
+  let fuente;
+  if (csvText && String(csvText).trim()) {
+    excelRows = parseCajaCsvText(String(csvText), 'upload');
+    fuente = 'Archivo CSV subido';
+  } else {
+    let gids = Array.isArray(sheetGids) ? sheetGids.filter(Boolean) : [];
+    if (!gids.length) {
+      if (mes === 'junio') gids = [CAJA_SHEETS.junio.gid];
+      else if (mes === 'julio') gids = [CAJA_SHEETS.julio.gid];
+      else gids = [CAJA_SHEETS.julio.gid];
+    }
+    excelRows = await fetchCajaData({ sheetGids: gids });
+    if (mes === 'junio' || (gids.length === 1 && gids[0] === CAJA_SHEETS.junio.gid)) {
+      fuente = CAJA_SHEETS.junio.label;
+    } else if (mes === 'julio' || (gids.length === 1 && gids[0] === CAJA_SHEETS.julio.gid)) {
+      fuente = CAJA_SHEETS.julio.label;
+    } else {
+      fuente = `Pestañas: ${gids.join(', ')}`;
+    }
+  }
+
+  const adhesiones = excelRows.filter(esFilaAdhesionCaja);
+  const indiceCrm = construirIndiceCierresPijCrm(leadsDB);
+
+  const faltantes = [];
+  const matched = [];
+  const ambiguos = [];
+  const seenKeys = new Set();
+
+  for (const row of adhesiones) {
+    const key = filaCajaKey(row);
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+
+    const variantes = generarVariantesRecibo(row);
+    const hits = [];
+    for (const v of variantes) {
+      const found = indiceCrm.get(v);
+      if (found?.length) hits.push(...found);
+    }
+
+    // Deduplicar por leadId+recibo
+    const uniqueHits = [];
+    const hitKeys = new Set();
+    for (const h of hits) {
+      const hk = `${h.leadId}|${h.numeroRecibo}|${h.isCompraAdicional}`;
+      if (hitKeys.has(hk)) continue;
+      hitKeys.add(hk);
+      uniqueHits.push(h);
+    }
+
+    let match = null;
+    let estado = 'sin_match';
+
+    if (uniqueHits.length === 1) {
+      match = uniqueHits[0];
+      estado = 'match';
+    } else if (uniqueHits.length > 1) {
+      const porVendedor = uniqueHits.filter(
+        (h) =>
+          vendedoresCoinciden(h.promotorNombre, row.nombreVendedor) ||
+          vendedoresCoinciden(h.operadorNombre, row.nombreVendedor),
+      );
+      if (porVendedor.length === 1) {
+        match = porVendedor[0];
+        estado = 'match';
+      } else {
+        const porNombre = uniqueHits.filter((h) =>
+          nombresCoinciden(h.nombreCliente, row.nombreCliente),
+        );
+        if (porNombre.length === 1) {
+          match = porNombre[0];
+          estado = 'match';
+        } else {
+          estado = 'ambiguo';
+        }
+      }
+    } else {
+      // Fallback: solo nombre de cliente (único)
+      const porNombre = [];
+      for (const lead of leadsDB || []) {
+        const seg = lead?.seguimiento;
+        if (seg?.resultadoEntrevista !== 'compro' || seg?.idProducto !== 'prod-pij') continue;
+        if (!nombresCoinciden(lead.nombre, row.nombreCliente)) continue;
+        porNombre.push({
+          leadId: String(lead.id),
+          nombreCliente: String(lead.nombre || ''),
+          promotorNombre: String(lead.promotorNombre || ''),
+          operadorNombre: String(seg.operadorNombre || ''),
+          numeroRecibo: String(seg.numeroRecibo || ''),
+          fechaCierre: seg.fechaCierre || null,
+          isCompraAdicional: false,
+        });
+      }
+      if (porNombre.length === 1) {
+        match = porNombre[0];
+        estado = 'match_nombre';
+      }
+    }
+
+    const item = {
+      idUnico: key,
+      estado,
+      fechaExcel: row.fecha || '',
+      fechaIso: parseFechaCaja(row.fecha) || null,
+      serie: String(row.serie || '').trim().toUpperCase() || 'A',
+      ordenAdh: String(row.ordenAdh || '').trim(),
+      ordenAnexo: String(row.ordenAnexo || '').trim(),
+      reciboSugerido: formatReciboCaja(row.serie, row.ordenAdh, row.ordenAnexo),
+      nombreClienteExcel: String(row.nombreCliente || '').trim(),
+      vendedorExcel: String(row.nombreVendedor || '').trim(),
+      concepto: String(row.concepto || '').trim(),
+      matchCrm: match
+        ? {
+            leadId: match.leadId,
+            nombreCliente: match.nombreCliente,
+            promotorNombre: match.promotorNombre,
+            operadorNombre: match.operadorNombre,
+            numeroRecibo: match.numeroRecibo,
+            fechaCierre: match.fechaCierre,
+          }
+        : null,
+    };
+
+    if (estado === 'sin_match') faltantes.push(item);
+    else if (estado === 'ambiguo') ambiguos.push(item);
+    else matched.push(item);
+  }
+
+  /** Agrupa faltantes por vendedor del Excel (quién no cargó). */
+  const porVendedorMap = new Map();
+  for (const f of faltantes) {
+    const v = f.vendedorExcel || 'Sin vendedor';
+    if (!porVendedorMap.has(v)) {
+      porVendedorMap.set(v, { vendedor: v, cantidad: 0, clientes: [] });
+    }
+    const g = porVendedorMap.get(v);
+    g.cantidad += 1;
+    g.clientes.push({
+      nombre: f.nombreClienteExcel,
+      recibo: f.reciboSugerido,
+      fecha: f.fechaExcel,
+    });
+  }
+  const porVendedor = Array.from(porVendedorMap.values()).sort(
+    (a, b) => b.cantidad - a.cantidad || a.vendedor.localeCompare(b.vendedor, 'es'),
+  );
+
+  return {
+    fuente,
+    resumen: {
+      adhesionesExcel: adhesiones.length,
+      matched: matched.length,
+      ambiguos: ambiguos.length,
+      faltantes: faltantes.length,
+      vendedoresConFaltantes: porVendedor.length,
+    },
+    faltantes,
+    ambiguos,
+    porVendedor,
+  };
+}
+

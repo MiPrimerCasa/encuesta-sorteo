@@ -28,10 +28,11 @@ import { cleanTelefonoSuffix } from '../../domain/whatsapp';
 import { AdminModificarLeadModal } from './AdminModificarLeadModal';
 import { LeadModalForm } from '../leads/LeadModalForm';
 import { SyncCajaModal } from './SyncCajaModal';
+import { FaltantesPijModal } from './FaltantesPijModal';
 import { PromotorInformeFilter } from './PromotorInformeFilter';
 import { GrabacionesCumplimientoPanel } from './GrabacionesCumplimientoPanel';
-import { previewSyncCajaPij, commitSyncCajaPij } from '../../api/client';
-import type { SyncPreviewItem } from '../../types';
+import { previewSyncCajaPij, commitSyncCajaPij, previewFaltantesPij } from '../../api/client';
+import type { SyncPreviewItem, FaltantesPijResponse } from '../../types';
 
 
 interface SuperadminDashboardProps {
@@ -340,6 +341,11 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
   const [syncPreviewItems, setSyncPreviewItems] = useState<SyncPreviewItem[]>([]);
   const [isSyncLoading, setIsSyncLoading] = useState(false);
 
+  const [isFaltantesModalOpen, setIsFaltantesModalOpen] = useState(false);
+  const [faltantesData, setFaltantesData] = useState<FaltantesPijResponse | null>(null);
+  const [faltantesMes, setFaltantesMes] = useState<'junio' | 'julio'>('julio');
+  const [isFaltantesLoading, setIsFaltantesLoading] = useState(false);
+
   const handlePreviewSync = async () => {
     try {
       setIsSyncLoading(true);
@@ -350,6 +356,28 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
       alert(err instanceof Error ? err.message : 'Error de sincronización');
     } finally {
       setIsSyncLoading(false);
+    }
+  };
+
+  const loadFaltantesPij = async (opts: {
+    mes?: 'junio' | 'julio';
+    csvText?: string;
+  } = {}) => {
+    const mes = opts.mes ?? faltantesMes;
+    try {
+      setIsFaltantesLoading(true);
+      setIsFaltantesModalOpen(true);
+      const res = await previewFaltantesPij({
+        mes,
+        csvText: opts.csvText,
+      });
+      setFaltantesData(res);
+      if (!opts.csvText) setFaltantesMes(mes);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Error al cruzar Excel con el CRM');
+      if (!faltantesData) setIsFaltantesModalOpen(false);
+    } finally {
+      setIsFaltantesLoading(false);
     }
   };
 
@@ -967,7 +995,22 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-zinc-400">
             Control de Anexos y Recibos por Operador
           </h3>
-          <button
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => void loadFaltantesPij({ mes: 'julio' })}
+              disabled={isFaltantesLoading}
+              className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-[13px] font-semibold text-amber-900 shadow-sm hover:bg-amber-100 transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {isFaltantesLoading ? (
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : null}
+              Detectar PIJ no cargados
+            </button>
+            <button
             onClick={handlePreviewSync}
             disabled={isSyncLoading}
             className="rounded-lg bg-emerald-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors disabled:opacity-50 flex items-center gap-2"
@@ -984,7 +1027,8 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
               </svg>
             )}
             Sincronizar PIJ con Caja
-          </button>
+            </button>
+          </div>
         </div>
         <div className="overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-sm">
           <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3 space-y-3">
@@ -2809,6 +2853,16 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
         cambiosPropuestos={syncPreviewItems}
         onCommit={handleCommitSync}
         isLoading={isSyncLoading}
+      />
+      <FaltantesPijModal
+        isOpen={isFaltantesModalOpen}
+        onClose={() => setIsFaltantesModalOpen(false)}
+        data={faltantesData}
+        isLoading={isFaltantesLoading}
+        mes={faltantesMes}
+        onCambiarMes={(m) => void loadFaltantesPij({ mes: m })}
+        onRecargar={() => void loadFaltantesPij({ mes: faltantesMes })}
+        onSubirCsv={(csvText) => void loadFaltantesPij({ csvText })}
       />
     </div>
   );

@@ -532,7 +532,7 @@ export async function modificarDatosLead(
   return data.lead;
 }
 
-import type { SyncPreviewResponse, SyncCommitResponse, SyncPreviewItem } from '../types';
+import type { SyncPreviewResponse, SyncCommitResponse, SyncPreviewItem, FaltantesPijResponse } from '../types';
 
 export interface SyncPreviewOptions {
   /** gids de pestañas de Google Sheets (ej. solo Junio: ['288750825']). */
@@ -561,6 +561,43 @@ export async function commitSyncCajaPij(
   return apiFetch<SyncCommitResponse>('/api/admin/sync-caja-pij/commit', {
     method: 'POST',
     body: JSON.stringify({ cambiosAprobados, tipo }),
+  });
+}
+
+export type FaltantesPijOptions = {
+  /** Por defecto julio. */
+  mes?: 'junio' | 'julio';
+  sheetGids?: string[];
+  /** CSV exportado del Excel de Caja (alternativa a Sheets). */
+  csvText?: string;
+};
+
+export async function previewFaltantesPij(
+  options: FaltantesPijOptions = {},
+): Promise<FaltantesPijResponse> {
+  if (_isDemoActive) {
+    return {
+      fuente: 'Demo',
+      mesConsultado: options.mes ?? 'julio',
+      resumen: {
+        adhesionesExcel: 0,
+        matched: 0,
+        ambiguos: 0,
+        faltantes: 0,
+        vendedoresConFaltantes: 0,
+      },
+      faltantes: [],
+      ambiguos: [],
+      porVendedor: [],
+    };
+  }
+  return apiFetch<FaltantesPijResponse>('/api/admin/reconciliar-pij/faltantes', {
+    method: 'POST',
+    body: JSON.stringify({
+      mes: options.mes ?? 'julio',
+      sheetGids: options.sheetGids,
+      csvText: options.csvText,
+    }),
   });
 }
 

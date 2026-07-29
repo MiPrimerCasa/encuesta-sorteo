@@ -190,6 +190,49 @@ export interface SyncCommitResponse {
   tipo?: 'fecha' | 'recibo';
 }
 
+export interface FaltantePijItem {
+  idUnico: string;
+  estado: 'sin_match' | 'ambiguo' | 'match' | 'match_nombre';
+  fechaExcel: string;
+  fechaIso: string | null;
+  serie: string;
+  ordenAdh: string;
+  ordenAnexo: string;
+  reciboSugerido: string;
+  nombreClienteExcel: string;
+  vendedorExcel: string;
+  concepto: string;
+  matchCrm: {
+    leadId: string;
+    nombreCliente: string;
+    promotorNombre: string;
+    operadorNombre: string;
+    numeroRecibo: string;
+    fechaCierre: string | null;
+  } | null;
+}
+
+export interface FaltantesPijPorVendedor {
+  vendedor: string;
+  cantidad: number;
+  clientes: Array<{ nombre: string; recibo: string; fecha: string }>;
+}
+
+export interface FaltantesPijResponse {
+  fuente?: string;
+  mesConsultado?: 'junio' | 'julio' | null;
+  resumen: {
+    adhesionesExcel: number;
+    matched: number;
+    ambiguos: number;
+    faltantes: number;
+    vendedoresConFaltantes: number;
+  };
+  faltantes: FaltantePijItem[];
+  ambiguos: FaltantePijItem[];
+  porVendedor: FaltantesPijPorVendedor[];
+}
+
 export interface Producto {
   id: string;
   codigo: string;

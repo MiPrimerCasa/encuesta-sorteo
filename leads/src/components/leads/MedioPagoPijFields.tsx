@@ -11,15 +11,16 @@ interface Props {
   formaPago: FormaPago | null;
   montoEfectivo: string;
   montoTransferencia: string;
+  /** Nombre del lead/cliente (apellido y nombre) para autocompletar titular. */
+  nombreCliente?: string;
+  /** null = sin responder; true = coincide; false = otro titular. */
+  titularCoincideCliente?: boolean | null;
   titularTransferencia?: string;
-  bancoTransferencia?: string;
-  referenciaTransferencia?: string;
   onFormaPago: (value: FormaPago) => void;
   onMontoEfectivo: (value: string) => void;
   onMontoTransferencia: (value: string) => void;
+  onTitularCoincideCliente?: (value: boolean) => void;
   onTitularTransferencia?: (value: string) => void;
-  onBancoTransferencia?: (value: string) => void;
-  onReferenciaTransferencia?: (value: string) => void;
   compact?: boolean;
 }
 
@@ -27,22 +28,21 @@ export function MedioPagoPijFields({
   formaPago,
   montoEfectivo,
   montoTransferencia,
+  nombreCliente = '',
+  titularCoincideCliente = null,
   titularTransferencia = '',
-  bancoTransferencia = '',
-  referenciaTransferencia = '',
   onFormaPago,
   onMontoEfectivo,
   onMontoTransferencia,
+  onTitularCoincideCliente,
   onTitularTransferencia,
-  onBancoTransferencia,
-  onReferenciaTransferencia,
   compact = false,
 }: Props) {
   const btnClass = compact ? 'h-10 text-[13px]' : 'h-12 text-[15px]';
   const inputClass = compact ? 'h-10 text-[14px]' : 'h-12 text-base';
   const showTrf =
     (formaPago === 'transferencia' || formaPago === 'mixto') &&
-    Boolean(onTitularTransferencia || onBancoTransferencia || onReferenciaTransferencia);
+    Boolean(onTitularCoincideCliente && onTitularTransferencia);
 
   const onEfectivoMixto = (raw: string) => {
     const value = limitarMontoPijInput(raw);
@@ -174,14 +174,61 @@ export function MedioPagoPijFields({
       )}
 
       {showTrf && (
-        <div className="space-y-2 rounded-lg border border-zinc-100 bg-zinc-50/80 p-3">
+        <div className="space-y-3 rounded-lg border border-zinc-100 bg-zinc-50/80 p-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
             Datos de transferencia (caja)
           </p>
-          {onTitularTransferencia && (
+          <div className="space-y-2">
+            <p className="text-[13px] font-medium text-zinc-800">
+              ¿El titular de la transferencia coincide con el cliente?
+            </p>
+            {nombreCliente.trim() ? (
+              <p className="text-[12px] text-zinc-500">Cliente: {nombreCliente.trim()}</p>
+            ) : null}
+            <div className="flex gap-2">
+              {(
+                [
+                  { value: true, label: 'Sí' },
+                  { value: false, label: 'No' },
+                ] as const
+              ).map((op) => {
+                const sel = titularCoincideCliente === op.value;
+                return (
+                  <button
+                    key={String(op.value)}
+                    type="button"
+                    onClick={() => {
+                      onTitularCoincideCliente?.(op.value);
+                      if (op.value) {
+                        onTitularTransferencia?.(nombreCliente.trim().slice(0, 200));
+                      } else {
+                        onTitularTransferencia?.('');
+                      }
+                    }}
+                    style={{ touchAction: 'manipulation' }}
+                    className={`flex-1 rounded-lg border px-3 font-medium transition-all duration-[140ms] ease-out ${btnClass} ${
+                      sel
+                        ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
+                        : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
+                    }`}
+                  >
+                    {op.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {titularCoincideCliente === true && nombreCliente.trim() ? (
+            <p className="rounded-lg border border-emerald-100 bg-emerald-50/80 px-3 py-2 text-[13px] text-emerald-900">
+              Titular a registrar: <strong>{nombreCliente.trim()}</strong>
+            </p>
+          ) : null}
+
+          {titularCoincideCliente === false && onTitularTransferencia ? (
             <div className="space-y-1">
               <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                Titular
+                Titular de la transferencia
               </label>
               <input
                 type="text"
@@ -191,35 +238,7 @@ export function MedioPagoPijFields({
                 className={`w-full rounded-lg border border-zinc-200 bg-white px-3 focus:outline-none focus:ring-2 focus:ring-brand-600/15 ${inputClass}`}
               />
             </div>
-          )}
-          {onBancoTransferencia && (
-            <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                Banco
-              </label>
-              <input
-                type="text"
-                value={bancoTransferencia}
-                onChange={(e) => onBancoTransferencia(e.target.value.slice(0, 120))}
-                placeholder="Banco emisor"
-                className={`w-full rounded-lg border border-zinc-200 bg-white px-3 focus:outline-none focus:ring-2 focus:ring-brand-600/15 ${inputClass}`}
-              />
-            </div>
-          )}
-          {onReferenciaTransferencia && (
-            <div className="space-y-1">
-              <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                Referencia / ID
-              </label>
-              <input
-                type="text"
-                value={referenciaTransferencia}
-                onChange={(e) => onReferenciaTransferencia(e.target.value.slice(0, 120))}
-                placeholder="Nº operación o referencia"
-                className={`w-full rounded-lg border border-zinc-200 bg-white px-3 focus:outline-none focus:ring-2 focus:ring-brand-600/15 ${inputClass}`}
-              />
-            </div>
-          )}
+          ) : null}
         </div>
       )}
     </div>

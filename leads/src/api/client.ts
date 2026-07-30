@@ -228,7 +228,7 @@ export async function fetchRecibosOcupados(): Promise<import('../domain/pij-reci
           vendedor: 'Catherine Contreras',
           leadId: '233',
           esAdicional: false,
-          reciboCompleto: 'A23/300 ANEXO 171/300',
+          reciboCompleto: 'A23/300 ANEXO 171',
         },
       },
       anexos: {
@@ -237,7 +237,7 @@ export async function fetchRecibosOcupados(): Promise<import('../domain/pij-reci
           vendedor: 'Catherine Contreras',
           leadId: '233',
           esAdicional: false,
-          reciboCompleto: 'A23/300 ANEXO 171/300',
+          reciboCompleto: 'A23/300 ANEXO 171',
         },
       },
       recibosTerreno: {},

@@ -354,7 +354,11 @@ export interface SeguimientoLead {
   montoTransferencia?: number | null;
   /** Datos TRF para conciliación en caja. */
   titularTransferencia?: string | null;
+  /** true = titular = cliente; false = otro titular cargado a mano. */
+  titularCoincideCliente?: boolean | null;
+  /** @deprecated Ya no se carga en UI; se mantiene por registros legados. */
   bancoTransferencia?: string | null;
+  /** @deprecated Ya no se carga en UI; se mantiene por registros legados. */
   referenciaTransferencia?: string | null;
   brindoReferidos?: boolean | null;
   referidos?: Referido[];

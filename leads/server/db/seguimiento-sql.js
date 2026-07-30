@@ -472,11 +472,28 @@ export function mapSqlRowToSeguimiento(row, child = {}) {
     montoTransferencia:
       base.montoTransferencia ??
       parseDecimalOrNull(row.monto_transferencia ?? row.montoTransferencia),
+    titularTransferencia:
+      base.titularTransferencia ??
+      row.titular_transferencia ??
+      row.titularTransferencia ??
+      null,
+    titularCoincideCliente:
+      base.titularCoincideCliente ??
+      bitOrNull(row.titular_coincide_cliente ?? row.titularCoincideCliente),
+    bancoTransferencia:
+      base.bancoTransferencia ?? row.banco_transferencia ?? row.bancoTransferencia ?? null,
+    referenciaTransferencia:
+      base.referenciaTransferencia ??
+      row.referencia_transferencia ??
+      row.referenciaTransferencia ??
+      null,
     dniCliente:
       normalizarDniCliente(base.dniCliente ?? row.dni_cliente ?? row.dniCliente) || null,
     brindoReferidos:
       base.brindoReferidos ?? bitOrNull(row.brindo_referidos ?? row.brindoReferidos),
-    derivacionTerrenoActiva: base.derivacionTerrenoActiva ?? null,
+    derivacionTerrenoActiva:
+      base.derivacionTerrenoActiva ??
+      bitOrNull(row.derivacion_terreno_activa ?? row.derivacionTerrenoActiva),
     referidos: Array.isArray(referidos) ? referidos : undefined,
     observaciones: base.observaciones ?? row.observaciones ?? undefined,
     fuente: base.fuente ?? row.fuente ?? undefined,
@@ -716,6 +733,36 @@ export async function execRegistrarSeguimientoLead(lead, merged, usuario) {
     'pij_integral_enviado_en',
     sql.DateTime2,
     parseFechaCierreForSql(merged.pijIntegralEnviadoEn),
+  );
+  request.input(
+    'derivacion_terreno_activa',
+    sql.Bit,
+    bitOrNull(merged.derivacionTerrenoActiva),
+  );
+  request.input(
+    'seguimiento_agenda_operador_rol',
+    sql.NVarChar(16),
+    merged.seguimientoAgendaOperadorRol?.trim()?.slice(0, 16) ?? null,
+  );
+  request.input(
+    'titular_transferencia',
+    sql.NVarChar(200),
+    merged.titularTransferencia?.trim()?.slice(0, 200) || null,
+  );
+  request.input(
+    'titular_coincide_cliente',
+    sql.Bit,
+    bitOrNull(merged.titularCoincideCliente),
+  );
+  request.input(
+    'banco_transferencia',
+    sql.NVarChar(120),
+    merged.bancoTransferencia?.trim()?.slice(0, 120) || null,
+  );
+  request.input(
+    'referencia_transferencia',
+    sql.NVarChar(120),
+    merged.referenciaTransferencia?.trim()?.slice(0, 120) || null,
   );
 
   const result = await request.execute(proc);
@@ -1095,6 +1142,11 @@ export async function resetearSeguimientoLead(leadId, leadContext) {
     montoCierre: null,
     montoEfectivo: null,
     montoTransferencia: null,
+    titularTransferencia: null,
+    titularCoincideCliente: null,
+    bancoTransferencia: null,
+    referenciaTransferencia: null,
+    derivacionTerrenoActiva: null,
     brindoReferidos: null,
     referidos: null,
     observaciones: null,

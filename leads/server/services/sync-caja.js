@@ -306,7 +306,7 @@ export function formatReciboCaja(serie, ordenAdh, ordenAnexo) {
     parts.push(`${s}${adh}/300`);
   }
   if (anexo && anexo !== '-') {
-    parts.push(`ANEXO ${anexo}/300`);
+    parts.push(`ANEXO ${anexo}`);
   }
 
   return parts.join(' ');

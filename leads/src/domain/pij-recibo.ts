@@ -53,7 +53,8 @@ export function buildPijRecibo(serie: string, adh: string, anexo: string): strin
   const x = anexo.trim().replace(/\D/g, '');
   const parts: string[] = [];
   if (a) parts.push(`${s}${a}/300`);
-  if (x) parts.push(`ANEXO ${x}/300`);
+  // Anexo: número sucesivo (sin /300). Ej.: A230/300 ANEXO 400
+  if (x) parts.push(`ANEXO ${x}`);
   return parts.join(' ');
 }
 
@@ -99,7 +100,7 @@ export function displayAdhesionPij(serie: string, adhesion: string): string {
 
 export function displayAnexoPij(anexo: string): string {
   const x = anexo.trim().replace(/\D/g, '');
-  return x ? `ANEXO ${x}/300` : '';
+  return x ? `ANEXO ${x}` : '';
 }
 
 function esMismoRegistroExcluido(

@@ -75,6 +75,12 @@ FROM (VALUES
     ( 43, 'monto_transferencia',        N'medio_pago',  N'Parte transferencia',                     'DECIMAL(12,2)'),
     ( 44, 'fecha_cierre',               N'medio_pago',  N'Fecha/hora cierre',                     'DATETIME2(0)'),
     ( 45, 'fuente',                     N'medio_pago',  N'Origen lead (qr, app, …)',              'NVARCHAR(16)'),
+    ( 46, 'titular_transferencia',      N'medio_pago',  N'Titular transferencia',                 'NVARCHAR(200)'),
+    ( 461, 'titular_coincide_cliente',  N'medio_pago',  N'Titular coincide con cliente',          'BIT'),
+    ( 47, 'banco_transferencia',        N'medio_pago',  N'Banco transferencia (legado)',          'NVARCHAR(120)'),
+    ( 48, 'referencia_transferencia',   N'medio_pago',  N'Referencia / nro. operación TRF (legado)', 'NVARCHAR(120)'),
+    ( 32, 'seguimiento_agenda_operador_rol', N'base',  N'Rol que agendó',                        'NVARCHAR(16)'),
+    ( 33, 'derivacion_terreno_activa',  N'base',        N'Derivación terreno activa',             'BIT'),
     -- Adhesión / anexo PIJ + compras adicionales
     ( 50, 'serie_pij',                  N'pij_recibo',  N'Serie A o B',                           'NVARCHAR(1)'),
     ( 51, 'nro_adhesion',               N'pij_recibo',  N'Número adhesión',                       'NVARCHAR(10)'),

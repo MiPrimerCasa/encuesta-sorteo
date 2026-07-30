@@ -48,6 +48,7 @@ import {
   resetCamposAlCambiarProducto,
   resetCamposVenta,
   validarMedioPagoPij,
+  validarTitularTransferenciaPij,
   montosPijDesdeEntrada,
   etiquetaMedioPagoPij,
 } from '../../domain/venta';
@@ -85,6 +86,8 @@ function cierreComproCompleto(
   formaPago: FormaPago | null,
   montoEfectivo: string,
   montoTransferencia: string,
+  titularCoincideCliente: boolean | null = null,
+  titularTransferencia = '',
 ): boolean {
   if (!idProducto || !estadoPago) return false;
   if (esTerreno(idProducto) && !idBarrio) return false;
@@ -92,6 +95,9 @@ function cierreComproCompleto(
   if (esPlanInversion(idProducto) && estadoPago === 'entrega_33') {
     if (!formaPago) return false;
     if (validarMedioPagoPij(formaPago, montoEfectivo, montoTransferencia)) return false;
+    if (validarTitularTransferenciaPij(formaPago, titularCoincideCliente, titularTransferencia)) {
+      return false;
+    }
   }
   return true;
 }
@@ -116,9 +122,8 @@ interface FormState {
   formaPago: FormaPago | null;
   montoEfectivo: string;
   montoTransferencia: string;
+  titularCoincideCliente: boolean | null;
   titularTransferencia: string;
-  bancoTransferencia: string;
-  referenciaTransferencia: string;
   dniCliente: string;
   brindoReferidos: boolean | null;
   referidos: Referido[];
@@ -141,8 +146,23 @@ function opcionesCanalContacto(): { value: CanalContacto; label: string }[] {
   return [...OPCIONES_CANAL_BASE, { value: 'en_persona', label: 'En persona' }];
 }
 
+function inferirTitularCoincideCliente(
+  s: SeguimientoLead,
+  nombreCliente: string,
+): boolean | null {
+  if (s.titularCoincideCliente === true || s.titularCoincideCliente === false) {
+    return s.titularCoincideCliente;
+  }
+  const titular = s.titularTransferencia?.trim() ?? '';
+  if (!titular) return null;
+  const cliente = nombreCliente.trim().toLowerCase();
+  if (cliente && titular.toLowerCase() === cliente) return true;
+  return false;
+}
+
 function buildInitialForm(lead: Lead | null): FormState {
   const s = lead?.seguimiento ?? {};
+  const nombreCliente = lead?.nombre?.trim() ?? '';
   const reagenda = s.resultadoEntrevista === 'reagenda';
   const seguimientoPij = s.seguimientoPijPromotor === true;
   const derivar = s.resultadoEntrevista === 'derivar_terreno';
@@ -173,6 +193,12 @@ function buildInitialForm(lead: Lead | null): FormState {
     }
   }
 
+  const titularCoincideCliente = inferirTitularCoincideCliente(s, nombreCliente);
+  let titularTransferencia = s.titularTransferencia ?? '';
+  if (titularCoincideCliente === true && !titularTransferencia.trim() && nombreCliente) {
+    titularTransferencia = nombreCliente;
+  }
+
   return {
     confirmoEntrevista: s.confirmoEntrevista ?? null,
     seContactoCliente: sinCita
@@ -196,9 +222,8 @@ function buildInitialForm(lead: Lead | null): FormState {
     formaPago: s.formaPago ?? null,
     montoEfectivo: s.montoEfectivo != null ? String(s.montoEfectivo) : '',
     montoTransferencia: s.montoTransferencia != null ? String(s.montoTransferencia) : '',
-    titularTransferencia: s.titularTransferencia ?? '',
-    bancoTransferencia: s.bancoTransferencia ?? '',
-    referenciaTransferencia: s.referenciaTransferencia ?? '',
+    titularCoincideCliente,
+    titularTransferencia,
     dniCliente: s.dniCliente ?? '',
     brindoReferidos: s.brindoReferidos ?? null,
     referidos: s.referidos?.length ? [...s.referidos] : [emptyReferido()],
@@ -794,6 +819,17 @@ export function LeadModalForm({
           setErrorVenta(errPago);
           return;
         }
+        const errTitular = validarTitularTransferenciaPij(
+          form.formaPago,
+          form.titularCoincideCliente,
+          form.titularCoincideCliente === true
+            ? lead.nombre.trim() || form.titularTransferencia
+            : form.titularTransferencia,
+        );
+        if (errTitular) {
+          setErrorVenta(errTitular);
+          return;
+        }
         const errImg = validarImagenesCierrePij('principal', form.formaPago, form.imagenesCierre);
         if (errImg) {
           setErrorVenta(errImg);
@@ -893,22 +929,18 @@ export function LeadModalForm({
       montoTransferencia: montosPrincipal?.montoTransferencia ?? null,
       titularTransferencia:
         montosPrincipal &&
-        (form.formaPago === 'transferencia' || form.formaPago === 'mixto') &&
-        form.titularTransferencia.trim()
-          ? form.titularTransferencia.trim()
+        (form.formaPago === 'transferencia' || form.formaPago === 'mixto')
+          ? form.titularCoincideCliente === true
+            ? lead.nombre.trim().slice(0, 200) || form.titularTransferencia.trim() || null
+            : form.titularTransferencia.trim() || null
           : null,
-      bancoTransferencia:
+      titularCoincideCliente:
         montosPrincipal &&
-        (form.formaPago === 'transferencia' || form.formaPago === 'mixto') &&
-        form.bancoTransferencia.trim()
-          ? form.bancoTransferencia.trim()
+        (form.formaPago === 'transferencia' || form.formaPago === 'mixto')
+          ? form.titularCoincideCliente
           : null,
-      referenciaTransferencia:
-        montosPrincipal &&
-        (form.formaPago === 'transferencia' || form.formaPago === 'mixto') &&
-        form.referenciaTransferencia.trim()
-          ? form.referenciaTransferencia.trim()
-          : null,
+      bancoTransferencia: null,
+      referenciaTransferencia: null,
       dniCliente:
         form.resultadoEntrevista === 'compro' &&
         esPlanInversion(form.idProducto) &&
@@ -1046,6 +1078,10 @@ export function LeadModalForm({
           form.formaPago,
           form.montoEfectivo,
           form.montoTransferencia,
+          form.titularCoincideCliente,
+          form.titularCoincideCliente === true
+            ? lead.nombre.trim() || form.titularTransferencia
+            : form.titularTransferencia,
         )
       : form.resultadoEntrevista === 'no_compro'
         ? form.reagendaTrasNoComproEnPersona !== null &&
@@ -2046,12 +2082,20 @@ export function LeadModalForm({
                             formaPago={form.formaPago}
                             montoEfectivo={form.montoEfectivo}
                             montoTransferencia={form.montoTransferencia}
+                            nombreCliente={lead.nombre}
+                            titularCoincideCliente={form.titularCoincideCliente}
                             titularTransferencia={form.titularTransferencia}
-                            bancoTransferencia={form.bancoTransferencia}
-                            referenciaTransferencia={form.referenciaTransferencia}
                             onFormaPago={(value) => {
                               setErrorVenta('');
-                              patch({ formaPago: value });
+                              patch({
+                                formaPago: value,
+                                ...(value === 'efectivo'
+                                  ? {
+                                      titularCoincideCliente: null,
+                                      titularTransferencia: '',
+                                    }
+                                  : {}),
+                              });
                             }}
                             onMontoEfectivo={(value) => {
                               setErrorVenta('');
@@ -2061,12 +2105,17 @@ export function LeadModalForm({
                               setErrorVenta('');
                               patch({ montoTransferencia: value });
                             }}
+                            onTitularCoincideCliente={(value) => {
+                              setErrorVenta('');
+                              patch({
+                                titularCoincideCliente: value,
+                                titularTransferencia: value
+                                  ? lead.nombre.trim().slice(0, 200)
+                                  : '',
+                              });
+                            }}
                             onTitularTransferencia={(value) =>
                               patch({ titularTransferencia: value })
-                            }
-                            onBancoTransferencia={(value) => patch({ bancoTransferencia: value })}
-                            onReferenciaTransferencia={(value) =>
-                              patch({ referenciaTransferencia: value })
                             }
                           />
                         )}
@@ -2116,7 +2165,9 @@ export function LeadModalForm({
                                     />
                                   </div>
                                   <div className="flex-1 space-y-1">
-                                    <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">N° Anexo</label>
+                                    <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                                      N° Anexo
+                                    </label>
                                     <input
                                       type="text"
                                       inputMode="numeric"
@@ -2126,9 +2177,10 @@ export function LeadModalForm({
                                         setPijAnexo(v);
                                         patch({ numeroRecibo: buildPijRecibo(pijSerie, pijAdh, v) });
                                       }}
-                                      placeholder="233"
+                                      placeholder="400"
                                       className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
                                     />
+                                    <p className="text-[11px] text-zinc-500">Número sucesivo (sin /300).</p>
                                   </div>
                                 </div>
                                 {/* Preview del recibo ensamblado */}
@@ -2466,7 +2518,9 @@ export function LeadModalForm({
                                           />
                                         </div>
                                         <div className="flex-1 space-y-1">
-                                          <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">N° Anexo</label>
+                                          <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+                                            N° Anexo
+                                          </label>
                                           <input
                                             type="text"
                                             inputMode="numeric"
@@ -2477,9 +2531,10 @@ export function LeadModalForm({
                                               const r = buildPijRecibo(adicPijSerie, adicPijAdh, v);
                                               setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
                                             }}
-                                            placeholder="233"
+                                            placeholder="400"
                                             className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
                                           />
+                                          <p className="text-[10px] text-zinc-500">Número sucesivo (sin /300).</p>
                                         </div>
                                       </div>
                                       {(adicPijAdh.trim() || adicPijAnexo.trim()) && (() => {

@@ -97,6 +97,25 @@ export function validarMedioPagoPij(
   return null;
 }
 
+/** Valida titular TRF (coincide con cliente o nombre manual). */
+export function validarTitularTransferenciaPij(
+  formaPago: FormaPago | null | undefined,
+  titularCoincideCliente: boolean | null | undefined,
+  titularTransferencia: string | null | undefined,
+): string | null {
+  if (formaPago !== 'transferencia' && formaPago !== 'mixto') return null;
+  if (titularCoincideCliente == null) {
+    return 'Indicá si el titular de la transferencia coincide con el cliente.';
+  }
+  if (titularCoincideCliente === false && !String(titularTransferencia ?? '').trim()) {
+    return 'Ingresá el apellido y nombre del titular de la transferencia.';
+  }
+  if (titularCoincideCliente === true && !String(titularTransferencia ?? '').trim()) {
+    return 'No se pudo tomar el nombre del cliente como titular.';
+  }
+  return null;
+}
+
 /** Convierte entradas del formulario a montos numéricos para guardar. */
 export function montosPijDesdeEntrada(
   formaPago: FormaPago,
@@ -279,6 +298,8 @@ export function resetCamposVenta(): {
   formaPago: null;
   montoEfectivo: string;
   montoTransferencia: string;
+  titularCoincideCliente: null;
+  titularTransferencia: string;
   dniCliente: string;
 } {
   return {
@@ -289,6 +310,8 @@ export function resetCamposVenta(): {
     formaPago: null,
     montoEfectivo: '',
     montoTransferencia: '',
+    titularCoincideCliente: null,
+    titularTransferencia: '',
     dniCliente: '',
   };
 }

@@ -30,6 +30,7 @@ import { LeadModalForm } from '../leads/LeadModalForm';
 import { SyncCajaModal } from './SyncCajaModal';
 import { FaltantesPijModal } from './FaltantesPijModal';
 import { PromotorInformeFilter } from './PromotorInformeFilter';
+import { InformeCierresPanel } from './InformeCierresPanel';
 import { GrabacionesCumplimientoPanel } from './GrabacionesCumplimientoPanel';
 import { previewSyncCajaPij, commitSyncCajaPij, previewFaltantesPij } from '../../api/client';
 import type { SyncPreviewItem, FaltantesPijResponse } from '../../types';
@@ -983,6 +984,17 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
         >
           Informe de Operaciones
         </button>
+        <button
+          type="button"
+          onClick={() => cambiarTab('informe_cierres')}
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
+            tabActivo === 'informe_cierres'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800'
+          }`}
+        >
+          Informe de cierres
+        </button>
         {moduloGrabacionesActivo && (
           <button
             type="button"
@@ -1547,6 +1559,10 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
             </div>
           </div>
         </section>
+      )}
+
+      {tabActivo === 'informe_cierres' && (
+        <InformeCierresPanel />
       )}
 
       {tabActivo === 'grabaciones' && moduloGrabacionesActivo && (

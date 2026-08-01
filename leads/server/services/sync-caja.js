@@ -976,6 +976,131 @@ function construirIndiceCierresPijCrm(leadsDB) {
   return byVariant;
 }
 
+/**
+ * Parsea adhesión PIJ del informe integral (PC tipo "B223/300", MZ = serie).
+ * @param {string} pc
+ * @param {string} mz
+ */
+export function parseAdhesionDesdeIntegral(pc, mz) {
+  const rawPc = String(pc || '')
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, '');
+  const mzSerie = String(mz || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, '')
+    .slice(0, 1);
+
+  const m = rawPc.match(/^([A-Z]+)?(\d+)(?:\/\d+)?$/);
+  if (!m) {
+    return {
+      serie: mzSerie || 'A',
+      ordenAdh: '',
+      display: rawPc || '',
+    };
+  }
+  const serieFromPc = String(m[1] || '')
+    .replace(/[^A-Z]/g, '')
+    .slice(0, 1);
+  const serie = serieFromPc || mzSerie || 'A';
+  const ordenAdh = String(m[2] || '').replace(/^0+/, '') || String(m[2] || '');
+  return {
+    serie,
+    ordenAdh,
+    display: ordenAdh ? `${serie}${ordenAdh}/300` : rawPc,
+  };
+}
+
+function claveAdhesionNormalizada(serie, ordenAdh) {
+  const s = normalizar(serie).replace(/[^A-Z]/g, '').slice(0, 1);
+  const n = normalizar(ordenAdh).replace(/^0+/, '');
+  if (!n) return '';
+  return `${s || 'A'}${n}`;
+}
+
+/**
+ * Resuelve idEjercicioDetalle del SP_periodo_selecciona para junio/julio.
+ * @param {'junio'|'julio'} mes
+ * @param {number} [idEjercicioDetalle]
+ */
+async function resolverPeriodoInforme(mes, idEjercicioDetalle) {
+  if (Number.isFinite(Number(idEjercicioDetalle)) && Number(idEjercicioDetalle) > 0) {
+    return {
+      idEjercicioDetalle: Number(idEjercicioDetalle),
+      codigo: `idEjercicioDetalle=${idEjercicioDetalle}`,
+    };
+  }
+  const { fetchPeriodosInformeCierres } = await import('../db/informe-cierres.js');
+  const data = await fetchPeriodosInformeCierres();
+  const needle = mes === 'junio' ? 'junio' : 'julio';
+  const periodos = data.periodos || [];
+  const found =
+    periodos.find((p) => String(p.codigo || p.descripcion || '').toLowerCase().includes(needle)) ||
+    null;
+  if (!found) {
+    throw new Error(
+      `No se encontró período "${needle}" en SP_periodo_selecciona. Pasá idEjercicioDetalle.`,
+    );
+  }
+  return {
+    idEjercicioDetalle: found.idEjercicioDetalle,
+    codigo: found.descripcion || found.codigo || String(found.idEjercicioDetalle),
+  };
+}
+
+/**
+ * Carga solo Plan Joven del SP_Informe_Cierre_Operadores y arma índice por adhesión.
+ * @param {{ idOperador?: number, idEjercicioDetalle: number, idVendedor?: number }} params
+ */
+async function cargarPijIntegral(params) {
+  const { fetchInformeCierresOperadores } = await import('../db/informe-cierres.js');
+  const informe = await fetchInformeCierresOperadores({
+    idOperador: params.idOperador ?? Number(process.env.INFORME_CIERRE_ID_OPERADOR || 1),
+    idEjercicioDetalle: params.idEjercicioDetalle,
+    idVendedor: params.idVendedor ?? 0,
+  });
+  const filas = (informe.pij?.filas?.length ? informe.pij.filas : informe.filas || []).filter(
+    (f) => f.tipo === 'pij' || String(f.barrio || '').trim().toUpperCase() === 'PLAN JOVEN',
+  );
+
+  /** @type {Map<string, object[]>} */
+  const byClave = new Map();
+  const items = [];
+
+  for (const f of filas) {
+    const parsed = parseAdhesionDesdeIntegral(f.pc, f.mz);
+    const clave = claveAdhesionNormalizada(parsed.serie, parsed.ordenAdh);
+    const item = {
+      idUnico: `integral:${f.idLoteVenta || `${clave}:${f.fechaInicioCobranza}`}`,
+      idLoteVenta: f.idLoteVenta,
+      serie: parsed.serie,
+      ordenAdh: parsed.ordenAdh,
+      adhesionDisplay: parsed.display || formatReciboCaja(parsed.serie, parsed.ordenAdh, ''),
+      vendedor: String(f.vendedor || '').trim(),
+      nombreCliente: String(f.nombreCliente || '').trim(),
+      fechaIso: f.fechaInicioCobranza || null,
+      montoCobrado: Number(f.totalCobradoPeriodo) || 0,
+      montoPactado: Number(f.montoPactadoAdhesion) || 0,
+      clave,
+      idOperador: f.idOperador,
+      reciboOperadorAsignado: f.reciboOperadorAsignado,
+    };
+    items.push(item);
+    if (!clave) continue;
+    if (!byClave.has(clave)) byClave.set(clave, []);
+    byClave.get(clave).push(item);
+    // También índice numérico solo (sin serie) para matches flojos
+    const soloNum = normalizar(parsed.ordenAdh).replace(/^0+/, '');
+    if (soloNum && soloNum !== clave) {
+      if (!byClave.has(soloNum)) byClave.set(soloNum, []);
+      byClave.get(soloNum).push(item);
+    }
+  }
+
+  return { items, byClave, source: informe.source, params: informe.params };
+}
+
 function filaCajaKey(row) {
   return [
     normalizar(row.serie),
@@ -987,14 +1112,14 @@ function filaCajaKey(row) {
 }
 
 /**
- * Cruza adhesiones del Excel/Sheets de Caja vs cierres PIJ del CRM.
- * Devuelve filas de Caja que NO tienen match en el sistema (clientes no cargados).
+ * Cruza adhesiones del Excel/Sheets de Caja vs cierres PIJ del CRM,
+ * y además Plan Joven del sistema integral (SP_Informe_Cierre_Operadores).
  *
  * @param {unknown[]} leadsDB
- * @param {{ sheetGids?: string[], mes?: 'junio'|'julio', csvText?: string }} [options]
+ * @param {{ sheetGids?: string[], mes?: 'junio'|'julio', csvText?: string, idEjercicioDetalle?: number, idOperador?: number }} [options]
  */
 export async function buildFaltantesDesdeCaja(leadsDB, options = {}) {
-  const { sheetGids, mes, csvText } = options;
+  const { sheetGids, mes, csvText, idEjercicioDetalle, idOperador } = options;
 
   let excelRows;
   let fuente;
@@ -1026,10 +1151,21 @@ export async function buildFaltantesDesdeCaja(leadsDB, options = {}) {
   const ambiguos = [];
   const seenKeys = new Set();
 
+  /** Índice Excel por clave de adhesión (serie+nro) para cruce con integral. */
+  const excelByClave = new Map();
+
   for (const row of adhesiones) {
     const key = filaCajaKey(row);
     if (seenKeys.has(key)) continue;
     seenKeys.add(key);
+
+    const serie = String(row.serie || '').trim().toUpperCase() || 'A';
+    const ordenAdh = String(row.ordenAdh || '').trim();
+    const clave = claveAdhesionNormalizada(serie, ordenAdh);
+    if (clave) {
+      if (!excelByClave.has(clave)) excelByClave.set(clave, []);
+      excelByClave.get(clave).push(row);
+    }
 
     const variantes = generarVariantesRecibo(row);
     const hits = [];
@@ -1102,10 +1238,10 @@ export async function buildFaltantesDesdeCaja(leadsDB, options = {}) {
       estado,
       fechaExcel: row.fecha || '',
       fechaIso: parseFechaCaja(row.fecha) || null,
-      serie: String(row.serie || '').trim().toUpperCase() || 'A',
-      ordenAdh: String(row.ordenAdh || '').trim(),
+      serie,
+      ordenAdh,
       ordenAnexo: String(row.ordenAnexo || '').trim(),
-      reciboSugerido: formatReciboCaja(row.serie, row.ordenAdh, row.ordenAnexo),
+      reciboSugerido: formatReciboCaja(serie, ordenAdh, row.ordenAnexo),
       nombreClienteExcel: String(row.nombreCliente || '').trim(),
       vendedorExcel: String(row.nombreVendedor || '').trim(),
       concepto: String(row.concepto || '').trim(),
@@ -1145,18 +1281,226 @@ export async function buildFaltantesDesdeCaja(leadsDB, options = {}) {
     (a, b) => b.cantidad - a.cantidad || a.vendedor.localeCompare(b.vendedor, 'es'),
   );
 
+  // —— Sistema integral (solo PLAN JOVEN) vs Excel y CRM ——
+  let integral = {
+    periodo: null,
+    source: null,
+    items: [],
+    sinCrm: [],
+    sinExcel: [],
+    excelSinIntegral: [],
+  };
+
+  try {
+    // Si no viene mes (CSV suelto), igual usamos julio para el SP integral.
+    const mesPeriodo = mes === 'junio' || mes === 'julio' ? mes : 'julio';
+    const periodo = await resolverPeriodoInforme(
+      mesPeriodo,
+      idEjercicioDetalle ?? (mesPeriodo === 'julio' ? 91 : undefined),
+    );
+    console.log(
+      '[faltantes-pij] consultando integral período=%s (%s) operador=%s',
+      periodo.idEjercicioDetalle,
+      periodo.codigo,
+      idOperador ?? 1,
+    );
+    const cargado = await cargarPijIntegral({
+      idEjercicioDetalle: periodo.idEjercicioDetalle,
+      idOperador: idOperador ?? 1,
+    });
+    console.log('[faltantes-pij] integral Plan Joven filas=%s', cargado.items.length);
+    integral.periodo = {
+      idEjercicioDetalle: periodo.idEjercicioDetalle,
+      codigo: periodo.codigo,
+    };
+    integral.source = cargado.source;
+
+    const clavesIntegralUsadas = new Set();
+    const nombresIntegralUsados = new Set();
+    const itemsEnriquecidos = [];
+
+    for (const row of cargado.items) {
+      const clave = row.clave;
+      let enExcel = false;
+      let matchExcel = null;
+      if (clave && excelByClave.has(clave)) {
+        enExcel = true;
+        const er = excelByClave.get(clave)[0];
+        matchExcel = {
+          nombreCliente: String(er.nombreCliente || '').trim(),
+          vendedor: String(er.nombreVendedor || '').trim(),
+          recibo: formatReciboCaja(er.serie, er.ordenAdh, er.ordenAnexo),
+          fecha: er.fecha || '',
+        };
+        clavesIntegralUsadas.add(clave);
+        const nk = normalizeName(er.nombreCliente);
+        if (nk) nombresIntegralUsados.add(nk);
+      } else if (row.nombreCliente) {
+        // Fallback: mismo cliente en Excel (CLIENTE del SP).
+        const candidatos = [];
+        for (const [, rows] of excelByClave.entries()) {
+          const er = rows[0];
+          if (nombresCoinciden(row.nombreCliente, er.nombreCliente)) candidatos.push(er);
+        }
+        if (candidatos.length === 1) {
+          enExcel = true;
+          const er = candidatos[0];
+          matchExcel = {
+            nombreCliente: String(er.nombreCliente || '').trim(),
+            vendedor: String(er.nombreVendedor || '').trim(),
+            recibo: formatReciboCaja(er.serie, er.ordenAdh, er.ordenAnexo),
+            fecha: er.fecha || '',
+          };
+          const claveExcel = claveAdhesionNormalizada(er.serie, er.ordenAdh);
+          if (claveExcel) clavesIntegralUsadas.add(claveExcel);
+          const nk = normalizeName(er.nombreCliente);
+          if (nk) nombresIntegralUsados.add(nk);
+        }
+      }
+
+      let enCrm = false;
+      let matchCrm = null;
+      if (clave) {
+        const variantes = generarVariantesRecibo({
+          serie: row.serie,
+          ordenAdh: row.ordenAdh,
+          ordenAnexo: '',
+        });
+        const hits = [];
+        for (const v of variantes) {
+          const found = indiceCrm.get(v);
+          if (found?.length) hits.push(...found);
+        }
+        const uniqueHits = [];
+        const hitKeys = new Set();
+        for (const h of hits) {
+          const hk = `${h.leadId}|${h.numeroRecibo}|${h.isCompraAdicional}`;
+          if (hitKeys.has(hk)) continue;
+          hitKeys.add(hk);
+          uniqueHits.push(h);
+        }
+        if (uniqueHits.length >= 1) {
+          enCrm = true;
+          const h = uniqueHits[0];
+          matchCrm = {
+            leadId: h.leadId,
+            nombreCliente: h.nombreCliente,
+            promotorNombre: h.promotorNombre,
+            numeroRecibo: h.numeroRecibo,
+            fechaCierre: h.fechaCierre,
+          };
+        }
+      }
+      // Fallback CRM por nombre del SP (CLIENTE)
+      if (!enCrm && row.nombreCliente) {
+        const porNombre = [];
+        for (const lead of leadsDB || []) {
+          const seg = lead?.seguimiento;
+          if (seg?.resultadoEntrevista !== 'compro' || seg?.idProducto !== 'prod-pij') continue;
+          if (!nombresCoinciden(lead.nombre, row.nombreCliente)) continue;
+          porNombre.push({
+            leadId: String(lead.id),
+            nombreCliente: String(lead.nombre || ''),
+            promotorNombre: String(lead.promotorNombre || ''),
+            numeroRecibo: String(seg.numeroRecibo || ''),
+            fechaCierre: seg.fechaCierre || null,
+          });
+        }
+        if (porNombre.length === 1) {
+          enCrm = true;
+          matchCrm = porNombre[0];
+        }
+      }
+
+      const item = {
+        ...row,
+        enExcel,
+        enCrm,
+        matchExcel,
+        matchCrm,
+      };
+      itemsEnriquecidos.push(item);
+      if (!enCrm) integral.sinCrm.push(item);
+      if (!enExcel) integral.sinExcel.push(item);
+    }
+
+    integral.items = itemsEnriquecidos;
+
+    for (const [clave, rows] of excelByClave.entries()) {
+      if (clavesIntegralUsadas.has(clave)) continue;
+      const soloNum = clave.replace(/^[A-Z]/, '');
+      if (cargado.byClave.has(clave) || (soloNum && cargado.byClave.has(soloNum))) continue;
+      const er = rows[0];
+      const nk = normalizeName(er.nombreCliente);
+      if (nk && nombresIntegralUsados.has(nk)) continue;
+      // ¿Algún Plan Joven del SP tiene el mismo cliente?
+      const matchNombreIntegral = cargado.items.some((i) =>
+        nombresCoinciden(i.nombreCliente, er.nombreCliente),
+      );
+      if (matchNombreIntegral) continue;
+
+      integral.excelSinIntegral.push({
+        idUnico: `excel-sin-int:${clave}`,
+        serie: String(er.serie || '').trim().toUpperCase() || 'A',
+        ordenAdh: String(er.ordenAdh || '').trim(),
+        ordenAnexo: String(er.ordenAnexo || '').trim(),
+        adhesionDisplay: formatReciboCaja(er.serie, er.ordenAdh, er.ordenAnexo),
+        nombreClienteExcel: String(er.nombreCliente || '').trim(),
+        vendedorExcel: String(er.nombreVendedor || '').trim(),
+        fechaExcel: er.fecha || '',
+      });
+    }
+  } catch (err) {
+    console.error('[faltantes-pij] cruce integral:', err);
+    integral.error = err instanceof Error ? err.message : 'Error al consultar sistema integral';
+  }
+
+  /** Excel presentes en Caja pero ausentes en sistema integral (Plan Joven), por vendedor. */
+  const porVendedorIntegralMap = new Map();
+  for (const f of integral.excelSinIntegral) {
+    const v = f.vendedorExcel || 'Sin vendedor';
+    if (!porVendedorIntegralMap.has(v)) {
+      porVendedorIntegralMap.set(v, { vendedor: v, cantidad: 0, clientes: [] });
+    }
+    const g = porVendedorIntegralMap.get(v);
+    g.cantidad += 1;
+    g.clientes.push({
+      nombre: f.nombreClienteExcel,
+      recibo: f.adhesionDisplay,
+      fecha: f.fechaExcel,
+    });
+  }
+  const porVendedorIntegral = Array.from(porVendedorIntegralMap.values()).sort(
+    (a, b) => b.cantidad - a.cantidad || a.vendedor.localeCompare(b.vendedor, 'es'),
+  );
+
   return {
     fuente,
     resumen: {
       adhesionesExcel: adhesiones.length,
       matched: matched.length,
       ambiguos: ambiguos.length,
+      /** Excel sin match en CRM */
       faltantes: faltantes.length,
+      faltantesEnCrm: faltantes.length,
       vendedoresConFaltantes: porVendedor.length,
+      adhesionesIntegral: integral.items.length,
+      integralEnCrm: integral.items.filter((i) => i.enCrm).length,
+      integralEnExcel: integral.items.filter((i) => i.enExcel).length,
+      integralSinCrm: integral.sinCrm.length,
+      integralSinExcel: integral.sinExcel.length,
+      /** Excel sin match en sistema integral (Plan Joven) */
+      excelSinIntegral: integral.excelSinIntegral.length,
+      faltantesEnIntegral: integral.excelSinIntegral.length,
+      vendedoresFaltanIntegral: porVendedorIntegral.length,
     },
     faltantes,
     ambiguos,
+    /** Agrupa faltantes Excel→CRM por vendedor */
     porVendedor,
+    /** Agrupa faltantes Excel→Integral por vendedor */
+    porVendedorIntegral,
+    integral,
   };
 }
 

@@ -47,6 +47,7 @@ import {
   loadOperadoresCatalogAsync,
 } from './db/operadores-catalog.js';
 import { fetchAdminDashboard } from './db/admin-dashboard.js';
+import { fetchInformeCierresOperadores, fetchPeriodosInformeCierres } from './db/informe-cierres.js';
 import { aplicarRolSuperadmin, esSuperadminUsuario, esSupervisorPanelGlobal } from './db/superadmin-auth.js';
 import { modificarTelefonoLeadSchema } from './schemas/modificar-telefono-lead.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
@@ -518,6 +519,74 @@ function registerApiRoutes(api) {
     }
   });
 
+  /** Informe de cierres con montos — SP_Informe_Cierre_Operadores */
+  api.get('/admin/informe-cierres', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso =
+      esSuperadminUsuario(usuario) || esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message: 'Panel de administración solo disponible para superadmin o supervisores con acceso global.',
+      });
+    }
+
+    try {
+      const idOperador =
+        req.query.idOperador != null && String(req.query.idOperador).trim() !== ''
+          ? Number(req.query.idOperador)
+          : undefined;
+      const idEjercicioDetalle =
+        req.query.idEjercicioDetalle != null && String(req.query.idEjercicioDetalle).trim() !== ''
+          ? Number(req.query.idEjercicioDetalle)
+          : undefined;
+      const idVendedor =
+        req.query.idVendedor != null && String(req.query.idVendedor).trim() !== ''
+          ? Number(req.query.idVendedor)
+          : undefined;
+      const informe = await fetchInformeCierresOperadores({
+        idOperador,
+        idEjercicioDetalle,
+        idVendedor,
+      });
+      return res.json(informe);
+    } catch (error) {
+      console.error('Error informe cierres:', error);
+      const err = formatSqlError(error);
+      return res.status(500).json(err);
+    }
+  });
+
+  /** Períodos para el informe de cierres — SP_periodo_selecciona */
+  api.get('/admin/informe-cierres/periodos', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso =
+      esSuperadminUsuario(usuario) || esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message: 'Panel de administración solo disponible para superadmin o supervisores con acceso global.',
+      });
+    }
+
+    try {
+      const data = await fetchPeriodosInformeCierres();
+      return res.json(data);
+    } catch (error) {
+      console.error('Error períodos informe cierres:', error);
+      const err = formatSqlError(error);
+      return res.status(500).json(err);
+    }
+  });
+
   api.post('/admin/sync-caja-pij/preview', async (req, res) => {
     if (!respondIfNotConfigured(res)) return;
 
@@ -618,11 +687,34 @@ function registerApiRoutes(api) {
           ? req.body.csvText
           : undefined;
 
+      // Julio 2026 = 91 (SP_periodo_selecciona). Override opcional por body.
+      const idEjercicioDetalleBody =
+        req.body?.idEjercicioDetalle != null && String(req.body.idEjercicioDetalle).trim() !== ''
+          ? Number(req.body.idEjercicioDetalle)
+          : undefined;
+      const idEjercicioDetalleDefault = mes === 'junio' ? undefined : 91;
+
       const resultado = await buildFaltantesDesdeCaja(leads, {
-        mes: csvText || sheetGids?.length ? undefined : mes,
+        mes: csvText || (sheetGids && sheetGids.length) ? undefined : mes,
         sheetGids,
         csvText,
+        idEjercicioDetalle: Number.isFinite(idEjercicioDetalleBody)
+          ? idEjercicioDetalleBody
+          : idEjercicioDetalleDefault,
+        idOperador:
+          req.body?.idOperador != null && String(req.body.idOperador).trim() !== ''
+            ? Number(req.body.idOperador)
+            : 1,
       });
+
+      console.log(
+        '[faltantes-pij] excel=%s integral=%s sinCrm=%s periodo=%s err=%s',
+        resultado.resumen?.adhesionesExcel,
+        resultado.resumen?.adhesionesIntegral,
+        resultado.resumen?.integralSinCrm,
+        resultado.integral?.periodo?.idEjercicioDetalle,
+        resultado.integral?.error || '-',
+      );
 
       return res.json({
         ...resultado,

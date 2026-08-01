@@ -7,6 +7,7 @@ export const ADMIN_TABS = [
   'sin_tratar',
   'reasignacion',
   'informe',
+  'informe_cierres',
   'grabaciones',
 ] as const;
 

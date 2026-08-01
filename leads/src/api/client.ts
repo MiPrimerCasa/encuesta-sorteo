@@ -7,6 +7,8 @@ import type {
   GrabacionPromotor,
   GuardarSeguimientoResult,
   ImagenCierrePij,
+  InformeCierresResponse,
+  InformeCierrePeriodosResponse,
   Lead,
   LinksRedes,
   NotificacionLinkRed,
@@ -324,6 +326,97 @@ export async function fetchAdminDashboard(periodo?: string): Promise<AdminDashbo
   return apiFetch<AdminDashboardData>(url);
 }
 
+export async function fetchInformeCierres(params?: {
+  idOperador?: number;
+  idEjercicioDetalle?: number;
+  idVendedor?: number;
+}): Promise<InformeCierresResponse> {
+  if (_isDemoActive) {
+    const vacio = {
+      filas: 0,
+      precioLote: 0,
+      montoPactadoAdhesion: 0,
+      senaRecuperada: 0,
+      cantidadRecibosPeriodo: 0,
+      montoCobradoEfectivo: 0,
+      montoCobradoMep: 0,
+      totalCobradoPeriodo: 0,
+      saldoAdhesion: 0,
+      adhesionCelebrada: 0,
+      adhesionCancelada: 0,
+      senaEnPeriodo: 0,
+    };
+    const seccionVacia = { totales: vacio, porVendedor: [], filas: [] };
+    return {
+      generadoEn: new Date().toISOString(),
+      source: 'demo',
+      params: {
+        idOperador: params?.idOperador ?? 1,
+        idEjercicioDetalle: params?.idEjercicioDetalle ?? 86,
+        idVendedor: params?.idVendedor ?? 0,
+      },
+      totales: vacio,
+      porVendedor: [],
+      filas: [],
+      pij: seccionVacia,
+      terreno: seccionVacia,
+      excel: {
+        fuente: 'Demo',
+        cantidad: 0,
+        totalRecaudado: 0,
+        montoUnitario: 33000,
+        error: null,
+      },
+      resumenPanel: {
+        adhesionesExcelCantidad: 0,
+        adhesionesExcelTotal: 0,
+        adhesionesExcelMontoUnitario: 33000,
+        adhesionesExcelFuente: 'Demo',
+        lotesCantidad: 0,
+        lotesMontoTotal: 0,
+      },
+    };
+  }
+  const qs = new URLSearchParams();
+  if (params?.idOperador != null) qs.set('idOperador', String(params.idOperador));
+  if (params?.idEjercicioDetalle != null) {
+    qs.set('idEjercicioDetalle', String(params.idEjercicioDetalle));
+  }
+  if (params?.idVendedor != null) qs.set('idVendedor', String(params.idVendedor));
+  const q = qs.toString();
+  return apiFetch(`/api/admin/informe-cierres${q ? `?${q}` : ''}`);
+}
+
+export async function fetchInformeCierresPeriodos(): Promise<InformeCierrePeriodosResponse> {
+  if (_isDemoActive) {
+    return {
+      generadoEn: new Date().toISOString(),
+      source: 'demo',
+      periodos: [
+        {
+          idEjercicioDetalle: 91,
+          idEjercicio: 8,
+          codigo: 'Julio 2026',
+          descripcion: 'Julio 2026',
+          fechaDesde: '2026-07-01T00:00:00.000Z',
+          fechaHasta: '2026-07-31T00:00:00.000Z',
+          activo: true,
+        },
+        {
+          idEjercicioDetalle: 86,
+          idEjercicio: 8,
+          codigo: 'Febrero 2026',
+          descripcion: 'Febrero 2026',
+          fechaDesde: '2026-02-01T00:00:00.000Z',
+          fechaHasta: '2026-02-28T00:00:00.000Z',
+          activo: true,
+        },
+      ],
+    };
+  }
+  return apiFetch<InformeCierrePeriodosResponse>('/api/admin/informe-cierres/periodos');
+}
+
 export async function fetchAdminLeads(): Promise<Lead[]> {
   if (_isDemoActive) {
     return getDemoLeads();
@@ -585,10 +678,25 @@ export async function previewFaltantesPij(
         ambiguos: 0,
         faltantes: 0,
         vendedoresConFaltantes: 0,
+        adhesionesIntegral: 0,
+        integralEnCrm: 0,
+        integralEnExcel: 0,
+        integralSinCrm: 0,
+        integralSinExcel: 0,
+        excelSinIntegral: 0,
       },
       faltantes: [],
       ambiguos: [],
       porVendedor: [],
+      porVendedorIntegral: [],
+      integral: {
+        periodo: null,
+        source: 'demo',
+        items: [],
+        sinCrm: [],
+        sinExcel: [],
+        excelSinIntegral: [],
+      },
     };
   }
   return apiFetch<FaltantesPijResponse>('/api/admin/reconciliar-pij/faltantes', {

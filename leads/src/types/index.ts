@@ -218,6 +218,58 @@ export interface FaltantesPijPorVendedor {
   clientes: Array<{ nombre: string; recibo: string; fecha: string }>;
 }
 
+/** Fila Plan Joven del SP_Informe_Cierre_Operadores cruzada con Excel y CRM. */
+export interface IntegralPijItem {
+  idUnico: string;
+  idLoteVenta: number;
+  serie: string;
+  ordenAdh: string;
+  adhesionDisplay: string;
+  vendedor: string;
+  /** Nombre del cliente desde el SP (si está disponible). */
+  nombreCliente?: string;
+  fechaIso: string | null;
+  montoCobrado: number;
+  montoPactado: number;
+  enExcel: boolean;
+  enCrm: boolean;
+  matchExcel: {
+    nombreCliente: string;
+    vendedor: string;
+    recibo: string;
+    fecha: string;
+  } | null;
+  matchCrm: {
+    leadId: string;
+    nombreCliente: string;
+    promotorNombre: string;
+    numeroRecibo: string;
+    fechaCierre: string | null;
+  } | null;
+}
+
+export interface ExcelSinIntegralItem {
+  idUnico: string;
+  serie: string;
+  ordenAdh: string;
+  ordenAnexo?: string;
+  adhesionDisplay: string;
+  nombreClienteExcel: string;
+  vendedorExcel: string;
+  fechaExcel: string;
+}
+
+export interface FaltantesPijIntegral {
+  periodo: { idEjercicioDetalle: number; codigo: string } | null;
+  source: string | null;
+  error?: string;
+  items: IntegralPijItem[];
+  sinCrm: IntegralPijItem[];
+  sinExcel: IntegralPijItem[];
+  /** Filas del Excel que no están en el sistema integral (Plan Joven). */
+  excelSinIntegral: ExcelSinIntegralItem[];
+}
+
 export interface FaltantesPijResponse {
   fuente?: string;
   mesConsultado?: 'junio' | 'julio' | null;
@@ -225,12 +277,28 @@ export interface FaltantesPijResponse {
     adhesionesExcel: number;
     matched: number;
     ambiguos: number;
+    /** Excel sin match en CRM */
     faltantes: number;
+    faltantesEnCrm?: number;
     vendedoresConFaltantes: number;
+    adhesionesIntegral?: number;
+    integralEnCrm?: number;
+    integralEnExcel?: number;
+    integralSinCrm?: number;
+    integralSinExcel?: number;
+    /** Excel sin match en sistema integral */
+    excelSinIntegral?: number;
+    faltantesEnIntegral?: number;
+    vendedoresFaltanIntegral?: number;
   };
   faltantes: FaltantePijItem[];
   ambiguos: FaltantePijItem[];
+  /** Agrupa faltantes Excel→CRM por vendedor */
   porVendedor: FaltantesPijPorVendedor[];
+  /** Agrupa faltantes Excel→Integral por vendedor */
+  porVendedorIntegral?: FaltantesPijPorVendedor[];
+  /** Cruce Plan Joven (sistema integral) vs Excel vs CRM. */
+  integral?: FaltantesPijIntegral;
 }
 
 export interface Producto {
@@ -638,6 +706,118 @@ export interface AdminProductividad {
   conocimientoVsCierre: AdminConocimientoCierre[];
   pijRecuperacion: AdminPijRecuperacion;
   referidos: AdminReferidosMetrica;
+}
+
+/** Fila de dbo.SP_Informe_Cierre_Operadores (montos de cierres / cobranzas). */
+export interface InformeCierreFila {
+  orden: number;
+  idOperador: number;
+  vendedor: string;
+  barrio: string;
+  /** pij = barrio "PLAN JOVEN"; terreno = cualquier otro barrio (adhesión lote). */
+  tipo: 'pij' | 'terreno';
+  /** Nombre del cliente (columna CLIENTE del SP). */
+  nombreCliente?: string;
+  mz: string;
+  pc: string;
+  idLoteVenta: number;
+  reciboOperadorAsignado: number;
+  precioLote: number;
+  montoPactadoAdhesion: number;
+  fechaInicioCobranza: string | null;
+  fechaFinCobranza: string | null;
+  fechaSenaPeriodoAnterior: string | null;
+  senaRecuperada: number;
+  cantidadRecibosPeriodo: number;
+  montoCobradoEfectivo: number;
+  montoCobradoMep: number;
+  totalCobradoPeriodo: number;
+  saldoAdhesion: number;
+  adhesionCelebrada: number;
+  adhesionCancelada: number;
+  senaEnPeriodo: number;
+  /** Números de recibo del período (columna del SP). */
+  recibosEnPeriodo?: string;
+}
+
+export interface InformeCierreTotales {
+  filas: number;
+  precioLote: number;
+  montoPactadoAdhesion: number;
+  senaRecuperada: number;
+  cantidadRecibosPeriodo: number;
+  montoCobradoEfectivo: number;
+  montoCobradoMep: number;
+  totalCobradoPeriodo: number;
+  saldoAdhesion: number;
+  adhesionCelebrada: number;
+  adhesionCancelada: number;
+  senaEnPeriodo: number;
+}
+
+export interface InformeCierrePorVendedor {
+  vendedor: string;
+  idOperador: number;
+  totales: InformeCierreTotales;
+  cierres: InformeCierreFila[];
+}
+
+export interface InformeCierreSeccion {
+  totales: InformeCierreTotales;
+  porVendedor: InformeCierrePorVendedor[];
+  filas: InformeCierreFila[];
+}
+
+export interface InformeCierresResponse {
+  generadoEn: string;
+  source: string;
+  params: {
+    idOperador: number;
+    idEjercicioDetalle: number;
+    idVendedor: number;
+  };
+  totales: InformeCierreTotales;
+  porVendedor: InformeCierrePorVendedor[];
+  filas: InformeCierreFila[];
+  /** Barrio PLAN JOVEN (montos ~$33.000 / $55.000). */
+  pij: InformeCierreSeccion;
+  /** Resto de barrios = adhesión de terrenos/lotes. */
+  terreno: InformeCierreSeccion;
+  /** Adhesiones del Excel de Caja del mes. */
+  excel?: {
+    fuente: string | null;
+    cantidad: number;
+    totalRecaudado: number;
+    montoUnitario: number;
+    error?: string | null;
+    periodoCodigo?: string | null;
+  };
+  /** KPIs del panel: Excel×$33.000 + lotes del SP. */
+  resumenPanel?: {
+    adhesionesExcelCantidad: number;
+    adhesionesExcelTotal: number;
+    adhesionesExcelMontoUnitario: number;
+    adhesionesExcelFuente: string | null;
+    lotesCantidad: number;
+    lotesMontoTotal: number;
+  };
+}
+
+/** Período de cobranzas (dbo.SP_periodo_selecciona). */
+export interface InformeCierrePeriodo {
+  idEjercicioDetalle: number;
+  idEjercicio: number;
+  codigo: string;
+  descripcion: string;
+  fechaDesde: string | null;
+  fechaHasta: string | null;
+  activo: boolean;
+}
+
+export interface InformeCierrePeriodosResponse {
+  generadoEn: string;
+  source: string;
+  periodos: InformeCierrePeriodo[];
 }
 
 export interface AdminDashboardData {

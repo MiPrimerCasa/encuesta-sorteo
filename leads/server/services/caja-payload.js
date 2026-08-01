@@ -365,9 +365,15 @@ export async function buildCrmIngestPayload({ lead, seguimiento, usuario, sucurs
   const extras = Array.isArray(seguimiento.comprasAdicionales)
     ? seguimiento.comprasAdicionales
     : [];
-  // Caja solo acepta PIJ: no enviar terrenos ni otros productos en comprasAdicionales.
+  // Enviar PIJ y terreno adicionales a caja (bloqueo integral sigue solo en PIJ).
   for (const c of extras) {
-    if (String(c?.idProducto) !== 'prod-pij' || !c?.estadoPago) continue;
+    const idProd = String(c?.idProducto ?? '');
+    if (
+      (idProd !== 'prod-pij' && idProd !== 'prod-terreno') ||
+      !c?.estadoPago
+    ) {
+      continue;
+    }
     seg.comprasAdicionales.push(buildCompraAdicional(c, seguimiento, basePath));
   }
 

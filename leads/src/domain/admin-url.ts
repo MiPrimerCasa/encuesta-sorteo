@@ -13,7 +13,15 @@ export const ADMIN_TABS = [
 
 export type AdminTab = (typeof ADMIN_TABS)[number];
 
-const VISTAS: VistaActiva[] = ['leads', 'promotores', 'metricas', 'calendario', 'admin', 'grabacion'];
+const VISTAS: VistaActiva[] = [
+  'leads',
+  'promotores',
+  'metricas',
+  'calendario',
+  'admin',
+  'grabacion',
+  'comisiones',
+];
 
 const TAB_DEFAULT: AdminTab = 'metricas';
 const PERIODO_DEFAULT = 'mes';
@@ -42,6 +50,7 @@ export function esPeriodoAdminUrl(val: string | null | undefined): val is string
 export function vistaPermitida(usuario: UsuarioSesion, vista: VistaActiva): boolean {
   if (usuario.rol === 'superadmin') return vista === 'admin';
   if (vista === 'admin') return Boolean(usuario.panelGlobal);
+  if (vista === 'comisiones') return Boolean(usuario.comisionesContable);
   if (vista === 'promotores') return usuario.rol === 'supervisor';
   if (vista === 'metricas' || vista === 'grabacion') return usuario.rol === 'promotor';
   return vista === 'leads' || vista === 'calendario';

@@ -48,7 +48,7 @@ import {
 } from './db/operadores-catalog.js';
 import { fetchAdminDashboard } from './db/admin-dashboard.js';
 import { fetchInformeCierresOperadores, fetchPeriodosInformeCierres } from './db/informe-cierres.js';
-import { aplicarRolSuperadmin, esSuperadminUsuario, esSupervisorPanelGlobal } from './db/superadmin-auth.js';
+import { aplicarRolSuperadmin, esSuperadminUsuario, esSupervisorPanelGlobal, esComisionesContableLogin } from './db/superadmin-auth.js';
 import { modificarTelefonoLeadSchema } from './schemas/modificar-telefono-lead.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
@@ -213,6 +213,7 @@ function registerApiRoutes(api) {
         }
       }
       const panelGlobal = esSupervisorPanelGlobal(user.loginId || usuario);
+      const comisionesContable = esComisionesContableLogin(user.loginId || usuario);
       return res.json({
         token: `sql-${user.id}`,
         usuario: {
@@ -230,6 +231,7 @@ function registerApiRoutes(api) {
           rolOrigen: user.rolOrigen,
           sucursal: user.sucursal,
           ...(panelGlobal ? { panelGlobal: true } : {}),
+          ...(comisionesContable ? { comisionesContable: true } : {}),
         },
       });
     } catch (error) {
@@ -416,6 +418,44 @@ function registerApiRoutes(api) {
     }
   });
 
+  /**
+   * Informe de comisiones contable — solo login allowlist (jesus.cajal.work@gmail.com).
+   */
+  api.get('/comisiones-contable', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    if (!esComisionesContableLogin(usuario.loginId)) {
+      return res.status(403).json({
+        message: 'No tenés acceso al informe de comisiones contable.',
+      });
+    }
+
+    try {
+      const periodo = String(req.query.periodo || 'mes').trim().toLowerCase();
+      const { buildInformeComisionesContable } = await import(
+        './services/comisiones-contable.js'
+      );
+      const leads = await listAllLeadsFromEncuestas({ incluirReferidos: false });
+      const data = await buildInformeComisionesContable(periodo, leads, {
+        idOperador:
+          req.query.idOperador != null && String(req.query.idOperador).trim() !== ''
+            ? Number(req.query.idOperador)
+            : 1,
+      });
+      return res.json(data);
+    } catch (error) {
+      console.error('Error informe comisiones contable:', error);
+      return res.status(500).json({
+        message: 'No se pudo generar el informe de comisiones.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
   api.get('/admin/dashboard', async (req, res) => {
     if (!respondIfNotConfigured(res)) return;
 
@@ -451,6 +491,48 @@ function registerApiRoutes(api) {
       console.error('Error admin dashboard:', error);
       const err = formatSqlError(error);
       return res.status(500).json(err);
+    }
+  });
+
+  /**
+   * Enriquecimiento del Informe de Operaciones: faltantes PIJ (Caja) + lotes SP cierres.
+   * Solo aplica a períodos mes / YYYY-MM.
+   */
+  api.get('/admin/dashboard/enriquecimiento', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso =
+      esSuperadminUsuario(usuario) || esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message:
+          'Panel de administración solo disponible para superadmin o supervisores con acceso global.',
+      });
+    }
+
+    try {
+      const periodo = String(req.query.periodo || 'mes').trim().toLowerCase();
+      const { buildEnriquecimientoInformeOperaciones } = await import(
+        './services/informe-operaciones-enriquecimiento.js'
+      );
+      const leads = await listAllLeadsFromEncuestas({ incluirReferidos: false });
+      const data = await buildEnriquecimientoInformeOperaciones(periodo, leads, {
+        idOperador:
+          req.query.idOperador != null && String(req.query.idOperador).trim() !== ''
+            ? Number(req.query.idOperador)
+            : 1,
+      });
+      return res.json(data);
+    } catch (error) {
+      console.error('Error enriquecimiento informe operaciones:', error);
+      return res.status(500).json({
+        message: 'No se pudo enriquecer el informe de operaciones.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
     }
   });
 
@@ -676,9 +758,69 @@ function registerApiRoutes(api) {
 
     try {
       const { buildFaltantesDesdeCaja, CAJA_SHEETS } = await import('./services/sync-caja.js');
+      const { resolverPeriodoPorYyyyMm } = await import('./db/informe-cierres.js');
       const leads = await listAllLeadsFromEncuestas({ incluirReferidos: false });
-      const mesRaw = String(req.body?.mes ?? 'julio').trim().toLowerCase();
-      const mes = mesRaw === 'junio' ? 'junio' : 'julio';
+
+      const idEjercicioDetalleBody =
+        req.body?.idEjercicioDetalle != null && String(req.body.idEjercicioDetalle).trim() !== ''
+          ? Number(req.body.idEjercicioDetalle)
+          : undefined;
+
+      let yyyyMm =
+        typeof req.body?.yyyyMm === 'string' && /^\d{4}-\d{2}$/.test(req.body.yyyyMm.trim())
+          ? req.body.yyyyMm.trim()
+          : null;
+      let mes =
+        typeof req.body?.mes === 'string' && req.body.mes.trim()
+          ? String(req.body.mes).trim().toLowerCase()
+          : undefined;
+
+      // Si viene idEjercicioDetalle, resolver yyyyMm/mes desde SP.
+      let idEjercicioDetalle = Number.isFinite(idEjercicioDetalleBody)
+        ? idEjercicioDetalleBody
+        : undefined;
+
+      if (idEjercicioDetalle != null) {
+        const { fetchPeriodosInformeCierres } = await import('./db/informe-cierres.js');
+        const data = await fetchPeriodosInformeCierres();
+        const found = (data.periodos || []).find(
+          (p) => Number(p.idEjercicioDetalle) === Number(idEjercicioDetalle),
+        );
+        if (found?.fechaDesde && !yyyyMm) {
+          const d = new Date(found.fechaDesde);
+          yyyyMm = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+        }
+        if (!mes && found) {
+          const texto = `${found.codigo || ''} ${found.descripcion || ''}`.toLowerCase();
+          if (texto.includes('junio')) mes = 'junio';
+          else if (texto.includes('julio')) mes = 'julio';
+          else if (texto.includes('agosto')) mes = 'agosto';
+        }
+      } else if (!yyyyMm && mes) {
+        // mes nombre sin id → SP_periodo_selecciona
+        try {
+          const { fetchPeriodosInformeCierres } = await import('./db/informe-cierres.js');
+          const data = await fetchPeriodosInformeCierres();
+          const found = (data.periodos || []).find((p) =>
+            String(p.codigo || p.descripcion || '')
+              .toLowerCase()
+              .includes(mes),
+          );
+          if (found) {
+            idEjercicioDetalle = found.idEjercicioDetalle;
+            if (found.fechaDesde) {
+              const d = new Date(found.fechaDesde);
+              yyyyMm = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+            }
+          }
+        } catch {
+          /* se resuelve dentro de buildFaltantes */
+        }
+      } else if (yyyyMm && idEjercicioDetalle == null) {
+        const resolved = await resolverPeriodoPorYyyyMm(yyyyMm);
+        if (resolved) idEjercicioDetalle = resolved.idEjercicioDetalle;
+      }
+
       const sheetGids = Array.isArray(req.body?.sheetGids)
         ? req.body.sheetGids.map((g) => String(g).trim()).filter(Boolean)
         : undefined;
@@ -687,20 +829,12 @@ function registerApiRoutes(api) {
           ? req.body.csvText
           : undefined;
 
-      // Julio 2026 = 91 (SP_periodo_selecciona). Override opcional por body.
-      const idEjercicioDetalleBody =
-        req.body?.idEjercicioDetalle != null && String(req.body.idEjercicioDetalle).trim() !== ''
-          ? Number(req.body.idEjercicioDetalle)
-          : undefined;
-      const idEjercicioDetalleDefault = mes === 'junio' ? undefined : 91;
-
       const resultado = await buildFaltantesDesdeCaja(leads, {
         mes: csvText || (sheetGids && sheetGids.length) ? undefined : mes,
+        yyyyMm: yyyyMm || undefined,
         sheetGids,
         csvText,
-        idEjercicioDetalle: Number.isFinite(idEjercicioDetalleBody)
-          ? idEjercicioDetalleBody
-          : idEjercicioDetalleDefault,
+        idEjercicioDetalle,
         idOperador:
           req.body?.idOperador != null && String(req.body.idOperador).trim() !== ''
             ? Number(req.body.idOperador)
@@ -718,10 +852,13 @@ function registerApiRoutes(api) {
 
       return res.json({
         ...resultado,
-        mesConsultado: csvText ? null : mes,
+        mesConsultado: csvText ? null : mes || yyyyMm || null,
+        idEjercicioDetalle: resultado.integral?.periodo?.idEjercicioDetalle ?? idEjercicioDetalle ?? null,
+        yyyyMm: yyyyMm || null,
         sheetsDisponibles: {
           junio: CAJA_SHEETS.junio,
           julio: CAJA_SHEETS.julio,
+          agosto: CAJA_SHEETS.agosto,
         },
       });
     } catch (error) {

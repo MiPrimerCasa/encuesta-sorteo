@@ -9,6 +9,8 @@ import type {
   ImagenCierrePij,
   InformeCierresResponse,
   InformeCierrePeriodosResponse,
+  InformeComisionesContable,
+  InformeOperacionesEnriquecimiento,
   Lead,
   LinksRedes,
   NotificacionLinkRed,
@@ -324,6 +326,103 @@ export async function fetchAdminDashboard(periodo?: string): Promise<AdminDashbo
     ? `/api/admin/dashboard?periodo=${encodeURIComponent(periodo)}`
     : '/api/admin/dashboard';
   return apiFetch<AdminDashboardData>(url);
+}
+
+export async function fetchInformeOperacionesEnriquecimiento(
+  periodo: string,
+): Promise<InformeOperacionesEnriquecimiento> {
+  if (_isDemoActive) {
+    return {
+      aplicable: false,
+      periodoPanel: periodo,
+      yyyyMm: null,
+      idEjercicioDetalle: null,
+      periodoCodigo: null,
+      pijExcelCantidad: 0,
+      pijExcelPorVendedor: [],
+      pijExcelItems: [],
+      pijFaltantesCantidad: 0,
+      pijFaltantes: [],
+      pijPorVendedor: [],
+      pijEventos: [],
+      lotesSpCantidad: 0,
+      lotesSp: [],
+      lotesPorVendedor: [],
+      lotesEventos: [],
+    };
+  }
+  return apiFetch<InformeOperacionesEnriquecimiento>(
+    `/api/admin/dashboard/enriquecimiento?periodo=${encodeURIComponent(periodo)}`,
+  );
+}
+
+export async function fetchInformeComisionesContable(
+  periodo: string,
+): Promise<InformeComisionesContable> {
+  if (_isDemoActive) {
+    return {
+      generadoEn: new Date().toISOString(),
+      destinatario: 'Departamento Contable — Mi Primer Casa',
+      periodoPanel: periodo,
+      yyyyMm: null,
+      idEjercicioDetalle: null,
+      periodoCodigo: null,
+      reglas: {
+        pijUnitario: 2000,
+        terrenoPorcentaje: 0.01,
+        salarioFijo: 800000,
+        objetivoPij: 100,
+        objetivoTerrenos: 30,
+        descripcionPij: '$2.000 por cada PIJ, solo si se alcanzan 100 adhesiones',
+        descripcionTerreno: '1% del recaudado en adhesiones de terrenos, solo si se alcanzan 30',
+        descripcionSalario: 'Salario fijo mensual $800.000',
+      },
+      pij: {
+        cantidad: 0,
+        unitario: 2000,
+        comision: 0,
+        comisionBruta: 0,
+        objetivoCumplido: false,
+        progreso: {
+          actual: 0,
+          objetivo: 100,
+          cada: 30,
+          faltan: 100,
+          porcentaje: 0,
+          cumplido: false,
+          tramo: 0,
+          mensaje: 'Cada PIJ cuenta. Meta del mes: 100 adhesiones para desbloquear la comisión.',
+        },
+        porVendedor: [],
+      },
+      terrenos: {
+        cantidad: 0,
+        montoRecaudado: 0,
+        porcentaje: 0.01,
+        comision: 0,
+        comisionBruta: 0,
+        objetivoCumplido: false,
+        progreso: {
+          actual: 0,
+          objetivo: 30,
+          cada: 10,
+          faltan: 30,
+          porcentaje: 0,
+          cumplido: false,
+          tramo: 0,
+          mensaje: 'Arrancá fuerte: cada adhesión de terreno suma. Meta: 30 para el 1%.',
+        },
+        porVendedor: [],
+        filas: [],
+      },
+      salarioFijo: 800000,
+      totalComision: 0,
+      totalALiquidar: 800000,
+    };
+  }
+  return apiFetch<InformeComisionesContable>(
+    `/api/comisiones-contable?periodo=${encodeURIComponent(periodo)}`,
+  );
 }
 
 export async function fetchInformeCierres(params?: {
@@ -658,8 +757,11 @@ export async function commitSyncCajaPij(
 }
 
 export type FaltantesPijOptions = {
-  /** Por defecto julio. */
-  mes?: 'junio' | 'julio';
+  /** Nombre de mes o etiqueta; preferir idEjercicioDetalle. */
+  mes?: string;
+  /** Código de SP_periodo_selecciona. */
+  idEjercicioDetalle?: number;
+  yyyyMm?: string;
   sheetGids?: string[];
   /** CSV exportado del Excel de Caja (alternativa a Sheets). */
   csvText?: string;
@@ -671,7 +773,9 @@ export async function previewFaltantesPij(
   if (_isDemoActive) {
     return {
       fuente: 'Demo',
-      mesConsultado: options.mes ?? 'julio',
+      mesConsultado: options.mes ?? options.yyyyMm ?? null,
+      idEjercicioDetalle: options.idEjercicioDetalle ?? null,
+      yyyyMm: options.yyyyMm ?? null,
       resumen: {
         adhesionesExcel: 0,
         matched: 0,
@@ -702,7 +806,9 @@ export async function previewFaltantesPij(
   return apiFetch<FaltantesPijResponse>('/api/admin/reconciliar-pij/faltantes', {
     method: 'POST',
     body: JSON.stringify({
-      mes: options.mes ?? 'julio',
+      mes: options.mes,
+      idEjercicioDetalle: options.idEjercicioDetalle,
+      yyyyMm: options.yyyyMm,
       sheetGids: options.sheetGids,
       csvText: options.csvText,
     }),

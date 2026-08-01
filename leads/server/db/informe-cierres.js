@@ -74,6 +74,102 @@ export async function fetchPeriodosInformeCierres() {
   };
 }
 
+const MESES_ES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/**
+ * Convierte período del panel admin (`mes`, `2026-07`, etc.) a YYYY-MM.
+ * @param {string} periodo
+ * @param {Date} [hoy]
+ * @returns {string | null}
+ */
+export function periodoPanelAYyyyMm(periodo, hoy = new Date()) {
+  const p = String(periodo || '')
+    .trim()
+    .toLowerCase();
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(p)) return p;
+  if (p === 'mes') {
+    const y = hoy.getFullYear();
+    const m = String(hoy.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  }
+  return null;
+}
+
+/**
+ * Busca en SP_periodo_selecciona el idEjercicioDetalle del mes YYYY-MM.
+ * @param {string} yyyyMm
+ * @param {{ periodos?: Array<object> }} [opts]
+ * @returns {Promise<{ idEjercicioDetalle: number, codigo: string, yyyyMm: string, fechaDesde: string|null, fechaHasta: string|null } | null>}
+ */
+export async function resolverPeriodoPorYyyyMm(yyyyMm, opts = {}) {
+  const match = String(yyyyMm || '').match(/^(\d{4})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]); // 1-12
+  const mesNombre = MESES_ES[month - 1];
+
+  const data = opts.periodos
+    ? { periodos: opts.periodos }
+    : await fetchPeriodosInformeCierres();
+  const periodos = data.periodos || [];
+
+  const byFecha = periodos.find((p) => {
+    if (!p.fechaDesde) return false;
+    const d = new Date(p.fechaDesde);
+    if (Number.isNaN(d.getTime())) return false;
+    return d.getUTCFullYear() === year && d.getUTCMonth() + 1 === month;
+  });
+  if (byFecha) {
+    return {
+      idEjercicioDetalle: byFecha.idEjercicioDetalle,
+      codigo: byFecha.descripcion || byFecha.codigo || String(byFecha.idEjercicioDetalle),
+      yyyyMm: `${year}-${String(month).padStart(2, '0')}`,
+      fechaDesde: byFecha.fechaDesde,
+      fechaHasta: byFecha.fechaHasta,
+    };
+  }
+
+  const byNombre = periodos.find((p) => {
+    const texto = `${p.codigo || ''} ${p.descripcion || ''}`.toLowerCase();
+    return texto.includes(mesNombre) && texto.includes(String(year));
+  });
+  if (byNombre) {
+    return {
+      idEjercicioDetalle: byNombre.idEjercicioDetalle,
+      codigo: byNombre.descripcion || byNombre.codigo || String(byNombre.idEjercicioDetalle),
+      yyyyMm: `${year}-${String(month).padStart(2, '0')}`,
+      fechaDesde: byNombre.fechaDesde,
+      fechaHasta: byNombre.fechaHasta,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Resuelve período SP desde el string del panel admin.
+ * @param {string} periodoPanel
+ * @param {Date} [hoy]
+ */
+export async function resolverPeriodoDesdePanel(periodoPanel, hoy = new Date()) {
+  const yyyyMm = periodoPanelAYyyyMm(periodoPanel, hoy);
+  if (!yyyyMm) return null;
+  return resolverPeriodoPorYyyyMm(yyyyMm);
+}
+
 /** Barrio del SP que identifica Plan Inversión Joven (el resto = adhesión lotes/terreno). */
 function esBarrioPlanJoven(barrio) {
   return str(barrio)
@@ -243,40 +339,48 @@ export async function fetchInformeCierresOperadores(params = {}) {
     error: null,
   };
   try {
-    const { fetchCajaData, CAJA_SHEETS, esFilaAdhesionCaja } = await import(
-      '../services/sync-caja.js'
-    );
+    const {
+      fetchCajaData,
+      cajaSheetDesdeTextoPeriodo,
+      cajaSheetParaYyyyMm,
+      esFilaAdhesionCaja,
+    } = await import('../services/sync-caja.js');
     const periodos = await fetchPeriodosInformeCierres();
     const periodo = (periodos.periodos || []).find(
       (p) => Number(p.idEjercicioDetalle) === Number(idEjercicioDetalle),
     );
-    const codigo = String(periodo?.codigo || periodo?.descripcion || '').toLowerCase();
-    let gid = CAJA_SHEETS.julio.gid;
-    let label = CAJA_SHEETS.julio.label;
-    if (codigo.includes('junio')) {
-      gid = CAJA_SHEETS.junio.gid;
-      label = CAJA_SHEETS.junio.label;
-    } else if (codigo.includes('julio')) {
-      gid = CAJA_SHEETS.julio.gid;
-      label = CAJA_SHEETS.julio.label;
-    } else if (periodo?.fechaDesde) {
-      const m = new Date(periodo.fechaDesde).getUTCMonth() + 1;
-      if (m === 6) {
-        gid = CAJA_SHEETS.junio.gid;
-        label = CAJA_SHEETS.junio.label;
-      }
+    const codigo = String(periodo?.codigo || periodo?.descripcion || '');
+    let sheet = cajaSheetDesdeTextoPeriodo(codigo);
+    if (!sheet && periodo?.fechaDesde) {
+      const d = new Date(periodo.fechaDesde);
+      const yyyyMm = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      sheet = cajaSheetParaYyyyMm(yyyyMm);
     }
-    const rows = await fetchCajaData({ sheetGids: [gid] });
-    const adhesiones = rows.filter(esFilaAdhesionCaja);
-    const MONTO_ADHESION = 33000;
-    excel = {
-      fuente: label,
-      cantidad: adhesiones.length,
-      totalRecaudado: adhesiones.length * MONTO_ADHESION,
-      montoUnitario: MONTO_ADHESION,
-      error: null,
-      periodoCodigo: periodo?.descripcion || periodo?.codigo || null,
-    };
+    const periodoCodigo = periodo?.descripcion || periodo?.codigo || null;
+    if (!sheet) {
+      excel = {
+        fuente: null,
+        cantidad: 0,
+        totalRecaudado: 0,
+        montoUnitario: 33000,
+        error: periodoCodigo
+          ? `No hay hoja Excel de Caja configurada para «${periodoCodigo}».`
+          : 'No hay hoja Excel de Caja para el período seleccionado.',
+        periodoCodigo,
+      };
+    } else {
+      const rows = await fetchCajaData({ sheetGids: [sheet.gid] });
+      const adhesiones = rows.filter(esFilaAdhesionCaja);
+      const MONTO_ADHESION = 33000;
+      excel = {
+        fuente: sheet.label,
+        cantidad: adhesiones.length,
+        totalRecaudado: adhesiones.length * MONTO_ADHESION,
+        montoUnitario: MONTO_ADHESION,
+        error: null,
+        periodoCodigo,
+      };
+    }
   } catch (err) {
     excel = {
       ...excel,

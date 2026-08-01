@@ -360,24 +360,25 @@ async function enrichRawRowMap(rawByLeadId) {
   return out;
 }
 
-/** Normaliza fila SQL o JSON del SP → objeto seguimiento (camelCase) de la app. */
+/** Normaliza fila SQL → objeto seguimiento (camelCase). Planas primero; JSON solo fallback. */
 export function mapSqlRowToSeguimiento(row, child = {}) {
   if (!row) return {};
 
-  let base = {};
+  // Fallback legacy: solo si el SP aún trae seguimiento_json (lectura vieja).
+  let jsonFallback = {};
   const jsonRaw = row.seguimiento_json ?? row.seguimientoJson;
   if (jsonRaw) {
     try {
       const parsed = typeof jsonRaw === 'string' ? JSON.parse(jsonRaw) : jsonRaw;
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        base = { ...parsed };
+        jsonFallback = parsed;
       }
     } catch {
-      /* columnas planas */
+      /* ignorar JSON inválido; usar planas */
     }
   }
 
-  let referidos = base.referidos;
+  let referidos = jsonFallback.referidos;
   const refRaw = row.referidos_json ?? row.referidosJson;
   if (refRaw) {
     try {
@@ -387,7 +388,7 @@ export function mapSqlRowToSeguimiento(row, child = {}) {
     }
   }
 
-  let comprasAdicionales = base.comprasAdicionales;
+  let comprasAdicionales = jsonFallback.comprasAdicionales;
   const comprasFlat = row.compras_adicionales_json ?? row.comprasAdicionalesJson;
   if (comprasFlat) {
     try {
@@ -398,7 +399,7 @@ export function mapSqlRowToSeguimiento(row, child = {}) {
     }
   }
 
-  let imagenesCierre = base.imagenesCierre;
+  let imagenesCierre = jsonFallback.imagenesCierre;
   const imagenesFlat = row.imagenes_cierre_json ?? row.imagenesCierreJson;
   if (imagenesFlat) {
     try {
@@ -422,8 +423,9 @@ export function mapSqlRowToSeguimiento(row, child = {}) {
     imagenesCierre = child.imagenesCierre;
   }
 
-  const idProducto = base.idProducto ?? row.id_producto ?? row.idProducto ?? null;
-  const numeroRecibo = base.numeroRecibo ?? row.numero_recibo ?? row.numeroRecibo ?? null;
+  const idProducto = row.id_producto ?? row.idProducto ?? jsonFallback.idProducto ?? null;
+  const numeroRecibo =
+    row.numero_recibo ?? row.numeroRecibo ?? jsonFallback.numeroRecibo ?? null;
   const partesPij =
     row.serie_pij != null || row.nro_adhesion != null || row.nro_anexo != null
       ? {
@@ -433,75 +435,109 @@ export function mapSqlRowToSeguimiento(row, child = {}) {
         }
       : partesReciboPij(idProducto, numeroRecibo);
 
+  const hasCol = (a, b) =>
+    Object.prototype.hasOwnProperty.call(row, a) || Object.prototype.hasOwnProperty.call(row, b);
+
+  const pickBit = (colA, colB, jsonKey) => {
+    if (hasCol(colA, colB)) {
+      return bitOrNull(row[colA] ?? row[colB]);
+    }
+    return bitOrNull(jsonFallback[jsonKey]);
+  };
+
+  const pick = (colA, colB, jsonKey) => {
+    if (hasCol(colA, colB)) {
+      const v = row[colA] ?? row[colB];
+      return v === undefined ? (jsonFallback[jsonKey] ?? null) : v;
+    }
+    return jsonFallback[jsonKey] ?? null;
+  };
+
   return {
-    ...base,
-    confirmoEntrevista:
-      base.confirmoEntrevista ??
-      bitOrNull(row.confirmo_entrevista ?? row.confirmoEntrevista),
-    canal: base.canal ?? row.canal ?? null,
-    huboEntrevista:
-      base.huboEntrevista ?? bitOrNull(row.hubo_entrevista ?? row.huboEntrevista),
-    resultadoEntrevista:
-      base.resultadoEntrevista ?? row.resultado_entrevista ?? row.resultadoEntrevista ?? null,
-    horarioEntrevistaPropuesto:
-      base.horarioEntrevistaPropuesto ??
-      row.horario_entrevista_propuesto ??
-      row.horarioEntrevistaPropuesto ??
-      null,
-    fechaReagenda: base.fechaReagenda ?? row.fecha_reagenda ?? row.fechaReagenda ?? null,
-    fechaCierre: base.fechaCierre ?? row.fecha_cierre ?? row.fechaCierre ?? null,
-    seguimientoPijPromotor:
-      base.seguimientoPijPromotor ??
-      bitOrNull(row.seguimiento_pij_promotor ?? row.seguimientoPijPromotor),
-    seguimientoAgendaOperadorRol:
-      base.seguimientoAgendaOperadorRol ??
-      row.seguimiento_agenda_operador_rol ??
-      row.seguimientoAgendaOperadorRol ??
-      null,
+    ...jsonFallback,
+    confirmoEntrevista: pickBit('confirmo_entrevista', 'confirmoEntrevista', 'confirmoEntrevista'),
+    canal: pick('canal', 'canal', 'canal'),
+    huboEntrevista: pickBit('hubo_entrevista', 'huboEntrevista', 'huboEntrevista'),
+    resultadoEntrevista: pick(
+      'resultado_entrevista',
+      'resultadoEntrevista',
+      'resultadoEntrevista',
+    ),
+    horarioEntrevistaPropuesto: pick(
+      'horario_entrevista_propuesto',
+      'horarioEntrevistaPropuesto',
+      'horarioEntrevistaPropuesto',
+    ),
+    fechaReagenda: pick('fecha_reagenda', 'fechaReagenda', 'fechaReagenda'),
+    fechaCierre: pick('fecha_cierre', 'fechaCierre', 'fechaCierre'),
+    seguimientoPijPromotor: pickBit(
+      'seguimiento_pij_promotor',
+      'seguimientoPijPromotor',
+      'seguimientoPijPromotor',
+    ),
+    seguimientoAgendaOperadorRol: pick(
+      'seguimiento_agenda_operador_rol',
+      'seguimientoAgendaOperadorRol',
+      'seguimientoAgendaOperadorRol',
+    ),
     idProducto,
-    estadoPago: base.estadoPago ?? row.estado_pago ?? row.estadoPago ?? null,
-    idBarrio: base.idBarrio ?? row.id_barrio ?? row.idBarrio ?? null,
+    estadoPago: pick('estado_pago', 'estadoPago', 'estadoPago'),
+    idBarrio: pick('id_barrio', 'idBarrio', 'idBarrio'),
     numeroRecibo,
-    seriePij: base.seriePij ?? partesPij.serie ?? null,
-    nroAdhesion: base.nroAdhesion ?? partesPij.nroAdhesion ?? null,
-    nroAnexo: base.nroAnexo ?? partesPij.nroAnexo ?? null,
-    formaPago: base.formaPago ?? row.forma_pago ?? row.formaPago ?? null,
-    montoCierre: base.montoCierre ?? parseDecimalOrNull(row.monto_cierre ?? row.montoCierre),
-    montoEfectivo:
-      base.montoEfectivo ?? parseDecimalOrNull(row.monto_efectivo ?? row.montoEfectivo),
-    montoTransferencia:
-      base.montoTransferencia ??
-      parseDecimalOrNull(row.monto_transferencia ?? row.montoTransferencia),
-    titularTransferencia:
-      base.titularTransferencia ??
-      row.titular_transferencia ??
-      row.titularTransferencia ??
-      null,
-    titularCoincideCliente:
-      base.titularCoincideCliente ??
-      bitOrNull(row.titular_coincide_cliente ?? row.titularCoincideCliente),
-    bancoTransferencia:
-      base.bancoTransferencia ?? row.banco_transferencia ?? row.bancoTransferencia ?? null,
-    referenciaTransferencia:
-      base.referenciaTransferencia ??
-      row.referencia_transferencia ??
-      row.referenciaTransferencia ??
-      null,
+    seriePij: partesPij.serie ?? jsonFallback.seriePij ?? null,
+    nroAdhesion: partesPij.nroAdhesion ?? jsonFallback.nroAdhesion ?? null,
+    nroAnexo: partesPij.nroAnexo ?? jsonFallback.nroAnexo ?? null,
+    formaPago: pick('forma_pago', 'formaPago', 'formaPago'),
+    montoCierre: hasCol('monto_cierre', 'montoCierre')
+      ? parseDecimalOrNull(row.monto_cierre ?? row.montoCierre)
+      : parseDecimalOrNull(jsonFallback.montoCierre),
+    montoEfectivo: hasCol('monto_efectivo', 'montoEfectivo')
+      ? parseDecimalOrNull(row.monto_efectivo ?? row.montoEfectivo)
+      : parseDecimalOrNull(jsonFallback.montoEfectivo),
+    montoTransferencia: hasCol('monto_transferencia', 'montoTransferencia')
+      ? parseDecimalOrNull(row.monto_transferencia ?? row.montoTransferencia)
+      : parseDecimalOrNull(jsonFallback.montoTransferencia),
+    titularTransferencia: pick(
+      'titular_transferencia',
+      'titularTransferencia',
+      'titularTransferencia',
+    ),
+    titularCoincideCliente: pickBit(
+      'titular_coincide_cliente',
+      'titularCoincideCliente',
+      'titularCoincideCliente',
+    ),
+    bancoTransferencia: pick('banco_transferencia', 'bancoTransferencia', 'bancoTransferencia'),
+    referenciaTransferencia: pick(
+      'referencia_transferencia',
+      'referenciaTransferencia',
+      'referenciaTransferencia',
+    ),
     dniCliente:
-      normalizarDniCliente(base.dniCliente ?? row.dni_cliente ?? row.dniCliente) || null,
-    brindoReferidos:
-      base.brindoReferidos ?? bitOrNull(row.brindo_referidos ?? row.brindoReferidos),
-    derivacionTerrenoActiva:
-      base.derivacionTerrenoActiva ??
-      bitOrNull(row.derivacion_terreno_activa ?? row.derivacionTerrenoActiva),
+      normalizarDniCliente(
+        hasCol('dni_cliente', 'dniCliente')
+          ? (row.dni_cliente ?? row.dniCliente)
+          : jsonFallback.dniCliente,
+      ) || null,
+    brindoReferidos: pickBit('brindo_referidos', 'brindoReferidos', 'brindoReferidos'),
+    derivacionTerrenoActiva: pickBit(
+      'derivacion_terreno_activa',
+      'derivacionTerrenoActiva',
+      'derivacionTerrenoActiva',
+    ),
     referidos: Array.isArray(referidos) ? referidos : undefined,
-    observaciones: base.observaciones ?? row.observaciones ?? undefined,
-    fuente: base.fuente ?? row.fuente ?? undefined,
-    operadorId: row.operador_id != null ? String(row.operador_id) : (base.operadorId ?? null),
-    operadorRol: row.operador_rol ?? row.operadorRol ?? base.operadorRol ?? null,
+    observaciones: hasCol('observaciones', 'observaciones')
+      ? (row.observaciones ?? undefined)
+      : (jsonFallback.observaciones ?? undefined),
+    fuente: pick('fuente', 'fuente', 'fuente') || undefined,
+    operadorId:
+      row.operador_id != null
+        ? String(row.operador_id)
+        : (jsonFallback.operadorId ?? null),
+    operadorRol: row.operador_rol ?? row.operadorRol ?? jsonFallback.operadorRol ?? null,
     operadorNombre:
-      row.operador_nombre ?? row.operadorNombre ?? base.operadorNombre ?? null,
-    creadoEn: formatCreadoEn(row) ?? base.creadoEn ?? null,
+      row.operador_nombre ?? row.operadorNombre ?? jsonFallback.operadorNombre ?? null,
+    creadoEn: formatCreadoEn(row) ?? jsonFallback.creadoEn ?? null,
     comprasAdicionales: comprasAdicionales ?? null,
     imagenesCierre: Array.isArray(imagenesCierre)
       ? imagenesCierre.map((img) => {
@@ -514,30 +550,28 @@ export function mapSqlRowToSeguimiento(row, child = {}) {
       if (fromCol != null && Number.isFinite(Number(fromCol)) && Number(fromCol) > 0) {
         return Number(fromCol);
       }
-      if (base.idVentaIntegral != null && Number.isFinite(Number(base.idVentaIntegral))) {
-        return Number(base.idVentaIntegral);
+      if (
+        !hasCol('id_venta_integral', 'idVentaIntegral') &&
+        jsonFallback.idVentaIntegral != null &&
+        Number.isFinite(Number(jsonFallback.idVentaIntegral))
+      ) {
+        return Number(jsonFallback.idVentaIntegral);
       }
       return null;
     })(),
-    pijIntegralEstado:
-      base.pijIntegralEstado ?? row.pij_integral_estado ?? row.pijIntegralEstado ?? null,
-    pijIntegralError:
-      base.pijIntegralError ?? row.pij_integral_error ?? row.pijIntegralError ?? null,
-    pijIntegralEnviadoEn:
-      base.pijIntegralEnviadoEn ??
-      row.pij_integral_enviado_en ??
-      row.pijIntegralEnviadoEn ??
-      null,
-    cajaEstado: base.cajaEstado ?? row.caja_estado ?? row.cajaEstado ?? null,
-    cajaVerificadoEn:
-      base.cajaVerificadoEn ?? row.caja_verificado_en ?? row.cajaVerificadoEn ?? null,
-    cajaComprobanteId:
-      base.cajaComprobanteId ?? row.caja_comprobante_id ?? row.cajaComprobanteId ?? null,
-    cajaMotivoRechazo:
-      base.cajaMotivoRechazo ?? row.caja_motivo_rechazo ?? row.cajaMotivoRechazo ?? null,
-    cajaSucursal: base.cajaSucursal ?? row.caja_sucursal ?? row.cajaSucursal ?? null,
-    cajaConfirmadoPor:
-      base.cajaConfirmadoPor ?? row.caja_confirmado_por ?? row.cajaConfirmadoPor ?? null,
+    pijIntegralEstado: pick('pij_integral_estado', 'pijIntegralEstado', 'pijIntegralEstado'),
+    pijIntegralError: pick('pij_integral_error', 'pijIntegralError', 'pijIntegralError'),
+    pijIntegralEnviadoEn: pick(
+      'pij_integral_enviado_en',
+      'pijIntegralEnviadoEn',
+      'pijIntegralEnviadoEn',
+    ),
+    cajaEstado: pick('caja_estado', 'cajaEstado', 'cajaEstado'),
+    cajaVerificadoEn: pick('caja_verificado_en', 'cajaVerificadoEn', 'cajaVerificadoEn'),
+    cajaComprobanteId: pick('caja_comprobante_id', 'cajaComprobanteId', 'cajaComprobanteId'),
+    cajaMotivoRechazo: pick('caja_motivo_rechazo', 'cajaMotivoRechazo', 'cajaMotivoRechazo'),
+    cajaSucursal: pick('caja_sucursal', 'cajaSucursal', 'cajaSucursal'),
+    cajaConfirmadoPor: pick('caja_confirmado_por', 'cajaConfirmadoPor', 'cajaConfirmadoPor'),
   };
 }
 

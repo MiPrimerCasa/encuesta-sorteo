@@ -1,5 +1,12 @@
 export type RolUsuario = 'promotor' | 'supervisor' | 'superadmin';
-export type VistaActiva = 'leads' | 'promotores' | 'metricas' | 'calendario' | 'admin' | 'grabacion';
+export type VistaActiva =
+  | 'leads'
+  | 'promotores'
+  | 'metricas'
+  | 'calendario'
+  | 'admin'
+  | 'grabacion'
+  | 'comisiones';
 export type ListaLead = 'entrevista' | 'contacto';
 /** Dónde quiere la entrevista el cliente (encuesta / SP). */
 export type LugarEntrevista = 'sucursal' | 'domicilio';
@@ -272,7 +279,9 @@ export interface FaltantesPijIntegral {
 
 export interface FaltantesPijResponse {
   fuente?: string;
-  mesConsultado?: 'junio' | 'julio' | null;
+  mesConsultado?: string | null;
+  idEjercicioDetalle?: number | null;
+  yyyyMm?: string | null;
   resumen: {
     adhesionesExcel: number;
     matched: number;
@@ -559,6 +568,80 @@ export interface UsuarioSesion {
   sucursal?: string;
   /** Supervisor con acceso al panel global de superadmin (PANEL_GLOBAL_LOGIN_IDS). */
   panelGlobal?: boolean;
+  /** Acceso al informe de comisiones contable (COMISIONES_CONTABLE_LOGIN_IDS). */
+  comisionesContable?: boolean;
+}
+
+/** Informe de comisiones y salarios para departamento contable. */
+export interface ProgresoComisionObjetivo {
+  actual: number;
+  objetivo: number;
+  cada: number;
+  faltan: number;
+  porcentaje: number;
+  cumplido: boolean;
+  tramo: number;
+  mensaje: string;
+}
+
+export interface InformeComisionesContable {
+  generadoEn: string;
+  destinatario: string;
+  periodoPanel: string;
+  yyyyMm: string | null;
+  idEjercicioDetalle: number | null;
+  periodoCodigo: string | null;
+  reglas: {
+    pijUnitario: number;
+    terrenoPorcentaje: number;
+    salarioFijo?: number;
+    objetivoPij?: number;
+    objetivoTerrenos?: number;
+    descripcionPij: string;
+    descripcionTerreno: string;
+    descripcionSalario?: string;
+  };
+  pij: {
+    cantidad: number;
+    unitario: number;
+    comision: number;
+    /** Comisión teórica sin umbral. */
+    comisionBruta?: number;
+    objetivoCumplido?: boolean;
+    progreso?: ProgresoComisionObjetivo;
+    porVendedor: Array<{
+      vendedor: string;
+      cantidad: number;
+      clientes?: Array<{ nombre: string; recibo: string; fecha: string }>;
+    }>;
+  };
+  terrenos: {
+    cantidad: number;
+    montoRecaudado: number;
+    porcentaje: number;
+    comision: number;
+    /** Comisión teórica sin umbral. */
+    comisionBruta?: number;
+    objetivoCumplido?: boolean;
+    progreso?: ProgresoComisionObjetivo;
+    porVendedor: Array<{ vendedor: string; cantidad: number }>;
+    filas: Array<{
+      vendedor: string;
+      nombreCliente: string;
+      barrio: string;
+      mz: string;
+      pc: string;
+      totalCobradoPeriodo: number;
+    }>;
+  };
+  /** Salario fijo mensual ($800.000). */
+  salarioFijo: number;
+  totalComision: number;
+  /** Comisiones + salario fijo. */
+  totalALiquidar: number;
+  excelError?: string | null;
+  error?: string | null;
+  aplicable?: boolean;
 }
 
 
@@ -611,6 +694,65 @@ export interface AdminChartEvent {
   fecha: string;
   tipo: AdminChartEventTipo;
   supervisorNombre?: string;
+}
+
+/** Enriquecimiento silencioso del Informe de Operaciones (faltantes PIJ + lotes SP). */
+export interface InformeOperacionesEnriquecimiento {
+  aplicable: boolean;
+  periodoPanel: string;
+  yyyyMm: string | null;
+  idEjercicioDetalle: number | null;
+  periodoCodigo: string | null;
+  /** Total oficial PIJ del mes (= adhesiones Excel). */
+  pijExcelCantidad?: number;
+  pijExcelPorVendedor?: Array<{
+    vendedor: string;
+    cantidad: number;
+    clientes: Array<{ nombre: string; recibo: string; fecha: string }>;
+  }>;
+  pijExcelItems?: Array<{
+    nombreCliente: string;
+    vendedor: string;
+    recibo: string;
+    fecha: string;
+    fechaIso: string | null;
+  }>;
+  pijFaltantesCantidad: number;
+  pijFaltantes: Array<{
+    nombreCliente: string;
+    vendedor: string;
+    recibo: string;
+    fecha: string;
+    fechaIso: string | null;
+  }>;
+  pijPorVendedor: Array<{
+    vendedor: string;
+    cantidad: number;
+    clientes: Array<{ nombre: string; recibo: string; fecha: string }>;
+  }>;
+  pijEventos: AdminChartEvent[];
+  lotesSpCantidad: number;
+  lotesSp: Array<{
+    vendedor: string;
+    nombreCliente: string;
+    barrio: string;
+    mz: string;
+    pc: string;
+    idLoteVenta: number;
+    fechaInicioCobranza: string | null;
+    totalCobradoPeriodo: number;
+    precioLote: number;
+  }>;
+  lotesPorVendedor: Array<{ vendedor: string; cantidad: number }>;
+  lotesEventos: AdminChartEvent[];
+  excelError?: string | null;
+  error?: string | null;
+  meta?: {
+    adhesionesExcel?: number;
+    matchedEnPeriodo?: number;
+    faltantesEnPeriodo?: number;
+    fuenteExcel?: string | null;
+  } | null;
 }
 
 export interface AdminConocimientoConteo {

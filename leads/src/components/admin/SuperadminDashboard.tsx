@@ -1,5 +1,18 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import type { AdminDashboardData, RankingAdminEntry, PersonaPijCierres, Lead, Barrio, Producto, SeguimientoLead, PijCierreDetalle, TerrenoCierreDetalle, PromotorMetricasAdmin } from '../../types';
+import type {
+  AdminDashboardData,
+  RankingAdminEntry,
+  PersonaPijCierres,
+  Lead,
+  Barrio,
+  Producto,
+  SeguimientoLead,
+  PijCierreDetalle,
+  TerrenoCierreDetalle,
+  PromotorMetricasAdmin,
+  InformeOperacionesEnriquecimiento,
+  InformeCierrePeriodo,
+} from '../../types';
 import {
   extraerVentasDetalleInforme,
   fechaIsoLocal,
@@ -15,12 +28,33 @@ import {
   etiquetaTipoPeriodo,
   rangoFechasIsoPorPeriodo,
 } from '../../domain/admin-periodo';
+import {
+  cantidadPorVendedorMatch,
+  vendedoresCoincidenUi,
+} from '../../domain/admin-enriquecimiento';
 import { actualizarAppQuery, leerTabDesdeUrl, type AdminTab } from '../../domain/admin-url';
 import { AdminConocimientoEncuesta } from './AdminConocimientoEncuesta';
 import { AdminMetricsChart } from './AdminMetricsChart';
 import { AdminPeriodoSelector } from './AdminPeriodoSelector';
 import { AdminProductividadPanel } from './AdminProductividadPanel';
-import { getSession, fetchAdminLeads, fetchAdminOperadores, reasignarLead, fetchBarrios, fetchProductos, guardarSeguimiento, duplicarLead, resetearLeadSeguimiento, modificarDatosLead, fetchGrabacionesConfig } from '../../api/client';
+import {
+  getSession,
+  fetchAdminLeads,
+  fetchAdminOperadores,
+  reasignarLead,
+  fetchBarrios,
+  fetchProductos,
+  guardarSeguimiento,
+  duplicarLead,
+  resetearLeadSeguimiento,
+  modificarDatosLead,
+  fetchGrabacionesConfig,
+  fetchInformeOperacionesEnriquecimiento,
+  fetchInformeCierresPeriodos,
+  previewSyncCajaPij,
+  commitSyncCajaPij,
+  previewFaltantesPij,
+} from '../../api/client';
 import type { ModificarDatosLeadPayload, OperadorCatalogo } from '../../api/client';
 import { getBarrioNombre } from '../../domain/venta';
 import { useAuth } from '../../context/AuthContext';
@@ -32,9 +66,12 @@ import { FaltantesPijModal } from './FaltantesPijModal';
 import { PromotorInformeFilter } from './PromotorInformeFilter';
 import { InformeCierresPanel } from './InformeCierresPanel';
 import { GrabacionesCumplimientoPanel } from './GrabacionesCumplimientoPanel';
-import { previewSyncCajaPij, commitSyncCajaPij, previewFaltantesPij } from '../../api/client';
 import type { SyncPreviewItem, FaltantesPijResponse } from '../../types';
 import { downloadVerificacionCajaCrmExcel } from '../../utils/export-verificacion-caja-crm-excel';
+
+function periodoAplicaEnriquecimiento(periodo: string) {
+  return periodo === 'mes' || esPeriodoMesCalendario(periodo);
+}
 
 
 interface SuperadminDashboardProps {
@@ -346,9 +383,57 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
 
   const [isFaltantesModalOpen, setIsFaltantesModalOpen] = useState(false);
   const [faltantesData, setFaltantesData] = useState<FaltantesPijResponse | null>(null);
-  const [faltantesMes, setFaltantesMes] = useState<'junio' | 'julio'>('julio');
+  const [faltantesIdEjercicio, setFaltantesIdEjercicio] = useState<number | null>(null);
+  const [faltantesPeriodos, setFaltantesPeriodos] = useState<InformeCierrePeriodo[]>([]);
   const [isFaltantesLoading, setIsFaltantesLoading] = useState(false);
   const [isExcelVerifLoading, setIsExcelVerifLoading] = useState(false);
+
+  const [enriquecimiento, setEnriquecimiento] =
+    useState<InformeOperacionesEnriquecimiento | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!periodoAplicaEnriquecimiento(periodoActivo)) {
+      setEnriquecimiento(null);
+      return;
+    }
+    (async () => {
+      try {
+        const data = await fetchInformeOperacionesEnriquecimiento(periodoActivo);
+        if (!cancelled) setEnriquecimiento(data);
+      } catch (err) {
+        console.error('Enriquecimiento informe operaciones:', err);
+        if (!cancelled) setEnriquecimiento(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [periodoActivo]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetchInformeCierresPeriodos();
+        if (cancelled) return;
+        const lista = res.periodos ?? [];
+        setFaltantesPeriodos(lista);
+        setFaltantesIdEjercicio((prev) => {
+          if (prev != null && lista.some((p) => p.idEjercicioDetalle === prev)) return prev;
+          const julio = lista.find((p) =>
+            `${p.codigo} ${p.descripcion}`.toLowerCase().includes('julio'),
+          );
+          return julio?.idEjercicioDetalle ?? lista[0]?.idEjercicioDetalle ?? null;
+        });
+      } catch {
+        /* el modal sigue usable con CSV */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handlePreviewSync = async () => {
     try {
@@ -367,19 +452,30 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
   const handleGenerarExcelVerificacion = async () => {
     try {
       setIsExcelVerifLoading(true);
+      const idEj = faltantesIdEjercicio;
       const [syncRes, faltantesRes] = await Promise.all([
         previewSyncCajaPij(),
-        previewFaltantesPij({ mes: faltantesMes }),
+        previewFaltantesPij({
+          idEjercicioDetalle: idEj ?? undefined,
+        }),
       ]);
       setSyncPreviewItems(syncRes.cambiosPropuestos);
       setSyncFuente(syncRes.fuente ?? '');
       setFaltantesData(faltantesRes);
+      if (faltantesRes.idEjercicioDetalle != null) {
+        setFaltantesIdEjercicio(faltantesRes.idEjercicioDetalle);
+      }
 
+      const label =
+        faltantesPeriodos.find((p) => p.idEjercicioDetalle === (faltantesRes.idEjercicioDetalle ?? idEj))
+          ?.descripcion ||
+        faltantesRes.yyyyMm ||
+        'periodo';
       const ok = downloadVerificacionCajaCrmExcel({
         syncItems: syncRes.cambiosPropuestos,
         faltantes: faltantesRes,
         fuenteSync: syncRes.fuente,
-        prefijoArchivo: `verificacion-caja-crm-${faltantesMes}`,
+        prefijoArchivo: `verificacion-caja-crm-${String(label).replace(/\s+/g, '-').toLowerCase()}`,
       });
       if (!ok) {
         alert('No hay diferencias ni faltantes para exportar en este cruce.');
@@ -392,19 +488,23 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
   };
 
   const loadFaltantesPij = async (opts: {
-    mes?: 'junio' | 'julio';
+    idEjercicioDetalle?: number;
     csvText?: string;
   } = {}) => {
-    const mes = opts.mes ?? faltantesMes;
+    const idEj = opts.idEjercicioDetalle ?? faltantesIdEjercicio ?? undefined;
     try {
       setIsFaltantesLoading(true);
       setIsFaltantesModalOpen(true);
       const res = await previewFaltantesPij({
-        mes,
+        idEjercicioDetalle: idEj,
         csvText: opts.csvText,
       });
       setFaltantesData(res);
-      if (!opts.csvText) setFaltantesMes(mes);
+      if (!opts.csvText && res.idEjercicioDetalle != null) {
+        setFaltantesIdEjercicio(res.idEjercicioDetalle);
+      } else if (!opts.csvText && idEj != null) {
+        setFaltantesIdEjercicio(idEj);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Error al cruzar Excel con el CRM');
       if (!faltantesData) setIsFaltantesModalOpen(false);
@@ -641,20 +741,67 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
     return b.leadsTotal - a.leadsTotal;
   });
 
+  const promotoresEnriquecidos = useMemo(() => {
+    const excelPijActivo =
+      !!enriquecimiento?.aplicable && (enriquecimiento.pijExcelCantidad ?? 0) > 0;
+    const porVendExcel =
+      enriquecimiento?.pijExcelPorVendedor ?? enriquecimiento?.pijPorVendedor ?? [];
+
+    return promotoresOrdenados.map((p) => {
+      const excelPij = excelPijActivo
+        ? cantidadPorVendedorMatch(porVendExcel, p.promotorNombre)
+        : 0;
+      const extraPij = excelPijActivo
+        ? 0
+        : enriquecimiento?.aplicable
+          ? cantidadPorVendedorMatch(enriquecimiento.pijPorVendedor, p.promotorNombre)
+          : 0;
+      const lotesSp = enriquecimiento?.aplicable
+        ? cantidadPorVendedorMatch(enriquecimiento.lotesPorVendedor, p.promotorNombre)
+        : 0;
+      // Con Excel del mes: el PIJ del promotor es el del Excel (total mes = 217 en julio).
+      const ventasPij = excelPijActivo ? excelPij : p.ventasPijSemana + extraPij;
+      const ventasTerreno =
+        enriquecimiento?.aplicable && enriquecimiento.lotesSpCantidad > 0
+          ? Math.max(p.ventasTerrenoSemana, lotesSp)
+          : p.ventasTerrenoSemana;
+      return {
+        ...p,
+        ventasPijSemana: ventasPij,
+        ventasTerrenoSemana: ventasTerreno,
+        _extraPij: excelPijActivo ? excelPij - p.ventasPijSemana : extraPij,
+        _lotesSp: lotesSp,
+        _pijDesdeExcel: excelPijActivo,
+      };
+    });
+  }, [promotoresOrdenados, enriquecimiento]);
+
   const promotoresFiltradosRanking =
     informePromotoresSeleccionados.size === 0
-      ? promotoresOrdenados
-      : promotoresOrdenados.filter((p) => informePromotoresSeleccionados.has(p.promotorId));
+      ? promotoresEnriquecidos
+      : promotoresEnriquecidos.filter((p) => informePromotoresSeleccionados.has(p.promotorId));
 
   const totalPromotoresCierres = promotoresFiltradosRanking.reduce((acc, p) => acc + p.cierresSemana, 0);
   const totalPromotoresEntrevistas = promotoresFiltradosRanking.reduce((acc, p) => acc + p.entrevistasSemana, 0);
   const totalPromotoresLeads = promotoresFiltradosRanking.reduce((acc, p) => acc + p.leadsSemana, 0);
-  const totalPromotoresTerrenos = promotoresFiltradosRanking.reduce((acc, p) => acc + p.ventasTerrenoSemana, 0);
   const totalPromotoresTerrenosSeña = promotoresFiltradosRanking.reduce(
     (acc, p) => acc + (p.ventasTerrenoSenaSemana ?? 0),
     0,
   );
-  const totalPromotoresPij = promotoresFiltradosRanking.reduce((acc, p) => acc + p.ventasPijSemana, 0);
+  const totalPromotoresTerrenos =
+    enriquecimiento?.aplicable &&
+    enriquecimiento.lotesSpCantidad > 0 &&
+    informePromotoresSeleccionados.size === 0
+      ? enriquecimiento.lotesSpCantidad
+      : promotoresFiltradosRanking.reduce((acc, p) => acc + p.ventasTerrenoSemana, 0);
+  /** PIJ del mes = adhesiones Excel (julio = 217). */
+  const totalPromotoresPij = (() => {
+    const excelN = enriquecimiento?.pijExcelCantidad ?? 0;
+    if (enriquecimiento?.aplicable && excelN > 0 && informePromotoresSeleccionados.size === 0) {
+      return excelN;
+    }
+    return promotoresFiltradosRanking.reduce((acc, p) => acc + p.ventasPijSemana, 0);
+  })();
   const totalPromotoresTratadosHoy = promotoresFiltradosRanking.reduce(
     (acc, p) => acc + (p.tratadosHoy ?? 0),
     0,
@@ -668,9 +815,35 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
     0,
   );
 
+  const eventosChart = useMemo(() => {
+    const base = data.eventos ?? [];
+    if (!enriquecimiento?.aplicable) return base;
+    const excelPij = (enriquecimiento.pijExcelCantidad ?? 0) > 0;
+    const pijEventos = enriquecimiento.pijEventos ?? [];
+    let next = base;
+    // PIJ: reemplazar CRM por eventos Excel del mes (total = cantidad Excel).
+    if (excelPij) {
+      next = next.filter((e) => e.tipo !== 'pij');
+      next = [...next, ...pijEventos];
+    } else if (pijEventos.length) {
+      next = [...next, ...pijEventos];
+    }
+    // Terrenos 100%: reemplazar CRM por eventos del SP.
+    if (enriquecimiento.lotesSpCantidad > 0) {
+      next = next.filter((e) => e.tipo !== 'terreno');
+      next = [...next, ...(enriquecimiento.lotesEventos ?? [])];
+    }
+    return next;
+  }, [data.eventos, enriquecimiento]);
+
   const rango = formatRangoSemana(data.semanaDesde, data.semanaHasta);
 
-  type PromotorConSupervisor = PromotorMetricasAdmin & { supervisorNombre?: string };
+  type PromotorConSupervisor = PromotorMetricasAdmin & {
+    supervisorNombre?: string;
+    _extraPij?: number;
+    _lotesSp?: number;
+    _pijDesdeExcel?: boolean;
+  };
 
   const abrirDetalleInformeVenta = async (
     promotor: PromotorConSupervisor | null,
@@ -711,20 +884,79 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
     const etiquetaTipo =
       tipo === 'pij' ? 'PIJ' : tipo === 'terreno100' ? 'Terrenos 100%' : 'Terrenos con seña';
 
+    const mergeEnriquecimiento = (
+      pij: PijCierreDetalle[],
+      terreno: TerrenoCierreDetalle[],
+    ): { pij: PijCierreDetalle[]; terreno: TerrenoCierreDetalle[] } => {
+      if (!enriquecimiento?.aplicable) return { pij, terreno };
+
+      if (tipo === 'pij') {
+        const excelItems = enriquecimiento.pijExcelItems;
+        if (excelItems && excelItems.length > 0) {
+          const filas = excelItems.filter((f) =>
+            promotor ? vendedoresCoincidenUi(f.vendedor, promotor.promotorNombre) : true,
+          );
+          const desdeExcel: PijCierreDetalle[] = filas.map((f, i) => ({
+            leadId: `excel-pij-${i}-${f.recibo}`,
+            leadNombre: f.nombreCliente || '—',
+            leadTelefono: '',
+            numeroAnexo: f.recibo || '—',
+            fechaCierre: f.fechaIso || f.fecha || '',
+            estadoPago: null,
+          }));
+          return { pij: desdeExcel, terreno };
+        }
+        const faltantes = (enriquecimiento.pijFaltantes || []).filter((f) =>
+          promotor ? vendedoresCoincidenUi(f.vendedor, promotor.promotorNombre) : true,
+        );
+        const extras: PijCierreDetalle[] = faltantes.map((f, i) => ({
+          leadId: `faltante-${i}-${f.recibo}`,
+          leadNombre: f.nombreCliente || '—',
+          leadTelefono: '',
+          numeroAnexo: f.recibo || '—',
+          fechaCierre: f.fechaIso || f.fecha || '',
+          estadoPago: null,
+        }));
+        return { pij: [...pij, ...extras], terreno };
+      }
+
+      if (tipo === 'terreno100' && enriquecimiento.lotesSpCantidad > 0) {
+        const filas = (enriquecimiento.lotesSp || []).filter((f) =>
+          promotor ? vendedoresCoincidenUi(f.vendedor, promotor.promotorNombre) : true,
+        );
+        const desdeSp: TerrenoCierreDetalle[] = filas.map((f, i) => ({
+          leadId: `sp-lote-${f.idLoteVenta || i}`,
+          leadNombre: f.nombreCliente || '—',
+          leadTelefono: '',
+          numeroRecibo: [f.barrio, f.mz && `MZ ${f.mz}`, f.pc && `PC ${f.pc}`]
+            .filter(Boolean)
+            .join(' · '),
+          idBarrio: f.barrio || null,
+          fechaCierre: f.fechaInicioCobranza || '',
+          estadoPago: 'cien',
+        }));
+        // Preferir listado SP (cantidad oficial Terrenos 100%).
+        return { pij, terreno: desdeSp.length > 0 ? desdeSp : terreno };
+      }
+
+      return { pij, terreno };
+    };
+
     const abrirModal = (pij: PijCierreDetalle[], terreno: TerrenoCierreDetalle[]) => {
+      const merged = mergeEnriquecimiento(pij, terreno);
       const cantidadMostrar =
-        (tipo === 'pij' ? pij.length : terreno.length) > 0
+        (tipo === 'pij' ? merged.pij.length : merged.terreno.length) > 0
           ? tipo === 'pij'
-            ? pij.length
-            : terreno.length
+            ? merged.pij.length
+            : merged.terreno.length
           : countTabla;
       setFilterText('');
       setInformeVentaDetalle({
         titulo: promotor ? `${etiquetaTipo} — ${promotor.promotorNombre}` : `${etiquetaTipo} — Total`,
         subtitulo: `${cantidadMostrar} venta${cantidadMostrar === 1 ? '' : 's'} · ${rango}`,
         tipo,
-        itemsPij: pij,
-        itemsTerreno: terreno,
+        itemsPij: merged.pij,
+        itemsTerreno: merged.terreno,
       });
     };
 
@@ -1041,7 +1273,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => void loadFaltantesPij({ mes: 'julio' })}
+              onClick={() => void loadFaltantesPij({ idEjercicioDetalle: faltantesIdEjercicio ?? undefined })}
               disabled={isFaltantesLoading}
               className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-[13px] font-semibold text-amber-900 shadow-sm hover:bg-amber-100 transition-colors disabled:opacity-50 flex items-center gap-2"
             >
@@ -1236,9 +1468,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
         </div>
       </section>
 
-      {(data.eventos?.length ?? 0) > 0 && (
+      {(eventosChart.length > 0) && (
         <AdminMetricsChart
-          eventos={data.eventos ?? []}
+          eventos={eventosChart}
           supervisores={data.supervisores.map((s) => ({
             supervisorId: s.supervisorId,
             supervisorNombre: s.supervisorNombre,
@@ -2929,9 +3161,12 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
         onClose={() => setIsFaltantesModalOpen(false)}
         data={faltantesData}
         isLoading={isFaltantesLoading}
-        mes={faltantesMes}
-        onCambiarMes={(m) => void loadFaltantesPij({ mes: m })}
-        onRecargar={() => void loadFaltantesPij({ mes: faltantesMes })}
+        periodos={faltantesPeriodos}
+        idEjercicioDetalle={faltantesIdEjercicio}
+        onCambiarPeriodo={(id) => void loadFaltantesPij({ idEjercicioDetalle: id })}
+        onRecargar={() =>
+          void loadFaltantesPij({ idEjercicioDetalle: faltantesIdEjercicio ?? undefined })
+        }
         onSubirCsv={(csvText) => void loadFaltantesPij({ csvText })}
       />
     </div>

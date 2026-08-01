@@ -12,13 +12,54 @@ const CAJA_SPREADSHEET_ID = '1jOxw0FXv_HDNkkh9vwQR9T5PoAPk5rcErUJEVjvayBA';
 export const CAJA_SHEETS = {
   junio: { gid: '288750825', label: 'Junio 2026', mes: '06' },
   julio: { gid: '95957770', label: 'Julio 2026', mes: '07' },
+  agosto: { gid: '1105569788', label: 'Agosto 2026', mes: '08' },
 };
 
-/** Pestañas mensuales del registro PIJ (Junio, Julio, …). Override: CAJA_SHEET_GIDS=288750825,95957770 */
-const CAJA_SHEET_GIDS = (process.env.CAJA_SHEET_GIDS || `${CAJA_SHEETS.junio.gid},${CAJA_SHEETS.julio.gid}`)
+/** Pestañas mensuales del registro PIJ. Override: CAJA_SHEET_GIDS=gid1,gid2,... */
+const CAJA_SHEET_GIDS = (
+  process.env.CAJA_SHEET_GIDS || Object.values(CAJA_SHEETS).map((s) => s.gid).join(',')
+)
   .split(',')
   .map((g) => g.trim())
   .filter(Boolean);
+
+/** @param {string | null | undefined} mesNombre junio|julio|agosto */
+export function cajaSheetPorNombreMes(mesNombre) {
+  const key = String(mesNombre || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
+  if (!key) return null;
+  if (CAJA_SHEETS[key]) return CAJA_SHEETS[key];
+  for (const [k, sheet] of Object.entries(CAJA_SHEETS)) {
+    if (key.includes(k)) return sheet;
+  }
+  return null;
+}
+
+/** Hoja Caja conocida para un YYYY-MM (null si no hay). */
+export function cajaSheetParaYyyyMm(yyyyMm) {
+  const m = String(yyyyMm || '').match(/^\d{4}-(\d{2})$/);
+  if (!m) return null;
+  return Object.values(CAJA_SHEETS).find((s) => s.mes === m[1]) || null;
+}
+
+/** Resuelve hoja desde texto de período (código/descripción SP). */
+export function cajaSheetDesdeTextoPeriodo(texto) {
+  return cajaSheetPorNombreMes(texto);
+}
+
+/** Etiqueta legible a partir de gids. */
+export function cajaFuenteDesdeGids(gids) {
+  const list = Array.isArray(gids) ? gids.filter(Boolean) : [];
+  if (list.length === 1) {
+    const sheet = Object.values(CAJA_SHEETS).find((s) => s.gid === list[0]);
+    if (sheet) return sheet.label;
+  }
+  if (!list.length) return null;
+  return `Pestañas: ${list.join(', ')}`;
+}
 
 function cajaCsvUrl(gid) {
   return `https://docs.google.com/spreadsheets/d/${CAJA_SPREADSHEET_ID}/export?format=csv&gid=${gid}`;
@@ -977,6 +1018,359 @@ function construirIndiceCierresPijCrm(leadsDB) {
 }
 
 /**
+ * Variantes estrictas para cruce del informe (evita falsos positivos por nº corto).
+ * Solo serie+ADH y anexo (≥3 dígitos).
+ */
+export function generarVariantesReciboEstrictas(row) {
+  const variantes = new Set();
+  const serie = normalizar(row.serie);
+  const adh = normalizar(row.ordenAdh);
+  const anexo = normalizar(row.ordenAnexo);
+
+  if (adh && adh !== '-') {
+    if (serie) {
+      variantes.add(`${serie}${adh}`);
+      if (anexo && anexo !== '-') {
+        variantes.add(`${serie}${adh}/${anexo}`);
+        variantes.add(`${serie}${adh}ANEXO${anexo}`);
+      }
+    }
+  }
+  if (anexo && anexo !== '-' && anexo.length >= 3) {
+    variantes.add(anexo);
+    variantes.add(`ANEXO${anexo}`);
+  }
+  return Array.from(variantes);
+}
+
+/**
+ * Claves estrictas de un recibo CRM PIJ (sin nº sueltos de 1–2 dígitos).
+ */
+export function extractNumbersFromCrmReciboEstrictos(recibo) {
+  if (!recibo) return [];
+  const clean = recibo.toUpperCase().replace(/\s+/g, '').replace(/[^A-Z0-9]/g, '/');
+  const matches = new Set();
+
+  const m = clean.match(/^([A-Z]*\d+)(?:\/\d+)?ANEXO(\d+)(?:\/\d+)?$/);
+  if (m) {
+    matches.add(m[1]); // A23 o 23
+    if (m[2].length >= 3) {
+      matches.add(m[2]);
+      matches.add(`ANEXO${m[2]}`);
+    }
+    matches.add(`${m[1]}ANEXO${m[2]}`);
+    matches.add(`${m[1]}/${m[2]}`);
+  }
+
+  const m2 = clean.match(/^([A-Z]+)(\d+)(?:\/\d+)?$/);
+  if (m2) {
+    matches.add(m2[1] + m2[2]);
+  }
+
+  const m3 = clean.match(/^ANEXO(\d+)(?:\/\d+)?$/);
+  if (m3 && m3[1].length >= 3) {
+    matches.add(m3[1]);
+    matches.add(`ANEXO${m3[1]}`);
+  }
+
+  matches.add(clean.replace(/[^A-Z0-9\/]/g, ''));
+  return Array.from(matches).filter(Boolean);
+}
+
+/**
+ * ¿La fecha de cierre cae en YYYY-MM? (calendario local; respeta Z/offset).
+ * @param {string|null|undefined} fecha
+ * @param {string} yyyyMm
+ */
+export function fechaCierreEnYyyyMm(fecha, yyyyMm) {
+  if (!fecha || !yyyyMm) return false;
+  const iso = fechaEventoYyyyMm(fecha);
+  return iso === yyyyMm;
+}
+
+function fechaEventoYyyyMm(fecha) {
+  const s = String(fecha || '').trim();
+  if (!s) return null;
+  // Instantáneo con zona → día calendario local (AR).
+  if (/Z$|[+-]\d{2}:?\d{2}$/i.test(s)) {
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return null;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+  const m = s.match(/^(\d{4})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}`;
+  const parsed = parseFechaCaja(s);
+  if (parsed) {
+    const m2 = String(parsed).match(/^(\d{4})-(\d{2})/);
+    if (m2) return `${m2[1]}-${m2[2]}`;
+  }
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Índice CRM PIJ del mes con claves estrictas (para enriquecer informe).
+ * @param {unknown[]} leadsDB
+ * @param {string} yyyyMm
+ */
+export function construirIndiceCierresPijCrmEnPeriodo(leadsDB, yyyyMm) {
+  /** @type {Map<string, Array<object>>} */
+  const byVariant = new Map();
+  const push = (variantes, meta) => {
+    for (const v of variantes) {
+      if (!v) continue;
+      if (!byVariant.has(v)) byVariant.set(v, []);
+      byVariant.get(v).push(meta);
+    }
+  };
+
+  for (const lead of leadsDB || []) {
+    const seg = lead?.seguimiento;
+    if (!seg) continue;
+    const baseMeta = {
+      leadId: String(lead.id),
+      nombreCliente: String(lead.nombre || ''),
+      promotorNombre: String(lead.promotorNombre || ''),
+      operadorNombre: String(seg.operadorNombre || ''),
+    };
+
+    if (
+      seg.resultadoEntrevista === 'compro' &&
+      seg.idProducto === 'prod-pij' &&
+      seg.numeroRecibo &&
+      String(seg.numeroRecibo).trim() !== '-' &&
+      fechaCierreEnYyyyMm(seg.fechaCierre || seg.creadoEn, yyyyMm)
+    ) {
+      push(extractNumbersFromCrmReciboEstrictos(seg.numeroRecibo), {
+        ...baseMeta,
+        numeroRecibo: String(seg.numeroRecibo),
+        fechaCierre: seg.fechaCierre || null,
+        isCompraAdicional: false,
+      });
+    }
+
+    const adicionales = Array.isArray(seg.comprasAdicionales) ? seg.comprasAdicionales : [];
+    for (const compra of adicionales) {
+      if (String(compra?.idProducto) !== 'prod-pij') continue;
+      if (!compra?.numeroRecibo || String(compra.numeroRecibo).trim() === '-') continue;
+      const fecha = compra.fechaCierre || compra.creadoEn || seg.fechaCierre;
+      if (!fechaCierreEnYyyyMm(fecha, yyyyMm)) continue;
+      push(extractNumbersFromCrmReciboEstrictos(compra.numeroRecibo), {
+        ...baseMeta,
+        numeroRecibo: String(compra.numeroRecibo),
+        fechaCierre: compra.fechaCierre || null,
+        isCompraAdicional: true,
+      });
+    }
+  }
+
+  return byVariant;
+}
+
+/**
+ * Todas las adhesiones Excel del mes (para total oficial del informe = cantidad Excel).
+ * @param {{ yyyyMm: string, sheetGids?: string[], mes?: string }} options
+ */
+export async function buildExcelAdhesionesDelMes(options = {}) {
+  const yyyyMm = options.yyyyMm;
+  if (!yyyyMm) {
+    return { adhesiones: [], porVendedor: [], cantidad: 0, excelError: 'Falta yyyyMm', fuente: null };
+  }
+
+  let sheet = cajaSheetParaYyyyMm(yyyyMm);
+  let gids = Array.isArray(options.sheetGids) ? options.sheetGids.filter(Boolean) : [];
+  if (!gids.length && sheet) gids = [sheet.gid];
+  if (!gids.length && options.mes) {
+    sheet = cajaSheetPorNombreMes(options.mes);
+    if (sheet) gids = [sheet.gid];
+  }
+  if (!gids.length) {
+    return {
+      adhesiones: [],
+      porVendedor: [],
+      cantidad: 0,
+      excelError: `No hay hoja Excel de Caja configurada para ${yyyyMm}.`,
+      fuente: null,
+    };
+  }
+
+  const excelRows = await fetchCajaData({ sheetGids: gids });
+  const rows = excelRows.filter(esFilaAdhesionCaja);
+  const seenKeys = new Set();
+  const adhesiones = [];
+
+  for (const row of rows) {
+    const key = [
+      String(row.serie || '').trim().toUpperCase(),
+      String(row.ordenAdh || '').trim(),
+      String(row.ordenAnexo || '').trim(),
+      String(row.nombreCliente || '').trim().toLowerCase(),
+    ].join('|');
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+
+    const serie = String(row.serie || '').trim().toUpperCase() || 'A';
+    const ordenAdh = String(row.ordenAdh || '').trim();
+    adhesiones.push({
+      idUnico: key,
+      fechaExcel: row.fecha || '',
+      fechaIso: parseFechaCaja(row.fecha) || null,
+      serie,
+      ordenAdh,
+      ordenAnexo: String(row.ordenAnexo || '').trim(),
+      reciboSugerido: formatReciboCaja(serie, ordenAdh, row.ordenAnexo),
+      nombreClienteExcel: String(row.nombreCliente || '').trim(),
+      vendedorExcel: String(row.nombreVendedor || '').trim(),
+      concepto: String(row.concepto || '').trim(),
+    });
+  }
+
+  const porVendedorMap = new Map();
+  for (const f of adhesiones) {
+    const v = f.vendedorExcel || 'Sin vendedor';
+    if (!porVendedorMap.has(v)) {
+      porVendedorMap.set(v, { vendedor: v, cantidad: 0, clientes: [] });
+    }
+    const g = porVendedorMap.get(v);
+    g.cantidad += 1;
+    g.clientes.push({
+      nombre: f.nombreClienteExcel,
+      recibo: f.reciboSugerido,
+      fecha: f.fechaExcel,
+    });
+  }
+  const porVendedor = Array.from(porVendedorMap.values()).sort(
+    (a, b) => b.cantidad - a.cantidad || a.vendedor.localeCompare(b.vendedor, 'es'),
+  );
+
+  return {
+    adhesiones,
+    porVendedor,
+    cantidad: adhesiones.length,
+    excelError: null,
+    fuente: sheet?.label || `Pestañas: ${gids.join(', ')}`,
+  };
+}
+
+/**
+ * Adhesiones Excel del mes que NO están en cierres PIJ del CRM en ese mismo mes.
+ * Match estricto (serie+ADH / anexo) para no ocultar faltantes reales del informe.
+ *
+ * @param {unknown[]} leadsDB
+ * @param {{ yyyyMm: string, sheetGids?: string[], mes?: string }} options
+ */
+export async function buildFaltantesExcelVsCrmEnPeriodo(leadsDB, options = {}) {
+  const yyyyMm = options.yyyyMm;
+  if (!yyyyMm) {
+    return {
+      faltantes: [],
+      porVendedor: [],
+      adhesionesExcel: 0,
+      matchedEnPeriodo: 0,
+      excelError: 'Falta yyyyMm',
+      fuente: null,
+    };
+  }
+
+  let sheet = cajaSheetParaYyyyMm(yyyyMm);
+  let gids = Array.isArray(options.sheetGids) ? options.sheetGids.filter(Boolean) : [];
+  if (!gids.length && sheet) gids = [sheet.gid];
+  if (!gids.length && options.mes) {
+    sheet = cajaSheetPorNombreMes(options.mes);
+    if (sheet) gids = [sheet.gid];
+  }
+
+  if (!gids.length) {
+    return {
+      faltantes: [],
+      porVendedor: [],
+      adhesionesExcel: 0,
+      matchedEnPeriodo: 0,
+      excelError: `No hay hoja Excel de Caja configurada para ${yyyyMm}.`,
+      fuente: null,
+    };
+  }
+
+  const excelRows = await fetchCajaData({ sheetGids: gids });
+  const adhesiones = excelRows.filter(esFilaAdhesionCaja);
+  const indicePeriodo = construirIndiceCierresPijCrmEnPeriodo(leadsDB, yyyyMm);
+
+  const faltantes = [];
+  let matchedEnPeriodo = 0;
+  const seenKeys = new Set();
+
+  for (const row of adhesiones) {
+    const key = [
+      String(row.serie || '').trim().toUpperCase(),
+      String(row.ordenAdh || '').trim(),
+      String(row.ordenAnexo || '').trim(),
+      String(row.nombreCliente || '').trim().toLowerCase(),
+    ].join('|');
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+
+    const variantes = generarVariantesReciboEstrictas(row);
+    let hitEnPeriodo = false;
+    for (const v of variantes) {
+      if (indicePeriodo.get(v)?.length) {
+        hitEnPeriodo = true;
+        break;
+      }
+    }
+
+    if (hitEnPeriodo) {
+      matchedEnPeriodo += 1;
+      continue;
+    }
+
+    const serie = String(row.serie || '').trim().toUpperCase() || 'A';
+    const ordenAdh = String(row.ordenAdh || '').trim();
+    faltantes.push({
+      idUnico: key,
+      estado: 'sin_match_periodo',
+      fechaExcel: row.fecha || '',
+      fechaIso: parseFechaCaja(row.fecha) || null,
+      serie,
+      ordenAdh,
+      ordenAnexo: String(row.ordenAnexo || '').trim(),
+      reciboSugerido: formatReciboCaja(serie, ordenAdh, row.ordenAnexo),
+      nombreClienteExcel: String(row.nombreCliente || '').trim(),
+      vendedorExcel: String(row.nombreVendedor || '').trim(),
+      concepto: String(row.concepto || '').trim(),
+      matchCrm: null,
+    });
+  }
+
+  const porVendedorMap = new Map();
+  for (const f of faltantes) {
+    const v = f.vendedorExcel || 'Sin vendedor';
+    if (!porVendedorMap.has(v)) {
+      porVendedorMap.set(v, { vendedor: v, cantidad: 0, clientes: [] });
+    }
+    const g = porVendedorMap.get(v);
+    g.cantidad += 1;
+    g.clientes.push({
+      nombre: f.nombreClienteExcel,
+      recibo: f.reciboSugerido,
+      fecha: f.fechaExcel,
+    });
+  }
+  const porVendedor = Array.from(porVendedorMap.values()).sort(
+    (a, b) => b.cantidad - a.cantidad || a.vendedor.localeCompare(b.vendedor, 'es'),
+  );
+
+  return {
+    faltantes,
+    porVendedor,
+    adhesionesExcel: adhesiones.length,
+    matchedEnPeriodo,
+    excelError: null,
+    fuente: sheet?.label || `Pestañas: ${gids.join(', ')}`,
+  };
+}
+
+/**
  * Parsea adhesión PIJ del informe integral (PC tipo "B223/300", MZ = serie).
  * @param {string} pc
  * @param {string} mz
@@ -1020,33 +1414,83 @@ function claveAdhesionNormalizada(serie, ordenAdh) {
 }
 
 /**
- * Resuelve idEjercicioDetalle del SP_periodo_selecciona para junio/julio.
- * @param {'junio'|'julio'} mes
+ * Resuelve idEjercicioDetalle del SP_periodo_selecciona.
+ * Acepta id explícito, mes nombre (junio/julio/…) o YYYY-MM.
+ * @param {string} [mes]
  * @param {number} [idEjercicioDetalle]
+ * @param {string} [yyyyMm]
  */
-async function resolverPeriodoInforme(mes, idEjercicioDetalle) {
+async function resolverPeriodoInforme(mes, idEjercicioDetalle, yyyyMm) {
   if (Number.isFinite(Number(idEjercicioDetalle)) && Number(idEjercicioDetalle) > 0) {
+    const { fetchPeriodosInformeCierres } = await import('../db/informe-cierres.js');
+    const data = await fetchPeriodosInformeCierres();
+    const found = (data.periodos || []).find(
+      (p) => Number(p.idEjercicioDetalle) === Number(idEjercicioDetalle),
+    );
     return {
       idEjercicioDetalle: Number(idEjercicioDetalle),
-      codigo: `idEjercicioDetalle=${idEjercicioDetalle}`,
+      codigo: found
+        ? found.descripcion || found.codigo || String(idEjercicioDetalle)
+        : `idEjercicioDetalle=${idEjercicioDetalle}`,
+      yyyyMm: found?.fechaDesde
+        ? `${new Date(found.fechaDesde).getUTCFullYear()}-${String(new Date(found.fechaDesde).getUTCMonth() + 1).padStart(2, '0')}`
+        : yyyyMm || null,
     };
   }
-  const { fetchPeriodosInformeCierres } = await import('../db/informe-cierres.js');
-  const data = await fetchPeriodosInformeCierres();
-  const needle = mes === 'junio' ? 'junio' : 'julio';
-  const periodos = data.periodos || [];
-  const found =
-    periodos.find((p) => String(p.codigo || p.descripcion || '').toLowerCase().includes(needle)) ||
-    null;
-  if (!found) {
-    throw new Error(
-      `No se encontró período "${needle}" en SP_periodo_selecciona. Pasá idEjercicioDetalle.`,
+
+  const { resolverPeriodoPorYyyyMm, fetchPeriodosInformeCierres } = await import(
+    '../db/informe-cierres.js'
+  );
+
+  let targetYyyyMm = yyyyMm || null;
+  if (!targetYyyyMm && mes) {
+    const needle = String(mes).trim().toLowerCase();
+    const data = await fetchPeriodosInformeCierres();
+    const found = (data.periodos || []).find((p) =>
+      String(p.codigo || p.descripcion || '')
+        .toLowerCase()
+        .includes(needle),
     );
+    if (found) {
+      return {
+        idEjercicioDetalle: found.idEjercicioDetalle,
+        codigo: found.descripcion || found.codigo || String(found.idEjercicioDetalle),
+        yyyyMm: found.fechaDesde
+          ? `${new Date(found.fechaDesde).getUTCFullYear()}-${String(new Date(found.fechaDesde).getUTCMonth() + 1).padStart(2, '0')}`
+          : null,
+      };
+    }
+    // Fallback: mes nombre → YYYY-MM del año del primer período que matchee el mes
+    const yearHint = (data.periodos || [])
+      .map((p) => (p.fechaDesde ? new Date(p.fechaDesde).getUTCFullYear() : null))
+      .find((y) => y);
+    const idx = [
+      'enero',
+      'febrero',
+      'marzo',
+      'abril',
+      'mayo',
+      'junio',
+      'julio',
+      'agosto',
+      'septiembre',
+      'octubre',
+      'noviembre',
+      'diciembre',
+    ].indexOf(needle);
+    if (idx >= 0 && yearHint) {
+      targetYyyyMm = `${yearHint}-${String(idx + 1).padStart(2, '0')}`;
+    }
   }
-  return {
-    idEjercicioDetalle: found.idEjercicioDetalle,
-    codigo: found.descripcion || found.codigo || String(found.idEjercicioDetalle),
-  };
+
+  if (targetYyyyMm) {
+    const resolved = await resolverPeriodoPorYyyyMm(targetYyyyMm);
+    if (resolved) return resolved;
+  }
+
+  throw new Error(
+    `No se encontró período en SP_periodo_selecciona${mes ? ` para «${mes}»` : ''}${yyyyMm ? ` (${yyyyMm})` : ''}. Pasá idEjercicioDetalle.`,
+  );
 }
 
 /**
@@ -1116,30 +1560,41 @@ function filaCajaKey(row) {
  * y además Plan Joven del sistema integral (SP_Informe_Cierre_Operadores).
  *
  * @param {unknown[]} leadsDB
- * @param {{ sheetGids?: string[], mes?: 'junio'|'julio', csvText?: string, idEjercicioDetalle?: number, idOperador?: number }} [options]
+ * @param {{ sheetGids?: string[], mes?: string, yyyyMm?: string, csvText?: string, idEjercicioDetalle?: number, idOperador?: number }} [options]
  */
 export async function buildFaltantesDesdeCaja(leadsDB, options = {}) {
-  const { sheetGids, mes, csvText, idEjercicioDetalle, idOperador } = options;
+  const { sheetGids, mes, yyyyMm, csvText, idEjercicioDetalle, idOperador } = options;
 
-  let excelRows;
-  let fuente;
+  let excelRows = [];
+  let fuente = null;
+  let excelError = null;
   if (csvText && String(csvText).trim()) {
     excelRows = parseCajaCsvText(String(csvText), 'upload');
     fuente = 'Archivo CSV subido';
   } else {
     let gids = Array.isArray(sheetGids) ? sheetGids.filter(Boolean) : [];
     if (!gids.length) {
-      if (mes === 'junio') gids = [CAJA_SHEETS.junio.gid];
-      else if (mes === 'julio') gids = [CAJA_SHEETS.julio.gid];
-      else gids = [CAJA_SHEETS.julio.gid];
+      let sheet = null;
+      if (mes) sheet = cajaSheetPorNombreMes(mes);
+      else if (yyyyMm) sheet = cajaSheetParaYyyyMm(yyyyMm);
+      else if (mes) {
+        // Resolver mes nombre → yyyyMm vía SP y luego hoja
+        try {
+          const periodoTmp = await resolverPeriodoInforme(mes, idEjercicioDetalle, yyyyMm);
+          if (periodoTmp.yyyyMm) sheet = cajaSheetParaYyyyMm(periodoTmp.yyyyMm);
+        } catch {
+          /* sin hoja */
+        }
+      }
+      if (sheet) gids = [sheet.gid];
     }
-    excelRows = await fetchCajaData({ sheetGids: gids });
-    if (mes === 'junio' || (gids.length === 1 && gids[0] === CAJA_SHEETS.junio.gid)) {
-      fuente = CAJA_SHEETS.junio.label;
-    } else if (mes === 'julio' || (gids.length === 1 && gids[0] === CAJA_SHEETS.julio.gid)) {
-      fuente = CAJA_SHEETS.julio.label;
+    if (!gids.length) {
+      excelError = 'No hay hoja Excel de Caja configurada para el período seleccionado.';
+      excelRows = [];
+      fuente = null;
     } else {
-      fuente = `Pestañas: ${gids.join(', ')}`;
+      excelRows = await fetchCajaData({ sheetGids: gids });
+      fuente = cajaFuenteDesdeGids(gids);
     }
   }
 
@@ -1292,12 +1747,7 @@ export async function buildFaltantesDesdeCaja(leadsDB, options = {}) {
   };
 
   try {
-    // Si no viene mes (CSV suelto), igual usamos julio para el SP integral.
-    const mesPeriodo = mes === 'junio' || mes === 'julio' ? mes : 'julio';
-    const periodo = await resolverPeriodoInforme(
-      mesPeriodo,
-      idEjercicioDetalle ?? (mesPeriodo === 'julio' ? 91 : undefined),
-    );
+    const periodo = await resolverPeriodoInforme(mes, idEjercicioDetalle, yyyyMm);
     console.log(
       '[faltantes-pij] consultando integral período=%s (%s) operador=%s',
       periodo.idEjercicioDetalle,
@@ -1476,6 +1926,7 @@ export async function buildFaltantesDesdeCaja(leadsDB, options = {}) {
 
   return {
     fuente,
+    excelError,
     resumen: {
       adhesionesExcel: adhesiones.length,
       matched: matched.length,

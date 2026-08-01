@@ -48,6 +48,11 @@ const SuperadminDashboard = lazy(() =>
     default: m.SuperadminDashboard,
   })),
 );
+const ComisionesContablePanel = lazy(() =>
+  import('./components/admin/ComisionesContablePanel').then((m) => ({
+    default: m.ComisionesContablePanel,
+  })),
+);
 const GrabacionDiariaPanel = lazy(() =>
   import('./components/grabaciones/GrabacionDiariaPanel').then((m) => ({
     default: m.GrabacionDiariaPanel,
@@ -303,8 +308,10 @@ function AppShell() {
   }
 
   const contenidoPrincipal =
-    cargando && !adminDashboard && leads.length === 0 ? (
+    cargando && !adminDashboard && leads.length === 0 && vistaActiva !== 'comisiones' ? (
       <VistaCargando texto="Cargando datos…" />
+    ) : vistaActiva === 'comisiones' && usuario.comisionesContable ? (
+      <ComisionesContablePanel />
     ) : esSuperadmin && adminDashboard ? (
       <SuperadminDashboard data={adminDashboard} periodo={periodo} onCambiarPeriodo={cambiarPeriodo} cargando={cargando} />
     ) : tienePanelGlobal && vistaActiva === 'admin' ? (

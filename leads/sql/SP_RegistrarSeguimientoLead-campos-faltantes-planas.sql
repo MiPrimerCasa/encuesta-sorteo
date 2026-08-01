@@ -1,0 +1,393 @@
+-- =============================================================================
+-- Columnas planas faltantes: derivación terreno, agenda rol, datos TRF
+-- Base: STRSYSTEM
+-- =============================================================================
+-- Completa el mapeo JSON → columnas planas para:
+--   derivacionTerrenoActiva      → derivacion_terreno_activa (BIT)
+--   seguimientoAgendaOperadorRol → seguimiento_agenda_operador_rol (NVARCHAR(16))
+--   titularTransferencia         → titular_transferencia (NVARCHAR(200))
+--   titularCoincideCliente       → titular_coincide_cliente (BIT)
+--   bancoTransferencia           → banco_transferencia (NVARCHAR(120))  [legado]
+--   referenciaTransferencia      → referencia_transferencia (NVARCHAR(120)) [legado]
+--
+-- Prerrequisito: SP_RegistrarSeguimientoLead ya con id_venta_integral
+--   (sql/SP_RegistrarSeguimientoLead-id-venta-integral.sql).
+--
+-- App Node: server/db/seguimiento-sql.js lee/escribe estos params.
+-- =============================================================================
+
+USE [STRSYSTEM];
+GO
+
+/* ---------------------------------------------------------------------------
+   PASO 1 — Columnas planas
+--------------------------------------------------------------------------- */
+IF COL_LENGTH('dbo.registrarSeguimientoLead', 'derivacion_terreno_activa') IS NULL
+BEGIN
+    ALTER TABLE dbo.registrarSeguimientoLead
+        ADD derivacion_terreno_activa BIT NULL;
+    PRINT N'Columna derivacion_terreno_activa AGREGADA.';
+END
+ELSE
+    PRINT N'Columna derivacion_terreno_activa ya existía.';
+GO
+
+IF COL_LENGTH('dbo.registrarSeguimientoLead', 'seguimiento_agenda_operador_rol') IS NULL
+BEGIN
+    ALTER TABLE dbo.registrarSeguimientoLead
+        ADD seguimiento_agenda_operador_rol NVARCHAR(16) NULL;
+    PRINT N'Columna seguimiento_agenda_operador_rol AGREGADA.';
+END
+ELSE
+    PRINT N'Columna seguimiento_agenda_operador_rol ya existía.';
+GO
+
+IF COL_LENGTH('dbo.registrarSeguimientoLead', 'titular_transferencia') IS NULL
+BEGIN
+    ALTER TABLE dbo.registrarSeguimientoLead
+        ADD titular_transferencia NVARCHAR(200) NULL;
+    PRINT N'Columna titular_transferencia AGREGADA.';
+END
+ELSE
+    PRINT N'Columna titular_transferencia ya existía.';
+GO
+
+IF COL_LENGTH('dbo.registrarSeguimientoLead', 'titular_coincide_cliente') IS NULL
+BEGIN
+    ALTER TABLE dbo.registrarSeguimientoLead
+        ADD titular_coincide_cliente BIT NULL;
+    PRINT N'Columna titular_coincide_cliente AGREGADA.';
+END
+ELSE
+    PRINT N'Columna titular_coincide_cliente ya existía.';
+GO
+
+IF COL_LENGTH('dbo.registrarSeguimientoLead', 'banco_transferencia') IS NULL
+BEGIN
+    ALTER TABLE dbo.registrarSeguimientoLead
+        ADD banco_transferencia NVARCHAR(120) NULL;
+    PRINT N'Columna banco_transferencia AGREGADA.';
+END
+ELSE
+    PRINT N'Columna banco_transferencia ya existía.';
+GO
+
+IF COL_LENGTH('dbo.registrarSeguimientoLead', 'referencia_transferencia') IS NULL
+BEGIN
+    ALTER TABLE dbo.registrarSeguimientoLead
+        ADD referencia_transferencia NVARCHAR(120) NULL;
+    PRINT N'Columna referencia_transferencia AGREGADA.';
+END
+ELSE
+    PRINT N'Columna referencia_transferencia ya existía.';
+GO
+
+/* ---------------------------------------------------------------------------
+   PASO 2 — Backfill desde seguimiento_json (registros previos)
+--------------------------------------------------------------------------- */
+UPDATE dbo.registrarSeguimientoLead
+SET
+    derivacion_terreno_activa = CASE
+        WHEN LOWER(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.derivacionTerrenoActiva'))))
+             IN (N'true', N'1') THEN CAST(1 AS BIT)
+        WHEN LOWER(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.derivacionTerrenoActiva'))))
+             IN (N'false', N'0') THEN CAST(0 AS BIT)
+        ELSE derivacion_terreno_activa
+    END,
+    seguimiento_agenda_operador_rol = COALESCE(
+        seguimiento_agenda_operador_rol,
+        LEFT(
+            NULLIF(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.seguimientoAgendaOperadorRol'))), N''),
+            16
+        )
+    ),
+    titular_transferencia = COALESCE(
+        titular_transferencia,
+        LEFT(
+            NULLIF(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.titularTransferencia'))), N''),
+            200
+        )
+    ),
+    titular_coincide_cliente = CASE
+        WHEN titular_coincide_cliente IS NOT NULL THEN titular_coincide_cliente
+        WHEN LOWER(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.titularCoincideCliente'))))
+             IN (N'true', N'1') THEN CAST(1 AS BIT)
+        WHEN LOWER(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.titularCoincideCliente'))))
+             IN (N'false', N'0') THEN CAST(0 AS BIT)
+        ELSE titular_coincide_cliente
+    END,
+    banco_transferencia = COALESCE(
+        banco_transferencia,
+        LEFT(
+            NULLIF(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.bancoTransferencia'))), N''),
+            120
+        )
+    ),
+    referencia_transferencia = COALESCE(
+        referencia_transferencia,
+        LEFT(
+            NULLIF(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.referenciaTransferencia'))), N''),
+            120
+        )
+    )
+WHERE seguimiento_json IS NOT NULL
+  AND (
+        (
+            derivacion_terreno_activa IS NULL
+            AND NULLIF(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.derivacionTerrenoActiva'))), N'') IS NOT NULL
+        )
+     OR (
+            seguimiento_agenda_operador_rol IS NULL
+            AND NULLIF(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.seguimientoAgendaOperadorRol'))), N'') IS NOT NULL
+        )
+     OR (
+            titular_transferencia IS NULL
+            AND NULLIF(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.titularTransferencia'))), N'') IS NOT NULL
+        )
+     OR (
+            titular_coincide_cliente IS NULL
+            AND NULLIF(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.titularCoincideCliente'))), N'') IS NOT NULL
+        )
+     OR (
+            banco_transferencia IS NULL
+            AND NULLIF(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.bancoTransferencia'))), N'') IS NOT NULL
+        )
+     OR (
+            referencia_transferencia IS NULL
+            AND NULLIF(LTRIM(RTRIM(JSON_VALUE(seguimiento_json, '$.referenciaTransferencia'))), N'') IS NOT NULL
+        )
+      );
+
+PRINT N'Backfill desde JSON: filas afectadas = ' + CAST(@@ROWCOUNT AS NVARCHAR(20));
+GO
+
+/* ---------------------------------------------------------------------------
+   PASO 3 — SP_RegistrarSeguimientoLead (parámetros + INSERT)
+--------------------------------------------------------------------------- */
+ALTER PROCEDURE [dbo].[SP_RegistrarSeguimientoLead]
+      @lead_id INT,
+      @telefono NVARCHAR(32),
+      @encuesta NVARCHAR(64),
+      @confirmo_entrevista BIT,
+      @canal NVARCHAR(16),
+      @hubo_entrevista BIT,
+      @resultado_entrevista NVARCHAR(16),
+      @horario_entrevista_propuesto NVARCHAR(32),
+      @fecha_reagenda NVARCHAR(32),
+      @seguimiento_pij_promotor BIT,
+      @id_producto NVARCHAR(32),
+      @estado_pago NVARCHAR(16),
+      @id_barrio NVARCHAR(32),
+      @numero_recibo NVARCHAR(80),
+      @brindo_referidos BIT,
+      @referidos_json NVARCHAR(MAX),
+      @observaciones NVARCHAR(500),
+      @operador_id INT,
+      @operador_rol NVARCHAR(16),
+      @operador_nombre NVARCHAR(200),
+      @seguimiento_json NVARCHAR(MAX),
+      -- Medio de pago
+      @forma_pago NVARCHAR(16) = NULL,
+      @monto_cierre DECIMAL(12, 2) = NULL,
+      @monto_efectivo DECIMAL(12, 2) = NULL,
+      @monto_transferencia DECIMAL(12, 2) = NULL,
+      @fecha_cierre DATETIME2(0) = NULL,
+      @fuente NVARCHAR(16) = NULL,
+      -- Adhesión / anexo PIJ
+      @serie_pij NVARCHAR(1) = NULL,
+      @nro_adhesion NVARCHAR(10) = NULL,
+      @nro_anexo NVARCHAR(10) = NULL,
+      -- Compras adicionales / imágenes (JSON plano legacy)
+      @compras_adicionales_json NVARCHAR(MAX) = NULL,
+      @imagenes_cierre_json NVARCHAR(MAX) = NULL,
+      -- DNI cliente
+      @dni_cliente NVARCHAR(16) = NULL,
+      -- Caja sucursal
+      @caja_estado NVARCHAR(16) = NULL,
+      @caja_verificado_en DATETIME2(0) = NULL,
+      @caja_comprobante_id NVARCHAR(64) = NULL,
+      @caja_motivo_rechazo NVARCHAR(300) = NULL,
+      @caja_sucursal NVARCHAR(32) = NULL,
+      @caja_confirmado_por NVARCHAR(200) = NULL,
+      -- Bloqueo sistema integral PIJ (loteVentaBloqueoVendedorPIJ → id)
+      @id_venta_integral INT = NULL,
+      @pij_integral_estado NVARCHAR(16) = NULL,
+      @pij_integral_error NVARCHAR(500) = NULL,
+      @pij_integral_enviado_en DATETIME2(0) = NULL,
+      -- Derivación terreno / agenda / datos transferencia
+      @derivacion_terreno_activa BIT = NULL,
+      @seguimiento_agenda_operador_rol NVARCHAR(16) = NULL,
+      @titular_transferencia NVARCHAR(200) = NULL,
+      @titular_coincide_cliente BIT = NULL,
+      @banco_transferencia NVARCHAR(120) = NULL,
+      @referencia_transferencia NVARCHAR(120) = NULL
+         WITH EXECUTE AS 'dbo'
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        INSERT INTO registrarSeguimientoLead
+            (
+            lead_id,
+            telefono,
+            encuesta,
+            fechaAlta,
+            confirmo_entrevista,
+            canal,
+            hubo_entrevista,
+            resultado_entrevista,
+            horario_entrevista_propuesto,
+            fecha_reagenda,
+            seguimiento_pij_promotor,
+            id_producto,
+            estado_pago,
+            id_barrio,
+            numero_recibo,
+            brindo_referidos,
+            referidos_json,
+            observaciones,
+            operador_id,
+            operador_rol,
+            operador_nombre,
+            seguimiento_json,
+            forma_pago,
+            monto_cierre,
+            monto_efectivo,
+            monto_transferencia,
+            fecha_cierre,
+            fuente,
+            serie_pij,
+            nro_adhesion,
+            nro_anexo,
+            compras_adicionales_json,
+            imagenes_cierre_json,
+            dni_cliente,
+            caja_estado,
+            caja_verificado_en,
+            caja_comprobante_id,
+            caja_motivo_rechazo,
+            caja_sucursal,
+            caja_confirmado_por,
+            id_venta_integral,
+            pij_integral_estado,
+            pij_integral_error,
+            pij_integral_enviado_en,
+            derivacion_terreno_activa,
+            seguimiento_agenda_operador_rol,
+            titular_transferencia,
+            titular_coincide_cliente,
+            banco_transferencia,
+            referencia_transferencia
+            )
+        VALUES
+            (
+            @lead_id,
+            @telefono,
+            @encuesta,
+            GETDATE(),
+            @confirmo_entrevista,
+            @canal,
+            @hubo_entrevista,
+            @resultado_entrevista,
+            @horario_entrevista_propuesto,
+            @fecha_reagenda,
+            @seguimiento_pij_promotor,
+            @id_producto,
+            @estado_pago,
+            @id_barrio,
+            @numero_recibo,
+            @brindo_referidos,
+            @referidos_json,
+            @observaciones,
+            @operador_id,
+            @operador_rol,
+            @operador_nombre,
+            @seguimiento_json,
+            @forma_pago,
+            @monto_cierre,
+            @monto_efectivo,
+            @monto_transferencia,
+            @fecha_cierre,
+            @fuente,
+            @serie_pij,
+            @nro_adhesion,
+            @nro_anexo,
+            @compras_adicionales_json,
+            @imagenes_cierre_json,
+            @dni_cliente,
+            @caja_estado,
+            @caja_verificado_en,
+            @caja_comprobante_id,
+            @caja_motivo_rechazo,
+            @caja_sucursal,
+            @caja_confirmado_por,
+            @id_venta_integral,
+            @pij_integral_estado,
+            @pij_integral_error,
+            @pij_integral_enviado_en,
+            @derivacion_terreno_activa,
+            @seguimiento_agenda_operador_rol,
+            @titular_transferencia,
+            @titular_coincide_cliente,
+            @banco_transferencia,
+            @referencia_transferencia
+            );
+
+        DECLARE @nuevoId INT = SCOPE_IDENTITY();
+
+        IF OBJECT_ID(N'dbo.SP_InsertarSeguimientoHijos', N'P') IS NOT NULL
+        BEGIN
+            EXEC dbo.SP_InsertarSeguimientoHijos
+                @id_seguimiento           = @nuevoId,
+                @lead_id                  = @lead_id,
+                @compras_adicionales_json = @compras_adicionales_json,
+                @imagenes_cierre_json     = @imagenes_cierre_json;
+        END
+
+        COMMIT TRANSACTION;
+
+        SELECT 1 AS codigo,
+               N'Seguimiento registrado correctamente.' AS mensaje,
+               @nuevoId AS idRegistrarSeguimientoLead;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        SELECT 0 AS codigo,
+               ERROR_MESSAGE() AS mensaje,
+               NULL AS idRegistrarSeguimientoLead;
+    END CATCH
+END;
+GO
+
+GRANT EXECUTE ON dbo.SP_RegistrarSeguimientoLead TO [MPCSP];
+GO
+
+/* ---------------------------------------------------------------------------
+   PASO 4 — Verificación
+--------------------------------------------------------------------------- */
+SELECT TOP 10
+    id,
+    lead_id,
+    derivacion_terreno_activa,
+    seguimiento_agenda_operador_rol,
+    titular_transferencia,
+    titular_coincide_cliente,
+    banco_transferencia,
+    referencia_transferencia,
+    JSON_VALUE(seguimiento_json, '$.derivacionTerrenoActiva') AS json_derivacion,
+    JSON_VALUE(seguimiento_json, '$.seguimientoAgendaOperadorRol') AS json_agenda_rol,
+    JSON_VALUE(seguimiento_json, '$.titularTransferencia') AS json_titular,
+    JSON_VALUE(seguimiento_json, '$.titularCoincideCliente') AS json_titular_coincide
+FROM dbo.registrarSeguimientoLead
+WHERE JSON_VALUE(seguimiento_json, '$.titularTransferencia') IS NOT NULL
+   OR JSON_VALUE(seguimiento_json, '$.titularCoincideCliente') IS NOT NULL
+   OR JSON_VALUE(seguimiento_json, '$.derivacionTerrenoActiva') IS NOT NULL
+   OR JSON_VALUE(seguimiento_json, '$.seguimientoAgendaOperadorRol') IS NOT NULL
+ORDER BY id DESC;
+GO

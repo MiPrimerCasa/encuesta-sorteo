@@ -80,6 +80,11 @@ export function NavBar({
             ? TABS_PROMOTOR_GLOBAL
             : TABS_PROMOTOR;
 
+  const tabsConComisiones =
+    usuario.comisionesContable && !tabs.some((t) => t.value === 'comisiones')
+      ? [...tabs, { value: 'comisiones' as const, label: 'Comisiones y salarios' }]
+      : tabs;
+
   return (
     <header
       className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 backdrop-blur-sm"
@@ -111,9 +116,9 @@ export function NavBar({
 
         {/* Desktop: nav */}
         <div className="hidden items-center gap-4 md:flex">
-          {tabs.length > 1 && (
+          {tabsConComisiones.length > 1 && (
             <SegmentedControl
-              options={tabs}
+              options={tabsConComisiones}
               value={vistaActiva}
               onChange={onCambiarVista}
             />
@@ -147,9 +152,9 @@ export function NavBar({
       </div>
 
       {/* Fila 2 mobile: underline tabs */}
-      {tabs.length > 1 && (
+      {tabsConComisiones.length > 1 && (
         <div className="flex border-t border-zinc-100 md:hidden">
-          {tabs.map((tab) => {
+          {tabsConComisiones.map((tab) => {
             const active = vistaActiva === tab.value;
             return (
               <button

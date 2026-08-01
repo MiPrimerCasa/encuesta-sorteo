@@ -33,6 +33,33 @@ function esBarrioPlanJoven(barrio: string) {
   return barrio.trim().toUpperCase().replace(/\s+/g, ' ') === 'PLAN JOVEN';
 }
 
+/**
+ * Período por defecto: mes calendario anterior (el mes en curso suele ir vacío
+ * a principio de mes). Si no está en la lista, el que contiene hoy; si no, el primero.
+ */
+function elegirPeriodoDefault(lista: InformeCierrePeriodo[]): number | null {
+  if (!lista.length) return null;
+  const now = new Date();
+  const ref = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 1, 15));
+  const mesAnterior = lista.find((p) => {
+    if (!p.fechaDesde) return false;
+    const d = new Date(p.fechaDesde);
+    return (
+      d.getUTCFullYear() === ref.getUTCFullYear() && d.getUTCMonth() === ref.getUTCMonth()
+    );
+  });
+  if (mesAnterior) return mesAnterior.idEjercicioDetalle;
+
+  const t = Date.now();
+  const actual = lista.find((p) => {
+    if (!p.fechaDesde || !p.fechaHasta) return false;
+    const desde = new Date(p.fechaDesde).getTime();
+    const hasta = new Date(p.fechaHasta).getTime();
+    return t >= desde && t <= hasta;
+  });
+  return (actual ?? lista[0]).idEjercicioDetalle;
+}
+
 function sumarTotalesFilas(filas: InformeCierreFila[]): InformeCierreTotales {
   const t = { ...TOTALES_VACIOS, filas: filas.length };
   for (const f of filas) {
@@ -221,7 +248,7 @@ function SeccionProducto({
   expandKey: string;
   expandido: string | null;
   onToggle: (key: string | null) => void;
-  /** pij = cantidad Excel + total×33k; lotes = cantidad + monto total del SP */
+  /** pij = cantidad adhesiones + total×33k; lotes = cantidad + monto total */
   modo: 'pij' | 'lotes';
   excelCantidad?: number;
   excelTotal?: number;
@@ -242,12 +269,12 @@ function SeccionProducto({
       {modo === 'pij' ? (
         <div className="grid gap-3 sm:grid-cols-2">
           <KpiCantidad
-            label="Cantidad adhesiones (Excel)"
+            label="Cantidad adhesiones"
             value={excelCantidad ?? 0}
             accent="text-indigo-700"
           />
           <Kpi
-            label="Total recaudado adhesiones (Excel × $33.000)"
+            label="Total recaudado adhesiones ($33.000 c/u)"
             value={excelTotal ?? 0}
             accent="text-emerald-700"
           />
@@ -269,7 +296,7 @@ function SeccionProducto({
 
       <div className="flex flex-wrap gap-3 text-[12px] text-zinc-500">
         <span>
-          Detalle SP:{' '}
+          Detalle:{' '}
           <strong className="text-zinc-800 tabular-nums">{filasVisibles}</strong>
           {q.trim() ? ` (de ${seccion.totales.filas})` : ''}
         </span>
@@ -450,14 +477,14 @@ export function InformeCierresPanel() {
         if (cancelled) return;
         const lista = res.periodos ?? [];
         setPeriodos(lista);
-        const preferido = lista[0]?.idEjercicioDetalle ?? null;
+        const preferido = elegirPeriodoDefault(lista);
         setIdEjercicio((prev) => prev ?? preferido);
       } catch (err) {
         if (!cancelled) {
           setError(
             err instanceof Error
               ? err.message
-              : 'No se pudieron cargar los períodos (SP_periodo_selecciona).',
+              : 'No se pudieron cargar los períodos.',
           );
         }
       } finally {
@@ -515,8 +542,7 @@ export function InformeCierresPanel() {
             Informe de cierres
           </h3>
           <p className="mt-0.5 text-[13px] text-zinc-500">
-            Adhesiones PIJ: cantidad y total del Excel ($33.000 c/u). Lotes: cantidad y monto total
-            del SP.
+            Adhesiones PIJ: cantidad y total ($33.000 c/u). Lotes: cantidad y monto total del período.
           </p>
         </div>
 
@@ -602,12 +628,12 @@ export function InformeCierresPanel() {
           <div className="space-y-5 p-5">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <KpiCantidad
-                label="Cantidad adhesiones (Excel)"
+                label="Cantidad adhesiones"
                 value={data.resumenPanel?.adhesionesExcelCantidad ?? data.excel?.cantidad ?? 0}
                 accent="text-indigo-700"
               />
               <Kpi
-                label="Total recaudado adhesiones (Excel × $33.000)"
+                label="Total recaudado adhesiones ($33.000 c/u)"
                 value={
                   data.resumenPanel?.adhesionesExcelTotal ?? data.excel?.totalRecaudado ?? 0
                 }
@@ -626,15 +652,15 @@ export function InformeCierresPanel() {
                 accent="text-emerald-700"
               />
             </div>
-            <p className="text-[12px] text-zinc-400">
-              Fuente SP: {data.source}
-              {data.excel?.fuente ? ` · Excel: ${data.excel.fuente}` : ''}
-              {data.excel?.error ? ` · Excel error: ${data.excel.error}` : ''}
-            </p>
+            {(data.excel?.error) && (
+              <p className="text-[12px] text-amber-800">
+                {data.excel.error}
+              </p>
+            )}
 
             <SeccionProducto
               titulo="Plan Inversión Joven — adhesiones"
-              subtitulo="Cantidad y total según Excel de Caja ($33.000 c/u). Detalle del SP abajo."
+              subtitulo="Cantidad y total a $33.000 c/u. Detalle por vendedor abajo."
               seccion={seccionPij}
               q={q}
               mostrarBarrio={false}
@@ -652,7 +678,11 @@ export function InformeCierresPanel() {
 
             <SeccionProducto
               titulo="Lotes — adhesión de terrenos"
-              subtitulo="Cantidad y monto total del SP (barrios distintos de PLAN JOVEN)."
+              subtitulo={
+                seccionTerreno.totales.filas === 0
+                  ? 'Sin lotes en este período. Probá Julio 2026 (u otro mes con cierres).'
+                  : 'Cantidad y monto total (barrios distintos de PLAN JOVEN).'
+              }
               seccion={seccionTerreno}
               q={q}
               mostrarBarrio={true}

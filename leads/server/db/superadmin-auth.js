@@ -57,3 +57,30 @@ export function esSupervisorPanelGlobal(loginId) {
   return panelGlobalLoginIds().includes(id);
 }
 
+/**
+ * Login IDs con acceso al informe de comisiones contable (Mi Primer Casa).
+ * Default: jesus.cajal.work@gmail.com
+ * Override: COMISIONES_CONTABLE_LOGIN_IDS=a@x.com,b@y.com
+ */
+export function comisionesContableLoginIds() {
+  const raw = process.env.COMISIONES_CONTABLE_LOGIN_IDS || 'jesus.cajal.work@gmail.com';
+  return raw
+    .split(',')
+    .map((s) => normalizeLoginId(s))
+    .filter(Boolean);
+}
+
+export function esComisionesContableLogin(loginId) {
+  const id = normalizeLoginId(loginId);
+  if (!id) return false;
+  return comisionesContableLoginIds().includes(id);
+}
+
+export function esComisionesContableUsuario(usuario) {
+  if (!usuario) return false;
+  if (usuario.comisionesContable === true) {
+    return esComisionesContableLogin(usuario.loginId);
+  }
+  return esComisionesContableLogin(usuario.loginId);
+}
+

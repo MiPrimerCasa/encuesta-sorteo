@@ -93,6 +93,13 @@ function parseFecha(val: string | Date | null | undefined) {
   if (val instanceof Date) return Number.isNaN(val.getTime()) ? null : val;
 
   const str = String(val).trim();
+  // Con Z/offset: usar el instante real (calendario local AR). Evita que
+  // 2026-08-01T01:04Z (31/07 22:04 AR) cuente como agosto.
+  if (/Z$|[+-]\d{2}:?\d{2}$/i.test(str)) {
+    const instant = new Date(str);
+    return Number.isNaN(instant.getTime()) ? null : instant;
+  }
+
   const m = str.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2}):(\d{2}))?/i);
   if (m) {
     const year = parseInt(m[1], 10);

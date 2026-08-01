@@ -261,6 +261,21 @@ function patchFechaReagenda(
   );
 }
 
+/** Etiqueta ordinal para compras adicionales (1ª, 2ª, 3ª…). */
+function etiquetaOrdinalCompra(n: number): string {
+  return `${n}ª`;
+}
+
+function labelGuardarCompraAdicional(indiceSiguiente: number): string {
+  if (indiceSiguiente <= 1) return 'Guardar 1ª compra adicional';
+  return `Guardar ${etiquetaOrdinalCompra(indiceSiguiente)} compra`;
+}
+
+function labelAgregarCompraAdicional(indiceSiguiente: number, tipo: 'pij' | 'terreno'): string {
+  const producto = tipo === 'pij' ? 'Plan' : 'Terreno';
+  return `+ Agregar ${etiquetaOrdinalCompra(indiceSiguiente)} compra (${producto})`;
+}
+
 function CampoFechaReagenda({
   value,
   onChange,
@@ -445,6 +460,164 @@ export function LeadModalForm({
   if (!open || !lead) return null;
 
   const patch = (partial: Partial<FormState>) => setForm((f) => ({ ...f, ...partial }));
+
+  const cantidadAdicionales = form.comprasAdicionales?.length ?? 0;
+  const indiceSiguienteAdicional = cantidadAdicionales + 1;
+
+  const resetDraftAdicionalCampos = (tipo: 'pij' | 'terreno') => {
+    if (tipo === 'pij') {
+      const draftId = crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 11);
+      setAdicionalDraftId(draftId);
+      setAdicionalForm({
+        idProducto: ID_PRODUCTO_PIJ,
+        estadoPago: 'entrega_33',
+        idBarrio: '',
+        numeroRecibo: '',
+        formaPago: null,
+        montoEfectivo: '',
+        montoTransferencia: '',
+      });
+      setAdicPijSerie('A');
+      setAdicPijAdh('');
+      setAdicPijAnexo('');
+    } else {
+      setAdicionalDraftId('');
+      setAdicionalForm({
+        idProducto: ID_PRODUCTO_TERRENO,
+        estadoPago: null,
+        idBarrio: '',
+        numeroRecibo: '',
+        formaPago: null,
+        montoEfectivo: '',
+        montoTransferencia: '',
+      });
+    }
+  };
+
+  /** Confirma el draft de compra adicional. Si seguirAgregando, reabre panel del mismo tipo. */
+  const confirmarCompraAdicional = (seguirAgregando: boolean) => {
+    if (!showAddAdicional) return;
+
+    if (showAddAdicional === 'terreno') {
+      if (!adicionalForm.idBarrio) {
+        setErrorVenta('Seleccioná el barrio para el terreno adicional.');
+        return;
+      }
+      if (!adicionalForm.estadoPago) {
+        setErrorVenta('Seleccioná el estado de pago para el terreno adicional.');
+        return;
+      }
+    }
+    if (!adicionalForm.numeroRecibo.trim()) {
+      setErrorVenta(
+        showAddAdicional === 'pij'
+          ? 'Ingresá el número de anexo adicional.'
+          : 'Ingresá el número de recibo adicional.',
+      );
+      return;
+    }
+    if (showAddAdicional === 'pij') {
+      const errPago = validarMedioPagoPij(
+        adicionalForm.formaPago,
+        adicionalForm.montoEfectivo,
+        adicionalForm.montoTransferencia,
+      );
+      if (errPago) {
+        setErrorVenta(errPago);
+        return;
+      }
+      if (!adicPijAdh.trim()) {
+        setErrorVenta('Ingresá el número de adhesión adicional.');
+        return;
+      }
+      if (!adicPijAnexo.trim()) {
+        setErrorVenta('Ingresá el número de anexo adicional.');
+        return;
+      }
+      const dup = buscarDuplicadoPij(
+        adicPijSerie,
+        adicPijAdh,
+        adicPijAnexo,
+        undefined,
+        form.comprasAdicionales,
+      );
+      if (dup) {
+        setErrorVenta(dup);
+        return;
+      }
+    }
+    if (showAddAdicional === 'terreno') {
+      const dup = buscarDuplicadoTerreno(
+        adicionalForm.numeroRecibo,
+        undefined,
+        form.comprasAdicionales,
+      );
+      if (dup) {
+        setErrorVenta(dup);
+        return;
+      }
+    }
+
+    setErrorVenta('');
+    const montosAdic =
+      showAddAdicional === 'pij' && adicionalForm.formaPago
+        ? montosPijDesdeEntrada(
+            adicionalForm.formaPago,
+            adicionalForm.montoEfectivo,
+            adicionalForm.montoTransferencia,
+          )
+        : null;
+    const newCompra: CompraAdicional = {
+      id: crypto.randomUUID
+        ? crypto.randomUUID()
+        : Math.random().toString(36).substring(2, 9),
+      idProducto: adicionalForm.idProducto,
+      estadoPago: adicionalForm.estadoPago as EstadoPago,
+      idBarrio: adicionalForm.idBarrio || null,
+      numeroRecibo: adicionalForm.numeroRecibo.trim(),
+      fechaCierre: new Date().toISOString(),
+      formaPago: montosAdic ? adicionalForm.formaPago : null,
+      montoCierre: montosAdic?.montoCierre ?? null,
+      montoEfectivo: montosAdic?.montoEfectivo ?? null,
+      montoTransferencia: montosAdic?.montoTransferencia ?? null,
+    };
+
+    const imagenesRemapeadas =
+      showAddAdicional === 'pij' && adicionalDraftId
+        ? form.imagenesCierre.map((img) =>
+            img.ventaKey === adicionalDraftId
+              ? { ...img, ventaKey: newCompra.id }
+              : img,
+          )
+        : form.imagenesCierre;
+
+    patch({
+      comprasAdicionales: [...(form.comprasAdicionales || []), newCompra],
+      imagenesCierre: imagenesRemapeadas,
+    });
+
+    if (seguirAgregando) {
+      resetDraftAdicionalCampos(showAddAdicional);
+      setShowAddAdicional(showAddAdicional);
+    } else {
+      setShowAddAdicional(null);
+      setAdicionalDraftId('');
+      setAdicionalForm({
+        idProducto: '',
+        estadoPago: null,
+        idBarrio: '',
+        numeroRecibo: '',
+        formaPago: null,
+        montoEfectivo: '',
+        montoTransferencia: '',
+      });
+      setAdicPijSerie('A');
+      setAdicPijAdh('');
+      setAdicPijAnexo('');
+    }
+  };
 
   const handleCanal = (canal: NonNullable<SeguimientoLead['canal']>) => {
     const sinCita = !leadTieneCitaPrevia(lead);
@@ -2319,48 +2492,35 @@ export function LeadModalForm({
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      const draftId = crypto.randomUUID
-                                        ? crypto.randomUUID()
-                                        : Math.random().toString(36).substring(2, 11);
-                                      setAdicionalDraftId(draftId);
+                                      resetDraftAdicionalCampos('pij');
                                       setShowAddAdicional('pij');
-                                      setAdicionalForm({
-                                        idProducto: ID_PRODUCTO_PIJ,
-                                        estadoPago: 'entrega_33',
-                                        idBarrio: '',
-                                        numeroRecibo: '',
-                                        formaPago: null,
-                                        montoEfectivo: '',
-                                        montoTransferencia: '',
-                                      });
                                       setErrorVenta('');
                                     }}
                                     style={{ touchAction: 'manipulation' }}
                                     className="flex-1 h-11 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-[13px] font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
                                   >
-                                    <span>+ Compró otro plan</span>
+                                    <span>
+                                      {labelAgregarCompraAdicional(indiceSiguienteAdicional, 'pij')}
+                                    </span>
                                   </button>
                                 )}
                                 {productosDisponibles.some((p) => esTerreno(p.id)) && (
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      resetDraftAdicionalCampos('terreno');
                                       setShowAddAdicional('terreno');
-                                      setAdicionalForm({
-                                        idProducto: ID_PRODUCTO_TERRENO,
-                                        estadoPago: null,
-                                        idBarrio: '',
-                                        numeroRecibo: '',
-                                        formaPago: null,
-                                        montoEfectivo: '',
-                                        montoTransferencia: '',
-                                      });
                                       setErrorVenta('');
                                     }}
                                     style={{ touchAction: 'manipulation' }}
                                     className="flex-1 h-11 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-[13px] font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
                                   >
-                                    <span>+ Compró otro terreno</span>
+                                    <span>
+                                      {labelAgregarCompraAdicional(
+                                        indiceSiguienteAdicional,
+                                        'terreno',
+                                      )}
+                                    </span>
                                   </button>
                                 )}
                               </div>
@@ -2370,7 +2530,8 @@ export function LeadModalForm({
                               <div className="mt-4 rounded-xl border border-dashed border-brand-200 bg-zinc-50/50 p-4 space-y-4">
                                 <div className="flex items-center justify-between">
                                   <h5 className="text-[12px] font-bold uppercase tracking-wider text-brand-800">
-                                    Nueva Compra Adicional ({showAddAdicional === 'pij' ? 'Plan' : 'Terreno'})
+                                    {etiquetaOrdinalCompra(indiceSiguienteAdicional)} compra adicional (
+                                    {showAddAdicional === 'pij' ? 'Plan' : 'Terreno'})
                                   </h5>
                                   <button
                                     type="button"
@@ -2596,124 +2757,22 @@ export function LeadModalForm({
                                   )}
                                 </div>
 
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (showAddAdicional === 'terreno') {
-                                      if (!adicionalForm.idBarrio) {
-                                        setErrorVenta('Seleccioná el barrio para el terreno adicional.');
-                                        return;
-                                      }
-                                      if (!adicionalForm.estadoPago) {
-                                        setErrorVenta('Seleccioná el estado de pago para el terreno adicional.');
-                                        return;
-                                      }
-                                    }
-                                    if (!adicionalForm.numeroRecibo.trim()) {
-                                      setErrorVenta(
-                                        showAddAdicional === 'pij'
-                                          ? 'Ingresá el número de anexo adicional.'
-                                          : 'Ingresá el número de recibo adicional.'
-                                      );
-                                      return;
-                                    }
-                                    if (showAddAdicional === 'pij') {
-                                      const errPago = validarMedioPagoPij(
-                                        adicionalForm.formaPago,
-                                        adicionalForm.montoEfectivo,
-                                        adicionalForm.montoTransferencia,
-                                      );
-                                      if (errPago) {
-                                        setErrorVenta(errPago);
-                                        return;
-                                      }
-                                      if (!adicPijAdh.trim()) {
-                                        setErrorVenta('Ingresá el número de adhesión adicional.');
-                                        return;
-                                      }
-                                      if (!adicPijAnexo.trim()) {
-                                        setErrorVenta('Ingresá el número de anexo adicional.');
-                                        return;
-                                      }
-                                      const dup = buscarDuplicadoPij(
-                                        adicPijSerie,
-                                        adicPijAdh,
-                                        adicPijAnexo,
-                                        undefined,
-                                        form.comprasAdicionales,
-                                      );
-                                      if (dup) {
-                                        setErrorVenta(dup);
-                                        return;
-                                      }
-                                    }
-                                    if (showAddAdicional === 'terreno') {
-                                      const dup = buscarDuplicadoTerreno(
-                                        adicionalForm.numeroRecibo,
-                                        undefined,
-                                        form.comprasAdicionales,
-                                      );
-                                      if (dup) {
-                                        setErrorVenta(dup);
-                                        return;
-                                      }
-                                    }
-
-                                    setErrorVenta('');
-                                    const montosAdic =
-                                      showAddAdicional === 'pij' && adicionalForm.formaPago
-                                        ? montosPijDesdeEntrada(
-                                            adicionalForm.formaPago,
-                                            adicionalForm.montoEfectivo,
-                                            adicionalForm.montoTransferencia,
-                                          )
-                                        : null;
-                                    const newCompra: CompraAdicional = {
-                                      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
-                                      idProducto: adicionalForm.idProducto,
-                                      estadoPago: adicionalForm.estadoPago as EstadoPago,
-                                      idBarrio: adicionalForm.idBarrio || null,
-                                      numeroRecibo: adicionalForm.numeroRecibo.trim(),
-                                      fechaCierre: new Date().toISOString(),
-                                      formaPago: montosAdic ? adicionalForm.formaPago : null,
-                                      montoCierre: montosAdic?.montoCierre ?? null,
-                                      montoEfectivo: montosAdic?.montoEfectivo ?? null,
-                                      montoTransferencia: montosAdic?.montoTransferencia ?? null,
-                                    };
-
-                                    const imagenesRemapeadas =
-                                      showAddAdicional === 'pij' && adicionalDraftId
-                                        ? form.imagenesCierre.map((img) =>
-                                            img.ventaKey === adicionalDraftId
-                                              ? { ...img, ventaKey: newCompra.id }
-                                              : img,
-                                          )
-                                        : form.imagenesCierre;
-
-                                    patch({
-                                      comprasAdicionales: [...(form.comprasAdicionales || []), newCompra],
-                                      imagenesCierre: imagenesRemapeadas,
-                                    });
-
-                                    setShowAddAdicional(null);
-                                    setAdicionalDraftId('');
-                                    setAdicionalForm({
-                                      idProducto: '',
-                                      estadoPago: null,
-                                      idBarrio: '',
-                                      numeroRecibo: '',
-                                      formaPago: null,
-                                      montoEfectivo: '',
-                                      montoTransferencia: '',
-                                    });
-                                    setAdicPijSerie('A');
-                                    setAdicPijAdh('');
-                                    setAdicPijAnexo('');
-                                  }}
-                                  className="h-10 w-full rounded-lg bg-zinc-900 text-[13px] font-semibold text-white shadow-sm hover:bg-zinc-800 active:scale-[0.98] transition-all"
-                                >
-                                  Agregar Compra
-                                </button>
+                                <div className="flex flex-col gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => confirmarCompraAdicional(false)}
+                                    className="h-10 w-full rounded-lg bg-zinc-900 text-[13px] font-semibold text-white shadow-sm hover:bg-zinc-800 active:scale-[0.98] transition-all"
+                                  >
+                                    {labelGuardarCompraAdicional(indiceSiguienteAdicional)}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => confirmarCompraAdicional(true)}
+                                    className="h-10 w-full rounded-lg border border-brand-600 bg-white text-[13px] font-semibold text-brand-700 shadow-sm hover:bg-brand-50 active:scale-[0.98] transition-all"
+                                  >
+                                    Guardar y agregar otra
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </>

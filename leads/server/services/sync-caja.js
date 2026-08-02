@@ -1560,10 +1560,11 @@ function filaCajaKey(row) {
  * y además Plan Joven del sistema integral (SP_Informe_Cierre_Operadores).
  *
  * @param {unknown[]} leadsDB
- * @param {{ sheetGids?: string[], mes?: string, yyyyMm?: string, csvText?: string, idEjercicioDetalle?: number, idOperador?: number }} [options]
+ * @param {{ sheetGids?: string[], mes?: string, yyyyMm?: string, csvText?: string, idEjercicioDetalle?: number, idOperador?: number, integralXlsxBase64?: string }} [options]
  */
 export async function buildFaltantesDesdeCaja(leadsDB, options = {}) {
-  const { sheetGids, mes, yyyyMm, csvText, idEjercicioDetalle, idOperador } = options;
+  const { sheetGids, mes, yyyyMm, csvText, idEjercicioDetalle, idOperador, integralXlsxBase64 } =
+    options;
 
   let excelRows = [];
   let fuente = null;
@@ -1747,23 +1748,48 @@ export async function buildFaltantesDesdeCaja(leadsDB, options = {}) {
   };
 
   try {
-    const periodo = await resolverPeriodoInforme(mes, idEjercicioDetalle, yyyyMm);
-    console.log(
-      '[faltantes-pij] consultando integral período=%s (%s) operador=%s',
-      periodo.idEjercicioDetalle,
-      periodo.codigo,
-      idOperador ?? 1,
-    );
-    const cargado = await cargarPijIntegral({
-      idEjercicioDetalle: periodo.idEjercicioDetalle,
-      idOperador: idOperador ?? 1,
-    });
-    console.log('[faltantes-pij] integral Plan Joven filas=%s', cargado.items.length);
-    integral.periodo = {
-      idEjercicioDetalle: periodo.idEjercicioDetalle,
-      codigo: periodo.codigo,
-    };
-    integral.source = cargado.source;
+    let periodo = null;
+    try {
+      periodo = await resolverPeriodoInforme(mes, idEjercicioDetalle, yyyyMm);
+    } catch (periodoErr) {
+      if (!(integralXlsxBase64 && String(integralXlsxBase64).trim())) throw periodoErr;
+      periodo = {
+        idEjercicioDetalle: idEjercicioDetalle ?? null,
+        codigo: mes || yyyyMm || 'xlsx-bloqueos',
+      };
+    }
+    let cargado;
+    if (integralXlsxBase64 && String(integralXlsxBase64).trim()) {
+      const { parseBloqueosIntegralXlsxBase64 } = await import('./bloqueos-integral-xlsx.js');
+      cargado = await parseBloqueosIntegralXlsxBase64(integralXlsxBase64);
+      console.log(
+        '[faltantes-pij] integral desde Excel bloqueos oficiales filas=%s',
+        cargado.items.length,
+      );
+      integral.periodo = {
+        idEjercicioDetalle: periodo?.idEjercicioDetalle ?? idEjercicioDetalle ?? null,
+        codigo: periodo?.codigo ?? 'xlsx-bloqueos',
+      };
+      integral.source = 'xlsx-bloqueos-integral';
+      integral.fuenteXlsx = true;
+    } else {
+      console.log(
+        '[faltantes-pij] consultando integral período=%s (%s) operador=%s',
+        periodo.idEjercicioDetalle,
+        periodo.codigo,
+        idOperador ?? 1,
+      );
+      cargado = await cargarPijIntegral({
+        idEjercicioDetalle: periodo.idEjercicioDetalle,
+        idOperador: idOperador ?? 1,
+      });
+      console.log('[faltantes-pij] integral Plan Joven filas=%s', cargado.items.length);
+      integral.periodo = {
+        idEjercicioDetalle: periodo.idEjercicioDetalle,
+        codigo: periodo.codigo,
+      };
+      integral.source = cargado.source;
+    }
 
     const clavesIntegralUsadas = new Set();
     const nombresIntegralUsados = new Set();

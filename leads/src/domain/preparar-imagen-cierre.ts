@@ -1,8 +1,9 @@
 /** Prepara foto de celular/cámara para subir al cierre PIJ (más liviana y JPEG). */
 
-const MAX_LADO_PX = 1920;
-const JPEG_QUALITY = 0.82;
-const MAX_BYTES_SIN_COMPRIMIR = 1.5 * 1024 * 1024;
+const MAX_LADO_PX = 1600;
+const JPEG_QUALITY = 0.78;
+const MAX_BYTES_SIN_COMPRIMIR = 1 * 1024 * 1024;
+const MAX_BYTES_OBJETIVO = 1.2 * 1024 * 1024;
 
 function canvasToJpegBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
@@ -67,9 +68,13 @@ export async function prepararImagenCierreParaSubida(file: File): Promise<File> 
 
     let quality = JPEG_QUALITY;
     let blob = await canvasToJpegBlob(canvas, quality);
-    // Si sigue muy pesada, bajar calidad una vez.
-    if (blob.size > 3.5 * 1024 * 1024) {
-      quality = 0.7;
+    // Si sigue pesada, bajar calidad (objetivo ~1.2 MB para 20 usuarios concurrentes).
+    if (blob.size > MAX_BYTES_OBJETIVO) {
+      quality = 0.65;
+      blob = await canvasToJpegBlob(canvas, quality);
+    }
+    if (blob.size > 2.5 * 1024 * 1024) {
+      quality = 0.55;
       blob = await canvasToJpegBlob(canvas, quality);
     }
 

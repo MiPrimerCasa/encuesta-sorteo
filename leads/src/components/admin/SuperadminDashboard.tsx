@@ -490,6 +490,7 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
   const loadFaltantesPij = async (opts: {
     idEjercicioDetalle?: number;
     csvText?: string;
+    integralXlsxBase64?: string;
   } = {}) => {
     const idEj = opts.idEjercicioDetalle ?? faltantesIdEjercicio ?? undefined;
     try {
@@ -498,11 +499,12 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
       const res = await previewFaltantesPij({
         idEjercicioDetalle: idEj,
         csvText: opts.csvText,
+        integralXlsxBase64: opts.integralXlsxBase64,
       });
       setFaltantesData(res);
-      if (!opts.csvText && res.idEjercicioDetalle != null) {
+      if (!opts.csvText && !opts.integralXlsxBase64 && res.idEjercicioDetalle != null) {
         setFaltantesIdEjercicio(res.idEjercicioDetalle);
-      } else if (!opts.csvText && idEj != null) {
+      } else if (!opts.csvText && !opts.integralXlsxBase64 && idEj != null) {
         setFaltantesIdEjercicio(idEj);
       }
     } catch (err) {
@@ -3168,6 +3170,9 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
           void loadFaltantesPij({ idEjercicioDetalle: faltantesIdEjercicio ?? undefined })
         }
         onSubirCsv={(csvText) => void loadFaltantesPij({ csvText })}
+        onSubirBloqueosIntegral={(integralXlsxBase64) =>
+          void loadFaltantesPij({ integralXlsxBase64 })
+        }
       />
     </div>
   );

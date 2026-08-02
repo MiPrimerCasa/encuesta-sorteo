@@ -85,6 +85,11 @@ export function NavBar({
       ? [...tabs, { value: 'comisiones' as const, label: 'Comisiones y salarios' }]
       : tabs;
 
+  const tabsFinal =
+    usuario.feedbackAdmin && !tabsConComisiones.some((t) => t.value === 'feedback')
+      ? [...tabsConComisiones, { value: 'feedback' as const, label: 'Feedback' }]
+      : tabsConComisiones;
+
   return (
     <header
       className="sticky top-0 z-40 border-b border-zinc-200 bg-white/90 backdrop-blur-sm"
@@ -116,9 +121,9 @@ export function NavBar({
 
         {/* Desktop: nav */}
         <div className="hidden items-center gap-4 md:flex">
-          {tabsConComisiones.length > 1 && (
+          {tabsFinal.length > 1 && (
             <SegmentedControl
-              options={tabsConComisiones}
+              options={tabsFinal}
               value={vistaActiva}
               onChange={onCambiarVista}
             />
@@ -152,9 +157,9 @@ export function NavBar({
       </div>
 
       {/* Fila 2 mobile: underline tabs */}
-      {tabsConComisiones.length > 1 && (
+      {tabsFinal.length > 1 && (
         <div className="flex border-t border-zinc-100 md:hidden">
-          {tabsConComisiones.map((tab) => {
+          {tabsFinal.map((tab) => {
             const active = vistaActiva === tab.value;
             return (
               <button

@@ -1136,12 +1136,26 @@ export async function persistirSeguimientoLead(leadId, patch, usuario, leadConte
 
   if (useSeguimientoSql()) {
     const reg = await execRegistrarSeguimientoLead(leadContext, merged, usuario);
-    await sincronizarImagenesBytesSql(
-      leadId,
-      reg.id,
-      merged.imagenesCierre,
-      parseOperadorId(usuario),
-    );
+    // Bytes a SQL en background solo si el patch trae fotos (evita re-sync en patches de cajaEstado).
+    const patchTieneImagenes = Object.prototype.hasOwnProperty.call(patch, 'imagenesCierre');
+    const imgs = merged.imagenesCierre;
+    if (
+      patchTieneImagenes &&
+      Array.isArray(imgs) &&
+      imgs.length > 0 &&
+      reg.id != null
+    ) {
+      const opId = parseOperadorId(usuario);
+      const leadIdCopy = leadId;
+      const regId = reg.id;
+      const imgsCopy = [...imgs];
+      const { enqueueBgJob } = await import('../services/bg-job-queue.js');
+      enqueueBgJob(
+        'sql-imagenes-cierre',
+        () => sincronizarImagenesBytesSql(leadIdCopy, regId, imgsCopy, opId),
+        { concurrency: Number(process.env.CIERRES_PIJ_SQL_IMG_CONCURRENCY ?? 2) || 2 },
+      );
+    }
     return {
       merged,
       saved: true,

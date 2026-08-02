@@ -10,6 +10,9 @@ export function getCajaMysqlPool() {
   }
   if (!pool) {
     const cfg = getCajaMysqlConfig();
+    const limitRaw = Number(process.env.CAJA_MYSQL_CONNECTION_LIMIT ?? 10);
+    const connectionLimit =
+      Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 25) : 10;
     pool = mysql.createPool({
       host: cfg.host,
       port: cfg.port,
@@ -17,7 +20,7 @@ export function getCajaMysqlPool() {
       user: cfg.user,
       password: cfg.password,
       waitForConnections: true,
-      connectionLimit: 5,
+      connectionLimit,
       queueLimit: 0,
       charset: 'utf8mb4',
       timezone: 'Z',

@@ -48,7 +48,13 @@ import {
 } from './db/operadores-catalog.js';
 import { fetchAdminDashboard } from './db/admin-dashboard.js';
 import { fetchInformeCierresOperadores, fetchPeriodosInformeCierres } from './db/informe-cierres.js';
-import { aplicarRolSuperadmin, esSuperadminUsuario, esSupervisorPanelGlobal, esComisionesContableLogin } from './db/superadmin-auth.js';
+import {
+  aplicarRolSuperadmin,
+  esSuperadminUsuario,
+  esSupervisorPanelGlobal,
+  esComisionesContableLogin,
+  esFeedbackAdminLogin,
+} from './db/superadmin-auth.js';
 import { modificarTelefonoLeadSchema } from './schemas/modificar-telefono-lead.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
@@ -73,9 +79,15 @@ import { loginSchema, seguimientoSchema } from './schemas/seguimiento.js';
 import { registerGrabacionesRoutes } from './routes/grabaciones-routes.js';
 import { registerCierresPijRoutes } from './routes/cierres-pij-routes.js';
 import { registerCajaSyncRoutes } from './routes/caja-sync-routes.js';
+import { registerFeedbackRoutes } from './routes/feedback-routes.js';
 import { syncPijSistemaIntegral } from './services/pij-integral-sync.js';
-import { publicarCierreACajaMysql } from './services/caja-publicar-cierre.js';
+import {
+  esCierrePublicableACaja,
+  publicarCierreACajaMysql,
+} from './services/caja-publicar-cierre.js';
 import { publicarCierreAIngestHttp } from './services/caja-ingest-http.js';
+import { isCajaIngestHttpEnabled } from './config/caja-ingest-config.js';
+import { isCajaMysqlEnabled } from './config/caja-mysql-config.js';
 
 async function runPijIntegralSync(lead, seguimiento, usuario) {
   return syncPijSistemaIntegral(lead, seguimiento, usuario, {
@@ -214,6 +226,7 @@ function registerApiRoutes(api) {
       }
       const panelGlobal = esSupervisorPanelGlobal(user.loginId || usuario);
       const comisionesContable = esComisionesContableLogin(user.loginId || usuario);
+      const feedbackAdmin = esFeedbackAdminLogin(user.loginId || usuario);
       return res.json({
         token: `sql-${user.id}`,
         usuario: {
@@ -232,6 +245,7 @@ function registerApiRoutes(api) {
           sucursal: user.sucursal,
           ...(panelGlobal ? { panelGlobal: true } : {}),
           ...(comisionesContable ? { comisionesContable: true } : {}),
+          ...(feedbackAdmin ? { feedbackAdmin: true } : {}),
         },
       });
     } catch (error) {
@@ -828,12 +842,17 @@ function registerApiRoutes(api) {
         typeof req.body?.csvText === 'string' && req.body.csvText.trim()
           ? req.body.csvText
           : undefined;
+      const integralXlsxBase64 =
+        typeof req.body?.integralXlsxBase64 === 'string' && req.body.integralXlsxBase64.trim()
+          ? req.body.integralXlsxBase64
+          : undefined;
 
       const resultado = await buildFaltantesDesdeCaja(leads, {
         mes: csvText || (sheetGids && sheetGids.length) ? undefined : mes,
         yyyyMm: yyyyMm || undefined,
         sheetGids,
         csvText,
+        integralXlsxBase64,
         idEjercicioDetalle,
         idOperador:
           req.body?.idOperador != null && String(req.body.idOperador).trim() !== ''
@@ -1468,8 +1487,7 @@ function registerApiRoutes(api) {
       }
 
       // 1) SQL Server ya persistió vía SP_RegistrarSeguimientoLead.
-      // 2a) Publicar a MySQL nube (caja) — best-effort; no deshace el cierre CRM.
-      // 2b) Ingest HTTP local (Electron :3847) — piloto same-PC.
+      // 2) Publicar a caja (MySQL / ingest) en background — no bloquea al operador.
       let cajaPublicacion = null;
       let cajaIngest = null;
       const segParaCaja = { ...data, ...(lead?.seguimiento ?? {}) };
@@ -1478,89 +1496,89 @@ function registerApiRoutes(api) {
         (entradaHistorial?.id != null && Number(entradaHistorial.id) > 0
           ? Number(entradaHistorial.id)
           : null);
-      if (saved) {
-        try {
-          cajaPublicacion = await publicarCierreACajaMysql({
-            lead,
-            seguimiento: segParaCaja,
-            usuario,
-            origenRegistroId: origenCaja,
-          });
-          if (cajaPublicacion?.error) {
-            message +=
-              ' El cierre se guardó en SQL Server, pero falló la publicación a la caja (MySQL).';
-          } else if (cajaPublicacion && !cajaPublicacion.skipped) {
-            message += ' Publicado en cola de caja.';
-          }
-        } catch (cajaErr) {
-          console.error('[caja-mysql] sync inesperado:', cajaErr);
-          cajaPublicacion = {
-            skipped: false,
-            cierreId: null,
-            error: cajaErr instanceof Error ? cajaErr.message : 'Error MySQL caja',
-          };
-          message +=
-            ' El cierre se guardó en SQL Server, pero falló la publicación a la caja (MySQL).';
-        }
+      if (
+        saved &&
+        esCierrePublicableACaja(segParaCaja) &&
+        (isCajaMysqlEnabled() || isCajaIngestHttpEnabled())
+      ) {
+        const leadIdStr = String(req.params.id);
+        const leadSnap = { ...lead };
+        const segSnap = { ...segParaCaja };
+        const usuarioSnap = { ...usuario };
+        const { enqueueBgJob } = await import('./services/bg-job-queue.js');
+        cajaPublicacion = { skipped: false, pending: true };
+        cajaIngest = { skipped: false, pending: true };
+        message += ' Publicación a caja en segundo plano.';
+        enqueueBgJob(
+          'caja-post-cierre',
+          async () => {
+            let pub = null;
+            let ingest = null;
+            try {
+              pub = await publicarCierreACajaMysql({
+                lead: leadSnap,
+                seguimiento: segSnap,
+                usuario: usuarioSnap,
+                origenRegistroId: origenCaja,
+              });
+              if (pub?.error) {
+                console.warn('[caja-mysql] bg lead=%s:', leadIdStr, pub.error);
+              } else if (pub && !pub.skipped) {
+                console.info('[caja-mysql] bg OK lead=%s', leadIdStr);
+              }
+            } catch (cajaErr) {
+              console.error('[caja-mysql] bg error lead=%s:', leadIdStr, cajaErr);
+              pub = {
+                skipped: false,
+                cierreId: null,
+                error: cajaErr instanceof Error ? cajaErr.message : 'Error MySQL caja',
+              };
+            }
 
-        try {
-          cajaIngest = await publicarCierreAIngestHttp({
-            lead,
-            seguimiento: segParaCaja,
-            usuario,
-            origenRegistroId: origenCaja,
-          });
-          if (cajaIngest?.error) {
-            message +=
-              ' Falló el envío al ingest local de caja (¿Electron en :3847?).';
-          } else if (cajaIngest && !cajaIngest.skipped && cajaIngest.ok) {
-            message += ' Enviado al ingest local de caja.';
-          }
-        } catch (ingestErr) {
-          console.error('[caja-ingest] sync inesperado:', ingestErr);
-          cajaIngest = {
-            skipped: false,
-            ok: false,
-            error: ingestErr instanceof Error ? ingestErr.message : 'Error ingest caja',
-          };
-          message += ' Falló el envío al ingest local de caja (¿Electron en :3847?).';
-        }
+            try {
+              ingest = await publicarCierreAIngestHttp({
+                lead: leadSnap,
+                seguimiento: segSnap,
+                usuario: usuarioSnap,
+                origenRegistroId: origenCaja,
+              });
+              if (ingest?.error) {
+                console.warn('[caja-ingest] bg lead=%s:', leadIdStr, ingest.error);
+              } else if (ingest && !ingest.skipped && ingest.ok) {
+                console.info('[caja-ingest] bg OK lead=%s', leadIdStr);
+              }
+            } catch (ingestErr) {
+              console.error('[caja-ingest] bg error lead=%s:', leadIdStr, ingestErr);
+            }
 
-        // Marcar pendiente si llegó a MySQL nube o al ingest local.
-        const publicadoCaja =
-          (cajaPublicacion && !cajaPublicacion.skipped && !cajaPublicacion.error) ||
-          (cajaIngest && !cajaIngest.skipped && cajaIngest.ok);
-        if (publicadoCaja) {
-          try {
-            const patchCaja = {
-              cajaEstado: 'pendiente',
-              cajaSucursal:
-                (cajaPublicacion?.sucursalCodigo
-                  ? String(cajaPublicacion.sucursalCodigo)
-                  : null) ||
-                String(process.env.CAJA_DEFAULT_SUCURSAL || '').trim().slice(0, 32) ||
-                null,
-              cajaMotivoRechazo: null,
-            };
-            await persistirSeguimientoLead(req.params.id, patchCaja, usuario, {
-              ...lead,
-              seguimiento: { ...(lead?.seguimiento ?? {}), ...segParaCaja },
-            });
-            lead = {
-              ...lead,
-              seguimiento: {
-                ...(lead?.seguimiento ?? {}),
-                ...segParaCaja,
-                ...patchCaja,
-              },
-            };
-          } catch (patchErr) {
-            console.warn(
-              '[caja] publicado OK pero no se pudo marcar cajaEstado=pendiente:',
-              patchErr instanceof Error ? patchErr.message : patchErr,
-            );
-          }
-        }
+            const publicadoCaja =
+              (pub && !pub.skipped && !pub.error) ||
+              (ingest && !ingest.skipped && ingest.ok);
+            if (!publicadoCaja) return;
+
+            try {
+              const patchCaja = {
+                cajaEstado: 'pendiente',
+                cajaSucursal:
+                  (pub?.sucursalCodigo ? String(pub.sucursalCodigo) : null) ||
+                  String(process.env.CAJA_DEFAULT_SUCURSAL || '').trim().slice(0, 32) ||
+                  null,
+                cajaMotivoRechazo: null,
+              };
+              await persistirSeguimientoLead(leadIdStr, patchCaja, usuarioSnap, {
+                ...leadSnap,
+                seguimiento: { ...(leadSnap?.seguimiento ?? {}), ...segSnap },
+              });
+            } catch (patchErr) {
+              console.warn(
+                '[caja] bg publicado OK pero no se pudo marcar cajaEstado=pendiente lead=%s:',
+                leadIdStr,
+                patchErr instanceof Error ? patchErr.message : patchErr,
+              );
+            }
+          },
+          { concurrency: Number(process.env.CAJA_POST_CIERRE_CONCURRENCY ?? 2) || 2 },
+        );
       }
 
       // 3) Bloqueo PIJ en sistema integral (SP directo o SOAP según PIJ_BLOQUEO_MODE).
@@ -1654,6 +1672,7 @@ function registerApiRoutes(api) {
   registerGrabacionesRoutes(api, { usuarioDesdeRequest });
   registerCierresPijRoutes(api, { usuarioDesdeRequest });
   registerCajaSyncRoutes(api);
+  registerFeedbackRoutes(api, { usuarioDesdeRequest });
 }
 
 function mountStaticAndSpa(app, distPath, basePath) {

@@ -6,7 +6,8 @@ export type VistaActiva =
   | 'calendario'
   | 'admin'
   | 'grabacion'
-  | 'comisiones';
+  | 'comisiones'
+  | 'feedback';
 export type ListaLead = 'entrevista' | 'contacto';
 /** Dónde quiere la entrevista el cliente (encuesta / SP). */
 export type LugarEntrevista = 'sucursal' | 'domicilio';
@@ -26,6 +27,28 @@ export type FormaPago = 'efectivo' | 'transferencia' | 'mixto';
 
 /** Tipo de foto al cierre PIJ (códigos de administración: img1, img2, img5, img6, img7). */
 export type TipoImagenCierrePij = 'img1' | 'img2' | 'img5' | 'img6' | 'img7';
+
+/** Feedback de usuarios (bugs / propuestas de mejora). */
+export type FeedbackTipo = 'bug' | 'mejora';
+/** Estados que marca el administrador de sistema. */
+export type FeedbackEstado = 'nuevo' | 'visto' | 'aprobado' | 'tratado';
+
+export interface FeedbackItem {
+  id: string;
+  tipo: FeedbackTipo;
+  mensaje: string;
+  anonimo: boolean;
+  usuarioId?: string | null;
+  usuarioNombre?: string | null;
+  usuarioRol?: string | null;
+  usuarioLoginId?: string | null;
+  tieneCaptura: boolean;
+  capturaMime?: string | null;
+  urlVista?: string | null;
+  userAgent?: string | null;
+  estado: FeedbackEstado;
+  creadoEn: string;
+}
 
 export interface ImagenCierrePij {
   id: string;
@@ -267,9 +290,11 @@ export interface ExcelSinIntegralItem {
 }
 
 export interface FaltantesPijIntegral {
-  periodo: { idEjercicioDetalle: number; codigo: string } | null;
+  periodo: { idEjercicioDetalle: number | null; codigo: string } | null;
   source: string | null;
   error?: string;
+  /** true si el integral vino del Excel oficial de bloqueos. */
+  fuenteXlsx?: boolean;
   items: IntegralPijItem[];
   sinCrm: IntegralPijItem[];
   sinExcel: IntegralPijItem[];
@@ -570,6 +595,8 @@ export interface UsuarioSesion {
   panelGlobal?: boolean;
   /** Acceso al informe de comisiones contable (COMISIONES_CONTABLE_LOGIN_IDS). */
   comisionesContable?: boolean;
+  /** Acceso a la bandeja de bugs/propuestas (FEEDBACK_ADMIN_LOGIN_IDS). */
+  feedbackAdmin?: boolean;
 }
 
 /** Informe de comisiones y salarios para departamento contable. */

@@ -23,6 +23,9 @@ import type {
   SeguimientoLead,
   UsuarioSesion,
   VerificarTelefonoCargaResult,
+  FeedbackItem,
+  FeedbackTipo,
+  FeedbackEstado,
 } from '../types';
 import { mensajeReferidosCreados } from '../domain/referidos-carga';
 import {
@@ -765,6 +768,8 @@ export type FaltantesPijOptions = {
   sheetGids?: string[];
   /** CSV exportado del Excel de Caja (alternativa a Sheets). */
   csvText?: string;
+  /** Excel oficial de bloqueos PIJ en sistema integral (base64). */
+  integralXlsxBase64?: string;
 };
 
 export async function previewFaltantesPij(
@@ -811,6 +816,7 @@ export async function previewFaltantesPij(
       yyyyMm: options.yyyyMm,
       sheetGids: options.sheetGids,
       csvText: options.csvText,
+      integralXlsxBase64: options.integralXlsxBase64,
     }),
   });
 }
@@ -1281,5 +1287,110 @@ export async function fetchImagenCierrePijBlob(
   }
   const blob = await res.blob();
   return URL.createObjectURL(blob);
+}
+
+export async function enviarFeedback(payload: {
+  tipo: FeedbackTipo;
+  mensaje: string;
+  anonimo: boolean;
+  captura?: File;
+  urlVista?: string;
+}): Promise<{ ok: boolean; item: FeedbackItem }> {
+  if (_isDemoActive) {
+    return {
+      ok: true,
+      item: {
+        id: `demo-${Date.now()}`,
+        tipo: payload.tipo,
+        mensaje: payload.mensaje,
+        anonimo: payload.anonimo,
+        usuarioId: payload.anonimo ? null : _demoUsuario.id,
+        usuarioNombre: payload.anonimo ? null : _demoUsuario.nombre,
+        usuarioRol: payload.anonimo ? null : _demoUsuario.rol,
+        tieneCaptura: Boolean(payload.captura),
+        urlVista: payload.urlVista ?? null,
+        estado: 'nuevo',
+        creadoEn: new Date().toISOString(),
+      },
+    };
+  }
+
+  const form = new FormData();
+  form.append('tipo', payload.tipo);
+  form.append('mensaje', payload.mensaje);
+  form.append('anonimo', payload.anonimo ? 'true' : 'false');
+  if (payload.urlVista) form.append('urlVista', payload.urlVista);
+  if (payload.captura) form.append('captura', payload.captura);
+
+  const res = await fetch(apiUrl('/api/feedback'), {
+    method: 'POST',
+    headers: authHeadersForSession(false),
+    body: form,
+  });
+  const rawText = await res.text();
+  let data: { message?: string; detail?: string; ok?: boolean; item?: FeedbackItem } = {};
+  try {
+    data = rawText ? (JSON.parse(rawText) as typeof data) : {};
+  } catch {
+    /* no JSON — suele ser 404 de API vieja o HTML de proxy */
+  }
+  if (!res.ok) {
+    const detalle = data.message || data.detail;
+    if (detalle) throw new Error(detalle);
+    if (res.status === 404) {
+      throw new Error(
+        'El servidor no tiene la ruta de feedback. Reiniciá la API (npm run dev) e intentá de nuevo.',
+      );
+    }
+    throw new Error(`No se pudo enviar el reporte (HTTP ${res.status}).`);
+  }
+  if (!data.item) throw new Error('Respuesta inválida del servidor.');
+  return { ok: true, item: data.item };
+}
+
+export async function fetchFeedbackList(params?: {
+  tipo?: FeedbackTipo;
+  estado?: FeedbackEstado;
+  limit?: number;
+}): Promise<{ items: FeedbackItem[]; nuevos: number }> {
+  if (_isDemoActive) return { items: [], nuevos: 0 };
+  const q = new URLSearchParams();
+  if (params?.tipo) q.set('tipo', params.tipo);
+  if (params?.estado) q.set('estado', params.estado);
+  if (params?.limit) q.set('limit', String(params.limit));
+  const suffix = q.toString() ? `?${q}` : '';
+  return apiFetch<{ items: FeedbackItem[]; nuevos: number }>(`/api/feedback${suffix}`);
+}
+
+export async function fetchMisFeedback(limit = 100): Promise<FeedbackItem[]> {
+  if (_isDemoActive) return [];
+  const data = await apiFetch<{ items: FeedbackItem[] }>(
+    `/api/feedback/mios?limit=${encodeURIComponent(String(limit))}`,
+  );
+  return data.items ?? [];
+}
+
+export async function patchFeedbackEstado(
+  id: string,
+  estado: FeedbackEstado,
+): Promise<FeedbackItem> {
+  if (_isDemoActive) throw new Error('No disponible en modo demo.');
+  const data = await apiFetch<{ ok: boolean; item: FeedbackItem }>(
+    `/api/feedback/${encodeURIComponent(id)}/estado`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ estado }),
+    },
+  );
+  return data.item;
+}
+
+export async function fetchFeedbackCapturaBlob(id: string): Promise<Blob> {
+  if (_isDemoActive) throw new Error('No disponible en modo demo.');
+  const res = await fetch(apiUrl(`/api/feedback/${encodeURIComponent(id)}/captura`), {
+    headers: authHeadersForSession(false),
+  });
+  if (!res.ok) throw new Error('No se pudo cargar la captura.');
+  return res.blob();
 }
 

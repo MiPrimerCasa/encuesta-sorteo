@@ -17,6 +17,8 @@ interface Props {
   onCambiarPeriodo: (idEjercicioDetalle: number) => void;
   onRecargar: () => void;
   onSubirCsv: (csvText: string, fileName: string) => void;
+  /** Excel oficial de bloqueos PIJ en sistema integral (.xlsx). */
+  onSubirBloqueosIntegral?: (base64: string, fileName: string) => void;
 }
 
 function formatFecha(fecha: string | null | undefined) {
@@ -92,6 +94,7 @@ export function FaltantesPijModal({
   onCambiarPeriodo,
   onRecargar,
   onSubirCsv,
+  onSubirBloqueosIntegral,
 }: Props) {
   const [tab, setTab] = useState<'faltan_crm' | 'faltan_integral' | 'ambiguos'>('faltan_crm');
   const [vista, setVista] = useState<'vendedores' | 'lista'>('vendedores');
@@ -248,7 +251,7 @@ export function FaltantesPijModal({
               Recargar
             </button>
             <label className="cursor-pointer rounded-lg border border-dashed border-brand-300 bg-brand-50/50 px-3 py-1.5 text-[12px] font-semibold text-brand-800 hover:bg-brand-50">
-              Subir CSV…
+              Subir CSV Caja…
               <input
                 type="file"
                 accept=".csv,text/csv"
@@ -263,7 +266,35 @@ export function FaltantesPijModal({
                 }}
               />
             </label>
+            {onSubirBloqueosIntegral ? (
+              <label className="cursor-pointer rounded-lg border border-dashed border-indigo-300 bg-indigo-50/60 px-3 py-1.5 text-[12px] font-semibold text-indigo-900 hover:bg-indigo-50">
+                Subir bloqueos integral…
+                <input
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const result = String(reader.result ?? '');
+                      const b64 = result.includes(',') ? result.split(',')[1] : result;
+                      onSubirBloqueosIntegral(b64 || '', file.name);
+                    };
+                    reader.readAsDataURL(file);
+                    e.target.value = '';
+                  }}
+                />
+              </label>
+            ) : null}
           </div>
+          {data?.integral?.fuenteXlsx || data?.integral?.source === 'xlsx-bloqueos-integral' ? (
+            <p className="text-[12px] text-indigo-800">
+              Cruce usando Excel oficial de bloqueos PIJ (
+              {data.resumen?.adhesionesIntegral ?? data.integral?.items?.length ?? 0} filas).
+            </p>
+          ) : null}
 
           {resumen && (
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">

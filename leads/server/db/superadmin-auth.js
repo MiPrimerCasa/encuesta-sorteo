@@ -84,3 +84,30 @@ export function esComisionesContableUsuario(usuario) {
   return esComisionesContableLogin(usuario.loginId);
 }
 
+/**
+ * Login IDs con acceso a la bandeja de bugs/propuestas (FeedbackFab).
+ * Default: jesus.cajal.work@gmail.com
+ * Override: FEEDBACK_ADMIN_LOGIN_IDS=a@x.com,b@y.com
+ */
+export function feedbackAdminLoginIds() {
+  const raw = process.env.FEEDBACK_ADMIN_LOGIN_IDS || 'jesus.cajal.work@gmail.com';
+  return raw
+    .split(',')
+    .map((s) => normalizeLoginId(s))
+    .filter(Boolean);
+}
+
+export function esFeedbackAdminLogin(loginId) {
+  const id = normalizeLoginId(loginId);
+  if (!id) return false;
+  return feedbackAdminLoginIds().includes(id);
+}
+
+export function esFeedbackAdminUsuario(usuario) {
+  if (!usuario) return false;
+  if (usuario.feedbackAdmin === true) {
+    return esFeedbackAdminLogin(usuario.loginId);
+  }
+  return esFeedbackAdminLogin(usuario.loginId);
+}
+

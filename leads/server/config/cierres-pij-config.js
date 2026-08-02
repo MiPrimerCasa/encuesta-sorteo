@@ -1,7 +1,7 @@
 /** Tamaño máximo por imagen de cierre PIJ (MB). El front comprime antes de subir. */
 export function getCierresPijMaxBytes() {
-  const mb = Number(process.env.CIERRES_PIJ_MAX_MB ?? 12);
-  const n = Number.isFinite(mb) && mb > 0 ? mb : 12;
+  const mb = Number(process.env.CIERRES_PIJ_MAX_MB ?? 8);
+  const n = Number.isFinite(mb) && mb > 0 ? mb : 8;
   return Math.floor(n * 1024 * 1024);
 }
 

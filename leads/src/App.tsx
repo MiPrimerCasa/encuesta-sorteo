@@ -16,6 +16,7 @@ import { leerPeriodoDesdeUrl, actualizarAppQuery, resolverVistaInicial } from '.
 import { referidosPendientesDeCarga } from './domain/referidos-carga';
 import { LoginPage } from './components/auth/LoginPage';
 import { NavBar } from './components/layout/NavBar';
+import { FeedbackProvider, FeedbackFab } from './components/feedback/FeedbackFab';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import type {
   AdminDashboardData,
@@ -51,6 +52,11 @@ const SuperadminDashboard = lazy(() =>
 const ComisionesContablePanel = lazy(() =>
   import('./components/admin/ComisionesContablePanel').then((m) => ({
     default: m.ComisionesContablePanel,
+  })),
+);
+const FeedbackPanel = lazy(() =>
+  import('./components/admin/FeedbackPanel').then((m) => ({
+    default: m.FeedbackPanel,
   })),
 );
 const GrabacionDiariaPanel = lazy(() =>
@@ -308,10 +314,18 @@ function AppShell() {
   }
 
   const contenidoPrincipal =
-    cargando && !adminDashboard && leads.length === 0 && vistaActiva !== 'comisiones' ? (
+    cargando &&
+    !adminDashboard &&
+    leads.length === 0 &&
+    vistaActiva !== 'comisiones' &&
+    vistaActiva !== 'feedback' ? (
       <VistaCargando texto="Cargando datos…" />
     ) : vistaActiva === 'comisiones' && usuario.comisionesContable ? (
       <ComisionesContablePanel />
+    ) : vistaActiva === 'feedback' && usuario.feedbackAdmin ? (
+      <div className="mx-auto max-w-3xl px-4 py-6">
+        <FeedbackPanel />
+      </div>
     ) : esSuperadmin && adminDashboard ? (
       <SuperadminDashboard data={adminDashboard} periodo={periodo} onCambiarPeriodo={cambiarPeriodo} cargando={cargando} />
     ) : tienePanelGlobal && vistaActiva === 'admin' ? (
@@ -382,6 +396,7 @@ function AppShell() {
         )}
         <Suspense fallback={<VistaCargando />}>{contenidoPrincipal}</Suspense>
       </main>
+      <FeedbackFab />
     </div>
   );
 }
@@ -389,7 +404,9 @@ function AppShell() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppShell />
+      <FeedbackProvider>
+        <AppShell />
+      </FeedbackProvider>
     </AuthProvider>
   );
 }

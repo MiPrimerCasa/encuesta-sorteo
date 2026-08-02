@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
+import { FeedbackHeaderButton } from '../feedback/FeedbackFab';
 import { cleanTelefonoSuffix } from '../../domain/whatsapp';
 import { fetchRecibosOcupados, reintentarPijIntegral } from '../../api/client';
 import {
@@ -1391,7 +1392,7 @@ export function LeadModalForm({
 
           {/* Header sticky */}
           <div className="flex shrink-0 items-start justify-between border-b border-zinc-100 px-4 pb-4 pt-3">
-            <div>
+            <div className="min-w-0 flex-1 pr-2">
               <Drawer.Title
                 id="sheet-lead-title"
                 className="text-[18px] font-semibold tracking-[-0.01em] text-zinc-900"
@@ -1400,15 +1401,18 @@ export function LeadModalForm({
               </Drawer.Title>
               <p className="mt-0.5 text-[13px] tabular-nums text-zinc-500">{cleanTelefonoSuffix(lead.telefono)}</p>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              style={{ touchAction: 'manipulation' }}
-              className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 active:bg-brand-50 active:text-brand-700"
-              aria-label="Cerrar"
-            >
-              ×
-            </button>
+            <div className="flex shrink-0 items-center gap-0.5">
+              <FeedbackHeaderButton />
+              <button
+                type="button"
+                onClick={onClose}
+                style={{ touchAction: 'manipulation' }}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 active:bg-brand-50 active:text-brand-700"
+                aria-label="Cerrar"
+              >
+                ×
+              </button>
+            </div>
           </div>
 
           {lead.bloqueadoSupervisor48h && (

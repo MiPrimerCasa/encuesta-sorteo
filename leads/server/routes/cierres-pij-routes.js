@@ -19,6 +19,23 @@ import {
 
 const TIPOS_IMAGEN = new Set(['img1', 'img2', 'img5', 'img6', 'img7', 'recibo', 'comprobante_transferencia']);
 
+/** Rate limit simple en memoria: uploads por usuario / minuto. */
+const uploadHitsByUser = new Map();
+const UPLOAD_WINDOW_MS = 60_000;
+const UPLOAD_MAX_PER_WINDOW = Number(process.env.CIERRES_PIJ_UPLOAD_MAX_PER_MIN ?? 24) || 24;
+
+function permitirUploadUsuario(userId) {
+  const key = String(userId || 'anon');
+  const now = Date.now();
+  let slot = uploadHitsByUser.get(key);
+  if (!slot || now >= slot.resetAt) {
+    slot = { count: 0, resetAt: now + UPLOAD_WINDOW_MS };
+    uploadHitsByUser.set(key, slot);
+  }
+  slot.count += 1;
+  return slot.count <= UPLOAD_MAX_PER_WINDOW;
+}
+
 /** Sube primero a _inbox; luego se mueve a carpeta del lead. */
 function createUploadMiddleware() {
   const root = getCierresPijRoot();
@@ -86,6 +103,14 @@ export function registerCierresPijRoutes(api, { usuarioDesdeRequest }) {
       if (!usuarioLogueado(usuario)) {
         borrarSiExiste(req.file?.path);
         return res.status(401).json({ error: 'Sesión inválida. Volvé a iniciar sesión.' });
+      }
+
+      if (!permitirUploadUsuario(usuario.id)) {
+        borrarSiExiste(req.file?.path);
+        return res.status(429).json({
+          error:
+            'Demasiadas fotos seguidas. Esperá un minuto e intentá de nuevo (máx. por minuto).',
+        });
       }
 
       if (!req.file?.path) {

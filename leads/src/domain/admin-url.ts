@@ -21,6 +21,7 @@ const VISTAS: VistaActiva[] = [
   'admin',
   'grabacion',
   'comisiones',
+  'feedback',
 ];
 
 const TAB_DEFAULT: AdminTab = 'metricas';
@@ -51,6 +52,7 @@ export function vistaPermitida(usuario: UsuarioSesion, vista: VistaActiva): bool
   if (usuario.rol === 'superadmin') return vista === 'admin';
   if (vista === 'admin') return Boolean(usuario.panelGlobal);
   if (vista === 'comisiones') return Boolean(usuario.comisionesContable);
+  if (vista === 'feedback') return Boolean(usuario.feedbackAdmin);
   if (vista === 'promotores') return usuario.rol === 'supervisor';
   if (vista === 'metricas' || vista === 'grabacion') return usuario.rol === 'promotor';
   return vista === 'leads' || vista === 'calendario';

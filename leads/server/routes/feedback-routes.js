@@ -15,6 +15,7 @@ import {
   updateFeedbackEstado,
 } from '../db/feedback-store.js';
 import { esFeedbackAdminUsuario } from '../db/superadmin-auth.js';
+import { notificarFeedbackPorEmail } from '../services/feedback-email.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const FEEDBACK_ROOT = path.resolve(__dirname, '../../data/feedback');
@@ -78,6 +79,16 @@ function resolveCapturaAbs(rel) {
  */
 export function registerFeedbackRoutes(api, { usuarioDesdeRequest }) {
   const upload = createUploadMiddleware();
+
+  if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.log(
+      '  Feedback email → pendiente (configurar SMTP_* + FEEDBACK_NOTIFY_EMAIL en .env)',
+    );
+  } else {
+    console.log(
+      `  Feedback email → activo → ${process.env.FEEDBACK_NOTIFY_EMAIL || 'jesus.cajal.work@gmail.com'}`,
+    );
+  }
 
   api.post('/feedback', (req, res) => {
     const usuario = usuarioDesdeRequest(req);
@@ -146,6 +157,13 @@ export function registerFeedbackRoutes(api, { usuarioDesdeRequest }) {
           capturaMime: req.file?.mimetype || null,
           urlVista: String(req.body?.urlVista || '').slice(0, 500) || null,
           userAgent: String(req.headers['user-agent'] || '').slice(0, 400) || null,
+        });
+
+        // Aviso por correo (no bloquea la respuesta si SMTP falla)
+        void notificarFeedbackPorEmail({
+          item,
+          capturaAbsPath: req.file?.path || null,
+          capturaMime: req.file?.mimetype || null,
         });
 
         return res.status(201).json({ ok: true, item });

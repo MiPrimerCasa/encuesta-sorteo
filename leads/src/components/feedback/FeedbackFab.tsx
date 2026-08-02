@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import html2canvas from 'html2canvas-pro';
 import { enviarFeedback, fetchMisFeedback } from '../../api/client';
 import type { FeedbackEstado, FeedbackItem, FeedbackTipo } from '../../types';
@@ -124,18 +125,50 @@ async function capturarPantallaApp(): Promise<File> {
   document.documentElement.setAttribute('data-feedback-capturing', '1');
   try {
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-    const canvas = await html2canvas(document.body, {
+
+    // Preferir el modal del lead (portal de Vaul); si no hay, toda la app
+    const leadModal = document.querySelector('[data-lead-modal-root]');
+    const target =
+      leadModal instanceof HTMLElement ? leadModal : document.body;
+
+    const canvas = await html2canvas(target, {
       useCORS: true,
       allowTaint: true,
       logging: false,
+      backgroundColor: '#ffffff',
       scale: Math.min(window.devicePixelRatio || 1, 1.5),
-      windowWidth: document.documentElement.scrollWidth,
-      windowHeight: document.documentElement.scrollHeight,
-      ignoreElements: (el) =>
-        el instanceof HTMLElement && el.hasAttribute('data-feedback-ui'),
+      // Vaul usa transform en el sheet; lo neutralizamos en el clon para que se vea el contenido
+      onclone: (clonedDoc) => {
+        const clonedTarget = clonedDoc.querySelector('[data-lead-modal-root]');
+        if (clonedTarget instanceof HTMLElement) {
+          clonedTarget.style.transform = 'none';
+          clonedTarget.style.position = 'relative';
+          clonedTarget.style.inset = 'auto';
+          clonedTarget.style.left = '0';
+          clonedTarget.style.right = '0';
+          clonedTarget.style.bottom = 'auto';
+          clonedTarget.style.top = '0';
+          clonedTarget.style.maxHeight = 'none';
+          clonedTarget.style.height = 'auto';
+          clonedTarget.style.width = '100%';
+        }
+        clonedDoc
+          .querySelectorAll('[data-feedback-ui], [data-lead-feedback-portal]')
+          .forEach((el) => {
+            if (el instanceof HTMLElement) el.style.display = 'none';
+          });
+      },
+      ignoreElements: (el) => {
+        if (!(el instanceof HTMLElement)) return false;
+        return (
+          el.hasAttribute('data-feedback-ui') ||
+          el.hasAttribute('data-lead-feedback-portal')
+        );
+      },
     });
+
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.82),
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.85),
     );
     if (!blob) throw new Error('No se pudo generar la captura.');
     return new File([blob], `captura-${Date.now()}.jpg`, { type: 'image/jpeg' });
@@ -238,6 +271,7 @@ function FeedbackHost({
     setError(null);
     setCapturando(true);
     try {
+      // Oculta el panel vía CSS (data-feedback-capturing) sin desmontar el lead
       const file = await capturarPantallaApp();
       setCaptura(file);
     } catch (e) {
@@ -290,12 +324,12 @@ function FeedbackHost({
 
   const esBug = tipo === 'bug';
   const tituloForm = esBug ? 'Reportar un bug' : 'Propuesta de mejora';
-  const posClass =
-    placement === 'header'
-      ? 'fixed right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-[90] flex flex-col items-end gap-2'
-      : 'fixed bottom-5 right-5 z-[90] flex flex-col items-end gap-2';
+  const enLead = placement === 'header';
+  const posClass = enLead
+    ? 'absolute right-3 top-3 flex max-h-full flex-col items-end gap-2'
+    : 'fixed bottom-5 right-5 z-[90] flex flex-col items-end gap-2';
 
-  return (
+  const ui = (
     <div data-feedback-ui className={`pointer-events-none ${posClass}`}>
       {paso === 'menu' && (
         <div
@@ -359,7 +393,7 @@ function FeedbackHost({
       {paso === 'form' && (
         <div
           ref={panelRef}
-          className="pointer-events-auto max-h-[min(80dvh,560px)] w-[min(100vw-2rem,380px)] overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl shadow-zinc-900/15"
+          className="pointer-events-auto max-h-[min(70dvh,520px)] w-[min(100vw-2rem,380px)] overflow-y-auto rounded-2xl border border-zinc-200 bg-white shadow-xl shadow-zinc-900/15"
           role="dialog"
           aria-modal="true"
           aria-labelledby={tituloId}
@@ -523,7 +557,7 @@ function FeedbackHost({
       {paso === 'mios' && (
         <div
           ref={panelRef}
-          className="pointer-events-auto max-h-[min(80dvh,560px)] w-[min(100vw-2rem,400px)] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl shadow-zinc-900/15"
+          className="pointer-events-auto max-h-[min(70dvh,520px)] w-[min(100vw-2rem,400px)] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-xl shadow-zinc-900/15"
           role="dialog"
           aria-modal="true"
           aria-labelledby={tituloId}
@@ -551,7 +585,7 @@ function FeedbackHost({
             </button>
           </div>
 
-          <div className="max-h-[min(68dvh,480px)] overflow-y-auto px-4 py-3">
+          <div className="max-h-[min(60dvh,440px)] overflow-y-auto px-4 py-3">
             {error && (
               <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12px] text-red-800">
                 {error}
@@ -610,6 +644,12 @@ function FeedbackHost({
       `}</style>
     </div>
   );
+
+  if (enLead) {
+    const portal = document.querySelector('[data-lead-feedback-portal]');
+    if (portal) return createPortal(ui, portal);
+  }
+  return ui;
 }
 
 export function FeedbackProvider({ children }: { children: ReactNode }) {
@@ -675,13 +715,15 @@ export function FeedbackHeaderButton({ className = '' }: { className?: string })
       type="button"
       data-feedback-ui
       onClick={(e) => {
+        e.preventDefault();
         e.stopPropagation();
         fb.openMenu({ placement: 'header' });
       }}
+      onPointerDown={(e) => e.stopPropagation()}
       style={{ touchAction: 'manipulation' }}
       className={`flex h-9 w-9 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-brand-700 active:bg-brand-50 active:text-brand-700 ${className}`}
       aria-label="Feedback: reportar o ver mis propuestas"
-      title="Feedback"
+      title="Feedback (el lead permanece abierto para poder capturar el error)"
     >
       <IconoBug />
     </button>

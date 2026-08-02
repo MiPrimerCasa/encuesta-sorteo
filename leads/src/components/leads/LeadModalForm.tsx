@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
-import { FeedbackHeaderButton } from '../feedback/FeedbackFab';
+import { FeedbackHeaderButton, useFeedbackOptional } from '../feedback/FeedbackFab';
 import { cleanTelefonoSuffix } from '../../domain/whatsapp';
 import { fetchRecibosOcupados, reintentarPijIntegral } from '../../api/client';
 import {
@@ -322,6 +322,7 @@ export function LeadModalForm({
   onSave,
   onLeadUpdated,
 }: LeadModalFormProps) {
+  const feedback = useFeedbackOptional();
   const [form, setForm] = useState<FormState>(() => buildInitialForm(lead));
   const [errorVenta, setErrorVenta] = useState('');
   const [errorForm, setErrorForm] = useState('');
@@ -370,6 +371,12 @@ export function LeadModalForm({
     } else {
       setIndiceVentasGlobal({ adhesiones: {}, anexos: {}, recibosTerreno: {} });
     }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) feedback?.close();
+    // Solo al cerrar el lead; no depender del objeto feedback (cambia en cada render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   const indiceVentasCompleto = useMemo(
@@ -1376,17 +1383,29 @@ export function LeadModalForm({
   return (
     <Drawer.Root
       open={open}
-      onOpenChange={(isOpen) => !isOpen && onClose()}
+      dismissible={!feedback?.isOpen}
+      onOpenChange={(isOpen) => {
+        // Mantener el lead abierto mientras reportan / capturan
+        if (!isOpen && feedback?.isOpen) return;
+        if (!isOpen) onClose();
+      }}
       shouldScaleBackground
     >
       <Drawer.Portal>
         <Drawer.Overlay className="fixed inset-0 z-50 bg-zinc-950/50 backdrop-blur-[2px]" />
 
         <Drawer.Content
+          data-lead-modal-root
           className="fixed inset-x-0 bottom-0 z-50 flex flex-col rounded-t-2xl bg-white outline-none"
           style={{ maxHeight: 'min(90dvh, 720px)' }}
           aria-labelledby="sheet-lead-title"
         >
+          {/* Portal del feedback (absolute respeta el containing block fixed del drawer) */}
+          <div
+            data-lead-feedback-portal
+            className="pointer-events-none absolute inset-0 z-[70] overflow-hidden rounded-t-2xl"
+          />
+
           {/* Drag handle */}
           <div className="mx-auto mt-3 h-1 w-10 shrink-0 rounded-full bg-zinc-200" aria-hidden="true" />
 

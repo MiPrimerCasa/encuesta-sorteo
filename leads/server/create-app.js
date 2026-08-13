@@ -683,6 +683,52 @@ function registerApiRoutes(api) {
     }
   });
 
+  /** Busca cierres PIJ (CRM) por adhesión, anexo, cliente o vendedor */
+  api.get('/admin/cierres-pij/buscar', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    const tieneAcceso =
+      esSuperadminUsuario(usuario) || esSupervisorPanelGlobal(usuario.loginId);
+    if (!tieneAcceso) {
+      return res.status(403).json({
+        message: 'Panel de administración solo disponible para superadmin o supervisores con acceso global.',
+      });
+    }
+
+    const q = String(req.query.q ?? '').trim();
+    if (q.length < 2) {
+      return res.status(400).json({
+        message: 'Ingresá al menos 2 caracteres (adhesión, anexo, cliente o vendedor).',
+      });
+    }
+
+    try {
+      const { buscarCierresPijEnLeads } = await import('./services/buscar-cierres-pij.js');
+      const limit =
+        req.query.limit != null && String(req.query.limit).trim() !== ''
+          ? Number(req.query.limit)
+          : 80;
+      const leads = await listAllLeadsFromEncuestas({ incluirReferidos: true });
+      const items = buscarCierresPijEnLeads(leads, q, limit);
+      return res.json({
+        q,
+        total: items.length,
+        items,
+        generadoEn: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Error búsqueda cierres PIJ:', error);
+      return res.status(500).json({
+        message: 'Error al buscar cierres PIJ.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
   api.post('/admin/sync-caja-pij/preview', async (req, res) => {
     if (!respondIfNotConfigured(res)) return;
 

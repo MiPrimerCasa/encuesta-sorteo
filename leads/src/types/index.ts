@@ -1060,6 +1060,29 @@ export interface PijCierreDetalle {
   estadoPago: string | null;
 }
 
+/** Resultado de GET /api/admin/cierres-pij/buscar */
+export interface BusquedaCierrePijItem {
+  leadId: string;
+  nombreCliente: string;
+  vendedor: string;
+  telefono: string | null;
+  seriePij: string | null;
+  nroAdhesion: string | null;
+  nroAnexo: string | null;
+  numeroRecibo: string | null;
+  fechaCierre: string | null;
+  esAdicional: boolean;
+  compraId: string | null;
+  formaPago: string | null;
+}
+
+export interface BusquedaCierresPijResponse {
+  q: string;
+  total: number;
+  items: BusquedaCierrePijItem[];
+  generadoEn: string;
+}
+
 export interface TerrenoCierreDetalle {
   leadId: string;
   leadNombre: string;

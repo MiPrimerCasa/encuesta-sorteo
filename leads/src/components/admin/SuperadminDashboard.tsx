@@ -65,6 +65,7 @@ import { SyncCajaModal } from './SyncCajaModal';
 import { FaltantesPijModal } from './FaltantesPijModal';
 import { PromotorInformeFilter } from './PromotorInformeFilter';
 import { InformeCierresPanel } from './InformeCierresPanel';
+import { BuscadorCierresPijPanel } from './BuscadorCierresPijPanel';
 import { GrabacionesCumplimientoPanel } from './GrabacionesCumplimientoPanel';
 import type { SyncPreviewItem, FaltantesPijResponse } from '../../types';
 import { downloadVerificacionCajaCrmExcel } from '../../utils/export-verificacion-caja-crm-excel';
@@ -574,6 +575,28 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
     setLeads((prev) => prev.map((l) => (l.id === result.lead.id ? result.lead : l)));
     setSeguimientoLead(null);
   };
+
+  const abrirSeguimientoPorId = useCallback(
+    async (leadId: string) => {
+      const id = String(leadId);
+      let pool = leads;
+      if (!pool.length) {
+        setCargandoLeads(true);
+        try {
+          pool = await fetchAdminLeads();
+          setLeads(pool);
+        } catch (err) {
+          console.error('Error al cargar leads para seguimiento:', err);
+          return;
+        } finally {
+          setCargandoLeads(false);
+        }
+      }
+      const found = pool.find((l) => String(l.id) === id);
+      if (found) setSeguimientoLead(found);
+    },
+    [leads],
+  );
 
   useEffect(() => {
     if (
@@ -1187,6 +1210,17 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
         </button>
         <button
           type="button"
+          onClick={() => cambiarTab('buscador_cierres')}
+          className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
+            tabActivo === 'buscador_cierres'
+              ? 'bg-white text-zinc-900 shadow-sm'
+              : 'text-zinc-500 hover:text-zinc-800'
+          }`}
+        >
+          Buscador cierres
+        </button>
+        <button
+          type="button"
           onClick={() => cambiarTab('sin_tratar')}
           className={`flex-1 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-all cursor-pointer text-center whitespace-nowrap ${
             tabActivo === 'sin_tratar'
@@ -1797,6 +1831,18 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
 
       {tabActivo === 'informe_cierres' && (
         <InformeCierresPanel />
+      )}
+
+      {tabActivo === 'buscador_cierres' && (
+        <section className="space-y-4">
+          <BuscadorCierresPijPanel
+            onAbrirSeguimiento={
+              usuario?.rol === 'superadmin' || usuario?.panelGlobal
+                ? abrirSeguimientoPorId
+                : undefined
+            }
+          />
+        </section>
       )}
 
       {tabActivo === 'grabaciones' && moduloGrabacionesActivo && (

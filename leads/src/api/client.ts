@@ -26,6 +26,7 @@ import type {
   FeedbackItem,
   FeedbackTipo,
   FeedbackEstado,
+  BusquedaCierresPijResponse,
 } from '../types';
 import { mensajeReferidosCreados } from '../domain/referidos-carga';
 import {
@@ -525,6 +526,21 @@ export async function fetchAdminLeads(): Promise<Lead[]> {
   }
   const data = await apiFetch<{ leads: Lead[] }>('/api/admin/leads?referidos=1');
   return data.leads ?? [];
+}
+
+/** Busca cierres PIJ en el CRM por adhesión, anexo, cliente o vendedor. */
+export async function buscarCierresPij(
+  q: string,
+  limit = 80,
+): Promise<BusquedaCierresPijResponse> {
+  if (_isDemoActive) {
+    return { q, total: 0, items: [], generadoEn: new Date().toISOString() };
+  }
+  const params = new URLSearchParams({
+    q: String(q).trim(),
+    limit: String(limit),
+  });
+  return apiFetch<BusquedaCierresPijResponse>(`/api/admin/cierres-pij/buscar?${params}`);
 }
 
 export async function fetchHistorialSeguimiento(

@@ -4,6 +4,7 @@ import type { UsuarioSesion, VistaActiva } from '../types';
 export const ADMIN_TABS = [
   'metricas',
   'buscador',
+  'buscador_cierres',
   'sin_tratar',
   'reasignacion',
   'informe',

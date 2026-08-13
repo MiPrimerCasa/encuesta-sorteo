@@ -277,6 +277,39 @@ function labelAgregarCompraAdicional(indiceSiguiente: number, tipo: 'pij' | 'ter
   return `+ Agregar ${etiquetaOrdinalCompra(indiceSiguiente)} compra (${producto})`;
 }
 
+/** Fecha de cierre ya registrada (no usar “ahora” al corregir adhesión/anexo). */
+function fechaCierreExistenteLead(lead: Lead | null): string | null {
+  const seg = lead?.seguimiento;
+  const candidatos = [
+    seg?.fechaCierre,
+    seg?.creadoEn,
+    lead?.fechaAlta,
+    lead?.fechaObtencion,
+  ];
+  for (const f of candidatos) {
+    const s = String(f ?? '').trim();
+    if (s) return s;
+  }
+  return null;
+}
+
+function formatearFechaCierreCorta(iso: string | null | undefined): string | null {
+  const raw = String(iso ?? '').trim();
+  if (!raw) return null;
+  try {
+    const d = parseIsoLocal(raw);
+    if (!d || Number.isNaN(d.getTime())) return raw;
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${day}/${month}/${year} ${hours}:${minutes}`;
+  } catch {
+    return raw;
+  }
+}
+
 function CampoFechaReagenda({
   value,
   onChange,
@@ -824,8 +857,8 @@ export function LeadModalForm({
     }
   };
 
-  const handleGuardar = (e: FormEvent) => {
-    e.preventDefault();
+  const handleGuardar = (e?: FormEvent, opciones?: { actualizarFechaCierre?: boolean }) => {
+    e?.preventDefault();
     setErrorForm('');
 
     const flujoSinCitaGuardar = !leadTieneCitaPrevia(lead);
@@ -1084,8 +1117,11 @@ export function LeadModalForm({
       fechaReagenda: esReagenda ? form.fechaReagenda || null : null,
       fechaCierre:
         form.resultadoEntrevista === 'compro'
-          ? lead.seguimiento?.fechaCierre || new Date().toISOString()
+          ? opciones?.actualizarFechaCierre
+            ? new Date().toISOString()
+            : fechaCierreExistenteLead(lead) || new Date().toISOString()
           : null,
+      creadoEn: lead.seguimiento?.creadoEn ?? null,
       seguimientoPijPromotor: esReagendaPij,
       seguimientoAgendaOperadorRol: null,
       derivacionTerrenoActiva: resolverDerivacionTerrenoActiva(lead, resultadoFinal),
@@ -1221,6 +1257,8 @@ export function LeadModalForm({
   const showCanalTrasNoConfirmo = eligioMotivoNoConfirmo;
 
   const showCompro = form.resultadoEntrevista === 'compro';
+  const yaEsCierreCompro = lead?.seguimiento?.resultadoEntrevista === 'compro';
+  const fechaCierreMostrada = formatearFechaCierreCorta(fechaCierreExistenteLead(lead));
   const showReagendaPijTrasNoCompro =
     esFlujoCampo && form.resultadoEntrevista === 'no_compro' && !entrevistaEnElMomento;
   const showReagendaTrasNoComproSinCita =
@@ -3011,6 +3049,31 @@ export function LeadModalForm({
                   className="h-[52px] w-full rounded-xl border border-zinc-200 bg-white text-[15px] font-semibold text-zinc-700 transition-all duration-[120ms] ease-out active:bg-zinc-50 active:scale-[0.98]"
                 >
                   Cerrar
+                </button>
+              </div>
+            ) : yaEsCierreCompro && showCompro ? (
+              <div className="flex flex-col gap-2">
+                {fechaCierreMostrada && (
+                  <p className="text-[12px] leading-snug text-zinc-500">
+                    Fecha de cierre actual: <span className="font-semibold text-zinc-800">{fechaCierreMostrada}</span>.
+                    Corregir adhesión o anexo no cambia esa fecha salvo que elijas actualizarla.
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  form="lead-form"
+                  style={{ touchAction: 'manipulation' }}
+                  className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:bg-brand-800 active:scale-[0.98]"
+                >
+                  Guardar y mantener fecha
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleGuardar(undefined, { actualizarFechaCierre: true })}
+                  style={{ touchAction: 'manipulation' }}
+                  className="h-[44px] w-full rounded-xl border border-zinc-200 bg-white text-[14px] font-semibold text-zinc-700 transition-all duration-[120ms] ease-out active:bg-zinc-50 active:scale-[0.98]"
+                >
+                  Guardar y actualizar fecha de cierre
                 </button>
               </div>
             ) : (

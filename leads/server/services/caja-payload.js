@@ -6,7 +6,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import { createReadStream, existsSync } from 'node:fs';
 import { resolveCierrePijPath } from '../domain/cierres-pij-storage.js';
 import { parsePijRecibo } from '../domain/pij-recibo.js';
-import { formatOperadorIdNombre, getOperadorNombreCompleto } from '../db/operador-rpt.js';
+import {
+  formatOperadorIdNombre,
+  parseIdOperadorOrNull,
+  resolveOperadorDesdeRpt,
+} from '../db/operador-rpt.js';
 
 const TIPO_IMG_A_ADJUNTO = {
   img1: 'DNI_FRENTE',
@@ -26,8 +30,7 @@ export function splitNombreCliente(nombreCompleto) {
 }
 
 function parseIdOrNull(val) {
-  const n = Number.parseInt(String(val ?? ''), 10);
-  return Number.isFinite(n) ? n : null;
+  return parseIdOperadorOrNull(val);
 }
 
 function numOrUndef(val) {
@@ -261,35 +264,54 @@ export async function buildCrmIngestPayload({ lead, seguimiento, usuario, sucurs
 
   const nombreCompleto = String(lead?.nombre ?? '').trim();
   const { apellido, nombrePila } = splitNombreCliente(nombreCompleto);
-  const promotorId =
-    parseIdOrNull(lead?.promotorId ?? lead?.idVendedor) ??
-    (usuario?.rol === 'promotor' ? parseIdOrNull(usuario?.id) : null);
-  const supervisorId = parseIdOrNull(lead?.idSupervisor);
-  const operadorId = parseIdOrNull(usuario?.id ?? seguimiento?.operadorId);
 
-  const [promotorNombreFull, supervisorNombreFull, operadorNombreFull, operadorLabel, promotorLabel, supervisorLabel] =
-    await Promise.all([
-      getOperadorNombreCompleto(promotorId),
-      getOperadorNombreCompleto(supervisorId),
-      getOperadorNombreCompleto(operadorId),
-      formatOperadorIdNombre(
-        operadorId,
-        usuario?.nombre ?? seguimiento?.operadorNombre,
-      ),
-      formatOperadorIdNombre(promotorId, lead?.promotorNombre),
-      formatOperadorIdNombre(supervisorId, lead?.supervisorNombre),
-    ]);
+  // idVendedor numérico de la encuesta (NO lead.promotorId: es un slug del nombre).
+  // Si falta, intentar por nombre en operadorRPT; si el usuario es promotor, su id.
+  const [promotorRpt, supervisorRpt, operadorRpt] = await Promise.all([
+    resolveOperadorDesdeRpt({
+      id: lead?.idVendedor,
+      nombreHint: lead?.promotorNombre,
+    }),
+    resolveOperadorDesdeRpt({
+      id: lead?.idSupervisor,
+      nombreHint: lead?.supervisorNombre,
+    }),
+    resolveOperadorDesdeRpt({
+      id: usuario?.id ?? usuario?.idOperador ?? seguimiento?.operadorId,
+      nombreHint: usuario?.nombre ?? seguimiento?.operadorNombre,
+    }),
+  ]);
 
-  const promotorNombre =
-    promotorNombreFull ||
-    (lead?.promotorNombre ? String(lead.promotorNombre).slice(0, 200) : undefined) ||
-    (usuario?.rol === 'promotor' && usuario?.nombre
-      ? String(usuario.nombre).slice(0, 200)
-      : undefined);
+  let promotorId = promotorRpt.id;
+  let promotorNombre = promotorRpt.nombre;
+  if (!promotorId && usuario?.rol === 'promotor') {
+    const self = await resolveOperadorDesdeRpt({
+      id: usuario?.id ?? usuario?.idOperador,
+      nombreHint: usuario?.nombre,
+    });
+    promotorId = self.id;
+    promotorNombre = self.nombre;
+  }
 
-  const supervisorNombre =
-    supervisorNombreFull ||
-    (lead?.supervisorNombre ? String(lead.supervisorNombre).slice(0, 200) : undefined);
+  const supervisorId = supervisorRpt.id;
+  const supervisorNombre = supervisorRpt.nombre;
+  const operadorId = operadorRpt.id;
+  const operadorNombreFull = operadorRpt.nombre;
+
+  const [operadorLabel, promotorLabel, supervisorLabel] = await Promise.all([
+    formatOperadorIdNombre(operadorId, operadorNombreFull),
+    formatOperadorIdNombre(promotorId, promotorNombre),
+    formatOperadorIdNombre(supervisorId, supervisorNombre),
+  ]);
+
+  // Último recurso textual SOLO si no hay id (nunca mezclar planilla con un idOperador).
+  if (!promotorId && !promotorNombre && lead?.promotorNombre) {
+    promotorNombre = String(lead.promotorNombre).slice(0, 200);
+  }
+  let supervisorNombreOut = supervisorNombre;
+  if (!supervisorId && !supervisorNombreOut && lead?.supervisorNombre) {
+    supervisorNombreOut = String(lead.supervisorNombre).slice(0, 200);
+  }
 
   const localidad =
     lead?.localidad || seguimiento?.localidad
@@ -323,7 +345,7 @@ export async function buildCrmIngestPayload({ lead, seguimiento, usuario, sucurs
     promotorLabel: promotorLabel || undefined,
     /** Rol fijo del titular de la encuesta / vendedor del lead */
     promotorRol: promotorId ? 'promotor' : undefined,
-    supervisorNombre: supervisorNombre || undefined,
+    supervisorNombre: supervisorNombreOut || undefined,
     supervisorLabel: supervisorLabel || undefined,
     supervisorId: supervisorId ?? undefined,
     /** Rol fijo del supervisor asignado al lead */
@@ -379,12 +401,13 @@ export async function buildCrmIngestPayload({ lead, seguimiento, usuario, sucurs
 
   const operadorNombre =
     operadorNombreFull ||
+    // Sin id en RPT: texto de sesión solo como etiqueta, sin asociar a otro id.
     String(usuario?.nombre ?? seguimiento?.operadorNombre ?? 'Operador').trim();
 
   const operador = {
     usuarioId: operadorId ?? undefined,
     /** Nombre completo (operadorRPT), no abreviatura de planilla */
-    nombre: operadorNombre.slice(0, 200),
+    nombre: (operadorNombreFull || operadorNombre).slice(0, 200),
     /** "132 - CAJAL JESUS LEONEL" para validar en caja */
     label: operadorLabel || undefined,
     rol:
@@ -394,27 +417,20 @@ export async function buildCrmIngestPayload({ lead, seguimiento, usuario, sucurs
   };
 
   // Datos listos para que caja ejecute loteVentaBloqueoVendedorPIJ (1 por cada PIJ)
-  const idVendedorBloqueo = operadorId ?? promotorId ?? 0;
+  // Preferir el vendedor del lead (idVendedor/RPT); si no, quien cerró.
+  const idVendedorBloqueo = promotorId ?? operadorId ?? 0;
+  const idVendedorResuelto = await resolveOperadorDesdeRpt({ id: idVendedorBloqueo });
   const idVendedorNombre =
-    (idVendedorBloqueo === operadorId
-      ? operadorNombreFull
-      : idVendedorBloqueo === promotorId
-        ? promotorNombreFull
-        : null) ||
-    (await getOperadorNombreCompleto(idVendedorBloqueo)) ||
-    operadorNombre;
+    idVendedorResuelto.nombre ||
+    (idVendedorBloqueo === operadorId ? operadorNombreFull : null) ||
+    (idVendedorBloqueo === promotorId ? promotorNombre : null) ||
+    null;
   const idVendedorLabel =
-    (idVendedorBloqueo === operadorId
-      ? operadorLabel
-      : idVendedorBloqueo === promotorId
-        ? promotorLabel
-        : null) ||
-    (await formatOperadorIdNombre(idVendedorBloqueo, idVendedorNombre)) ||
-    undefined;
+    (await formatOperadorIdNombre(idVendedorBloqueo, idVendedorNombre)) || undefined;
 
   const cerradoPor = {
     id: operadorId ?? undefined,
-    nombre: operador.nombre,
+    nombre: operadorNombreFull || operador.nombre,
     label: operador.label,
     rol: operador.rol,
   };
@@ -423,7 +439,8 @@ export async function buildCrmIngestPayload({ lead, seguimiento, usuario, sucurs
     promotor: promotorId
       ? {
           id: promotorId,
-          nombre: promotorNombre || undefined,
+          // Solo nombre RPT: no mezclar planilla con este id
+          nombre: promotorRpt.nombre || undefined,
           label: promotorLabel || undefined,
           rol: 'promotor',
         }
@@ -431,7 +448,7 @@ export async function buildCrmIngestPayload({ lead, seguimiento, usuario, sucurs
     supervisor: supervisorId
       ? {
           id: supervisorId,
-          nombre: supervisorNombre || undefined,
+          nombre: supervisorRpt.nombre || undefined,
           label: supervisorLabel || undefined,
           rol: 'supervisor',
         }

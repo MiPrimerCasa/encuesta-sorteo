@@ -19,6 +19,7 @@ import {
   urlDescargaImagenCaja,
 } from './caja-payload.js';
 import { equipoDesdeCodigo, upsertOperadoresCaja } from './caja-operadores.js';
+import { parseIdOperadorOrNull, resolveOperadorDesdeRpt } from '../db/operador-rpt.js';
 
 /** Caja (SistemaCajaPIJ) solo acepta PIJ por ahora; terreno no se publica. */
 const PRODUCTOS_CAJA = new Set(['prod-pij']);
@@ -81,11 +82,10 @@ export function esCierrePublicableACaja(seguimiento) {
 }
 
 function parseIdOrNull(val) {
-  const n = Number.parseInt(String(val ?? ''), 10);
-  return Number.isFinite(n) ? n : null;
+  return parseIdOperadorOrNull(val);
 }
 
-function datosEquipoDesdeLead(lead, usuario) {
+async function datosEquipoDesdeLead(lead, usuario) {
   const promotorCodigo =
     String(lead?.codigoPromotorCarga ?? lead?.encuestaUsuario ?? '').trim() ||
     (usuario?.rol === 'promotor'
@@ -99,12 +99,24 @@ function datosEquipoDesdeLead(lead, usuario) {
       : '') ||
     null;
 
+  // Nunca usar lead.promotorId (slug). Solo idVendedor / idSupervisor numéricos + RPT.
+  const [promotorRpt, supervisorRpt] = await Promise.all([
+    resolveOperadorDesdeRpt({
+      id: lead?.idVendedor,
+      nombreHint: lead?.promotorNombre,
+    }),
+    resolveOperadorDesdeRpt({
+      id: lead?.idSupervisor,
+      nombreHint: lead?.supervisorNombre,
+    }),
+  ]);
+
   return {
-    promotorId: parseIdOrNull(lead?.promotorId ?? lead?.idVendedor),
-    promotorNombre: String(lead?.promotorNombre ?? '').trim().slice(0, 200) || null,
+    promotorId: promotorRpt.id,
+    promotorNombre: promotorRpt.nombre,
     promotorCodigo: promotorCodigo ? promotorCodigo.slice(0, 64) : null,
-    supervisorId: parseIdOrNull(lead?.idSupervisor),
-    supervisorNombre: String(lead?.supervisorNombre ?? '').trim().slice(0, 200) || null,
+    supervisorId: supervisorRpt.id,
+    supervisorNombre: supervisorRpt.nombre,
     supervisorCodigo: supervisorCodigo ? supervisorCodigo.slice(0, 64) : null,
   };
 }
@@ -270,7 +282,7 @@ export async function publicarCierreACajaMysql({
   }
 
   const crmVentaExt = String(origenId);
-  const equipo = datosEquipoDesdeLead(lead, usuario);
+  const equipo = await datosEquipoDesdeLead(lead, usuario);
 
   try {
     const pool = getCajaMysqlPool();

@@ -158,6 +158,24 @@ export const seguimientoSchema = z
     cajaSucursal: z.string().max(32).nullable().optional(),
     /** Usuario de caja que confirmó/rechazó la venta. */
     cajaConfirmadoPor: z.string().max(200).nullable().optional(),
+    /** Datos de persona corregidos desde caja (no son medio de pago). */
+    emailCliente: z.string().trim().max(120).nullable().optional(),
+    localidadCliente: z.string().trim().max(120).nullable().optional(),
+    domicilioBarrio: z.string().trim().max(120).nullable().optional(),
+    cuilCuitCliente: z.string().trim().max(20).nullable().optional(),
+    cotitular: z
+      .object({
+        apellido: z.string().trim().max(120).optional(),
+        nombre: z.string().trim().max(120).optional(),
+        nombreCompleto: z.string().trim().max(200).optional(),
+        documentoNumero: z.string().trim().max(20).optional(),
+        telefono: z.string().trim().max(32).optional(),
+        cuilCuit: z.string().trim().max(20).optional(),
+      })
+      .nullable()
+      .optional(),
+    cajaClienteCorregidoPor: z.string().trim().max(200).nullable().optional(),
+    cajaClienteCorregidoEn: z.string().nullable().optional(),
   })
   .superRefine((data, ctx) => {
     if (data.resultadoEntrevista === 'reagenda' && !data.fechaReagenda) {

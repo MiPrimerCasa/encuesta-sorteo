@@ -474,6 +474,21 @@ export interface SeguimientoLead {
   creadoEn?: string | null;
   /** DNI del cliente al cierre PIJ (columna plana SQL: dni_cliente). */
   dniCliente?: string | null;
+  /** Correcciones de persona desde caja (solo JSON / no son medio de pago). */
+  emailCliente?: string | null;
+  localidadCliente?: string | null;
+  domicilioBarrio?: string | null;
+  cuilCuitCliente?: string | null;
+  cotitular?: {
+    apellido?: string;
+    nombre?: string;
+    nombreCompleto?: string;
+    documentoNumero?: string;
+    telefono?: string;
+    cuilCuit?: string;
+  } | null;
+  cajaClienteCorregidoPor?: string | null;
+  cajaClienteCorregidoEn?: string | null;
   comprasAdicionales?: CompraAdicional[] | null;
   /** Fotos de recibo/comprobante al cierre PIJ (columna plana: imagenes_cierre_json). */
   imagenesCierre?: ImagenCierrePij[] | null;

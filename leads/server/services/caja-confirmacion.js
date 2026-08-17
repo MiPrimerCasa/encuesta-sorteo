@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { isCajaMysqlEnabled } from '../config/caja-mysql-config.js';
 import { getCajaMysqlPool } from '../db/caja-mysql.js';
 import { persistirSeguimientoLead, getLatestSeguimientoSql } from '../db/seguimiento-sql.js';
+import { aplicarCorreccionClienteCaja } from './caja-correccion-cliente.js';
 
 /** Normaliza estado API → CONFIRMADA | RECHAZADA */
 export function normalizarEstadoCierreCaja(estadoRaw) {
@@ -251,11 +252,23 @@ export async function aplicarConfirmacionCaja(body, sucursal) {
     idVentasIntegral[0]?.idVentaIntegral ||
     null;
 
-  // Doble chequeo opcional DNI / adhesión vs payload publicado
+  // Doble chequeo informativo DNI vs payload. Si viene documentoAnterior / clienteCorreccion,
+  // es corrección intencional de caja: no rechazar la confirmación.
   const clienteDocumento = body?.clienteDocumento
     ? String(body.clienteDocumento).replace(/\D/g, '')
     : null;
-  if (clienteDocumento && payload?.lead?.documentoNumero) {
+  const documentoAnterior = body?.documentoAnterior
+    ? String(body.documentoAnterior).replace(/\D/g, '')
+    : null;
+  const tieneCorreccionPersona =
+    Boolean(body?.clienteCorreccion) ||
+    (documentoAnterior && clienteDocumento && documentoAnterior !== clienteDocumento);
+
+  if (
+    clienteDocumento &&
+    payload?.lead?.documentoNumero &&
+    !tieneCorreccionPersona
+  ) {
     const esperado = String(payload.lead.documentoNumero).replace(/\D/g, '');
     if (esperado && esperado !== clienteDocumento) {
       console.warn(
@@ -265,6 +278,13 @@ export async function aplicarConfirmacionCaja(body, sucursal) {
         clienteDocumento,
       );
     }
+  } else if (tieneCorreccionPersona && documentoAnterior && clienteDocumento) {
+    console.info(
+      '[caja-confirmacion] Corrección DNI lead=%s %s → %s (no se rechaza)',
+      leadId,
+      documentoAnterior,
+      clienteDocumento,
+    );
   }
 
   const patch = {
@@ -368,6 +388,41 @@ export async function aplicarConfirmacionCaja(body, sucursal) {
     }
   }
 
+  let correccionCliente = null;
+  if (body?.clienteCorreccion && typeof body.clienteCorreccion === 'object') {
+    try {
+      correccionCliente = await aplicarCorreccionClienteCaja(
+        {
+          pendienteUuid: pendiente.uuid,
+          clienteCorreccion: body.clienteCorreccion,
+          clienteDocumento: body.clienteDocumento ?? null,
+          documentoAnterior: body.documentoAnterior ?? null,
+          corregidoPor: confirmadoPor,
+        },
+        sucursal,
+      );
+    } catch (err) {
+      // La confirmación de caja ya quedó en MySQL + CRM (cajaEstado). Si falla el patch de
+      // persona, devolvemos 502 para que caja sepa que hay que reintentar correcciones-cliente.
+      console.error(
+        '[caja-confirmacion] Confirmación OK pero falló clienteCorreccion lead=%s:',
+        leadId,
+        err,
+      );
+      const wrap = new Error(
+        err instanceof Error
+          ? `Confirmación OK pero falló la corrección de cliente: ${err.message}`
+          : 'Confirmación OK pero falló la corrección de cliente.',
+      );
+      wrap.code = 'CRM_PATCH_FAILED';
+      wrap.confirmacionId = cierreVentaId;
+      wrap.cierreId = Number(pendiente.id);
+      wrap.pendienteUuid = pendiente.uuid;
+      wrap.leadId = leadId;
+      throw wrap;
+    }
+  }
+
   return {
     ok: true,
     confirmacionId: cierreVentaId,
@@ -386,5 +441,6 @@ export async function aplicarConfirmacionCaja(body, sucursal) {
     idVentasIntegral,
     pijIntegralEstado: patch.pijIntegralEstado ?? null,
     saved,
+    correccionCliente,
   };
 }

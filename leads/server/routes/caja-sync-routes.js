@@ -6,6 +6,7 @@ import {
 } from '../config/caja-mysql-config.js';
 import { pingCajaMysql } from '../db/caja-mysql.js';
 import { aplicarConfirmacionCaja } from '../services/caja-confirmacion.js';
+import { aplicarCorreccionClienteCaja } from '../services/caja-correccion-cliente.js';
 import { recibirReciboCaja } from '../services/caja-recibos.js';
 import {
   ackPullCaja,
@@ -24,6 +25,41 @@ const idVentaIntegralItemSchema = z.object({
   idVentaIntegral: z.coerce.number().int().positive(),
   esPrincipal: z.boolean().optional(),
 });
+
+const cotitularSchema = z
+  .object({
+    apellido: z.string().trim().max(120).optional(),
+    nombre: z.string().trim().max(120).optional(),
+    nombrePila: z.string().trim().max(120).optional(),
+    documentoNumero: z.string().trim().max(20).optional(),
+    dni: z.string().trim().max(20).optional(),
+    telefono: z.string().trim().max(32).optional(),
+    cuilCuit: z.string().trim().max(20).optional(),
+    cuil: z.string().trim().max(20).optional(),
+  })
+  .passthrough();
+
+const clienteCorreccionSchema = z
+  .object({
+    apellido: z.string().trim().max(120).optional(),
+    nombre: z.string().trim().max(120).optional(),
+    nombrePila: z.string().trim().max(120).optional(),
+    nombreCompleto: z.string().trim().max(200).optional(),
+    documentoNumero: z.string().trim().max(20).optional(),
+    dni: z.string().trim().max(20).optional(),
+    dniCliente: z.string().trim().max(20).optional(),
+    cuilCuit: z.string().trim().max(20).optional(),
+    cuil: z.string().trim().max(20).optional(),
+    telefono: z.string().trim().max(32).optional(),
+    email: z.string().trim().max(120).optional(),
+    domicilio: z.string().trim().max(200).optional(),
+    domicilioBarrio: z.string().trim().max(120).optional(),
+    barrio: z.string().trim().max(120).optional(),
+    localidad: z.string().trim().max(120).optional(),
+    cotitular: cotitularSchema.nullable().optional(),
+    quitarCotitular: z.union([z.boolean(), z.string(), z.number()]).optional(),
+  })
+  .passthrough();
 
 const confirmacionSchema = z
   .object({
@@ -50,12 +86,15 @@ const confirmacionSchema = z
       .optional(),
     pijIntegralError: z.string().trim().max(500).nullable().optional(),
     clienteDocumento: z.string().trim().max(20).nullable().optional(),
+    documentoAnterior: z.string().trim().max(20).nullable().optional(),
     solicitud: z.string().trim().max(40).nullable().optional(),
     adhesionGrupo: z.string().trim().max(4).nullable().optional(),
     adhesionNumero: z.coerce.number().int().nonnegative().optional(),
     adhesionNotacion: z.string().trim().max(40).nullable().optional(),
     anexoNumero: z.coerce.number().int().nonnegative().optional(),
     anexoNotacion: z.string().trim().max(40).nullable().optional(),
+    /** Corrección de persona en la misma validación (caja → CRM). */
+    clienteCorreccion: clienteCorreccionSchema.optional(),
   })
   .refine((d) => d.cierreId || d.pendienteUuid, {
     message: 'Indicá cierreId o pendienteUuid.',
@@ -63,6 +102,14 @@ const confirmacionSchema = z
   .refine((d) => d.confirmadoPor || d.verificadoPor, {
     message: 'confirmadoPor (o verificadoPor) es obligatorio.',
   });
+
+const correccionClienteSchema = z.object({
+  pendienteUuid: z.string().uuid(),
+  clienteDocumento: z.string().trim().max(20).nullable().optional(),
+  documentoAnterior: z.string().trim().max(20).nullable().optional(),
+  corregidoPor: z.string().trim().min(1).max(200).optional(),
+  clienteCorreccion: clienteCorreccionSchema,
+});
 
 const reciboSchema = z.object({
   pendienteUuid: z.string().uuid().optional(),
@@ -177,7 +224,7 @@ export function registerCajaSyncRoutes(api) {
         ok: true,
         sucursal: req.cajaSucursal,
         mysql,
-        contrato: 'crm_venta_pendiente+caja_cierre_imagen+recibos',
+        contrato: 'crm_venta_pendiente+caja_cierre_imagen+recibos+correcciones-cliente',
       });
     } catch (error) {
       console.error('[caja-sync] health:', error);
@@ -325,6 +372,7 @@ export function registerCajaSyncRoutes(api) {
    * Push caja → CRM.
    * Body preferido: { pendienteUuid, estado: CONFIRMADA|RECHAZADA, confirmadoPor, ... }
    * Compat: { cierreId, estado: cerrado|rechazado, confirmadoPor, ... }
+   * Si viene clienteCorreccion, se pisa solo datos de persona (no pagos/TRF).
    */
   api.post('/caja/confirmaciones', requireCajaSyncToken, async (req, res) => {
     const parsed = confirmacionSchema.safeParse(req.body ?? {});
@@ -346,6 +394,40 @@ export function registerCajaSyncRoutes(api) {
           result.cajaEstado === 'verificado'
             ? 'Cierre verificado en caja y actualizado en el CRM.'
             : 'Cierre rechazado por caja y actualizado en el CRM.',
+        ...result,
+      });
+    } catch (error) {
+      return respondCajaError(res, error);
+    }
+  });
+
+  /**
+   * Edición posterior de persona del lead desde caja (sin re-validar adhesión).
+   * Auth: Bearer CAJA_SYNC_TOKEN. Clave: pendienteUuid.
+   * Idempotente; no toca montos / TRF / comprobante.
+   */
+  api.post('/caja/correcciones-cliente', requireCajaSyncToken, async (req, res) => {
+    const parsed = correccionClienteSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: 'Datos de corrección de cliente inválidos.',
+        details: parsed.error.flatten(),
+      });
+    }
+    try {
+      const result = await aplicarCorreccionClienteCaja(
+        {
+          ...parsed.data,
+          corregidoPor:
+            parsed.data.corregidoPor ||
+            req.body?.confirmadoPor ||
+            req.body?.verificadoPor ||
+            'Caja',
+        },
+        req.cajaSucursal,
+      );
+      return res.status(200).json({
+        message: 'Corrección de cliente aplicada en el CRM.',
         ...result,
       });
     } catch (error) {

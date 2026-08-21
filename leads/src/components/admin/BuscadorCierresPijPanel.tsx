@@ -5,6 +5,7 @@ import type { BusquedaCierrePijItem } from '../../types';
 
 interface BuscadorCierresPijPanelProps {
   onAbrirSeguimiento?: (leadId: string) => void;
+  onAbrirModificar?: (leadId: string) => void;
 }
 
 function formatearFecha(iso: string | null | undefined) {
@@ -27,7 +28,10 @@ function etiquetaAdhesion(item: BusquedaCierrePijItem) {
   return '—';
 }
 
-export function BuscadorCierresPijPanel({ onAbrirSeguimiento }: BuscadorCierresPijPanelProps) {
+export function BuscadorCierresPijPanel({
+  onAbrirSeguimiento,
+  onAbrirModificar,
+}: BuscadorCierresPijPanelProps) {
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<BusquedaCierrePijItem[]>([]);
   const [cargando, setCargando] = useState(false);
@@ -36,6 +40,7 @@ export function BuscadorCierresPijPanel({ onAbrirSeguimiento }: BuscadorCierresP
   const [ultimaQ, setUltimaQ] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reqIdRef = useRef(0);
+  const tieneAcciones = Boolean(onAbrirSeguimiento || onAbrirModificar);
 
   const ejecutarBusqueda = useCallback(async (qRaw: string) => {
     const q = qRaw.trim();
@@ -158,7 +163,7 @@ export function BuscadorCierresPijPanel({ onAbrirSeguimiento }: BuscadorCierresP
                   <th className="py-2.5 px-4 text-center">Anexo</th>
                   <th className="py-2.5 px-4 text-center">Fecha</th>
                   <th className="py-2.5 px-4 text-center">Tipo</th>
-                  {onAbrirSeguimiento && (
+                  {tieneAcciones && (
                     <th className="py-2.5 px-4 text-center">Acción</th>
                   )}
                 </tr>
@@ -198,15 +203,31 @@ export function BuscadorCierresPijPanel({ onAbrirSeguimiento }: BuscadorCierresP
                         </span>
                       )}
                     </td>
-                    {onAbrirSeguimiento && (
+                    {tieneAcciones && (
                       <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => onAbrirSeguimiento(item.leadId)}
-                          className="text-[12px] font-semibold text-emerald-600 hover:text-emerald-800 hover:underline cursor-pointer"
-                        >
-                          Seguimiento
-                        </button>
+                        <div className="flex justify-center items-center gap-2 flex-wrap">
+                          {onAbrirSeguimiento && (
+                            <button
+                              type="button"
+                              onClick={() => onAbrirSeguimiento(item.leadId)}
+                              className="text-[12px] font-semibold text-emerald-600 hover:text-emerald-800 hover:underline cursor-pointer"
+                            >
+                              Seguimiento
+                            </button>
+                          )}
+                          {onAbrirSeguimiento && onAbrirModificar && (
+                            <span className="text-zinc-300">|</span>
+                          )}
+                          {onAbrirModificar && (
+                            <button
+                              type="button"
+                              onClick={() => onAbrirModificar(item.leadId)}
+                              className="text-[12px] font-semibold text-amber-600 hover:text-amber-800 hover:underline cursor-pointer"
+                            >
+                              Modificar
+                            </button>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>

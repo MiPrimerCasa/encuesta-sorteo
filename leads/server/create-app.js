@@ -1483,7 +1483,8 @@ function registerApiRoutes(api) {
     const data = parsed.data;
 
     if (data.resultadoEntrevista === 'compro' && data.idProducto) {
-      if (!rol || !productoPermitidoParaRol(data.idProducto, rol)) {
+      const rolProducto = rol === 'superadmin' ? 'supervisor' : rol;
+      if (!rolProducto || !productoPermitidoParaRol(data.idProducto, rolProducto)) {
         return res.status(403).json({
           message: 'Tu rol no puede registrar la venta de ese producto.',
         });

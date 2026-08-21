@@ -23,7 +23,8 @@ import {
   persistirSeguimientoLead,
   useSeguimientoSql,
 } from './seguimiento-sql.js';
-import { adminSupervisorOperadorIds } from './superadmin-auth.js';
+import { adminSupervisorOperadorIds, esSuperadminUsuario } from './superadmin-auth.js';
+import { IDS_OPERADOR_TECNICO } from '../domain/operador-canonical.js';
 
 function pickField(row, ...candidates) {
   if (!row) return null;
@@ -1056,17 +1057,80 @@ export function useEncuestasFromSql() {
   return isSqlServerConfigured();
 }
 
-export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario, usuarioId) {
+/** Superadmin o supervisor con panel global: puede editar cualquier lead. */
+function esEdicionAdminGlobal(usuario) {
+  return esSuperadminUsuario(usuario) || Boolean(usuario?.panelGlobal);
+}
+
+function filaEncuestaCoincideLead(row, leadId) {
+  const pk = pickField(row, 'id', 'Id', 'ID');
+  const usuarioFila = pickField(row, 'usuario', 'Usuario');
+  return String(pk ?? '') === leadId || String(usuarioFila ?? '') === leadId;
+}
+
+/**
+ * Busca la fila de encuesta del lead.
+ * Admin global: encuestasMuestra (todas). Resto: encuestas del operador logueado.
+ */
+async function findEncuestaRowParaSeguimiento(leadId, usuario) {
+  if (esEdicionAdminGlobal(usuario)) {
+    const globalRows = await fetchEncuestasMuestraGlobalRaw();
+    const hit = globalRows.find((r) => filaEncuestaCoincideLead(r, leadId));
+    if (hit) return hit;
+  }
   const rows = await fetchEncuestaRowsParaUsuario(usuario);
-  const row = rows.find((r) => {
-    const pk = pickField(r, 'id', 'Id', 'ID');
-    const usuario = pickField(r, 'usuario', 'Usuario');
-    return String(pk ?? '') === leadId || String(usuario ?? '') === leadId;
-  });
+  return rows.find((r) => filaEncuestaCoincideLead(r, leadId)) ?? null;
+}
+
+/**
+ * En edición admin, el SP debe quedar atribuido al vendedor del lead (idVendedor),
+ * no al superadmin que corrige.
+ */
+function usuarioAtribucionAlGuardar(lead, prevSeg, usuario) {
+  if (!esEdicionAdminGlobal(usuario)) return usuario;
+
+  const idVend = String(lead?.idVendedor ?? '').trim();
+  const idPrev = String(prevSeg?.operadorId ?? '').trim();
+  const id =
+    (idVend && !IDS_OPERADOR_TECNICO.has(idVend) ? idVend : '') ||
+    (idPrev && !IDS_OPERADOR_TECNICO.has(idPrev) ? idPrev : '');
+
+  if (!id) return usuario;
+
+  return {
+    id,
+    idOperador: id,
+    nombre: String(lead?.promotorNombre || prevSeg?.operadorNombre || 'Vendedor').trim(),
+    rol: prevSeg?.operadorRol || lead?.cargadoPorRol || 'promotor',
+  };
+}
+
+export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario, usuarioId) {
+  const row = await findEncuestaRowParaSeguimiento(leadId, usuario);
   if (!row) return null;
-  const idOperador = parseInt(String(usuario?.id ?? usuario?.idOperador ?? ''), 10);
+
+  const adminGlobal = esEdicionAdminGlobal(usuario);
+  const idVendedorLead = parseInt(
+    String(normalizeSqlScalar(pickField(row, 'idVendedor', 'IdVendedor')) ?? ''),
+    10,
+  );
+  const idSupervisorLead = parseInt(
+    String(normalizeSqlScalar(pickField(row, 'idSupervisor', 'IdSupervisor')) ?? ''),
+    10,
+  );
+  // Admin: leer con id del vendedor/supervisor del lead (el SP valida visibilidad, no filtra por quien guardó).
+  const idOperadorLectura = adminGlobal
+    ? Number.isFinite(idVendedorLead)
+      ? idVendedorLead
+      : Number.isFinite(idSupervisorLead)
+        ? idSupervisorLead
+        : null
+    : parseInt(String(usuario?.id ?? usuario?.idOperador ?? ''), 10);
   const prevSeg = useSeguimientoSql()
-    ? await getLatestSeguimientoSql(leadId, Number.isFinite(idOperador) ? idOperador : null)
+    ? await getLatestSeguimientoSql(
+        leadId,
+        Number.isFinite(idOperadorLectura) ? idOperadorLectura : null,
+      )
     : getSeguimientoExterno(leadId);
   if (usuario?.rol === 'promotor' && cierreRegistradoPorSupervisor(prevSeg)) {
     const err = new Error(
@@ -1076,8 +1140,9 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     throw err;
   }
   const base = mapEncuestaRowToLead(row, { [leadId]: prevSeg });
-  
+
   if (
+    !adminGlobal &&
     usuario?.rol === 'supervisor' &&
     base.cargadoPorRol === 'promotor' &&
     !hasPassed48Hours(base.fechaAlta) &&
@@ -1092,6 +1157,7 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
   }
 
   if (
+    !adminGlobal &&
     usuario?.rol === 'supervisor' &&
     leadTieneCitaPrevia(base) &&
     base.cargadoPorRol === 'promotor' &&
@@ -1104,6 +1170,16 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     throw err;
   }
   let seguimientoParaGuardar = { ...seguimiento };
+  if (adminGlobal) {
+    seguimientoParaGuardar = {
+      ...seguimientoParaGuardar,
+      corregidoPorAdmin: {
+        id: String(usuario?.id ?? ''),
+        nombre: String(usuario?.nombre ?? 'Admin'),
+        en: new Date().toISOString(),
+      },
+    };
+  }
   const resultadoGuardado =
     seguimientoParaGuardar.resultadoEntrevista ?? prevSeg?.resultadoEntrevista ?? null;
   if (resultadoGuardado === 'derivar_terreno') {
@@ -1142,18 +1218,20 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     }
   }
 
+  const usuarioAtribucion = usuarioAtribucionAlGuardar(base, prevSeg, usuario);
+
   const { merged, saved, entradaHistorial, registroId } = await persistirSeguimientoLead(
     leadId,
     seguimientoParaGuardar,
-    usuario,
+    usuarioAtribucion,
     base,
   );
   const ahoraIso = new Date().toISOString().slice(0, 19);
   const operadorIdStamp =
-    usuario?.id != null && String(usuario.id).trim() !== ''
-      ? String(usuario.id).trim()
-      : usuario?.idOperador != null && String(usuario.idOperador).trim() !== ''
-        ? String(usuario.idOperador).trim()
+    usuarioAtribucion?.id != null && String(usuarioAtribucion.id).trim() !== ''
+      ? String(usuarioAtribucion.id).trim()
+      : usuarioAtribucion?.idOperador != null && String(usuarioAtribucion.idOperador).trim() !== ''
+        ? String(usuarioAtribucion.idOperador).trim()
         : merged.operadorId != null
           ? String(merged.operadorId)
           : null;
@@ -1162,8 +1240,8 @@ export async function updateLeadSeguimientoEncuesta(leadId, seguimiento, usuario
     ? {
         ...merged,
         operadorId: operadorIdStamp ?? merged.operadorId ?? null,
-        operadorRol: usuario?.rol ?? merged.operadorRol ?? null,
-        operadorNombre: usuario?.nombre ?? merged.operadorNombre ?? null,
+        operadorRol: usuarioAtribucion?.rol ?? merged.operadorRol ?? null,
+        operadorNombre: usuarioAtribucion?.nombre ?? merged.operadorNombre ?? null,
         /** Marca “gestionado ahora” para bandeja Hoy sin esperar F5. */
         creadoEn: ahoraIso,
       }

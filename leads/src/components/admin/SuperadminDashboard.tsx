@@ -580,11 +580,13 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
     async (leadId: string) => {
       const id = String(leadId);
       let pool = leads;
-      if (!pool.length) {
+      let found = pool.find((l) => String(l.id) === id);
+      if (!found) {
         setCargandoLeads(true);
         try {
           pool = await fetchAdminLeads();
           setLeads(pool);
+          found = pool.find((l) => String(l.id) === id);
         } catch (err) {
           console.error('Error al cargar leads para seguimiento:', err);
           return;
@@ -592,8 +594,38 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
           setCargandoLeads(false);
         }
       }
-      const found = pool.find((l) => String(l.id) === id);
-      if (found) setSeguimientoLead(found);
+      if (found) {
+        setSeguimientoLead(found);
+        return;
+      }
+      console.warn('[admin] Lead no encontrado para abrir seguimiento:', id);
+    },
+    [leads],
+  );
+
+  const abrirModificarPorId = useCallback(
+    async (leadId: string) => {
+      const id = String(leadId);
+      let pool = leads;
+      let found = pool.find((l) => String(l.id) === id);
+      if (!found) {
+        setCargandoLeads(true);
+        try {
+          pool = await fetchAdminLeads();
+          setLeads(pool);
+          found = pool.find((l) => String(l.id) === id);
+        } catch (err) {
+          console.error('Error al cargar leads para modificar:', err);
+          return;
+        } finally {
+          setCargandoLeads(false);
+        }
+      }
+      if (found) {
+        setModificandoLead(found);
+        return;
+      }
+      console.warn('[admin] Lead no encontrado para modificar:', id);
     },
     [leads],
   );
@@ -1839,6 +1871,11 @@ export function SuperadminDashboard({ data, periodo, onCambiarPeriodo, cargando 
             onAbrirSeguimiento={
               usuario?.rol === 'superadmin' || usuario?.panelGlobal
                 ? abrirSeguimientoPorId
+                : undefined
+            }
+            onAbrirModificar={
+              usuario?.rol === 'superadmin' || usuario?.panelGlobal
+                ? abrirModificarPorId
                 : undefined
             }
           />

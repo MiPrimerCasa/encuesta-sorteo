@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
 import { FeedbackHeaderButton, useFeedbackOptional } from '../feedback/FeedbackFab';
 import { cleanTelefonoSuffix } from '../../domain/whatsapp';
-import { fetchRecibosOcupados, reintentarPijIntegral } from '../../api/client';
+import { fetchRecibosOcupados, fetchStockPij, reintentarPijIntegral } from '../../api/client';
+import type { StockPijCrmResponse } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 import {
   formatEntrevistaCalendario,
   getHorarioEntrevistaLead,
@@ -27,6 +29,9 @@ import {
   construirIndiceVentasDesdeLeads,
   fusionarIndicesVentas,
   indiceVentasDesdeComprasFormulario,
+  serieUsaStockCaja,
+  claveAdhesionPij,
+  claveAnexoPij,
   type IndiceVentasOcupados,
   type ExcluirRegistroVenta,
 } from '../../domain/pij-recibo';
@@ -356,6 +361,9 @@ export function LeadModalForm({
   onLeadUpdated,
 }: LeadModalFormProps) {
   const feedback = useFeedbackOptional();
+  const { usuario } = useAuth();
+  const bypassStockPij =
+    rolUsuario === 'superadmin' || Boolean(usuario?.panelGlobal);
   const [form, setForm] = useState<FormState>(() => buildInitialForm(lead));
   const [errorVenta, setErrorVenta] = useState('');
   const [errorForm, setErrorForm] = useState('');
@@ -381,11 +389,11 @@ export function LeadModalForm({
     montoTransferencia: '',
   });
   // Campos estructurados para número de anexo PIJ (principal)
-  const [pijSerie, setPijSerie] = useState<'A' | 'B'>('A');
+  const [pijSerie, setPijSerie] = useState('A');
   const [pijAdh, setPijAdh] = useState('');
   const [pijAnexo, setPijAnexo] = useState('');
   // Campos estructurados para número de anexo PIJ (adicional)
-  const [adicPijSerie, setAdicPijSerie] = useState<'A' | 'B'>('A');
+  const [adicPijSerie, setAdicPijSerie] = useState('A');
   const [adicPijAdh, setAdicPijAdh] = useState('');
   const [adicPijAnexo, setAdicPijAnexo] = useState('');
   const [adicionalDraftId, setAdicionalDraftId] = useState('');
@@ -395,6 +403,9 @@ export function LeadModalForm({
     anexos: {},
     recibosTerreno: {},
   });
+  const [stockPij, setStockPij] = useState<StockPijCrmResponse | null>(null);
+  const [stockPijLoading, setStockPijLoading] = useState(false);
+  const [stockPijError, setStockPijError] = useState('');
 
   useEffect(() => {
     if (open) {
@@ -403,8 +414,37 @@ export function LeadModalForm({
         .catch((err) => console.error('[LeadModalForm] Error al obtener recibos ocupados:', err));
     } else {
       setIndiceVentasGlobal({ adhesiones: {}, anexos: {}, recibosTerreno: {} });
+      setStockPij(null);
+      setStockPijError('');
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open || soloLectura || bypassStockPij) {
+      return;
+    }
+    let cancelled = false;
+    setStockPijLoading(true);
+    setStockPijError('');
+    fetchStockPij()
+      .then((data) => {
+        if (!cancelled) setStockPij(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setStockPij(null);
+          setStockPijError(
+            err instanceof Error ? err.message : 'No se pudo cargar stock PIJ de caja.',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setStockPijLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, soloLectura, bypassStockPij]);
 
   useEffect(() => {
     if (!open) feedback?.close();
@@ -498,9 +538,70 @@ export function LeadModalForm({
     }
   }, [open, lead, rol, productos, soloLectura]);
 
+  const seriesPijBotones = useMemo(() => {
+    const grupos = (stockPij?.gruposDisponibles ?? []).filter(
+      (g) => g && g !== 'A' && g !== 'B',
+    );
+    return ['A', 'B', ...grupos];
+  }, [stockPij]);
+
   if (!open || !lead) return null;
 
   const patch = (partial: Partial<FormState>) => setForm((f) => ({ ...f, ...partial }));
+
+  const usaStockPijSerie = (serie: string) =>
+    !bypassStockPij && serieUsaStockCaja(serie);
+
+  const opcionesAdhesionParaSerie = (serie: string, excluir?: ExcluirRegistroVenta) => {
+    const g = serie.trim().toUpperCase();
+    return (stockPij?.opcionesAdhesion ?? []).filter((o) => {
+      if (String(o.grupo || '').toUpperCase() !== g) return false;
+      const clave = claveAdhesionPij(g, String(o.numero));
+      if (!clave) return true;
+      const ocup = indiceVentasCompleto.adhesiones[clave];
+      if (!ocup) return true;
+      if (
+        excluir?.leadId &&
+        String(ocup.leadId) === String(excluir.leadId) &&
+        excluir.esPrincipal &&
+        !ocup.esAdicional
+      ) {
+        return true;
+      }
+      if (
+        excluir?.compraId &&
+        ocup.esAdicional &&
+        String(ocup.compraId) === String(excluir.compraId)
+      ) {
+        return true;
+      }
+      return false;
+    });
+  };
+
+  const opcionesAnexoDisponibles = (excluir?: ExcluirRegistroVenta) =>
+    (stockPij?.opcionesAnexo ?? []).filter((o) => {
+      const clave = claveAnexoPij(String(o.numero));
+      if (!clave) return true;
+      const ocup = indiceVentasCompleto.anexos[clave];
+      if (!ocup) return true;
+      if (
+        excluir?.leadId &&
+        String(ocup.leadId) === String(excluir.leadId) &&
+        excluir.esPrincipal &&
+        !ocup.esAdicional
+      ) {
+        return true;
+      }
+      if (
+        excluir?.compraId &&
+        ocup.esAdicional &&
+        String(ocup.compraId) === String(excluir.compraId)
+      ) {
+        return true;
+      }
+      return false;
+    });
 
   const cantidadAdicionales = form.comprasAdicionales?.length ?? 0;
   const indiceSiguienteAdicional = cantidadAdicionales + 1;
@@ -587,6 +688,36 @@ export function LeadModalForm({
       if (dup) {
         setErrorVenta(dup);
         return;
+      }
+      if (usaStockPijSerie(adicPijSerie)) {
+        if (stockPijLoading) {
+          setErrorVenta('Esperá a que cargue el stock PIJ de caja.');
+          return;
+        }
+        if (!stockPij?.configurado) {
+          setErrorVenta(
+            stockPij?.aviso ||
+              stockPijError ||
+              'No hay conexión al stock de caja.',
+          );
+          return;
+        }
+        const adhOk = opcionesAdhesionParaSerie(adicPijSerie).some(
+          (o) => String(o.numero) === String(Number(adicPijAdh)),
+        );
+        if (!adhOk) {
+          setErrorVenta(
+            `La adhesión ${adicPijSerie}${adicPijAdh} no está en tu stock asignado (serie C+).`,
+          );
+          return;
+        }
+        const anxOk = opcionesAnexoDisponibles().some(
+          (o) => String(o.numero) === String(Number(adicPijAnexo)),
+        );
+        if (!anxOk) {
+          setErrorVenta(`El anexo ${adicPijAnexo} no está en tu stock asignado.`);
+          return;
+        }
       }
     }
     if (showAddAdicional === 'terreno') {
@@ -1005,6 +1136,40 @@ export function LeadModalForm({
         if (dup) {
           setErrorVenta(dup);
           return;
+        }
+        if (usaStockPijSerie(pijSerie)) {
+          if (stockPijLoading) {
+            setErrorVenta('Esperá a que cargue el stock PIJ de caja.');
+            return;
+          }
+          if (!stockPij?.configurado) {
+            setErrorVenta(
+              stockPij?.aviso ||
+                stockPijError ||
+                'No hay conexión al stock de caja. Configurá ERP_CAJA_INGEST_URL o pedí soporte.',
+            );
+            return;
+          }
+          const adhOk = opcionesAdhesionParaSerie(pijSerie, {
+            leadId: lead?.id,
+            esPrincipal: true,
+          }).some((o) => String(o.numero) === String(Number(pijAdh)));
+          if (!adhOk) {
+            setErrorVenta(
+              `La adhesión ${pijSerie}${pijAdh} no está en tu stock asignado (serie C+).`,
+            );
+            return;
+          }
+          if (pijAnexo.trim()) {
+            const anxOk = opcionesAnexoDisponibles({
+              leadId: lead?.id,
+              esPrincipal: true,
+            }).some((o) => String(o.numero) === String(Number(pijAnexo)));
+            if (!anxOk) {
+              setErrorVenta(`El anexo ${pijAnexo} no está en tu stock asignado.`);
+              return;
+            }
+          }
         }
       }
       if (esTerreno(form.idProducto) && form.numeroRecibo.trim()) {
@@ -2362,17 +2527,26 @@ export function LeadModalForm({
                             {esPlanInversion(form.idProducto) ? (
                               // Entrada estructurada solo para PIJ (serie + adh + anexo)
                               <div className="space-y-2">
-                                {/* Serie */}
-                                <div className="flex gap-2">
-                                  {(['A', 'B'] as const).map((s) => (
+                                {/* Serie: A/B libres; C+ desde stock caja */}
+                                <div className="flex flex-wrap gap-2">
+                                  {seriesPijBotones.map((s) => (
                                     <button
                                       key={s}
                                       type="button"
                                       onClick={() => {
                                         setPijSerie(s);
-                                        patch({ numeroRecibo: buildPijRecibo(s, pijAdh, pijAnexo) });
+                                        const clearNums = usaStockPijSerie(s);
+                                        const nextAdh = clearNums ? '' : pijAdh;
+                                        const nextAnx = clearNums ? '' : pijAnexo;
+                                        if (clearNums) {
+                                          setPijAdh('');
+                                          setPijAnexo('');
+                                        }
+                                        patch({
+                                          numeroRecibo: buildPijRecibo(s, nextAdh, nextAnx),
+                                        });
                                       }}
-                                      className={`flex-1 h-11 rounded-lg border text-[15px] font-bold transition-all ${pijSerie === s
+                                      className={`min-w-[4.5rem] flex-1 h-11 rounded-lg border text-[15px] font-bold transition-all ${pijSerie === s
                                           ? 'border-brand-700 bg-brand-600 text-white'
                                           : 'border-zinc-200 bg-white text-zinc-700 active:bg-zinc-50'
                                         }`}
@@ -2381,39 +2555,99 @@ export function LeadModalForm({
                                     </button>
                                   ))}
                                 </div>
-                                {/* N° Adhesión */}
+                                {usaStockPijSerie(pijSerie) && (
+                                  <p className="text-[11px] text-zinc-500">
+                                    {stockPijLoading
+                                      ? 'Cargando stock asignado en caja…'
+                                      : stockPijError
+                                        ? stockPijError
+                                        : !stockPij?.configurado
+                                          ? stockPij?.aviso ||
+                                            'Sin ingest de caja: no se puede listar stock C+.'
+                                          : `Stock C+: ${stockPij.resumen?.cantidadAdhesiones ?? 0} adhesiones, ${stockPij.resumen?.cantidadAnexos ?? 0} anexos.`}
+                                  </p>
+                                )}
+                                {/* N° Adhesión / Anexo */}
                                 <div className="flex gap-2">
                                   <div className="flex-1 space-y-1">
                                     <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">N° Adhesión</label>
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      value={pijAdh}
-                                      onChange={(e) => {
-                                        const v = e.target.value.replace(/\D/g, '');
-                                        setPijAdh(v);
-                                        patch({ numeroRecibo: buildPijRecibo(pijSerie, v, pijAnexo) });
-                                      }}
-                                      placeholder="128"
-                                      className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                                    />
+                                    {usaStockPijSerie(pijSerie) ? (
+                                      <select
+                                        value={pijAdh}
+                                        onChange={(e) => {
+                                          const v = e.target.value.replace(/\D/g, '');
+                                          setPijAdh(v);
+                                          patch({
+                                            numeroRecibo: buildPijRecibo(pijSerie, v, pijAnexo),
+                                          });
+                                        }}
+                                        className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                                      >
+                                        <option value="">Elegí adhesión…</option>
+                                        {opcionesAdhesionParaSerie(pijSerie, {
+                                          leadId: lead?.id,
+                                          esPrincipal: true,
+                                        }).map((o) => (
+                                          <option key={o.notacion} value={String(o.numero)}>
+                                            {o.notacion}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={pijAdh}
+                                        onChange={(e) => {
+                                          const v = e.target.value.replace(/\D/g, '');
+                                          setPijAdh(v);
+                                          patch({ numeroRecibo: buildPijRecibo(pijSerie, v, pijAnexo) });
+                                        }}
+                                        placeholder="128"
+                                        className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                                      />
+                                    )}
                                   </div>
                                   <div className="flex-1 space-y-1">
                                     <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                                       N° Anexo
                                     </label>
-                                    <input
-                                      type="text"
-                                      inputMode="numeric"
-                                      value={pijAnexo}
-                                      onChange={(e) => {
-                                        const v = e.target.value.replace(/\D/g, '');
-                                        setPijAnexo(v);
-                                        patch({ numeroRecibo: buildPijRecibo(pijSerie, pijAdh, v) });
-                                      }}
-                                      placeholder="400"
-                                      className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                                    />
+                                    {usaStockPijSerie(pijSerie) ? (
+                                      <select
+                                        value={pijAnexo}
+                                        onChange={(e) => {
+                                          const v = e.target.value.replace(/\D/g, '');
+                                          setPijAnexo(v);
+                                          patch({
+                                            numeroRecibo: buildPijRecibo(pijSerie, pijAdh, v),
+                                          });
+                                        }}
+                                        className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                                      >
+                                        <option value="">Sin anexo / elegí…</option>
+                                        {opcionesAnexoDisponibles({
+                                          leadId: lead?.id,
+                                          esPrincipal: true,
+                                        }).map((o) => (
+                                          <option key={o.notacion} value={String(o.numero)}>
+                                            {o.notacion}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={pijAnexo}
+                                        onChange={(e) => {
+                                          const v = e.target.value.replace(/\D/g, '');
+                                          setPijAnexo(v);
+                                          patch({ numeroRecibo: buildPijRecibo(pijSerie, pijAdh, v) });
+                                        }}
+                                        placeholder="400"
+                                        className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                                      />
+                                    )}
                                     <p className="text-[11px] text-zinc-500">Número sucesivo (sin /300).</p>
                                   </div>
                                 </div>
@@ -2703,17 +2937,24 @@ export function LeadModalForm({
                                   {showAddAdicional === 'pij' ? (
                                     // Entrada estructurada PIJ adicional
                                     <div className="space-y-2">
-                                      <div className="flex gap-2">
-                                        {(['A', 'B'] as const).map((s) => (
+                                      <div className="flex flex-wrap gap-2">
+                                        {seriesPijBotones.map((s) => (
                                           <button
                                             key={s}
                                             type="button"
                                             onClick={() => {
                                               setAdicPijSerie(s);
-                                              const r = buildPijRecibo(s, adicPijAdh, adicPijAnexo);
-                                              setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
+                                              const clearNums = usaStockPijSerie(s);
+                                              const nextAdh = clearNums ? '' : adicPijAdh;
+                                              const nextAnx = clearNums ? '' : adicPijAnexo;
+                                              if (clearNums) {
+                                                setAdicPijAdh('');
+                                                setAdicPijAnexo('');
+                                              }
+                                              const r = buildPijRecibo(s, nextAdh, nextAnx);
+                                              setAdicionalForm((f) => ({ ...f, numeroRecibo: r }));
                                             }}
-                                            className={`flex-1 h-10 rounded-lg border text-[14px] font-bold transition-all ${adicPijSerie === s
+                                            className={`min-w-[4.5rem] flex-1 h-10 rounded-lg border text-[14px] font-bold transition-all ${adicPijSerie === s
                                                 ? 'border-brand-700 bg-brand-600 text-white'
                                                 : 'border-zinc-200 bg-white text-zinc-700'
                                               }`}
@@ -2725,37 +2966,77 @@ export function LeadModalForm({
                                       <div className="flex gap-2">
                                         <div className="flex-1 space-y-1">
                                           <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">N° Adhesión</label>
-                                          <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={adicPijAdh}
-                                            onChange={(e) => {
-                                              const v = e.target.value.replace(/\D/g, '');
-                                              setAdicPijAdh(v);
-                                              const r = buildPijRecibo(adicPijSerie, v, adicPijAnexo);
-                                              setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
-                                            }}
-                                            placeholder="128"
-                                            className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
-                                          />
+                                          {usaStockPijSerie(adicPijSerie) ? (
+                                            <select
+                                              value={adicPijAdh}
+                                              onChange={(e) => {
+                                                const v = e.target.value.replace(/\D/g, '');
+                                                setAdicPijAdh(v);
+                                                const r = buildPijRecibo(adicPijSerie, v, adicPijAnexo);
+                                                setAdicionalForm((f) => ({ ...f, numeroRecibo: r }));
+                                              }}
+                                              className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                            >
+                                              <option value="">Elegí adhesión…</option>
+                                              {opcionesAdhesionParaSerie(adicPijSerie).map((o) => (
+                                                <option key={o.notacion} value={String(o.numero)}>
+                                                  {o.notacion}
+                                                </option>
+                                              ))}
+                                            </select>
+                                          ) : (
+                                            <input
+                                              type="text"
+                                              inputMode="numeric"
+                                              value={adicPijAdh}
+                                              onChange={(e) => {
+                                                const v = e.target.value.replace(/\D/g, '');
+                                                setAdicPijAdh(v);
+                                                const r = buildPijRecibo(adicPijSerie, v, adicPijAnexo);
+                                                setAdicionalForm((f) => ({ ...f, numeroRecibo: r }));
+                                              }}
+                                              placeholder="128"
+                                              className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                            />
+                                          )}
                                         </div>
                                         <div className="flex-1 space-y-1">
                                           <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                                             N° Anexo
                                           </label>
-                                          <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={adicPijAnexo}
-                                            onChange={(e) => {
-                                              const v = e.target.value.replace(/\D/g, '');
-                                              setAdicPijAnexo(v);
-                                              const r = buildPijRecibo(adicPijSerie, adicPijAdh, v);
-                                              setAdicionalForm(f => ({ ...f, numeroRecibo: r }));
-                                            }}
-                                            placeholder="400"
-                                            className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
-                                          />
+                                          {usaStockPijSerie(adicPijSerie) ? (
+                                            <select
+                                              value={adicPijAnexo}
+                                              onChange={(e) => {
+                                                const v = e.target.value.replace(/\D/g, '');
+                                                setAdicPijAnexo(v);
+                                                const r = buildPijRecibo(adicPijSerie, adicPijAdh, v);
+                                                setAdicionalForm((f) => ({ ...f, numeroRecibo: r }));
+                                              }}
+                                              className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                            >
+                                              <option value="">Sin anexo / elegí…</option>
+                                              {opcionesAnexoDisponibles().map((o) => (
+                                                <option key={o.notacion} value={String(o.numero)}>
+                                                  {o.notacion}
+                                                </option>
+                                              ))}
+                                            </select>
+                                          ) : (
+                                            <input
+                                              type="text"
+                                              inputMode="numeric"
+                                              value={adicPijAnexo}
+                                              onChange={(e) => {
+                                                const v = e.target.value.replace(/\D/g, '');
+                                                setAdicPijAnexo(v);
+                                                const r = buildPijRecibo(adicPijSerie, adicPijAdh, v);
+                                                setAdicionalForm((f) => ({ ...f, numeroRecibo: r }));
+                                              }}
+                                              placeholder="400"
+                                              className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                            />
+                                          )}
                                           <p className="text-[10px] text-zinc-500">Número sucesivo (sin /300).</p>
                                         </div>
                                       </div>

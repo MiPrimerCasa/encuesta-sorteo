@@ -1,6 +1,26 @@
 /** Utilidades PIJ — serie/adhesión/anexo (compartido formulario + validación). */
 
-export type SeriePij = 'A' | 'B';
+/** Serie/grupo de adhesión: A/B históricas (tipeo libre) o C+ (stock caja). */
+export type SeriePij = string;
+
+const SERIES_LIBRES = new Set(['A', 'B']);
+
+export function normalizarSeriePij(serie: string | null | undefined): string {
+  return String(serie ?? '')
+    .trim()
+    .toUpperCase();
+}
+
+/** true si debe elegirse del stock asignado en caja (C, D, …). */
+export function serieUsaStockCaja(serie: string | null | undefined): boolean {
+  const g = normalizarSeriePij(serie);
+  if (!g || g.length > 4) return false;
+  return !SERIES_LIBRES.has(g);
+}
+
+export function esSerieLibreHistorica(serie: string | null | undefined): boolean {
+  return SERIES_LIBRES.has(normalizarSeriePij(serie));
+}
 
 export type PijReciboParseado = {
   serie: SeriePij;
@@ -60,19 +80,19 @@ export function buildPijRecibo(serie: string, adh: string, anexo: string): strin
 
 export function parsePijRecibo(recibo: string): PijReciboParseado {
   const clean = recibo.trim().toUpperCase().replace(/\s+/g, ' ');
-  const match = clean.match(/^([AB])(\d+)(?:\/300)?(?:\s+ANEXO\s+(\d+)(?:\/300)?)?$/);
+  const match = clean.match(/^([A-Z])(\d+)(?:\/300)?(?:\s+ANEXO\s+(\d+)(?:\/300)?)?$/);
   if (match) {
     return {
-      serie: match[1] as SeriePij,
+      serie: match[1],
       adhesion: match[2],
       anexo: match[3] || '',
     };
   }
-  const matchFuzzy = clean.match(/^([AB])(\d+)/);
+  const matchFuzzy = clean.match(/^([A-Z])(\d+)/);
   if (matchFuzzy) {
     const anexoMatch = clean.match(/ANEXO\s*(\d+)/);
     return {
-      serie: matchFuzzy[1] as SeriePij,
+      serie: matchFuzzy[1],
       adhesion: matchFuzzy[2],
       anexo: anexoMatch ? anexoMatch[1] : '',
     };

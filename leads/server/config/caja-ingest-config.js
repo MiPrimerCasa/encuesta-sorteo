@@ -1,6 +1,7 @@
 /**
- * Config del ingest HTTP de caja (Electron / servicio :3847).
- * Piloto local: CRM → POST /api/v1/crm/leads → MySQL erp_sucursal.
+ * Config del ingest HTTP de caja / erp-sync-api.
+ * Prod VPS: ERP_CAJA_INGEST_URL=https://…/api/erp-sync
+ * Piloto local: CRM → Electron :3847
  */
 export function isCajaIngestHttpEnabled() {
   return Boolean(String(process.env.ERP_CAJA_INGEST_URL ?? '').trim());

@@ -1463,6 +1463,33 @@ function registerApiRoutes(api) {
     }
   });
 
+  api.get('/leads/stock-pij', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    try {
+      const { listarStockPijParaCrm } = await import('./services/caja-stock-asignaciones.js');
+      const data = await listarStockPijParaCrm({
+        crmPromotorCodigo:
+          usuario.codigoCarga || usuario.codigoPromotor || usuario.loginId || null,
+        idVendedor: usuario.id || usuario.idOperador || null,
+        sucursalCodigo:
+          usuario.sucursal ||
+          process.env.CAJA_DEFAULT_SUCURSAL ||
+          null,
+      });
+      return res.json(data);
+    } catch (error) {
+      console.error('[stock-pij]', error);
+      const status = error?.status && Number.isFinite(error.status) ? error.status : 500;
+      return res.status(status).json({
+        message: error instanceof Error ? error.message : 'No se pudo leer stock PIJ desde caja.',
+      });
+    }
+  });
+
   api.patch('/leads/:id/seguimiento', async (req, res) => {
     if (!respondIfNotConfigured(res)) return;
 
@@ -1494,6 +1521,68 @@ function registerApiRoutes(api) {
     const usuario = usuarioDesdeRequest(req);
     if (!usuario) {
       return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+
+    // Serie C+: validar adhesión/anexo contra stock pull de caja (A/B tipen libre).
+    // Superadmin / panel global pueden tipeo libre también en C+.
+    const bypassStockPij =
+      usuario.rol === 'superadmin' ||
+      usuario.panelGlobal === true ||
+      String(req.headers['x-usuario-panel-global'] || '') === 'true';
+    if (
+      !bypassStockPij &&
+      data.resultadoEntrevista === 'compro' &&
+      String(data.idProducto || '') === 'prod-pij' &&
+      data.numeroRecibo
+    ) {
+      try {
+        const { parsePijRecibo } = await import('./domain/pij-recibo.js');
+        const { serieUsaStockCaja } = await import('./domain/pij-stock-serie.js');
+        const { validarNumerosEnStockCaja } = await import(
+          './services/caja-stock-asignaciones.js'
+        );
+        const parsed = parsePijRecibo(data.numeroRecibo);
+        if (serieUsaStockCaja(parsed.serie)) {
+          await validarNumerosEnStockCaja({
+            serie: parsed.serie,
+            nroAdhesion: parsed.adhesion,
+            nroAnexo: parsed.anexo,
+            crmPromotorCodigo:
+              usuario.codigoCarga || usuario.codigoPromotor || usuario.loginId || null,
+            idVendedor: usuario.id || usuario.idOperador || null,
+            sucursalCodigo:
+              usuario.sucursal || process.env.CAJA_DEFAULT_SUCURSAL || null,
+          });
+        }
+        const adicionales = Array.isArray(data.comprasAdicionales)
+          ? data.comprasAdicionales
+          : [];
+        for (const c of adicionales) {
+          if (String(c?.idProducto || '') !== 'prod-pij' || !c?.numeroRecibo) continue;
+          const p = parsePijRecibo(c.numeroRecibo);
+          if (!serieUsaStockCaja(p.serie)) continue;
+          await validarNumerosEnStockCaja({
+            serie: p.serie,
+            nroAdhesion: p.adhesion,
+            nroAnexo: p.anexo,
+            crmPromotorCodigo:
+              usuario.codigoCarga || usuario.codigoPromotor || usuario.loginId || null,
+            idVendedor: usuario.id || usuario.idOperador || null,
+            sucursalCodigo:
+              usuario.sucursal || process.env.CAJA_DEFAULT_SUCURSAL || null,
+          });
+        }
+      } catch (stockErr) {
+        const status =
+          stockErr?.status && Number.isFinite(stockErr.status) ? stockErr.status : 400;
+        return res.status(status).json({
+          message:
+            stockErr instanceof Error
+              ? stockErr.message
+              : 'Número PIJ no válido en stock de caja.',
+          code: stockErr?.code || 'STOCK_PIJ',
+        });
+      }
     }
 
     try {

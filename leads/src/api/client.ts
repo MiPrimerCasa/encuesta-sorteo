@@ -227,6 +227,54 @@ export async function fetchLeads(): Promise<{
   };
 }
 
+/** Stock PIJ C+ del vendedor (pull a caja vía proxy CRM). */
+export type StockPijCrmResponse = {
+  adhesiones?: unknown[];
+  anexos?: unknown[];
+  opcionesAdhesion: Array<{
+    grupo: string | null;
+    numero: number;
+    notacion: string;
+    stockRangoId?: number | string;
+    sucursalCodigo?: string;
+    campanaNombre?: string;
+  }>;
+  opcionesAnexo: Array<{
+    grupo: string | null;
+    numero: number;
+    notacion: string;
+  }>;
+  gruposDisponibles: string[];
+  resumen?: {
+    cantidadAdhesiones?: number;
+    cantidadAnexos?: number;
+  };
+  aviso?: string;
+  configurado: boolean;
+  vendedor?: unknown;
+};
+
+export async function fetchStockPij(): Promise<StockPijCrmResponse> {
+  if (_isDemoActive) {
+    return {
+      adhesiones: [],
+      anexos: [],
+      opcionesAdhesion: [
+        { grupo: 'C', numero: 120, notacion: 'C120' },
+        { grupo: 'C', numero: 121, notacion: 'C121' },
+      ],
+      opcionesAnexo: [
+        { grupo: null, numero: 500, notacion: '500' },
+        { grupo: null, numero: 501, notacion: '501' },
+      ],
+      gruposDisponibles: ['C'],
+      resumen: { cantidadAdhesiones: 2, cantidadAnexos: 2 },
+      configurado: true,
+    };
+  }
+  return apiFetch<StockPijCrmResponse>('/api/leads/stock-pij');
+}
+
 export async function fetchRecibosOcupados(): Promise<import('../domain/pij-recibo').IndiceVentasOcupados> {
   if (_isDemoActive) {
     return {

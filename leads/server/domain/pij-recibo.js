@@ -5,11 +5,11 @@ const ID_TERRENO = 'prod-terreno';
 
 export function parsePijRecibo(recibo) {
   const clean = String(recibo ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
-  const match = clean.match(/^([AB])(\d+)(?:\/300)?(?:\s+ANEXO\s+(\d+)(?:\/300)?)?$/);
+  const match = clean.match(/^([A-Z])(\d+)(?:\/300)?(?:\s+ANEXO\s+(\d+)(?:\/300)?)?$/);
   if (match) {
     return { serie: match[1], adhesion: match[2], anexo: match[3] || '' };
   }
-  const matchFuzzy = clean.match(/^([AB])(\d+)/);
+  const matchFuzzy = clean.match(/^([A-Z])(\d+)/);
   if (matchFuzzy) {
     const anexoMatch = clean.match(/ANEXO\s*(\d+)/);
     return {

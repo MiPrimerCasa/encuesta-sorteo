@@ -161,8 +161,8 @@ export function requireCajaSyncToken(req, res, next) {
 
 function respondCajaError(res, error) {
   const code = error?.code;
-  if (code === 'VALIDATION') {
-    return res.status(400).json({ message: error.message, code });
+  if (error?.status === 400 || code === 'VALIDATION') {
+    return res.status(400).json({ message: error.message, code: code || 'VALIDATION' });
   }
   if (code === 'NOT_FOUND') {
     return res.status(404).json({ message: error.message, code });

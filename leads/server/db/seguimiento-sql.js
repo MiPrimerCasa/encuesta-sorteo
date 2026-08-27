@@ -997,14 +997,61 @@ export async function fetchUltimosSeguimientoPorOperadores(idOperadores = []) {
   return [...byLead.values()];
 }
 
+async function findGlobalUltimoRowForLead(leadId) {
+  const leadIdStr = String(leadId);
+  const globalRows = await queryUltimosGlobalRows();
+  if (globalRows == null) return null;
+  return (
+    globalRows.find((row) => String(row.lead_id ?? row.leadId) === leadIdStr) ?? null
+  );
+}
+
+async function mapRowToSeguimientoConHijos(row) {
+  if (!row) return {};
+  const childMaps = await fetchChildDataBySeguimientoIds([
+    row.id ?? row.idRegistrarSeguimientoLead,
+  ]);
+  return mapSqlRowToSeguimiento(row, childDataForRow(row, childMaps));
+}
+
+/**
+ * Último seguimiento con cierre (compro) en historial admin reciente.
+ * Útil para reparar leads cuyo último registro perdió el estado de cierre.
+ */
+export async function buscarUltimoSeguimientoComproEnHistorial(leadId, { dias = 60 } = {}) {
+  if (!useSeguimientoSql()) return null;
+  const desde = new Date(Date.now() - Math.max(dias, 1) * 86400000);
+  const rows = await fetchHistorialAdminDesde(desde);
+  const leadIdStr = String(leadId);
+  let bestRow = null;
+  let bestId = 0;
+  for (const row of rows) {
+    if (String(row.lead_id ?? row.leadId) !== leadIdStr) continue;
+    const resultado = row.resultado_entrevista ?? row.resultadoEntrevista;
+    if (resultado !== 'compro') continue;
+    const rid = Number(row.id ?? row.idRegistrarSeguimientoLead ?? 0);
+    if (rid >= bestId) {
+      bestId = rid;
+      bestRow = row;
+    }
+  }
+  if (!bestRow) return null;
+  return mapRowToSeguimientoConHijos(bestRow);
+}
+
 export async function getLatestSeguimientoSql(leadId, idOperador = null) {
   try {
+    // operador 0 = usuario sistema caja; usar último global, no historial filtrado por op. 0
+    const usarGlobal = idOperador == null || idOperador === 0;
+    if (usarGlobal) {
+      const globalRow = await findGlobalUltimoRowForLead(leadId);
+      if (globalRow) return mapRowToSeguimientoConHijos(globalRow);
+      if (idOperador == null) return {};
+    }
+
     const rows = await queryHistorialRows(leadId, 1, idOperador);
     if (!rows.length) return {};
-    const childMaps = await fetchChildDataBySeguimientoIds([
-      rows[0].id ?? rows[0].idRegistrarSeguimientoLead,
-    ]);
-    return mapSqlRowToSeguimiento(rows[0], childDataForRow(rows[0], childMaps));
+    return mapRowToSeguimientoConHijos(rows[0]);
   } catch (error) {
     if (isSeguimientoDegraded(error)) {
       warnSeguimientoLecturaDegradada(error);
@@ -1117,8 +1164,10 @@ export async function listHistorialForLead(leadId, lead = {}, opts = {}) {
 
 export async function persistirSeguimientoLead(leadId, patch, usuario, leadContext) {
   const idOperador = parseOperadorId(usuario);
+  // Caja usa operador_id=0; el merge debe basarse en el último global, no en filas de op. 0
+  const idOperadorPrev = idOperador === 0 ? null : idOperador;
   let prev = useSeguimientoSql()
-    ? await getLatestSeguimientoSql(leadId, idOperador)
+    ? await getLatestSeguimientoSql(leadId, idOperadorPrev)
     : getSeguimientoExterno(leadId);
   if (
     useSeguimientoSql() &&

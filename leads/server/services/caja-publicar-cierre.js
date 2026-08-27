@@ -39,11 +39,11 @@ export function resolveSucursalParaCaja(usuario, lead) {
     return /^\d{1,2}$/.test(s) || /^S\d{1,2}$/i.test(s);
   };
 
-  // 1) Código ERP explícito (01) o equipo S##
+  // 1) Código ERP numérico (01) en header; S## solo si el mapa lo traduce a ERP
   for (const cand of [usuario?.sucursalCodigo, usuario?.sucursal]) {
-    if (esCodigoErpOEquipo(cand)) {
-      return normalizarSucursalCodigoErp(cand).slice(0, 40);
-    }
+    if (!esCodigoErpOEquipo(cand)) continue;
+    const norm = normalizarSucursalCodigoErp(cand).slice(0, 40);
+    if (/^\d{1,2}$/.test(norm)) return norm.padStart(2, '0');
   }
 
   // 2) Extraer S## del código promotor/supervisor (SORTEO01S21P01 → S21 → 01 vía mapa)

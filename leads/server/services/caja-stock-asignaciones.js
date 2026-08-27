@@ -7,10 +7,24 @@ import {
   getCajaIngestHttpConfig,
   isCajaIngestHttpEnabled,
 } from '../config/caja-ingest-config.js';
+import { codigoCrmStockPijDesdeSesion } from '../db/codigo-promotor.js';
 import {
   normalizarGrupoSerie,
   serieUsaStockCaja,
 } from '../domain/pij-stock-serie.js';
+import { resolveSucursalParaCaja } from './caja-publicar-cierre.js';
+
+/** Parámetros de stock PIJ a partir de la sesión CRM (código SORTEO + sucursal ERP). */
+export function paramsStockPijDesdeUsuario(usuario, lead = null) {
+  return {
+    crmPromotorCodigo: codigoCrmStockPijDesdeSesion(usuario),
+    idVendedor: null,
+    sucursalCodigo:
+      resolveSucursalParaCaja(usuario, lead) ||
+      String(process.env.CAJA_DEFAULT_SUCURSAL ?? '').trim() ||
+      null,
+  };
+}
 
 function authHeaders(apiKey) {
   const h = { Accept: 'application/json' };

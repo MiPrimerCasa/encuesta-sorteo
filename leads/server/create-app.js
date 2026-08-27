@@ -1470,24 +1470,14 @@ function registerApiRoutes(api) {
       return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
     }
     try {
-      const { listarStockPijParaCrm } = await import('./services/caja-stock-asignaciones.js');
-      const crmPromotorCodigo =
-        usuario.codigoCarga ||
-        usuario.codigoPromotor ||
-        usuario.codigoSupervisor ||
-        usuario.loginId ||
-        null;
-      const data = await listarStockPijParaCrm({
-        crmPromotorCodigo,
-        // Preferir código CRM; no mandar id de sesión SQL (rompe lookup en erp-sync).
-        idVendedor: null,
-        sucursalCodigo:
-          usuario.sucursal ||
-          process.env.CAJA_DEFAULT_SUCURSAL ||
-          null,
-      });
+      const { listarStockPijParaCrm, paramsStockPijDesdeUsuario } = await import(
+        './services/caja-stock-asignaciones.js'
+      );
+      const stockParams = paramsStockPijDesdeUsuario(usuario);
+      const data = await listarStockPijParaCrm(stockParams);
       console.info('[stock-pij]', {
-        codigo: crmPromotorCodigo,
+        codigo: stockParams.crmPromotorCodigo,
+        sucursal: stockParams.sucursalCodigo,
         rol: usuario.rol,
         configurado: data?.configurado,
         grupos: data?.gruposDisponibles,
@@ -1552,24 +1542,17 @@ function registerApiRoutes(api) {
       try {
         const { parsePijRecibo } = await import('./domain/pij-recibo.js');
         const { serieUsaStockCaja } = await import('./domain/pij-stock-serie.js');
-        const { validarNumerosEnStockCaja } = await import(
+        const { validarNumerosEnStockCaja, paramsStockPijDesdeUsuario } = await import(
           './services/caja-stock-asignaciones.js'
         );
+        const stockParams = paramsStockPijDesdeUsuario(usuario, lead);
         const parsed = parsePijRecibo(data.numeroRecibo);
         if (serieUsaStockCaja(parsed.serie)) {
           await validarNumerosEnStockCaja({
             serie: parsed.serie,
             nroAdhesion: parsed.adhesion,
             nroAnexo: parsed.anexo,
-            crmPromotorCodigo:
-              usuario.codigoCarga ||
-              usuario.codigoPromotor ||
-              usuario.codigoSupervisor ||
-              usuario.loginId ||
-              null,
-            idVendedor: null,
-            sucursalCodigo:
-              usuario.sucursal || process.env.CAJA_DEFAULT_SUCURSAL || null,
+            ...stockParams,
           });
         }
         const adicionales = Array.isArray(data.comprasAdicionales)
@@ -1583,15 +1566,7 @@ function registerApiRoutes(api) {
             serie: p.serie,
             nroAdhesion: p.adhesion,
             nroAnexo: p.anexo,
-            crmPromotorCodigo:
-              usuario.codigoCarga ||
-              usuario.codigoPromotor ||
-              usuario.codigoSupervisor ||
-              usuario.loginId ||
-              null,
-            idVendedor: null,
-            sucursalCodigo:
-              usuario.sucursal || process.env.CAJA_DEFAULT_SUCURSAL || null,
+            ...stockParams,
           });
         }
       } catch (stockErr) {

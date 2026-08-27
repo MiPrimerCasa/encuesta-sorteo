@@ -12,7 +12,7 @@ import {
   digitsTelefono,
 } from '../db/encuesta-carga.js';
 import { listAllLeadsFromEncuestas } from '../db/encuestas.js';
-import { persistirSeguimientoLead, getLatestSeguimientoSql } from '../db/seguimiento-sql.js';
+import { persistirSeguimientoLead, getLatestSeguimientoSql, buscarUltimoSeguimientoComproEnHistorial } from '../db/seguimiento-sql.js';
 import { normalizarDniCliente } from '../domain/dni-cliente.js';
 
 function strOrNull(val, max) {
@@ -110,6 +110,180 @@ export function buildPatchPersonaDesdeCorreccion(corr, { corregidoPor } = {}) {
   }
 
   return patch;
+}
+
+/** Mapea seguimiento del payload de caja (ingest) al shape del CRM. */
+export function seguimientoCierreDesdePayloadCaja(payload) {
+  const seg = payload?.seguimiento;
+  if (!seg || typeof seg !== 'object') return {};
+
+  const out = {};
+  const copyStr = (srcKey, dstKey = srcKey) => {
+    const v = seg[srcKey];
+    if (v != null && String(v).trim() !== '') out[dstKey] = String(v).trim();
+  };
+
+  copyStr('resultadoEntrevista');
+  copyStr('idProducto');
+  copyStr('estadoPago');
+  copyStr('numeroRecibo');
+  copyStr('formaPago');
+  copyStr('idBarrio');
+  copyStr('seriePij');
+  copyStr('nroAdhesion');
+  copyStr('nroAnexo');
+  copyStr('observaciones');
+  copyStr('fechaCierre');
+  copyStr('fechaAdhesionPapel');
+
+  const pagos = seg.pagos;
+  if (pagos && typeof pagos === 'object') {
+    for (const key of [
+      'montoCierre',
+      'montoEfectivo',
+      'montoTransferencia',
+      'titularTransferencia',
+      'bancoTransferencia',
+      'referenciaTransferencia',
+    ]) {
+      if (pagos[key] != null && pagos[key] !== '') out[key] = pagos[key];
+    }
+  }
+
+  if (Array.isArray(seg.comprasAdicionales) && seg.comprasAdicionales.length) {
+    out.comprasAdicionales = seg.comprasAdicionales;
+  }
+  if (Array.isArray(seg.adjuntos) && seg.adjuntos.length) {
+    out.imagenesCierre = seg.adjuntos;
+  }
+
+  return out;
+}
+
+/** Campos de cierre que una corrección de persona no debe borrar. */
+const CAMPOS_CIERRE_PRESERVAR = [
+  'resultadoEntrevista',
+  'idProducto',
+  'estadoPago',
+  'numeroRecibo',
+  'formaPago',
+  'montoCierre',
+  'montoEfectivo',
+  'montoTransferencia',
+  'fechaCierre',
+  'fechaAdhesionPapel',
+  'idBarrio',
+  'seriePij',
+  'nroAdhesion',
+  'nroAnexo',
+  'comprasAdicionales',
+  'imagenesCierre',
+  'titularTransferencia',
+  'titularCoincideCliente',
+  'bancoTransferencia',
+  'referenciaTransferencia',
+  'cajaEstado',
+  'cajaVerificadoEn',
+  'cajaComprobanteId',
+  'cajaMotivoRechazo',
+  'cajaSucursal',
+  'cajaConfirmadoPor',
+  'idVentaIntegral',
+  'pijIntegralEstado',
+  'pijIntegralError',
+  'pijIntegralEnviadoEn',
+  'huboEntrevista',
+  'canal',
+  'confirmoEntrevista',
+  'operadorId',
+  'operadorRol',
+  'operadorNombre',
+];
+
+/** Superpone persona sobre cierre sin perder estado compro del base. */
+export function preservarCamposCierreEnMerge(base, overlay) {
+  const out = { ...base, ...overlay };
+  if (base?.resultadoEntrevista !== 'compro') return out;
+  if (overlay?.resultadoEntrevista === 'compro') return out;
+
+  out.resultadoEntrevista = 'compro';
+  for (const key of CAMPOS_CIERRE_PRESERVAR) {
+    if (key === 'resultadoEntrevista') continue;
+    if (overlay?.[key] == null && base[key] != null) out[key] = base[key];
+  }
+  return out;
+}
+
+/**
+ * Base de seguimiento para corrección de persona: último global + fallback cierre
+ * (payload caja o historial compro) si el último registro perdió el cierre.
+ */
+export async function resolverSeguimientoBaseParaCorreccionCaja(leadId, payload) {
+  const actual = (await getLatestSeguimientoSql(leadId, null)) || {};
+  if (actual.resultadoEntrevista === 'compro') return actual;
+
+  const fromPayload = seguimientoCierreDesdePayloadCaja(payload);
+  if (fromPayload.resultadoEntrevista === 'compro') {
+    return preservarCamposCierreEnMerge(fromPayload, actual);
+  }
+
+  const fromHistorial = await buscarUltimoSeguimientoComproEnHistorial(leadId);
+  if (fromHistorial) {
+    return preservarCamposCierreEnMerge(fromHistorial, actual);
+  }
+
+  return actual;
+}
+
+/** Fusiona patch de persona sin pisar campos de cierre ya presentes en la base. */
+export function fusionarPatchPersonaPreservandoCierre(baseSeg, patchPersona) {
+  return preservarCamposCierreEnMerge(baseSeg, patchPersona);
+}
+
+/**
+ * Operador para SP_RegistrarSeguimientoLead: el del cierre original (vendedor),
+ * no "Caja 01". La auditoría de caja va en cajaClienteCorregidoPor/En del patch.
+ */
+export function resolverUsuarioPersistenciaCorreccionCaja(baseSeg, payload, leadEncuesta) {
+  const segPayload = payload?.seguimiento && typeof payload.seguimiento === 'object'
+    ? payload.seguimiento
+    : {};
+  const leadPayload = payload?.lead && typeof payload.lead === 'object' ? payload.lead : {};
+
+  const idRaw =
+    baseSeg?.operadorId ??
+    segPayload.operadorId ??
+    leadPayload.promotorId ??
+    leadPayload.supervisorId ??
+    payload?.operador?.usuarioId ??
+    null;
+  const id =
+    idRaw != null && String(idRaw).trim() !== '' && String(idRaw) !== '0'
+      ? String(idRaw).trim()
+      : undefined;
+
+  const rol =
+    baseSeg?.operadorRol ??
+    segPayload.operadorRol ??
+    (leadPayload.supervisorId ? 'supervisor' : null) ??
+    (leadPayload.promotorId ? 'promotor' : null) ??
+    payload?.operador?.rol ??
+    'supervisor';
+
+  const nombre =
+    baseSeg?.operadorNombre ??
+    leadPayload.supervisorNombre ??
+    leadPayload.promotorNombre ??
+    payload?.operador?.nombre ??
+    leadEncuesta?.promotorNombre ??
+    leadEncuesta?.nombrePromotor ??
+    'Operador';
+
+  return {
+    id,
+    rol,
+    nombre: String(nombre).trim().slice(0, 200),
+  };
 }
 
 async function resolverPendientePorUuid(pendienteUuid, sucursal) {
@@ -273,12 +447,13 @@ export async function aplicarCorreccionClienteCaja(body, sucursal) {
 
   let seguimientoSaved = false;
   if (Object.keys(patchSeg).length > 0) {
-    const usuarioSistema = {
-      id: payload?.operador?.usuarioId != null ? String(payload.operador.usuarioId) : '0',
-      rol: payload?.operador?.rol || 'promotor',
-      nombre: `Caja ${sucursal || pendiente.sucursal_codigo || ''}`.trim(),
-    };
-    const prevSeg = (await getLatestSeguimientoSql(leadId, null)) || {};
+    const baseSeg = await resolverSeguimientoBaseParaCorreccionCaja(leadId, payload);
+    const patchConCierre = fusionarPatchPersonaPreservandoCierre(baseSeg, patchSeg);
+    const usuarioPersistencia = resolverUsuarioPersistenciaCorreccionCaja(
+      baseSeg,
+      payload,
+      leadEncuesta,
+    );
     const leadContext = {
       id: leadId,
       telefono:
@@ -287,13 +462,13 @@ export async function aplicarCorreccionClienteCaja(body, sucursal) {
         payload?.lead?.telefono ||
         '',
       nombre: nombreNuevo || leadEncuesta?.nombre || payload?.lead?.nombre || '',
-      seguimiento: prevSeg,
+      seguimiento: baseSeg,
     };
     try {
       const res = await persistirSeguimientoLead(
         leadId,
-        patchSeg,
-        usuarioSistema,
+        patchConCierre,
+        usuarioPersistencia,
         leadContext,
       );
       seguimientoSaved = Boolean(res?.saved);

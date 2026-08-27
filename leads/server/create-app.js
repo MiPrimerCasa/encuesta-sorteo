@@ -1471,14 +1471,28 @@ function registerApiRoutes(api) {
     }
     try {
       const { listarStockPijParaCrm } = await import('./services/caja-stock-asignaciones.js');
+      const crmPromotorCodigo =
+        usuario.codigoCarga ||
+        usuario.codigoPromotor ||
+        usuario.codigoSupervisor ||
+        usuario.loginId ||
+        null;
       const data = await listarStockPijParaCrm({
-        crmPromotorCodigo:
-          usuario.codigoCarga || usuario.codigoPromotor || usuario.loginId || null,
-        idVendedor: usuario.id || usuario.idOperador || null,
+        crmPromotorCodigo,
+        // Preferir código CRM; no mandar id de sesión SQL (rompe lookup en erp-sync).
+        idVendedor: null,
         sucursalCodigo:
           usuario.sucursal ||
           process.env.CAJA_DEFAULT_SUCURSAL ||
           null,
+      });
+      console.info('[stock-pij]', {
+        codigo: crmPromotorCodigo,
+        rol: usuario.rol,
+        configurado: data?.configurado,
+        grupos: data?.gruposDisponibles,
+        adh: data?.resumen?.cantidadAdhesiones,
+        anx: data?.resumen?.cantidadAnexos,
       });
       return res.json(data);
     } catch (error) {
@@ -1548,8 +1562,12 @@ function registerApiRoutes(api) {
             nroAdhesion: parsed.adhesion,
             nroAnexo: parsed.anexo,
             crmPromotorCodigo:
-              usuario.codigoCarga || usuario.codigoPromotor || usuario.loginId || null,
-            idVendedor: usuario.id || usuario.idOperador || null,
+              usuario.codigoCarga ||
+              usuario.codigoPromotor ||
+              usuario.codigoSupervisor ||
+              usuario.loginId ||
+              null,
+            idVendedor: null,
             sucursalCodigo:
               usuario.sucursal || process.env.CAJA_DEFAULT_SUCURSAL || null,
           });
@@ -1566,8 +1584,12 @@ function registerApiRoutes(api) {
             nroAdhesion: p.adhesion,
             nroAnexo: p.anexo,
             crmPromotorCodigo:
-              usuario.codigoCarga || usuario.codigoPromotor || usuario.loginId || null,
-            idVendedor: usuario.id || usuario.idOperador || null,
+              usuario.codigoCarga ||
+              usuario.codigoPromotor ||
+              usuario.codigoSupervisor ||
+              usuario.loginId ||
+              null,
+            idVendedor: null,
             sucursalCodigo:
               usuario.sucursal || process.env.CAJA_DEFAULT_SUCURSAL || null,
           });

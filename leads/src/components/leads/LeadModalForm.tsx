@@ -362,6 +362,7 @@ export function LeadModalForm({
 }: LeadModalFormProps) {
   const feedback = useFeedbackOptional();
   const { usuario } = useAuth();
+  /** Solo libera tipeo en C+; el stock igual se consulta para mostrar Serie C. */
   const bypassStockPij =
     rolUsuario === 'superadmin' || Boolean(usuario?.panelGlobal);
   const [form, setForm] = useState<FormState>(() => buildInitialForm(lead));
@@ -420,9 +421,7 @@ export function LeadModalForm({
   }, [open]);
 
   useEffect(() => {
-    if (!open || soloLectura || bypassStockPij) {
-      return;
-    }
+    if (!open) return;
     let cancelled = false;
     setStockPijLoading(true);
     setStockPijError('');
@@ -444,7 +443,7 @@ export function LeadModalForm({
     return () => {
       cancelled = true;
     };
-  }, [open, soloLectura, bypassStockPij]);
+  }, [open]);
 
   useEffect(() => {
     if (!open) feedback?.close();
@@ -2555,18 +2554,18 @@ export function LeadModalForm({
                                     </button>
                                   ))}
                                 </div>
-                                {usaStockPijSerie(pijSerie) && (
-                                  <p className="text-[11px] text-zinc-500">
-                                    {stockPijLoading
-                                      ? 'Cargando stock asignado en caja…'
-                                      : stockPijError
-                                        ? stockPijError
-                                        : !stockPij?.configurado
-                                          ? stockPij?.aviso ||
-                                            'Sin ingest de caja: no se puede listar stock C+.'
-                                          : `Stock C+: ${stockPij.resumen?.cantidadAdhesiones ?? 0} adhesiones, ${stockPij.resumen?.cantidadAnexos ?? 0} anexos.`}
-                                  </p>
-                                )}
+                                <p className="text-[11px] text-zinc-500">
+                                  {stockPijLoading
+                                    ? 'Cargando stock asignado en caja…'
+                                    : stockPijError
+                                      ? `Stock: ${stockPijError}`
+                                      : !stockPij?.configurado
+                                        ? stockPij?.aviso ||
+                                          'Sin ingest de caja: no se puede listar stock C+.'
+                                        : (stockPij.gruposDisponibles?.length ?? 0) > 0
+                                          ? `Stock C+: series ${(stockPij.gruposDisponibles ?? []).join(', ')} — ${stockPij.resumen?.cantidadAdhesiones ?? 0} adhesiones, ${stockPij.resumen?.cantidadAnexos ?? 0} anexos.`
+                                          : 'Sin stock C+ asignado para tu usuario. Pedí acta de entrega en caja.'}
+                                </p>
                                 {/* N° Adhesión / Anexo */}
                                 <div className="flex gap-2">
                                   <div className="flex-1 space-y-1">

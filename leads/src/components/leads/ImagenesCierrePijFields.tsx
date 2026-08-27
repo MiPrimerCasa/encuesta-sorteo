@@ -143,7 +143,6 @@ function SlotImagen({
       ref={inputRef}
       type="file"
       accept="image/jpeg,image/png,image/webp,image/*"
-      capture="environment"
       className="hidden"
       onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
     />

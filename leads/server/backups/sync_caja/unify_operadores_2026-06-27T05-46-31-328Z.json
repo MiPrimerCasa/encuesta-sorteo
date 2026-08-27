@@ -1,0 +1,789 @@
+{
+  "fechaEjecucion": "2026-06-27T05:46:31.330Z",
+  "operadorQueSincroniza": "Unificación canónica de operadores",
+  "totalRegistros": 46,
+  "cambios": [
+    {
+      "leadId": "1231",
+      "nombreCliente": "ANDREA YAMILA GOMEZ",
+      "promotorNombreCRM": "Carolina A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Carolina A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "139",
+        "nombre": "AGUIRRE CAROLINA",
+        "rol": "promotor"
+      },
+      "recibo": "B222/300 ANEXO 81/300",
+      "fechaCierre": "2026-06-05"
+    },
+    {
+      "leadId": "1281",
+      "nombreCliente": "Lidia Aguirre",
+      "promotorNombreCRM": "Velazco G",
+      "operadorAnterior": {
+        "id": "136",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "operadorNuevo": {
+        "id": "110",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "recibo": "A294/300 ANEXO 24/300",
+      "fechaCierre": "2026-06-06"
+    },
+    {
+      "leadId": "1286",
+      "nombreCliente": "Nancy Rodriguez",
+      "promotorNombreCRM": "Samaniego L",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Samaniego L",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "141",
+        "nombre": "SAMANIEGO LUCAS",
+        "rol": "promotor"
+      },
+      "recibo": "B203/300 ANEXO 43/300",
+      "fechaCierre": "2026-06-17"
+    },
+    {
+      "leadId": "1304",
+      "nombreCliente": "Olga Baez",
+      "promotorNombreCRM": "Carolina A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Carolina A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "139",
+        "nombre": "AGUIRRE CAROLINA",
+        "rol": "promotor"
+      },
+      "recibo": "B224/300 ANEXO 85/300",
+      "fechaCierre": "2026-06-07"
+    },
+    {
+      "leadId": "1321",
+      "nombreCliente": "Fernando Daniel González",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B261/300 ANEXO 251/300",
+      "fechaCierre": "2026-06-09"
+    },
+    {
+      "leadId": "1322",
+      "nombreCliente": "German Andrés Galeano",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B268/300 ANEXO 258/300",
+      "fechaCierre": "2026-06-12"
+    },
+    {
+      "leadId": "1629",
+      "nombreCliente": "Britez juan",
+      "promotorNombreCRM": "Samaniego L",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Samaniego L",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "141",
+        "nombre": "SAMANIEGO LUCAS",
+        "rol": "promotor"
+      },
+      "recibo": "B202/300 ANEXO 41/300",
+      "fechaCierre": "2026-06-08"
+    },
+    {
+      "leadId": "1636",
+      "nombreCliente": "Ortiz silvina noemi",
+      "promotorNombreCRM": "Dahiana C",
+      "operadorAnterior": {
+        "id": "47",
+        "nombre": "Dahiana C",
+        "rol": "supervisor"
+      },
+      "operadorNuevo": {
+        "id": "47",
+        "nombre": "CERRIZUELA DAHIANA  AYLEN",
+        "rol": "supervisor"
+      },
+      "recibo": "A55/300",
+      "fechaCierre": "2026-06-02"
+    },
+    {
+      "leadId": "1675",
+      "nombreCliente": "Pedro noguera",
+      "promotorNombreCRM": "Velazco G",
+      "operadorAnterior": {
+        "id": "136",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "operadorNuevo": {
+        "id": "110",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "recibo": "A292/300 ANEXO 22/300",
+      "fechaCierre": "2026-06-06"
+    },
+    {
+      "leadId": "1732",
+      "nombreCliente": "Sergio Figueredo",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B104/300 ANEXO 335/300",
+      "fechaCierre": "2026-06-16"
+    },
+    {
+      "leadId": "1833",
+      "nombreCliente": "Sara Esther Allendre",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B266/300 ANEXO 256/300",
+      "fechaCierre": "2026-06-09"
+    },
+    {
+      "leadId": "1836",
+      "nombreCliente": "Ezequiel Fornari",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B263/300 ANEXO 253/300",
+      "fechaCierre": "2026-06-09"
+    },
+    {
+      "leadId": "1838",
+      "nombreCliente": "Allendre, Raquel",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B262/300 ANEXO 252/300",
+      "fechaCierre": "2026-06-09"
+    },
+    {
+      "leadId": "1859",
+      "nombreCliente": "Juan Leonardo martinez",
+      "promotorNombreCRM": "Christian R",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Christian R",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "37",
+        "nombre": "ROCDAN CRISTIAN GABRIEL",
+        "rol": "supervisor"
+      },
+      "recibo": "A62/300 ANEXO 293/300",
+      "fechaCierre": "2026-06-15"
+    },
+    {
+      "leadId": "1863",
+      "nombreCliente": "Ruiz Dias Gabriela",
+      "promotorNombreCRM": "Samaniego L",
+      "operadorAnterior": {
+        "id": "123",
+        "nombre": "FÁTIMA FARÍAS",
+        "rol": "supervisor"
+      },
+      "operadorNuevo": {
+        "id": "141",
+        "nombre": "SAMANIEGO LUCAS",
+        "rol": "promotor"
+      },
+      "recibo": "10400",
+      "fechaCierre": null
+    },
+    {
+      "leadId": "1874",
+      "nombreCliente": "ALLENDRE BELEN",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B264/300 ANEXO 254/300",
+      "fechaCierre": "2026-06-09"
+    },
+    {
+      "leadId": "1875",
+      "nombreCliente": "Samuel david Palomo",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B265/300 ANEXO 255/300",
+      "fechaCierre": "2026-06-09"
+    },
+    {
+      "leadId": "1885",
+      "nombreCliente": "Fatima Fanny Farias",
+      "promotorNombreCRM": "Samaniego L",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Samaniego L",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "141",
+        "nombre": "SAMANIEGO LUCAS",
+        "rol": "promotor"
+      },
+      "recibo": "B201/300 ANEXO 42/300",
+      "fechaCierre": "2026-06-05"
+    },
+    {
+      "leadId": "1898",
+      "nombreCliente": "Mayra Vallejos",
+      "promotorNombreCRM": "Gamarra E ",
+      "operadorAnterior": {
+        "id": "42",
+        "nombre": "GAMARRA ESTEFANIA LIA",
+        "rol": "supervisor"
+      },
+      "operadorNuevo": {
+        "id": "142",
+        "nombre": "GAMARRA EZEQUIEL",
+        "rol": "promotor"
+      },
+      "recibo": "B291/300 ANEXO 10/300",
+      "fechaCierre": "2026-06-12"
+    },
+    {
+      "leadId": "1905",
+      "nombreCliente": "Perla Maldonado",
+      "promotorNombreCRM": "Carolina A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Carolina A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "139",
+        "nombre": "AGUIRRE CAROLINA",
+        "rol": "promotor"
+      },
+      "recibo": "B225/300 ANEXO 87/300",
+      "fechaCierre": "2026-06-08"
+    },
+    {
+      "leadId": "1937",
+      "nombreCliente": "Víctor Joaquin Nuñez",
+      "promotorNombreCRM": "Velazco G",
+      "operadorAnterior": {
+        "id": "136",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "operadorNuevo": {
+        "id": "110",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "recibo": "A296/300 ANEXO 26/300",
+      "fechaCierre": "2026-06-11"
+    },
+    {
+      "leadId": "1938",
+      "nombreCliente": "Aguirre Luciana Anahi",
+      "promotorNombreCRM": "Carolina A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Carolina A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "139",
+        "nombre": "AGUIRRE CAROLINA",
+        "rol": "promotor"
+      },
+      "recibo": "B221/300 ANEXO 83/300",
+      "fechaCierre": "2026-06-05"
+    },
+    {
+      "leadId": "1939",
+      "nombreCliente": "Zamira P",
+      "promotorNombreCRM": "Velazco G",
+      "operadorAnterior": {
+        "id": "136",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "operadorNuevo": {
+        "id": "110",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "recibo": "A295/300 ANEXO 25/300",
+      "fechaCierre": "2026-06-07"
+    },
+    {
+      "leadId": "1941",
+      "nombreCliente": "Matías Aguirre",
+      "promotorNombreCRM": "Velazco G",
+      "operadorAnterior": {
+        "id": "136",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "operadorNuevo": {
+        "id": "110",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "recibo": "A293/300 ANEXO 23/300",
+      "fechaCierre": "2026-06-05"
+    },
+    {
+      "leadId": "1942",
+      "nombreCliente": "María Luz Navarro",
+      "promotorNombreCRM": "Velazco G",
+      "operadorAnterior": {
+        "id": "136",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "operadorNuevo": {
+        "id": "110",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "recibo": "A291/300 ANEXO 21/300",
+      "fechaCierre": "2026-06-03"
+    },
+    {
+      "leadId": "1945",
+      "nombreCliente": "Yolanda Nuñez",
+      "promotorNombreCRM": "Velazco G",
+      "operadorAnterior": {
+        "id": "136",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "operadorNuevo": {
+        "id": "110",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "recibo": "A297/300 ANEXO 27/300",
+      "fechaCierre": "2026-06-11"
+    },
+    {
+      "leadId": "2020",
+      "nombreCliente": "Gomez Maria",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B267/300 ANEXO 257/300",
+      "fechaCierre": "2026-06-11"
+    },
+    {
+      "leadId": "2038",
+      "nombreCliente": "Fanny Bernal",
+      "promotorNombreCRM": "Velazco G",
+      "operadorAnterior": {
+        "id": "136",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "operadorNuevo": {
+        "id": "110",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "recibo": "A298/300 ANEXO 28/300",
+      "fechaCierre": "2026-06-11"
+    },
+    {
+      "leadId": "2039",
+      "nombreCliente": "Delia rojas",
+      "promotorNombreCRM": "Velazco G",
+      "operadorAnterior": {
+        "id": "136",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "operadorNuevo": {
+        "id": "110",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "recibo": "A299/300 ANEXO 29/300",
+      "fechaCierre": "2026-06-11"
+    },
+    {
+      "leadId": "2099",
+      "nombreCliente": "Nélida Noemí Benítez",
+      "promotorNombreCRM": "Norma M",
+      "operadorAnterior": {
+        "id": "23",
+        "nombre": "Norma M",
+        "rol": "supervisor"
+      },
+      "operadorNuevo": {
+        "id": "23",
+        "nombre": "MORZAN NORMA",
+        "rol": "supervisor"
+      },
+      "recibo": "A267/300 ANEXO 181/300",
+      "fechaCierre": "2026-06-06"
+    },
+    {
+      "leadId": "2161",
+      "nombreCliente": "Leiva Fernando Sebastián",
+      "promotorNombreCRM": "Marina L",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Marina L",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "72",
+        "nombre": "LEIVA MARINA SOLEDAD",
+        "rol": "supervisor"
+      },
+      "recibo": "B271/300 ANEXO 231/300",
+      "fechaCierre": "2026-06-09"
+    },
+    {
+      "leadId": "2162",
+      "nombreCliente": "Yasmin Denise Estigarribia",
+      "promotorNombreCRM": "Marina L",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Marina L",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "72",
+        "nombre": "LEIVA MARINA SOLEDAD",
+        "rol": "supervisor"
+      },
+      "recibo": "B272/300 ANEXO 232/300",
+      "fechaCierre": "2026-06-12"
+    },
+    {
+      "leadId": "2168",
+      "nombreCliente": "Fabian Vargas",
+      "promotorNombreCRM": "Marina L",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Marina L",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "72",
+        "nombre": "LEIVA MARINA SOLEDAD",
+        "rol": "supervisor"
+      },
+      "recibo": "B273/300 ANEXO 233/300",
+      "fechaCierre": "2026-06-12"
+    },
+    {
+      "leadId": "2271",
+      "nombreCliente": "Veronica Palomo",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B270/300 ANEXO 260/300",
+      "fechaCierre": "2026-06-15"
+    },
+    {
+      "leadId": "2397",
+      "nombreCliente": "Alvarenga Zulma",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B269/300 ANEXO 259/300",
+      "fechaCierre": "2026-06-15"
+    },
+    {
+      "leadId": "2398",
+      "nombreCliente": "Palomo Ruth",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B101/300 ANEXO 332/300",
+      "fechaCierre": "2026-06-15"
+    },
+    {
+      "leadId": "2409",
+      "nombreCliente": "Nuñez Natalia yamila",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B102/300 ANEXO 333/300",
+      "fechaCierre": "2026-06-15"
+    },
+    {
+      "leadId": "2435",
+      "nombreCliente": "Gisel Aquino",
+      "promotorNombreCRM": "Christian R",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Christian R",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "37",
+        "nombre": "ROCDAN CRISTIAN GABRIEL",
+        "rol": "supervisor"
+      },
+      "recibo": "A61/300 ANEXO 292/300",
+      "fechaCierre": "2026-06-15"
+    },
+    {
+      "leadId": "2534",
+      "nombreCliente": "Torres Carlos",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B103/300 ANEXO 334/300",
+      "fechaCierre": "2026-06-16"
+    },
+    {
+      "leadId": "2938",
+      "nombreCliente": "Maria Aguirre",
+      "promotorNombreCRM": "Velazco G",
+      "operadorAnterior": {
+        "id": "136",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "operadorNuevo": {
+        "id": "110",
+        "nombre": "VELAZCO GERALDINE",
+        "rol": "promotor"
+      },
+      "recibo": "A300/300 ANEXO 30/300",
+      "fechaCierre": "2026-06-22"
+    },
+    {
+      "leadId": "2954",
+      "nombreCliente": "Víctor orlando Benítez",
+      "promotorNombreCRM": "Christian R",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Christian R",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "37",
+        "nombre": "ROCDAN CRISTIAN GABRIEL",
+        "rol": "supervisor"
+      },
+      "recibo": "A63/300 ANEXO 294/300",
+      "fechaCierre": "2026-06-22"
+    },
+    {
+      "leadId": "3130",
+      "nombreCliente": "Colman erika",
+      "promotorNombreCRM": "Christian R",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Christian R",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "37",
+        "nombre": "ROCDAN CRISTIAN GABRIEL",
+        "rol": "supervisor"
+      },
+      "recibo": "A65/300 ANEXO 296/300",
+      "fechaCierre": "2026-06-22"
+    },
+    {
+      "leadId": "3343",
+      "nombreCliente": "CANTERO GISEL",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B105/300 ANEXO 336/300",
+      "fechaCierre": "2026-06-24"
+    },
+    {
+      "leadId": "3637",
+      "nombreCliente": "Enzo Aponte",
+      "promotorNombreCRM": "Dahiana C",
+      "operadorAnterior": {
+        "id": "47",
+        "nombre": "Dahiana C",
+        "rol": "supervisor"
+      },
+      "operadorNuevo": {
+        "id": "47",
+        "nombre": "CERRIZUELA DAHIANA  AYLEN",
+        "rol": "supervisor"
+      },
+      "recibo": "A56/300 ANEXO 221/300",
+      "fechaCierre": "2026-06-26"
+    },
+    {
+      "leadId": "3820",
+      "nombreCliente": "BARROS VIVIANA",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B106/300 ANEXO 337/300",
+      "fechaCierre": "2026-06-25"
+    },
+    {
+      "leadId": "3823",
+      "nombreCliente": "GONZALEZ KAREN",
+      "promotorNombreCRM": "Belen A",
+      "operadorAnterior": {
+        "id": "999",
+        "nombre": "Belen A",
+        "rol": "superadmin"
+      },
+      "operadorNuevo": {
+        "id": "39",
+        "nombre": "ALLENDRE BELÉN ELIZABETH",
+        "rol": "supervisor"
+      },
+      "recibo": "B107/300 ANEXO 338/300",
+      "fechaCierre": "2026-06-25"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "idUnico": "2332_principal",
+    "leadId": "2332",
+    "nombreCliente": "Caceres Delfina",
+    "numeroAnexo": "202",
+    "nombreVendedor": "NAARA PONA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-24",
+    "fechaCierreNueva": "2026-06-19",
+    "excelRow": {
+      "fecha": "19/06",
+      "ordenAdh": "127",
+      "ordenAnexo": "202",
+      "nombreCliente": "CACERES DELFINA",
+      "nombreVendedor": "NAARA PONA",
+      "concepto": "ADHESION"
+    }
+  }
+]

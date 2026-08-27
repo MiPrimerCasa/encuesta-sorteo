@@ -1,0 +1,1322 @@
+[
+  {
+    "idUnico": "233_principal",
+    "leadId": "233",
+    "nombreCliente": "Federico Ceballos Bertero",
+    "numeroAnexo": "171",
+    "nombreVendedor": "CATHERINE CONTRERAS",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-04",
+    "excelRow": {
+      "fecha": "04/06",
+      "ordenAdh": "23",
+      "ordenAnexo": "171",
+      "nombreCliente": "CEBALLOS BERTERO FEDERICO",
+      "nombreVendedor": "CATHERINE CONTRERAS",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1221_principal",
+    "leadId": "1221",
+    "nombreCliente": "Rocio belen verdun",
+    "numeroAnexo": "3",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-05",
+    "excelRow": {
+      "fecha": "05/06",
+      "ordenAdh": "282",
+      "ordenAnexo": "3",
+      "nombreCliente": "VERDUN ROCIO BELEN",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1231_principal",
+    "leadId": "1231",
+    "nombreCliente": "ANDREA YAMILA GOMEZ",
+    "numeroAnexo": "81",
+    "nombreVendedor": "AGUIRRE CAROLINA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-11",
+    "fechaCierreNueva": "2026-06-05",
+    "excelRow": {
+      "fecha": "05/06",
+      "ordenAdh": "222",
+      "ordenAnexo": "81",
+      "nombreCliente": "GOMEZ ANDREA YAMILA",
+      "nombreVendedor": "AGUIRRE CAROLINA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1268_principal",
+    "leadId": "1268",
+    "nombreCliente": "Isaac Gamarra",
+    "numeroAnexo": "4",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "283",
+      "ordenAnexo": "4",
+      "nombreCliente": "GAMARRA CASTRO ISAC FELIPE",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1281_principal",
+    "leadId": "1281",
+    "nombreCliente": "Lidia Aguirre",
+    "numeroAnexo": "24",
+    "nombreVendedor": "GERALDINE VELAZCO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "294",
+      "ordenAnexo": "24",
+      "nombreCliente": "AGUIRRE LIDIA ELIZABET",
+      "nombreVendedor": "GERALDINE VELAZCO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1286_principal",
+    "leadId": "1286",
+    "nombreCliente": "Nancy Rodriguez",
+    "numeroAnexo": "43",
+    "nombreVendedor": "LUCAS SAMANIEGO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-17",
+    "excelRow": {
+      "fecha": "17/06",
+      "ordenAdh": "203",
+      "ordenAnexo": "43",
+      "nombreCliente": "NANCY RODRIGUEZ",
+      "nombreVendedor": "LUCAS SAMANIEGO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1310_principal",
+    "leadId": "1310",
+    "nombreCliente": "Dana Gómez",
+    "numeroAnexo": "11",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-17",
+    "excelRow": {
+      "fecha": "17/06",
+      "ordenAdh": "290",
+      "ordenAnexo": "11",
+      "nombreCliente": "DANA GOMEZ",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1321_principal",
+    "leadId": "1321",
+    "nombreCliente": "Fernando Daniel González",
+    "numeroAnexo": "251",
+    "nombreVendedor": "BELEN ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-10",
+    "fechaCierreNueva": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "261",
+      "ordenAnexo": "251",
+      "nombreCliente": "GONZALES DANIEL FERNANDO",
+      "nombreVendedor": "BELEN ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1322_principal",
+    "leadId": "1322",
+    "nombreCliente": "German Andrés Galeano",
+    "numeroAnexo": "258",
+    "nombreVendedor": "BELEN ELIZABETH ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-12",
+    "fechaCierreNueva": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "268",
+      "ordenAnexo": "258",
+      "nombreCliente": "GALEANO GERMAN",
+      "nombreVendedor": "BELEN ELIZABETH ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1329_principal",
+    "leadId": "1329",
+    "nombreCliente": "Axel rodrigo Brizuela",
+    "numeroAnexo": "20",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "284",
+      "ordenAnexo": "20",
+      "nombreCliente": "AXEL RODRIGO BRIZUELA",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1351_principal",
+    "leadId": "1351",
+    "nombreCliente": "William Sibilla",
+    "numeroAnexo": "5",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-07",
+    "excelRow": {
+      "fecha": "07/06",
+      "ordenAdh": "285",
+      "ordenAnexo": "5",
+      "nombreCliente": "SIBILLA WILLIAM",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1369_principal",
+    "leadId": "1369",
+    "nombreCliente": "Matías Nahuel López",
+    "numeroAnexo": "6",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "286",
+      "ordenAnexo": "6",
+      "nombreCliente": "LOPEZ MATIAS NAHUEL",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1504_principal",
+    "leadId": "1504",
+    "nombreCliente": "Vicente Daniel mereles",
+    "numeroAnexo": "173",
+    "nombreVendedor": "CATHERINE CONTRERAS",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-04",
+    "excelRow": {
+      "fecha": "04/06",
+      "ordenAdh": "25",
+      "ordenAnexo": "173",
+      "nombreCliente": "MERELES VICENTE DANIEL",
+      "nombreVendedor": "CATHERINE CONTRERAS",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1512_principal",
+    "leadId": "1512",
+    "nombreCliente": "Santiago Daniel cabrera",
+    "numeroAnexo": "8",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-08",
+    "excelRow": {
+      "fecha": "08/06",
+      "ordenAdh": "287",
+      "ordenAnexo": "8",
+      "nombreCliente": "CABRERA SANTIAGO DANIEL",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1552_principal",
+    "leadId": "1552",
+    "nombreCliente": "Daniel salinas",
+    "numeroAnexo": "174",
+    "nombreVendedor": "CATHERINE CONTRERAS",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-19",
+    "fechaCierreNueva": "2026-06-07",
+    "excelRow": {
+      "fecha": "07/06",
+      "ordenAdh": "26",
+      "ordenAnexo": "174",
+      "nombreCliente": "SALINAS LUIS DANIEL",
+      "nombreVendedor": "CATHERINE CONTRERAS",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1552_compra_dea7d97e-a8ac-4676-8ff5-8d6c1f3bec4c",
+    "leadId": "1552",
+    "nombreCliente": "Daniel salinas (Adic.)",
+    "numeroAnexo": "175",
+    "nombreVendedor": "CATHERINE CONTRERAS",
+    "concepto": "ADHESION",
+    "isCompraAdicional": true,
+    "compraId": "dea7d97e-a8ac-4676-8ff5-8d6c1f3bec4c",
+    "fechaCierreCRMAnterior": "2026-06-20",
+    "fechaCierreNueva": "2026-06-07",
+    "excelRow": {
+      "fecha": "07/06",
+      "ordenAdh": "27",
+      "ordenAnexo": "175",
+      "nombreCliente": "SALINAS LUIS DANIEL",
+      "nombreVendedor": "CATHERINE CONTRERAS",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1576_principal",
+    "leadId": "1576",
+    "nombreCliente": "Anahi Delgado",
+    "numeroAnexo": "162",
+    "nombreVendedor": "FARIAS FATIMA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-23",
+    "excelRow": {
+      "fecha": "23/06",
+      "ordenAdh": "2",
+      "ordenAnexo": "162",
+      "nombreCliente": "DELGADO ANAHI AILEN",
+      "nombreVendedor": "FARIAS FATIMA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1629_principal",
+    "leadId": "1629",
+    "nombreCliente": "Britez juan",
+    "numeroAnexo": "41",
+    "nombreVendedor": "LUCAS SAMANIEGO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-08",
+    "excelRow": {
+      "fecha": "08/06",
+      "ordenAdh": "202",
+      "ordenAnexo": "41",
+      "nombreCliente": "BRITEZ JUAN ALBERTO",
+      "nombreVendedor": "LUCAS SAMANIEGO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1636_principal",
+    "leadId": "1636",
+    "nombreCliente": "Ortiz silvina noemi",
+    "numeroAnexo": "-",
+    "nombreVendedor": "DAHIANA CERRIZUELA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-02",
+    "excelRow": {
+      "fecha": "02/06",
+      "ordenAdh": "55",
+      "ordenAnexo": "-",
+      "nombreCliente": "ORTIZ SILVANA NOEMI/RAMIREZ JORGE",
+      "nombreVendedor": "DAHIANA CERRIZUELA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1675_principal",
+    "leadId": "1675",
+    "nombreCliente": "Pedro noguera",
+    "numeroAnexo": "22",
+    "nombreVendedor": "GERALDINE VELAZCO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "292",
+      "ordenAnexo": "22",
+      "nombreCliente": "PEDRO ANTONIO NOGUERA",
+      "nombreVendedor": "GERALDINE VELAZCO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1724_principal",
+    "leadId": "1724",
+    "nombreCliente": "RAMIREZ GABRIELA MARISEL",
+    "numeroAnexo": "268",
+    "nombreVendedor": "ESTEFANIA GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-10",
+    "excelRow": {
+      "fecha": "10/06",
+      "ordenAdh": "281",
+      "ordenAnexo": "268",
+      "nombreCliente": "RAMIREZ GABRIELA MARISEL",
+      "nombreVendedor": "ESTEFANIA GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1732_principal",
+    "leadId": "1732",
+    "nombreCliente": "Sergio Figueredo",
+    "numeroAnexo": "335",
+    "nombreVendedor": "BELEN ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-16",
+    "excelRow": {
+      "fecha": "16/06",
+      "ordenAdh": "104",
+      "ordenAnexo": "335",
+      "nombreCliente": "FIGUEREDO SERGIO",
+      "nombreVendedor": "BELEN ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1754_principal",
+    "leadId": "1754",
+    "nombreCliente": "Diego Benítez",
+    "numeroAnexo": "7",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "288",
+      "ordenAnexo": "7",
+      "nombreCliente": "DIEGO ORLANDO BENITEZ",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1775_principal",
+    "leadId": "1775",
+    "nombreCliente": "Karina Cáceres",
+    "numeroAnexo": "161",
+    "nombreVendedor": "FATIMA FARIAS",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "1",
+      "ordenAnexo": "161",
+      "nombreCliente": "CACERES KARINA MARICEL",
+      "nombreVendedor": "FATIMA FARIAS",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1833_principal",
+    "leadId": "1833",
+    "nombreCliente": "Sara Esther Allendre",
+    "numeroAnexo": "256",
+    "nombreVendedor": "BELEN ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-10",
+    "fechaCierreNueva": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "266",
+      "ordenAnexo": "256",
+      "nombreCliente": "ALLENDRE SARA",
+      "nombreVendedor": "BELEN ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1836_principal",
+    "leadId": "1836",
+    "nombreCliente": "Ezequiel Fornari",
+    "numeroAnexo": "253",
+    "nombreVendedor": "BELEN ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-10",
+    "fechaCierreNueva": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "263",
+      "ordenAnexo": "253",
+      "nombreCliente": "FORNARI EZEQUIEL ALBERTO",
+      "nombreVendedor": "BELEN ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1838_principal",
+    "leadId": "1838",
+    "nombreCliente": "Allendre, Raquel",
+    "numeroAnexo": "252",
+    "nombreVendedor": "BELEN ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-10",
+    "fechaCierreNueva": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "262",
+      "ordenAnexo": "252",
+      "nombreCliente": "ALLENDRE ESTEFANIA RAQUEL",
+      "nombreVendedor": "BELEN ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1859_principal",
+    "leadId": "1859",
+    "nombreCliente": "Juan Leonardo martinez",
+    "numeroAnexo": "293",
+    "nombreVendedor": "ROCDAN CRISTIAN",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-15",
+    "excelRow": {
+      "fecha": "15/06",
+      "ordenAdh": "62",
+      "ordenAnexo": "293",
+      "nombreCliente": "JUAN  LEONARDO MARTINEZ",
+      "nombreVendedor": "ROCDAN CRISTIAN",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1874_principal",
+    "leadId": "1874",
+    "nombreCliente": "ALLENDRE BELEN",
+    "numeroAnexo": "254",
+    "nombreVendedor": "BELEN ELIZABETH ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-10",
+    "fechaCierreNueva": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "264",
+      "ordenAnexo": "254",
+      "nombreCliente": "BELEN ELIZABETH ALLENDRE",
+      "nombreVendedor": "BELEN ELIZABETH ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1875_principal",
+    "leadId": "1875",
+    "nombreCliente": "Samuel david Palomo",
+    "numeroAnexo": "255",
+    "nombreVendedor": "BELEN ELIZABETH ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-10",
+    "fechaCierreNueva": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "265",
+      "ordenAnexo": "255",
+      "nombreCliente": "SAMUEL DAVID PALOMO",
+      "nombreVendedor": "BELEN ELIZABETH ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1885_principal",
+    "leadId": "1885",
+    "nombreCliente": "Fatima Fanny Farias",
+    "numeroAnexo": "42",
+    "nombreVendedor": "LUCAS SAMANIEGO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-05",
+    "excelRow": {
+      "fecha": "05/06",
+      "ordenAdh": "201",
+      "ordenAnexo": "42",
+      "nombreCliente": "FARIAS FATIMA FANNY",
+      "nombreVendedor": "LUCAS SAMANIEGO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1898_principal",
+    "leadId": "1898",
+    "nombreCliente": "Mayra Vallejos",
+    "numeroAnexo": "10",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "291",
+      "ordenAnexo": "10",
+      "nombreCliente": "VALLEJOS MAIRA",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1937_principal",
+    "leadId": "1937",
+    "nombreCliente": "Víctor Joaquin Nuñez",
+    "numeroAnexo": "26",
+    "nombreVendedor": "GERALDINE VELAZCO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-11",
+    "excelRow": {
+      "fecha": "11/06",
+      "ordenAdh": "296",
+      "ordenAnexo": "26",
+      "nombreCliente": "JOAQUIN ÑUNEZ",
+      "nombreVendedor": "GERALDINE VELAZCO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1939_principal",
+    "leadId": "1939",
+    "nombreCliente": "Zamira P",
+    "numeroAnexo": "25",
+    "nombreVendedor": "GERALDINE VELAZCO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-07",
+    "excelRow": {
+      "fecha": "07/06",
+      "ordenAdh": "295",
+      "ordenAnexo": "25",
+      "nombreCliente": "PAREDES ZAMIRA",
+      "nombreVendedor": "GERALDINE VELAZCO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1941_principal",
+    "leadId": "1941",
+    "nombreCliente": "Matías Aguirre",
+    "numeroAnexo": "23",
+    "nombreVendedor": "GERALDINE VELAZCO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-05",
+    "excelRow": {
+      "fecha": "05/06",
+      "ordenAdh": "293",
+      "ordenAnexo": "23",
+      "nombreCliente": "AGUIRRE MATIAS ALEJANDRO",
+      "nombreVendedor": "GERALDINE VELAZCO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1942_principal",
+    "leadId": "1942",
+    "nombreCliente": "María Luz Navarro",
+    "numeroAnexo": "21",
+    "nombreVendedor": "GERALDINE VELAZCO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-03",
+    "excelRow": {
+      "fecha": "03/06",
+      "ordenAdh": "291",
+      "ordenAnexo": "21",
+      "nombreCliente": "NAVARRO MARIA LUZ ERCILIA",
+      "nombreVendedor": "GERALDINE VELAZCO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "1945_principal",
+    "leadId": "1945",
+    "nombreCliente": "Yolanda Nuñez",
+    "numeroAnexo": "27",
+    "nombreVendedor": "GERALDINE VELAZCO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-11",
+    "excelRow": {
+      "fecha": "11/06",
+      "ordenAdh": "297",
+      "ordenAnexo": "27",
+      "nombreCliente": "YOLANDA NUÑEZ",
+      "nombreVendedor": "GERALDINE VELAZCO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2020_principal",
+    "leadId": "2020",
+    "nombreCliente": "Gomez Maria",
+    "numeroAnexo": "257",
+    "nombreVendedor": "BELEN ELIZABETH ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-11",
+    "fechaCierreNueva": "2026-06-11",
+    "excelRow": {
+      "fecha": "11/06",
+      "ordenAdh": "267",
+      "ordenAnexo": "257",
+      "nombreCliente": "GOMEZ MARIA",
+      "nombreVendedor": "BELEN ELIZABETH ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2038_principal",
+    "leadId": "2038",
+    "nombreCliente": "Fanny Bernal",
+    "numeroAnexo": "28",
+    "nombreVendedor": "GERALDINE VELAZCO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-11",
+    "excelRow": {
+      "fecha": "11/06",
+      "ordenAdh": "298",
+      "ordenAnexo": "28",
+      "nombreCliente": "BERNAL FANNY",
+      "nombreVendedor": "GERALDINE VELAZCO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2039_principal",
+    "leadId": "2039",
+    "nombreCliente": "Delia rojas",
+    "numeroAnexo": "29",
+    "nombreVendedor": "GERALDINE VELAZCO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-11",
+    "excelRow": {
+      "fecha": "11/06",
+      "ordenAdh": "299",
+      "ordenAnexo": "29",
+      "nombreCliente": "ROJAS DELIA",
+      "nombreVendedor": "GERALDINE VELAZCO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2040_principal",
+    "leadId": "2040",
+    "nombreCliente": "Erix Furno",
+    "numeroAnexo": "9",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-11",
+    "excelRow": {
+      "fecha": "11/06",
+      "ordenAdh": "289",
+      "ordenAnexo": "9",
+      "nombreCliente": "ERIX FURNO",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2041_principal",
+    "leadId": "2041",
+    "nombreCliente": "Andreina Gisela Silva",
+    "numeroAnexo": "1",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-02",
+    "excelRow": {
+      "fecha": "02/06",
+      "ordenAdh": "231",
+      "ordenAnexo": "1",
+      "nombreCliente": "SILVA ANDREINA GISELLE",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2042_principal",
+    "leadId": "2042",
+    "nombreCliente": "Víctor Martínez",
+    "numeroAnexo": "2",
+    "nombreVendedor": "GAMARRA EZEQUIEL",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-05",
+    "excelRow": {
+      "fecha": "05/06",
+      "ordenAdh": "281",
+      "ordenAnexo": "2",
+      "nombreCliente": "MARTINEZ VICTOR ANTONIO",
+      "nombreVendedor": "GAMARRA EZEQUIEL",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2093_principal",
+    "leadId": "2093",
+    "nombreCliente": "Dominga montiel",
+    "numeroAnexo": "241",
+    "nombreVendedor": "ADELA ALCARAZ",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "143",
+      "ordenAnexo": "241",
+      "nombreCliente": "MONTIEL DOMINGA",
+      "nombreVendedor": "ADELA ALCARAZ",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2099_principal",
+    "leadId": "2099",
+    "nombreCliente": "Nélida Noemí Benítez",
+    "numeroAnexo": "181",
+    "nombreVendedor": "NORMA MONZON",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "267",
+      "ordenAnexo": "181",
+      "nombreCliente": "NELIDA NOIEMI BENITEZ",
+      "nombreVendedor": "NORMA MONZON",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2123_principal",
+    "leadId": "2123",
+    "nombreCliente": "Matias Gabriel Heriberto Da Silva",
+    "numeroAnexo": "242",
+    "nombreVendedor": "ADELA ALCARAZ",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "144",
+      "ordenAnexo": "242",
+      "nombreCliente": "DA SILVA MATIAS",
+      "nombreVendedor": "ADELA ALCARAZ",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2149_principal",
+    "leadId": "2149",
+    "nombreCliente": "Mercedes  Isabel benitez",
+    "numeroAnexo": "243",
+    "nombreVendedor": "ADELA ALCARAZ",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "145",
+      "ordenAnexo": "243",
+      "nombreCliente": "BENITEZ MERCEDES",
+      "nombreVendedor": "ADELA ALCARAZ",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2161_principal",
+    "leadId": "2161",
+    "nombreCliente": "Leiva Fernando Sebastián",
+    "numeroAnexo": "231",
+    "nombreVendedor": "MARINA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "271",
+      "ordenAnexo": "231",
+      "nombreCliente": "LEIVA FERNANDO SEBASTIAN",
+      "nombreVendedor": "MARINA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2162_principal",
+    "leadId": "2162",
+    "nombreCliente": "Yasmin Denise Estigarribia",
+    "numeroAnexo": "232",
+    "nombreVendedor": "MARINA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "272",
+      "ordenAnexo": "232",
+      "nombreCliente": "ESTIGARRIBIA YASMIN",
+      "nombreVendedor": "MARINA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2166_principal",
+    "leadId": "2166",
+    "nombreCliente": "Ayala tatiana",
+    "numeroAnexo": "270",
+    "nombreVendedor": "ESTEFANIA GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-22",
+    "excelRow": {
+      "fecha": "22/06",
+      "ordenAdh": "283",
+      "ordenAnexo": "270",
+      "nombreCliente": "AYALA TATIANA MICAELA",
+      "nombreVendedor": "ESTEFANIA GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2399_principal",
+    "leadId": "2399",
+    "nombreCliente": "Marcela",
+    "numeroAnexo": "12",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-22",
+    "fechaCierreNueva": "2026-06-22",
+    "excelRow": {
+      "fecha": "22/06",
+      "ordenAdh": "292",
+      "ordenAnexo": "12",
+      "nombreCliente": "MOREL MARCELA ALEJANDRA",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2409_principal",
+    "leadId": "2409",
+    "nombreCliente": "Nuñez Natalia yamila",
+    "numeroAnexo": "333",
+    "nombreVendedor": "BELEN ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-15",
+    "excelRow": {
+      "fecha": "15/06",
+      "ordenAdh": "102",
+      "ordenAnexo": "333",
+      "nombreCliente": "ÑUNEZ YAMILA- FERNANDEZ JOSE",
+      "nombreVendedor": "BELEN ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2435_principal",
+    "leadId": "2435",
+    "nombreCliente": "Gisel Aquino",
+    "numeroAnexo": "292",
+    "nombreVendedor": "ROCDAN CRISTIAN",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-15",
+    "excelRow": {
+      "fecha": "15/06",
+      "ordenAdh": "61",
+      "ordenAnexo": "292",
+      "nombreCliente": "ELIANA GISEL  AQUINO",
+      "nombreVendedor": "ROCDAN CRISTIAN",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2534_principal",
+    "leadId": "2534",
+    "nombreCliente": "Torres Carlos",
+    "numeroAnexo": "334",
+    "nombreVendedor": "BELEN ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-18",
+    "fechaCierreNueva": "2026-06-16",
+    "excelRow": {
+      "fecha": "16/06",
+      "ordenAdh": "103",
+      "ordenAnexo": "334",
+      "nombreCliente": "CARLOS ANDRES TORRES",
+      "nombreVendedor": "BELEN ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2811_principal",
+    "leadId": "2811",
+    "nombreCliente": "Belen Albornoz",
+    "numeroAnexo": "201",
+    "nombreVendedor": "NAARA PONA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-19",
+    "excelRow": {
+      "fecha": "19/06",
+      "ordenAdh": "126",
+      "ordenAnexo": "201",
+      "nombreCliente": "ALBORNOZ BELEN",
+      "nombreVendedor": "NAARA PONA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2842_principal",
+    "leadId": "2842",
+    "nombreCliente": "Luciana Carolina Benitez",
+    "numeroAnexo": "172",
+    "nombreVendedor": "CATHERINE CONTRERAS",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-04",
+    "excelRow": {
+      "fecha": "04/06",
+      "ordenAdh": "24",
+      "ordenAnexo": "172",
+      "nombreCliente": "BENITEZ LUCIANA CAROLINA",
+      "nombreVendedor": "CATHERINE CONTRERAS",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2844_principal",
+    "leadId": "2844",
+    "nombreCliente": "Rebeca Solange Perez",
+    "numeroAnexo": "176",
+    "nombreVendedor": "CATHERINE CONTRERAS",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-16",
+    "excelRow": {
+      "fecha": "16/06",
+      "ordenAdh": "28",
+      "ordenAnexo": "176",
+      "nombreCliente": "PEREZ REBECA SOLANGE",
+      "nombreVendedor": "CATHERINE CONTRERAS",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2938_principal",
+    "leadId": "2938",
+    "nombreCliente": "Maria Aguirre",
+    "numeroAnexo": "30",
+    "nombreVendedor": "GERALDINE VELAZCO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-22",
+    "excelRow": {
+      "fecha": "22/06",
+      "ordenAdh": "300",
+      "ordenAnexo": "30",
+      "nombreCliente": "AGUIRRE MARIA",
+      "nombreVendedor": "GERALDINE VELAZCO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "2954_principal",
+    "leadId": "2954",
+    "nombreCliente": "Víctor orlando Benítez",
+    "numeroAnexo": "294",
+    "nombreVendedor": "ROCDAN CRISTIAN",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-22",
+    "excelRow": {
+      "fecha": "22/06",
+      "ordenAdh": "63",
+      "ordenAnexo": "294",
+      "nombreCliente": "VICTOR BENITEZ",
+      "nombreVendedor": "ROCDAN CRISTIAN",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "3130_principal",
+    "leadId": "3130",
+    "nombreCliente": "Colman erika",
+    "numeroAnexo": "296",
+    "nombreVendedor": "ROCDAN CRISTIAN",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-22",
+    "excelRow": {
+      "fecha": "22/06",
+      "ordenAdh": "65",
+      "ordenAnexo": "296",
+      "nombreCliente": "COLMAN ERIKA",
+      "nombreVendedor": "ROCDAN CRISTIAN",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "3131_principal",
+    "leadId": "3131",
+    "nombreCliente": "Palacios González",
+    "numeroAnexo": "297",
+    "nombreVendedor": "ROCDAN CRISTIAN",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-23",
+    "fechaCierreNueva": "2026-06-22",
+    "excelRow": {
+      "fecha": "22/06",
+      "ordenAdh": "66",
+      "ordenAnexo": "297",
+      "nombreCliente": "PALACIOS FLORENCIA",
+      "nombreVendedor": "ROCDAN CRISTIAN",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "3343_principal",
+    "leadId": "3343",
+    "nombreCliente": "CANTERO GISEL",
+    "numeroAnexo": "336",
+    "nombreVendedor": "BELEN ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-24",
+    "fechaCierreNueva": "2026-06-24",
+    "excelRow": {
+      "fecha": "24/06",
+      "ordenAdh": "105",
+      "ordenAnexo": "336",
+      "nombreCliente": "CANTERO GISELE",
+      "nombreVendedor": "BELEN ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "3359_principal",
+    "leadId": "3359",
+    "nombreCliente": "Ozorio Hernan",
+    "numeroAnexo": "31",
+    "nombreVendedor": "GERALDINE VELAZCO",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-24",
+    "excelRow": {
+      "fecha": "24/06",
+      "ordenAdh": "111",
+      "ordenAnexo": "31",
+      "nombreCliente": "HERNAL OZORIO",
+      "nombreVendedor": "GERALDINE VELAZCO",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "3377_principal",
+    "leadId": "3377",
+    "nombreCliente": "Leandro Bogarin",
+    "numeroAnexo": "13",
+    "nombreVendedor": "EZEQUIEL GAMARRA",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-24",
+    "excelRow": {
+      "fecha": "24/06",
+      "ordenAdh": "293",
+      "ordenAnexo": "13",
+      "nombreCliente": "BOGARIN LEANDRO",
+      "nombreVendedor": "EZEQUIEL GAMARRA",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "3820_principal",
+    "leadId": "3820",
+    "nombreCliente": "BARROS VIVIANA",
+    "numeroAnexo": "337",
+    "nombreVendedor": "BELEN ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-25",
+    "excelRow": {
+      "fecha": "25/06",
+      "ordenAdh": "106",
+      "ordenAnexo": "337",
+      "nombreCliente": "BARROS VIVIANA",
+      "nombreVendedor": "BELEN ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  },
+  {
+    "idUnico": "3823_principal",
+    "leadId": "3823",
+    "nombreCliente": "GONZALEZ KAREN",
+    "numeroAnexo": "338",
+    "nombreVendedor": "BELEN ALLENDRE",
+    "concepto": "ADHESION",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "fechaCierreCRMAnterior": "2026-06-26",
+    "fechaCierreNueva": "2026-06-25",
+    "excelRow": {
+      "fecha": "25/06",
+      "ordenAdh": "107",
+      "ordenAnexo": "338",
+      "nombreCliente": "GONZALEZ KAREN",
+      "nombreVendedor": "BELEN ALLENDRE",
+      "concepto": "ADHESION"
+    }
+  }
+]

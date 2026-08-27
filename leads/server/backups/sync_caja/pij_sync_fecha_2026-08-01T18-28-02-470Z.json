@@ -1,0 +1,28 @@
+{
+  "fechaEjecucion": "2026-08-01T18:28:02.472Z",
+  "operadorQueSincroniza": "SOSA  MARTINIANO",
+  "tipoAplicado": "fecha",
+  "totalRegistros": 1,
+  "cambios": [
+    {
+      "leadId": "6935",
+      "nombreCliente": "Facundo Soto",
+      "promotorNombreCRM": "Lucia N",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "A75/300 ANEXO 194",
+      "fechaCierreAnterior": "2026-08-01T17:44:52.384Z",
+      "fechaCierreNueva": "2026-07-28T17:44:52",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "28/07",
+        "serie": "A",
+        "ordenAdh": "75",
+        "ordenAnexo": "194",
+        "nombreCliente": "SOTO FACUNDO",
+        "nombreVendedor": "LUCILA",
+        "concepto": "ADHESION"
+      }
+    }
+  ]
+}

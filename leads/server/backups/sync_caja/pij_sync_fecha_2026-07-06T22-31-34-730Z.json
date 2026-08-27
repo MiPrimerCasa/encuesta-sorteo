@@ -1,0 +1,308 @@
+{
+  "fechaEjecucion": "2026-07-06T22:31:34.731Z",
+  "operadorQueSincroniza": "SOSA  MARTINIANO",
+  "tipoAplicado": "fecha",
+  "totalRegistros": 15,
+  "cambios": [
+    {
+      "leadId": "1452",
+      "nombreCliente": "Mercedes Liliana Coronel",
+      "promotorNombreCRM": "Fatima Farias",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "A7/300 ANEXO 167/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-30T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "30/06",
+        "serie": "A",
+        "ordenAdh": "7",
+        "ordenAnexo": "167",
+        "nombreCliente": "CORONEL MERCEDES LILIANA",
+        "nombreVendedor": "FARIAS FATIMA",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "1902",
+      "nombreCliente": "Araceli Guerrero",
+      "promotorNombreCRM": "Lucia N",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "A73/300 ANEXO 191/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-19T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "19/06",
+        "serie": "A",
+        "ordenAdh": "73",
+        "ordenAnexo": "191",
+        "nombreCliente": "ARACELI GUERRERO",
+        "nombreVendedor": "LUCILA",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "3707",
+      "nombreCliente": "Damian Ramirez",
+      "promotorNombreCRM": "Adela Alcaraz",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "B126/300 ANEXO 500/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-30T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "30/06",
+        "serie": "B",
+        "ordenAdh": "126",
+        "ordenAnexo": "500",
+        "nombreCliente": "RAMIREZ DAMIAN",
+        "nombreVendedor": "ADELA CARDOZO",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "3983",
+      "nombreCliente": "Cesar Ceferino Arias",
+      "promotorNombreCRM": "Carlos G",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "A34/300 ANEXO 285/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-29T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "29/06",
+        "serie": "A",
+        "ordenAdh": "34",
+        "ordenAnexo": "285",
+        "nombreCliente": "ARIAS CESAR",
+        "nombreVendedor": "GAMARRA CARLOS",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "4008",
+      "nombreCliente": "Mirta Contreras",
+      "promotorNombreCRM": "Carlos G",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "A31/300 ANEXO 282/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-28T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "28/06",
+        "serie": "A",
+        "ordenAdh": "31",
+        "ordenAnexo": "282",
+        "nombreCliente": "CONTRERAS MIRTA",
+        "nombreVendedor": "GAMARRA CARLOS",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "4016",
+      "nombreCliente": "Rodrigo Nicolas Acosta",
+      "promotorNombreCRM": "Carlos G",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "A33/300 ANEXO 284/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-28T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "28/06",
+        "serie": "A",
+        "ordenAdh": "33",
+        "ordenAnexo": "284",
+        "nombreCliente": "ACOSTA NICOLAS",
+        "nombreVendedor": "GAMARRA CARLOS",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "4151",
+      "nombreCliente": "Lujan Robles",
+      "promotorNombreCRM": "Carlos G",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "A32/300 ANEXO 283/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-28T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "28/06",
+        "serie": "A",
+        "ordenAdh": "32",
+        "ordenAnexo": "283",
+        "nombreCliente": "ROBLE LUJAN/RESQUIN HERNAN",
+        "nombreVendedor": "GAMARRA CARLOS",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "4189",
+      "nombreCliente": "Acosta Adelaida Beatriz",
+      "promotorNombreCRM": "Carlos G",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "A35/300 ANEXO 286/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-30T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "30/06",
+        "serie": "A",
+        "ordenAdh": "35",
+        "ordenAnexo": "286",
+        "nombreCliente": "ACOSTA ADELAIDA",
+        "nombreVendedor": "CARLOS GAMARRA",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "4197",
+      "nombreCliente": "Gregorio Emanuel Paredes",
+      "promotorNombreCRM": "Adela Alcaraz",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "B122/300 ANEXO 250/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-30T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "30/06",
+        "serie": "B",
+        "ordenAdh": "122",
+        "ordenAnexo": "250",
+        "nombreCliente": "GREGORIO EMANUEL PAREDES",
+        "nombreVendedor": "ADELA ALCARAZ",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "4200",
+      "nombreCliente": "Paredes Marilu",
+      "promotorNombreCRM": "Adela Alcaraz",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "B123/300 ANEXO 350/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-30T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "30/06",
+        "serie": "B",
+        "ordenAdh": "123",
+        "ordenAnexo": "350",
+        "nombreCliente": "PAREDES MARILU",
+        "nombreVendedor": "ADELA ALCARAZ",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "4489",
+      "nombreCliente": "BENÍTEZ LEANDRO ARIEL",
+      "promotorNombreCRM": "Adela Alcaraz",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "B125/300 ANEXO 352/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-30T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "30/06",
+        "serie": "B",
+        "ordenAdh": "125",
+        "ordenAnexo": "352",
+        "nombreCliente": "BENITEZ LEANDRO ARIEL",
+        "nombreVendedor": "ADELA ALCARAZ",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "4502",
+      "nombreCliente": "ALCARAZ JUANA",
+      "promotorNombreCRM": "Adela Alcaraz",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "B125/300 ANEXO 352/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-30T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "30/06",
+        "serie": "B",
+        "ordenAdh": "125",
+        "ordenAnexo": "352",
+        "nombreCliente": "BENITEZ LEANDRO ARIEL",
+        "nombreVendedor": "ADELA ALCARAZ",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "4512",
+      "nombreCliente": "ALCARAZ ANTONIA",
+      "promotorNombreCRM": "Adela Alcaraz",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "B121/300 ANEXO 249/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-29T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "29/06",
+        "serie": "B",
+        "ordenAdh": "121",
+        "ordenAnexo": "249",
+        "nombreCliente": "ALCARAZ RUIZ ANTONIA",
+        "nombreVendedor": "ADELA ALCARZ",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "4542",
+      "nombreCliente": "AYALA MELINA MARISOL",
+      "promotorNombreCRM": "Adela Alcaraz",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "B127/300 ANEXO 354/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-30T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "30/06",
+        "serie": "B",
+        "ordenAdh": "127",
+        "ordenAnexo": "354",
+        "nombreCliente": "AYALA MILENA MARISOL",
+        "nombreVendedor": "ADELA ALCARAZ",
+        "concepto": "ADHESION"
+      }
+    },
+    {
+      "leadId": "4547",
+      "nombreCliente": "ALFONZO ELBA",
+      "promotorNombreCRM": "Adela Alcaraz",
+      "isCompraAdicional": false,
+      "compraId": null,
+      "reciboActual": "B124/300 ANEXO 351/300",
+      "fechaCierreAnterior": "",
+      "fechaCierreNueva": "2026-06-30T12:00:00",
+      "tipoAplicado": "fecha",
+      "excelRow": {
+        "fecha": "30/06",
+        "serie": "B",
+        "ordenAdh": "124",
+        "ordenAnexo": "351",
+        "nombreCliente": "ALFONSO ELBA",
+        "nombreVendedor": "ADELA ALCARAZ",
+        "concepto": "ADHESION"
+      }
+    }
+  ]
+}

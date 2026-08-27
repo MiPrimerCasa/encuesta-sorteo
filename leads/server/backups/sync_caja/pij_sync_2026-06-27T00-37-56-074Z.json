@@ -1,0 +1,802 @@
+[
+  {
+    "idUnico": "233_principal",
+    "leadId": "233",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Federico Ceballos Bertero",
+    "numeroRecibo": "171",
+    "fechaActual": "2026-06-19",
+    "nuevaFecha": "2026-06-04",
+    "excelRow": {
+      "fecha": "04/06",
+      "ordenAdh": "23",
+      "ordenAnexo": "171",
+      "nombreCliente": "CEBALLOS BERTERO FEDERICO"
+    }
+  },
+  {
+    "idUnico": "1221_principal",
+    "leadId": "1221",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Rocio belen verdun",
+    "numeroRecibo": "3",
+    "fechaActual": "2026-06-10",
+    "nuevaFecha": "2026-06-05",
+    "excelRow": {
+      "fecha": "05/06",
+      "ordenAdh": "282",
+      "ordenAnexo": "3",
+      "nombreCliente": "VERDUN ROCIO BELEN"
+    }
+  },
+  {
+    "idUnico": "1268_principal",
+    "leadId": "1268",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Isaac Gamarra",
+    "numeroRecibo": "4",
+    "fechaActual": "2026-06-10",
+    "nuevaFecha": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "283",
+      "ordenAnexo": "4",
+      "nombreCliente": "GAMARRA CASTRO ISAC FELIPE"
+    }
+  },
+  {
+    "idUnico": "1281_principal",
+    "leadId": "1281",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Lidia Aguirre",
+    "numeroRecibo": "24",
+    "fechaActual": "2026-06-10",
+    "nuevaFecha": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "294",
+      "ordenAnexo": "24",
+      "nombreCliente": "AGUIRRE LIDIA ELIZABET"
+    }
+  },
+  {
+    "idUnico": "1286_principal",
+    "leadId": "1286",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Nancy Rodriguez",
+    "numeroRecibo": "43",
+    "fechaActual": "2026-06-17",
+    "nuevaFecha": "2026-06-17",
+    "excelRow": {
+      "fecha": "17/06",
+      "ordenAdh": "203",
+      "ordenAnexo": "43",
+      "nombreCliente": "NANCY RODRIGUEZ"
+    }
+  },
+  {
+    "idUnico": "1310_principal",
+    "leadId": "1310",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Dana Gómez",
+    "numeroRecibo": "11",
+    "fechaActual": "2026-06-17",
+    "nuevaFecha": "2026-06-17",
+    "excelRow": {
+      "fecha": "17/06",
+      "ordenAdh": "290",
+      "ordenAnexo": "11",
+      "nombreCliente": "DANA GOMEZ"
+    }
+  },
+  {
+    "idUnico": "1329_principal",
+    "leadId": "1329",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Axel rodrigo Brizuela",
+    "numeroRecibo": "20",
+    "fechaActual": "2026-06-10",
+    "nuevaFecha": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "284",
+      "ordenAnexo": "20",
+      "nombreCliente": "AXEL RODRIGO BRIZUELA"
+    }
+  },
+  {
+    "idUnico": "1351_principal",
+    "leadId": "1351",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "William Sibilla",
+    "numeroRecibo": "5",
+    "fechaActual": "2026-06-10",
+    "nuevaFecha": "2026-06-07",
+    "excelRow": {
+      "fecha": "07/06",
+      "ordenAdh": "285",
+      "ordenAnexo": "5",
+      "nombreCliente": "SIBILLA WILLIAM"
+    }
+  },
+  {
+    "idUnico": "1369_principal",
+    "leadId": "1369",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Matías Nahuel López",
+    "numeroRecibo": "6",
+    "fechaActual": "2026-06-10",
+    "nuevaFecha": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "286",
+      "ordenAnexo": "6",
+      "nombreCliente": "LOPEZ MATIAS NAHUEL"
+    }
+  },
+  {
+    "idUnico": "1504_principal",
+    "leadId": "1504",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Vicente Daniel mereles",
+    "numeroRecibo": "173",
+    "fechaActual": "2026-06-19",
+    "nuevaFecha": "2026-06-04",
+    "excelRow": {
+      "fecha": "04/06",
+      "ordenAdh": "25",
+      "ordenAnexo": "173",
+      "nombreCliente": "MERELES VICENTE DANIEL"
+    }
+  },
+  {
+    "idUnico": "1512_principal",
+    "leadId": "1512",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Santiago Daniel cabrera",
+    "numeroRecibo": "8",
+    "fechaActual": "2026-06-11",
+    "nuevaFecha": "2026-06-08",
+    "excelRow": {
+      "fecha": "08/06",
+      "ordenAdh": "287",
+      "ordenAnexo": "8",
+      "nombreCliente": "CABRERA SANTIAGO DANIEL"
+    }
+  },
+  {
+    "idUnico": "1576_principal",
+    "leadId": "1576",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Anahi Delgado",
+    "numeroRecibo": "162",
+    "fechaActual": "2026-06-25",
+    "nuevaFecha": "2026-06-23",
+    "excelRow": {
+      "fecha": "23/06",
+      "ordenAdh": "2",
+      "ordenAnexo": "162",
+      "nombreCliente": "DELGADO ANAHI AILEN"
+    }
+  },
+  {
+    "idUnico": "1629_principal",
+    "leadId": "1629",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Britez juan",
+    "numeroRecibo": "202",
+    "fechaActual": "2026-06-08",
+    "nuevaFecha": "2026-06-08",
+    "excelRow": {
+      "fecha": "08/06",
+      "ordenAdh": "202",
+      "ordenAnexo": "41",
+      "nombreCliente": "BRITEZ JUAN ALBERTO"
+    }
+  },
+  {
+    "idUnico": "1636_principal",
+    "leadId": "1636",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Ortiz silvina noemi",
+    "numeroRecibo": "55",
+    "fechaActual": "2026-06-19",
+    "nuevaFecha": "2026-06-02",
+    "excelRow": {
+      "fecha": "02/06",
+      "ordenAdh": "55",
+      "ordenAnexo": "-",
+      "nombreCliente": "ORTIZ SILVANA NOEMI/RAMIREZ JORGE"
+    }
+  },
+  {
+    "idUnico": "1675_principal",
+    "leadId": "1675",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Pedro noguera",
+    "numeroRecibo": "22",
+    "fechaActual": "2026-06-10",
+    "nuevaFecha": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "292",
+      "ordenAnexo": "22",
+      "nombreCliente": "PEDRO ANTONIO NOGUERA"
+    }
+  },
+  {
+    "idUnico": "1724_principal",
+    "leadId": "1724",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "RAMIREZ GABRIELA MARISEL",
+    "numeroRecibo": "268",
+    "fechaActual": "2026-06-11",
+    "nuevaFecha": "2026-06-10",
+    "excelRow": {
+      "fecha": "10/06",
+      "ordenAdh": "281",
+      "ordenAnexo": "268",
+      "nombreCliente": "RAMIREZ GABRIELA MARISEL"
+    }
+  },
+  {
+    "idUnico": "1732_principal",
+    "leadId": "1732",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Sergio Figueredo",
+    "numeroRecibo": "335",
+    "fechaActual": "2026-06-16",
+    "nuevaFecha": "2026-06-16",
+    "excelRow": {
+      "fecha": "16/06",
+      "ordenAdh": "104",
+      "ordenAnexo": "335",
+      "nombreCliente": "FIGUEREDO SERGIO"
+    }
+  },
+  {
+    "idUnico": "1754_principal",
+    "leadId": "1754",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Diego Benítez",
+    "numeroRecibo": "7",
+    "fechaActual": "2026-06-11",
+    "nuevaFecha": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "288",
+      "ordenAnexo": "7",
+      "nombreCliente": "DIEGO ORLANDO BENITEZ"
+    }
+  },
+  {
+    "idUnico": "1775_principal",
+    "leadId": "1775",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Karina Cáceres",
+    "numeroRecibo": "161",
+    "fechaActual": "2026-06-10",
+    "nuevaFecha": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "1",
+      "ordenAnexo": "161",
+      "nombreCliente": "CACERES KARINA MARICEL"
+    }
+  },
+  {
+    "idUnico": "1859_principal",
+    "leadId": "1859",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Juan Leonardo martinez",
+    "numeroRecibo": "293",
+    "fechaActual": "2026-06-16",
+    "nuevaFecha": "2026-06-15",
+    "excelRow": {
+      "fecha": "15/06",
+      "ordenAdh": "62",
+      "ordenAnexo": "293",
+      "nombreCliente": "JUAN  LEONARDO MARTINEZ"
+    }
+  },
+  {
+    "idUnico": "1885_principal",
+    "leadId": "1885",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Fatima Fanny Farias",
+    "numeroRecibo": "42",
+    "fechaActual": "2026-06-12",
+    "nuevaFecha": "2026-06-05",
+    "excelRow": {
+      "fecha": "05/06",
+      "ordenAdh": "201",
+      "ordenAnexo": "42",
+      "nombreCliente": "FARIAS FATIMA FANNY"
+    }
+  },
+  {
+    "idUnico": "1898_principal",
+    "leadId": "1898",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Mayra Vallejos",
+    "numeroRecibo": "10",
+    "fechaActual": "2026-06-12",
+    "nuevaFecha": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "291",
+      "ordenAnexo": "10",
+      "nombreCliente": "VALLEJOS MAIRA"
+    }
+  },
+  {
+    "idUnico": "1937_principal",
+    "leadId": "1937",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Víctor Joaquin Nuñez",
+    "numeroRecibo": "26",
+    "fechaActual": "2026-06-11",
+    "nuevaFecha": "2026-06-11",
+    "excelRow": {
+      "fecha": "11/06",
+      "ordenAdh": "296",
+      "ordenAnexo": "26",
+      "nombreCliente": "JOAQUIN ÑUNEZ"
+    }
+  },
+  {
+    "idUnico": "1939_principal",
+    "leadId": "1939",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Zamira P",
+    "numeroRecibo": "25",
+    "fechaActual": "2026-06-10",
+    "nuevaFecha": "2026-06-07",
+    "excelRow": {
+      "fecha": "07/06",
+      "ordenAdh": "295",
+      "ordenAnexo": "25",
+      "nombreCliente": "PAREDES ZAMIRA"
+    }
+  },
+  {
+    "idUnico": "1941_principal",
+    "leadId": "1941",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Matías Aguirre",
+    "numeroRecibo": "23",
+    "fechaActual": "2026-06-10",
+    "nuevaFecha": "2026-06-05",
+    "excelRow": {
+      "fecha": "05/06",
+      "ordenAdh": "293",
+      "ordenAnexo": "23",
+      "nombreCliente": "AGUIRRE MATIAS ALEJANDRO"
+    }
+  },
+  {
+    "idUnico": "1942_principal",
+    "leadId": "1942",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "María Luz Navarro",
+    "numeroRecibo": "21",
+    "fechaActual": "2026-06-10",
+    "nuevaFecha": "2026-06-03",
+    "excelRow": {
+      "fecha": "03/06",
+      "ordenAdh": "291",
+      "ordenAnexo": "21",
+      "nombreCliente": "NAVARRO MARIA LUZ ERCILIA"
+    }
+  },
+  {
+    "idUnico": "1945_principal",
+    "leadId": "1945",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Yolanda Nuñez",
+    "numeroRecibo": "27",
+    "fechaActual": "2026-06-11",
+    "nuevaFecha": "2026-06-11",
+    "excelRow": {
+      "fecha": "11/06",
+      "ordenAdh": "297",
+      "ordenAnexo": "27",
+      "nombreCliente": "YOLANDA NUÑEZ"
+    }
+  },
+  {
+    "idUnico": "2038_principal",
+    "leadId": "2038",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Fanny Bernal",
+    "numeroRecibo": "298",
+    "fechaActual": "2026-06-11",
+    "nuevaFecha": "2026-06-11",
+    "excelRow": {
+      "fecha": "11/06",
+      "ordenAdh": "298",
+      "ordenAnexo": "28",
+      "nombreCliente": "BERNAL FANNY"
+    }
+  },
+  {
+    "idUnico": "2039_principal",
+    "leadId": "2039",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Delia rojas",
+    "numeroRecibo": "299",
+    "fechaActual": "2026-06-11",
+    "nuevaFecha": "2026-06-11",
+    "excelRow": {
+      "fecha": "11/06",
+      "ordenAdh": "299",
+      "ordenAnexo": "29",
+      "nombreCliente": "ROJAS DELIA"
+    }
+  },
+  {
+    "idUnico": "2040_principal",
+    "leadId": "2040",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Erix Furno",
+    "numeroRecibo": "9",
+    "fechaActual": "2026-06-11",
+    "nuevaFecha": "2026-06-11",
+    "excelRow": {
+      "fecha": "11/06",
+      "ordenAdh": "289",
+      "ordenAnexo": "9",
+      "nombreCliente": "ERIX FURNO"
+    }
+  },
+  {
+    "idUnico": "2041_principal",
+    "leadId": "2041",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Andreina Gisela Silva",
+    "numeroRecibo": "1",
+    "fechaActual": "2026-06-11",
+    "nuevaFecha": "2026-06-02",
+    "excelRow": {
+      "fecha": "02/06",
+      "ordenAdh": "231",
+      "ordenAnexo": "1",
+      "nombreCliente": "SILVA ANDREINA GISELLE"
+    }
+  },
+  {
+    "idUnico": "2042_principal",
+    "leadId": "2042",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Víctor Martínez",
+    "numeroRecibo": "2",
+    "fechaActual": "2026-06-11",
+    "nuevaFecha": "2026-06-05",
+    "excelRow": {
+      "fecha": "05/06",
+      "ordenAdh": "281",
+      "ordenAnexo": "2",
+      "nombreCliente": "MARTINEZ VICTOR ANTONIO"
+    }
+  },
+  {
+    "idUnico": "2093_principal",
+    "leadId": "2093",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Dominga montiel",
+    "numeroRecibo": "241",
+    "fechaActual": "2026-06-12",
+    "nuevaFecha": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "143",
+      "ordenAnexo": "241",
+      "nombreCliente": "MONTIEL DOMINGA"
+    }
+  },
+  {
+    "idUnico": "2099_principal",
+    "leadId": "2099",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Nélida Noemí Benítez",
+    "numeroRecibo": "181",
+    "fechaActual": "2026-06-12",
+    "nuevaFecha": "2026-06-06",
+    "excelRow": {
+      "fecha": "06/06",
+      "ordenAdh": "267",
+      "ordenAnexo": "181",
+      "nombreCliente": "NELIDA NOIEMI BENITEZ"
+    }
+  },
+  {
+    "idUnico": "2123_principal",
+    "leadId": "2123",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Matias Gabriel Heriberto Da Silva",
+    "numeroRecibo": "242",
+    "fechaActual": "2026-06-12",
+    "nuevaFecha": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "144",
+      "ordenAnexo": "242",
+      "nombreCliente": "DA SILVA MATIAS"
+    }
+  },
+  {
+    "idUnico": "2149_principal",
+    "leadId": "2149",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Mercedes  Isabel benitez",
+    "numeroRecibo": "243",
+    "fechaActual": "2026-06-12",
+    "nuevaFecha": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "145",
+      "ordenAnexo": "243",
+      "nombreCliente": "BENITEZ MERCEDES"
+    }
+  },
+  {
+    "idUnico": "2161_principal",
+    "leadId": "2161",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Leiva Fernando Sebastián",
+    "numeroRecibo": "231",
+    "fechaActual": "2026-06-12",
+    "nuevaFecha": "2026-06-09",
+    "excelRow": {
+      "fecha": "09/06",
+      "ordenAdh": "271",
+      "ordenAnexo": "231",
+      "nombreCliente": "LEIVA FERNANDO SEBASTIAN"
+    }
+  },
+  {
+    "idUnico": "2162_principal",
+    "leadId": "2162",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Yasmin Denise Estigarribia",
+    "numeroRecibo": "232",
+    "fechaActual": "2026-06-12",
+    "nuevaFecha": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "272",
+      "ordenAnexo": "232",
+      "nombreCliente": "ESTIGARRIBIA YASMIN"
+    }
+  },
+  {
+    "idUnico": "2166_principal",
+    "leadId": "2166",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Ayala tatiana",
+    "numeroRecibo": "270",
+    "fechaActual": "2026-06-22",
+    "nuevaFecha": "2026-06-22",
+    "excelRow": {
+      "fecha": "22/06",
+      "ordenAdh": "283",
+      "ordenAnexo": "270",
+      "nombreCliente": "AYALA TATIANA MICAELA"
+    }
+  },
+  {
+    "idUnico": "2168_principal",
+    "leadId": "2168",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Fabian Vargas",
+    "numeroRecibo": "233",
+    "fechaActual": "2026-06-12",
+    "nuevaFecha": "2026-06-12",
+    "excelRow": {
+      "fecha": "12/06",
+      "ordenAdh": "273",
+      "ordenAnexo": "233",
+      "nombreCliente": "FABIAN EDUARDO VARGAS"
+    }
+  },
+  {
+    "idUnico": "2409_principal",
+    "leadId": "2409",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Nuñez Natalia yamila",
+    "numeroRecibo": "333",
+    "fechaActual": "2026-06-18",
+    "nuevaFecha": "2026-06-15",
+    "excelRow": {
+      "fecha": "15/06",
+      "ordenAdh": "102",
+      "ordenAnexo": "333",
+      "nombreCliente": "ÑUNEZ YAMILA- FERNANDEZ JOSE"
+    }
+  },
+  {
+    "idUnico": "2435_principal",
+    "leadId": "2435",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Gisel Aquino",
+    "numeroRecibo": "292",
+    "fechaActual": "2026-06-16",
+    "nuevaFecha": "2026-06-15",
+    "excelRow": {
+      "fecha": "15/06",
+      "ordenAdh": "61",
+      "ordenAnexo": "292",
+      "nombreCliente": "ELIANA GISEL  AQUINO"
+    }
+  },
+  {
+    "idUnico": "2811_principal",
+    "leadId": "2811",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Belen Albornoz",
+    "numeroRecibo": "201",
+    "fechaActual": "2026-06-24",
+    "nuevaFecha": "2026-06-19",
+    "excelRow": {
+      "fecha": "19/06",
+      "ordenAdh": "126",
+      "ordenAnexo": "201",
+      "nombreCliente": "ALBORNOZ BELEN"
+    }
+  },
+  {
+    "idUnico": "2842_principal",
+    "leadId": "2842",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Luciana Carolina Benitez",
+    "numeroRecibo": "172",
+    "fechaActual": "2026-06-19",
+    "nuevaFecha": "2026-06-04",
+    "excelRow": {
+      "fecha": "04/06",
+      "ordenAdh": "24",
+      "ordenAnexo": "172",
+      "nombreCliente": "BENITEZ LUCIANA CAROLINA"
+    }
+  },
+  {
+    "idUnico": "2844_principal",
+    "leadId": "2844",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Rebeca Solange Perez",
+    "numeroRecibo": "176",
+    "fechaActual": "2026-06-19",
+    "nuevaFecha": "2026-06-16",
+    "excelRow": {
+      "fecha": "16/06",
+      "ordenAdh": "28",
+      "ordenAnexo": "176",
+      "nombreCliente": "PEREZ REBECA SOLANGE"
+    }
+  },
+  {
+    "idUnico": "2938_principal",
+    "leadId": "2938",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Maria Aguirre",
+    "numeroRecibo": "30",
+    "fechaActual": "2026-06-23",
+    "nuevaFecha": "2026-06-22",
+    "excelRow": {
+      "fecha": "22/06",
+      "ordenAdh": "300",
+      "ordenAnexo": "30",
+      "nombreCliente": "AGUIRRE MARIA"
+    }
+  },
+  {
+    "idUnico": "2954_principal",
+    "leadId": "2954",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Víctor orlando Benítez",
+    "numeroRecibo": "294",
+    "fechaActual": "2026-06-23",
+    "nuevaFecha": "2026-06-22",
+    "excelRow": {
+      "fecha": "22/06",
+      "ordenAdh": "63",
+      "ordenAnexo": "294",
+      "nombreCliente": "VICTOR BENITEZ"
+    }
+  },
+  {
+    "idUnico": "3130_principal",
+    "leadId": "3130",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Colman erika",
+    "numeroRecibo": "296",
+    "fechaActual": "2026-06-23",
+    "nuevaFecha": "2026-06-22",
+    "excelRow": {
+      "fecha": "22/06",
+      "ordenAdh": "65",
+      "ordenAnexo": "296",
+      "nombreCliente": "COLMAN ERIKA"
+    }
+  },
+  {
+    "idUnico": "3359_principal",
+    "leadId": "3359",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Ozorio Hernan",
+    "numeroRecibo": "31",
+    "fechaActual": "2026-06-24",
+    "nuevaFecha": "2026-06-24",
+    "excelRow": {
+      "fecha": "24/06",
+      "ordenAdh": "111",
+      "ordenAnexo": "31",
+      "nombreCliente": "HERNAL OZORIO"
+    }
+  },
+  {
+    "idUnico": "3377_principal",
+    "leadId": "3377",
+    "isCompraAdicional": false,
+    "compraId": null,
+    "nombreCliente": "Leandro Bogarin",
+    "numeroRecibo": "13",
+    "fechaActual": "2026-06-24",
+    "nuevaFecha": "2026-06-24",
+    "excelRow": {
+      "fecha": "24/06",
+      "ordenAdh": "293",
+      "ordenAnexo": "13",
+      "nombreCliente": "BOGARIN LEANDRO"
+    }
+  }
+]

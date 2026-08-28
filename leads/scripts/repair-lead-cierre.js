@@ -40,6 +40,15 @@ function usage() {
   process.exit(1);
 }
 
+function esOperadorCajaSeguimiento(seg) {
+  const opId = seg?.operadorId;
+  if (opId === 0 || opId === '0') return true;
+  if (opId == null || String(opId).trim() === '') {
+    return /^caja\s*\d/i.test(String(seg?.operadorNombre ?? ''));
+  }
+  return /^caja\s*\d/i.test(String(seg?.operadorNombre ?? ''));
+}
+
 function numeroReciboCoincide(lead, q) {
   const seg = lead?.seguimiento ?? {};
   const qUp = String(q).trim().toUpperCase();
@@ -130,10 +139,14 @@ async function main() {
     `  Último compro en historial: ${comproHist ? `recibo=${comproHist.numeroRecibo ?? '-'}  producto=${comproHist.idProducto ?? '-'}` : '(no encontrado)'}`,
   );
 
-  if (actual.resultadoEntrevista === 'compro') {
-    console.log('\nEl lead ya está en cierre. No hace falta reparar.');
+  if (actual.resultadoEntrevista === 'compro' && !esOperadorCajaSeguimiento(actual)) {
+    console.log('\nEl lead ya está en cierre con operador vendedor. No hace falta reparar.');
     await closeSqlPool();
     return;
+  }
+
+  if (actual.resultadoEntrevista === 'compro' && esOperadorCajaSeguimiento(actual)) {
+    console.log('\nCierre presente pero operador es Caja; se restaurará el vendedor del historial.');
   }
 
   if (!comproHist) {
@@ -181,7 +194,9 @@ async function main() {
   }
 
   const post = (await getLatestSeguimientoSql(leadId, null)) || {};
-  console.log(`  Post-reparación: resultado=${post.resultadoEntrevista ?? '(vacío)'}`);
+  console.log(
+    `  Post-reparación: resultado=${post.resultadoEntrevista ?? '(vacío)'}  operador=${post.operadorNombre ?? '?'} (id ${post.operadorId ?? '?'})`,
+  );
 
   await closeSqlPool();
 }

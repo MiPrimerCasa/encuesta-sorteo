@@ -211,6 +211,16 @@ export function preservarCamposCierreEnMerge(base, overlay) {
     if (key === 'resultadoEntrevista') continue;
     if (overlay?.[key] == null && base[key] != null) out[key] = base[key];
   }
+  const opOverlay = overlay?.operadorId;
+  const esOperadorCaja =
+    opOverlay === 0 ||
+    opOverlay === '0' ||
+    /caja\s*\d/i.test(String(overlay?.operadorNombre ?? ''));
+  if (esOperadorCaja && base.operadorId != null && String(base.operadorId) !== '0') {
+    out.operadorId = base.operadorId;
+    out.operadorRol = base.operadorRol ?? out.operadorRol;
+    out.operadorNombre = base.operadorNombre ?? out.operadorNombre;
+  }
   return out;
 }
 

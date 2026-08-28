@@ -1018,6 +1018,13 @@ async function mapRowToSeguimientoConHijos(row) {
  * Último seguimiento con cierre (compro) en historial admin reciente.
  * Útil para reparar leads cuyo último registro perdió el estado de cierre.
  */
+function esOperadorCajaEnFilaHistorial(row) {
+  const opId = row.operador_id ?? row.operadorId;
+  if (opId === 0 || opId === '0') return true;
+  const nombre = String(row.operador_nombre ?? row.operadorNombre ?? '').trim();
+  return /^caja\s*\d/i.test(nombre);
+}
+
 export async function buscarUltimoSeguimientoComproEnHistorial(leadId, { dias = 60 } = {}) {
   if (!useSeguimientoSql()) return null;
   const desde = new Date(Date.now() - Math.max(dias, 1) * 86400000);
@@ -1029,6 +1036,7 @@ export async function buscarUltimoSeguimientoComproEnHistorial(leadId, { dias = 
     if (String(row.lead_id ?? row.leadId) !== leadIdStr) continue;
     const resultado = row.resultado_entrevista ?? row.resultadoEntrevista;
     if (resultado !== 'compro') continue;
+    if (esOperadorCajaEnFilaHistorial(row)) continue;
     const rid = Number(row.id ?? row.idRegistrarSeguimientoLead ?? 0);
     if (rid >= bestId) {
       bestId = rid;

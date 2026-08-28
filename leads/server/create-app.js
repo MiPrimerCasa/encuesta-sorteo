@@ -1545,7 +1545,7 @@ function registerApiRoutes(api) {
         const { validarNumerosEnStockCaja, paramsStockPijDesdeUsuario } = await import(
           './services/caja-stock-asignaciones.js'
         );
-        const stockParams = paramsStockPijDesdeUsuario(usuario, lead);
+        const stockParams = paramsStockPijDesdeUsuario(usuario);
         const parsed = parsePijRecibo(data.numeroRecibo);
         if (serieUsaStockCaja(parsed.serie)) {
           await validarNumerosEnStockCaja({

@@ -451,8 +451,8 @@ export function leadSoloLecturaUltimoModificador(
   userRole?: string | null,
   historial: SeguimientoHistorialEntry[] = [],
 ): boolean {
-  if (!lead?.seguimiento?.operadorId) {
-    // Si no tiene operadorId de seguimiento previo, cualquiera puede gestionarlo.
+  if (!lead?.seguimiento?.operadorId || String(lead.seguimiento.operadorId) === '0') {
+    // Sin operador previo, o corrección sistema caja (id 0): no bloquear al vendedor.
     return false;
   }
   const esSupervisor =

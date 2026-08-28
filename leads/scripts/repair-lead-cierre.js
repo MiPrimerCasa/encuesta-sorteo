@@ -14,6 +14,7 @@ import { listAllLeadsFromEncuestas } from '../server/db/encuestas.js';
 import { closeSqlPool, isSqlServerConfigured } from '../server/db/mssql.js';
 import {
   buscarUltimoSeguimientoComproEnHistorial,
+  fetchHistorialAdminDesde,
   getLatestSeguimientoSql,
   persistirSeguimientoLead,
   useSeguimientoSql,
@@ -30,16 +31,72 @@ const nombreArg = args
   .join('=')
   ?.trim();
 
+const reciboArg = args.find((a) => a.startsWith('--recibo='))?.split('=')[1]?.trim();
+
 function usage() {
-  console.log(`Uso: node --env-file=src/.env scripts/repair-lead-cierre.js (--lead-id=ID | --nombre="APELLIDO") [--apply]`);
+  console.log(
+    'Uso: node --env-file=src/.env scripts/repair-lead-cierre.js (--lead-id=ID | --nombre="APELLIDO" | --recibo=A200) [--apply]',
+  );
   process.exit(1);
+}
+
+function numeroReciboCoincide(lead, q) {
+  const seg = lead?.seguimiento ?? {};
+  const qUp = String(q).trim().toUpperCase();
+  const principal = String(seg.numeroRecibo ?? '').toUpperCase();
+  if (principal.includes(qUp)) return true;
+  const extras = Array.isArray(seg.comprasAdicionales) ? seg.comprasAdicionales : [];
+  return extras.some((c) => String(c?.numeroRecibo ?? '').toUpperCase().includes(qUp));
+}
+
+async function buscarLeadIdPorReciboEnHistorial(reciboQuery) {
+  const q = String(reciboQuery).trim().toUpperCase();
+  const desde = new Date(Date.now() - 90 * 86400000);
+  const rows = await fetchHistorialAdminDesde(desde);
+  let bestLeadId = null;
+  let bestId = 0;
+  for (const row of rows) {
+    if (row.resultado_entrevista !== 'compro' && row.resultadoEntrevista !== 'compro') continue;
+    const recibo = String(row.numero_recibo ?? row.numeroRecibo ?? '').toUpperCase();
+    if (!recibo.includes(q)) continue;
+    const rid = Number(row.id ?? row.idRegistrarSeguimientoLead ?? 0);
+    const leadId = String(row.lead_id ?? row.leadId ?? '');
+    if (leadId && rid >= bestId) {
+      bestId = rid;
+      bestLeadId = leadId;
+    }
+  }
+  return bestLeadId;
 }
 
 async function resolverLeadId() {
   if (leadIdArg) return leadIdArg;
-  if (!nombreArg) usage();
 
   const leads = await listAllLeadsFromEncuestas();
+
+  if (reciboArg) {
+    const q = reciboArg.toUpperCase();
+    const matches = leads.filter((l) => numeroReciboCoincide(l, q));
+    if (!matches.length) {
+      const fromHist = await buscarLeadIdPorReciboEnHistorial(reciboArg);
+      if (fromHist) return fromHist;
+      console.error(`No se encontró lead con recibo/adhesión que contenga: ${reciboArg}`);
+      process.exit(1);
+    }
+    if (matches.length > 1) {
+      console.log('Varios leads coinciden por recibo:');
+      for (const m of matches.slice(0, 10)) {
+        console.log(
+          `  id=${m.id}  ${m.nombre}  recibo=${m.seguimiento?.numeroRecibo ?? '-'}`,
+        );
+      }
+      console.error('Especificá --lead-id= con el id correcto.');
+      process.exit(1);
+    }
+    return String(matches[0].id);
+  }
+
+  if (!nombreArg) usage();
   const q = nombreArg.toUpperCase();
   const matches = leads.filter((l) => String(l.nombre || '').toUpperCase().includes(q));
   if (!matches.length) {
@@ -90,6 +147,9 @@ async function main() {
   console.log(
     `  compro · ${patch.idProducto ?? '?'} · ${patch.formaPago ?? '?'} · recibo ${patch.numeroRecibo ?? '?'}`,
   );
+  console.log(
+    `  operador: ${patch.operadorNombre ?? comproHist.operadorNombre ?? '?'} (id ${patch.operadorId ?? comproHist.operadorId ?? '?'})`,
+  );
 
   if (!APPLY) {
     console.log('\nDry-run. Agregá --apply para registrar el seguimiento reparado.');
@@ -100,10 +160,17 @@ async function main() {
   const leads = await listAllLeadsFromEncuestas();
   const lead = leads.find((l) => String(l.id) === leadId) || { id: leadId };
 
+  const operadorId = patch.operadorId ?? comproHist.operadorId;
+  const usuarioRepair = {
+    id: operadorId != null && String(operadorId) !== '0' ? String(operadorId) : undefined,
+    rol: patch.operadorRol ?? comproHist.operadorRol ?? 'supervisor',
+    nombre: patch.operadorNombre ?? comproHist.operadorNombre ?? 'Operador',
+  };
+
   const res = await persistirSeguimientoLead(
     leadId,
     patch,
-    { id: '0', rol: 'superadmin', nombre: 'Reparación cierre (script)' },
+    usuarioRepair,
     { ...lead, seguimiento: actual },
   );
 

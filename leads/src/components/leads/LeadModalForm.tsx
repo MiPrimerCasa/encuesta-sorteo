@@ -64,7 +64,7 @@ import { etiquetaCajaEstadoUi, variantCajaEstado, detalleCajaEstado } from '../.
 import { StatusPill } from '../ui/StatusPill';
 import { MedioPagoPijFields } from './MedioPagoPijFields';
 import { ImagenesCierrePijFields } from './ImagenesCierrePijFields';
-import { resumenFotosCierrePij } from '../../domain/imagenes-cierre-pij';
+import { BadgesFotosCierrePij } from './BadgesFotosCierrePij';
 import type {
   Barrio,
   CanalContacto,
@@ -2164,9 +2164,7 @@ export function LeadModalForm({
                               ? 'border-rose-200 bg-rose-50 text-rose-950'
                               : lead.seguimiento.cajaEstado === 'verificado'
                                 ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                                : lead.seguimiento.cajaEstado === 'pendiente'
-                                  ? 'border-sky-200 bg-sky-50 text-sky-950'
-                                  : 'border-zinc-200 bg-zinc-50 text-zinc-800'
+                                : 'border-sky-200 bg-sky-50 text-sky-950'
                           }`}
                         >
                           <div className="flex flex-wrap items-center gap-2">
@@ -2184,10 +2182,8 @@ export function LeadModalForm({
                           )}
                           {!lead.seguimiento.cajaEstado && (
                             <p className="mt-1 text-[12px] opacity-80">
-                              El cierre aún no se publicó a la cola de caja (MySQL VPS o ingest
-                              local). En este entorno local hace falta{' '}
-                              <code className="text-[11px]">CAJA_MYSQL_ENABLED=true</code> o
-                              Electron en :3847.
+                              El cierre quedó registrado. Cuando se publique a caja aparecerá como
+                              pendiente de verificación en sucursal.
                             </p>
                           )}
                           {lead.seguimiento.cajaEstado === 'pendiente' && (
@@ -2195,25 +2191,15 @@ export function LeadModalForm({
                               Esperando validación y cobro en la caja de sucursal.
                             </p>
                           )}
-                          {(() => {
-                            const fotos = resumenFotosCierrePij(
-                              'principal',
-                              lead.seguimiento.formaPago ?? form.formaPago,
-                              lead.seguimiento.imagenesCierre ?? form.imagenesCierre,
-                            );
-                            return (
-                              <p className="mt-1.5 text-[12px]">
-                                <span className="font-semibold">Fotos para caja:</span>{' '}
-                                {fotos.completo ? (
-                                  <span className="text-emerald-700">completas</span>
-                                ) : (
-                                  <span className="text-rose-700">
-                                    faltan: {fotos.etiquetasFaltantes.join(' · ')}
-                                  </span>
-                                )}
-                              </p>
-                            );
-                          })()}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[12px]">
+                            <span className="font-semibold">Fotos:</span>
+                            <BadgesFotosCierrePij
+                              formaPago={lead.seguimiento.formaPago ?? form.formaPago}
+                              imagenes={
+                                lead.seguimiento.imagenesCierre ?? form.imagenesCierre
+                              }
+                            />
+                          </div>
                           {lead.seguimiento.idVentaIntegral != null &&
                             lead.seguimiento.cajaEstado === 'verificado' && (
                               <p className="mt-1 text-[12px]">

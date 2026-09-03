@@ -25,7 +25,7 @@ import {
 import { prioridadTabInicial } from '../../domain/prioridad-leads';
 import { etiquetaCortaNumeroDocumentoVenta, etiquetaMedioPagoPij, etiquetaPagoProducto, esPlanInversion } from '../../domain/venta';
 import { etiquetaCajaEstadoUi, variantCajaEstado } from '../../domain/caja-estado';
-import { resumenFotosCierrePij } from '../../domain/imagenes-cierre-pij';
+import { BadgesFotosCierrePij } from './BadgesFotosCierrePij';
 import { etiquetaCampania } from '../../domain/campania';
 import { FUENTE_LABEL } from '../../domain/fuenteLabels';
 import type { Barrio, Lead, Producto, Promotor, RolUsuario, SeguimientoHistorialEntry } from '../../types';
@@ -170,13 +170,6 @@ export function LeadCard({
     lead.seguimiento?.montoEfectivo,
     lead.seguimiento?.montoTransferencia,
   );
-  const fotosCierre = esCierrePij
-    ? resumenFotosCierrePij(
-        'principal',
-        lead.seguimiento?.formaPago,
-        lead.seguimiento?.imagenesCierre,
-      )
-    : null;
   const teniaCitaProgramada = esCierrePij && leadTieneCitaPrevia(lead);
   const horarioCita = teniaCitaProgramada ? getHorarioEntrevistaLead(lead) : null;
   const soloLecturaPromotor =
@@ -482,19 +475,13 @@ export function LeadCard({
                 <span className="font-semibold">Medio de pago:</span> sin indicar
               </p>
             )}
-            {fotosCierre && (
-              <p>
-                <span className="font-semibold text-zinc-800">Fotos para caja:</span>{' '}
-                {fotosCierre.completo ? (
-                  <span className="font-medium text-emerald-700">completas</span>
-                ) : (
-                  <span className="text-rose-700">
-                    faltan {fotosCierre.faltantes.length}:{' '}
-                    {fotosCierre.etiquetasFaltantes.join(' · ')}
-                  </span>
-                )}
-              </p>
-            )}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="font-semibold text-zinc-800">Fotos:</span>
+              <BadgesFotosCierrePij
+                formaPago={lead.seguimiento?.formaPago}
+                imagenes={lead.seguimiento?.imagenesCierre}
+              />
+            </div>
           </div>
         )}
 

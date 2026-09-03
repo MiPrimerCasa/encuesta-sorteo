@@ -268,8 +268,9 @@ export function ImagenesCierrePijFields({
         Documentación del cierre
       </p>
       <p className="text-[12px] text-zinc-600">
-        Obligatorias: DNI frente, DNI reverso, consentimiento/solicitud y foto de anexo. Con
-        transferencia o mixto, también el comprobante de transferencia.
+        Podés guardar el cierre aunque falten fotos. Recomendadas: DNI frente/reverso,
+        solicitud de adhesión (ADH) y anexo. Con transferencia o mixto, también el
+        comprobante. En la tarjeta se marcan en verde las cargadas y en rojo las que faltan.
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {slotsVisibles.map((tipo) => (

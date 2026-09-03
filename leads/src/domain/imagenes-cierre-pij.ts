@@ -139,3 +139,46 @@ export function resumenFotosCierrePij(
     completo: faltantes.length === 0,
   };
 }
+
+export type BadgeFotoCierrePij = {
+  key: 'adh' | 'anexo' | 'dni' | 'comprobante';
+  label: string;
+  cargada: boolean;
+  /** Si false, no aplica (ej. efectivo sin comprobante de transferencia). */
+  aplica: boolean;
+};
+
+/**
+ * Chips cortos para la tarjeta/modal: ADH · ANEXO · DNI · COMPROBANTE.
+ * Verde si están cargadas; rojo si faltan (cuando aplican).
+ * No bloquean el guardado del lead.
+ */
+export function badgesFotosCierrePij(
+  ventaKey: string,
+  formaPago: FormaPago | null | undefined,
+  imagenes: { ventaKey: string; tipo: string }[] | null | undefined,
+): BadgeFotoCierrePij[] {
+  const deVenta = (imagenes ?? []).filter((i) => i.ventaKey === ventaKey);
+  const tipos = new Set(
+    deVenta
+      .map((i) => normalizarTipoImagenCierrePij(i.tipo))
+      .filter((t): t is TipoImagenCierrePij => t != null),
+  );
+  const requiereComp = formaPagoRequiereComprobanteTransferencia(formaPago);
+  return [
+    { key: 'adh', label: 'ADH', cargada: tipos.has('img5'), aplica: true },
+    { key: 'anexo', label: 'ANEXO', cargada: tipos.has('img6'), aplica: true },
+    {
+      key: 'dni',
+      label: 'DNI',
+      cargada: tipos.has('img1') && tipos.has('img2'),
+      aplica: true,
+    },
+    {
+      key: 'comprobante',
+      label: 'COMPROBANTE',
+      cargada: tipos.has('img7'),
+      aplica: requiereComp,
+    },
+  ];
+}

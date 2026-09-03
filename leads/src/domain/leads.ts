@@ -131,24 +131,29 @@ function normalizarRolOperador(rol?: string | null): RolUsuario | null {
   return null;
 }
 
-/** Señales de cierre hecho por supervisor cuando operador_rol no viene de SQL. */
-function seguimientoIndicaCierreSupervisor(seguimiento: SeguimientoLead) {
-  if (normalizarRolOperador(seguimiento.operadorRol) === 'supervisor') return true;
-  if (seguimiento.idProducto === ID_PRODUCTO_TERRENO) return true;
-  // Flujo supervisor: «¿Confirmó entrevista?» — el promotor en calle no usa este campo.
-  if (seguimiento.confirmoEntrevista != null) return true;
-  return false;
+/**
+ * Quién cargó el «compró». El promotor con cita también usa confirmoEntrevista;
+ * ese campo no indica rol.
+ */
+function rolQueRegistroCierre(
+  seguimiento: SeguimientoLead | Record<string, unknown> | undefined,
+): RolUsuario | null {
+  if (!seguimiento) return null;
+  return normalizarRolOperador(
+    (seguimiento as SeguimientoLead).operadorRol as string | undefined,
+  );
 }
 
-function historialIndicaCierreSupervisor(historial: SeguimientoHistorialEntry[]) {
+function rolCierreDesdeHistorial(historial: SeguimientoHistorialEntry[]): RolUsuario | null {
+  let mejor: SeguimientoHistorialEntry | null = null;
   for (const entry of historial) {
     if (entry.resultadoEntrevista !== 'compro') continue;
-    const snap = entry.seguimientoSnapshot ?? {};
-    if (normalizarRolOperador(entry.operadorRol) === 'supervisor') return true;
-    if (normalizarRolOperador(entry.operadorRol) === 'promotor') return false;
-    if (seguimientoIndicaCierreSupervisor(snap)) return true;
+    if (!mejor || entry.creadoEn.localeCompare(mejor.creadoEn) > 0) mejor = entry;
   }
-  return false;
+  if (!mejor) return null;
+  const rolEntry = normalizarRolOperador(mejor.operadorRol);
+  if (rolEntry) return rolEntry;
+  return rolQueRegistroCierre(mejor.seguimientoSnapshot ?? {});
 }
 
 /** Cierre «Compró» cargado por el supervisor (promotor solo consulta). */
@@ -158,8 +163,14 @@ export function leadCierreRegistradoSupervisor(
 ) {
   if (!leadCompro(lead)) return false;
   const seg = lead.seguimiento ?? {};
-  if (seguimientoIndicaCierreSupervisor(seg)) return true;
-  return historialIndicaCierreSupervisor(historial);
+  const rolActual = rolQueRegistroCierre(seg);
+  if (rolActual === 'promotor') return false;
+  if (rolActual === 'supervisor') return true;
+  const rolHist = rolCierreDesdeHistorial(historial);
+  if (rolHist === 'promotor') return false;
+  if (rolHist === 'supervisor') return true;
+  // Legado sin operador_rol: terreno lo carga el supervisor, no el promotor en calle.
+  return seg.idProducto === ID_PRODUCTO_TERRENO;
 }
 
 export function leadSoloLecturaPromotor(

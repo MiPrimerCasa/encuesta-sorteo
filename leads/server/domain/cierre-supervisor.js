@@ -8,17 +8,15 @@ function normalizarRolOperador(rol) {
   return null;
 }
 
-function seguimientoIndicaCierreSupervisor(seguimiento = {}) {
-  if (normalizarRolOperador(seguimiento.operadorRol) === 'supervisor') return true;
-  if (seguimiento.idProducto === ID_PRODUCTO_TERRENO) return true;
-  if (seguimiento.confirmoEntrevista != null) return true;
-  return false;
-}
-
-/** @param {import('../../src/types/index.js').SeguimientoLead | Record<string, unknown>} seguimiento */
+/**
+ * El promotor con cita también guarda confirmoEntrevista; no usar ese campo como rol.
+ * @param {import('../../src/types/index.js').SeguimientoLead | Record<string, unknown>} seguimiento
+ */
 export function cierreRegistradoPorSupervisor(seguimiento) {
-  return (
-    seguimiento?.resultadoEntrevista === 'compro' &&
-    seguimientoIndicaCierreSupervisor(seguimiento)
-  );
+  if (seguimiento?.resultadoEntrevista !== 'compro') return false;
+  const rol = normalizarRolOperador(seguimiento.operadorRol);
+  if (rol === 'promotor') return false;
+  if (rol === 'supervisor') return true;
+  // Legado sin operador_rol: terreno lo carga el supervisor.
+  return seguimiento.idProducto === ID_PRODUCTO_TERRENO;
 }

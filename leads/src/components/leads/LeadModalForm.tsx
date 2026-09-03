@@ -13,6 +13,7 @@ import {
   getProductosPorRol,
   labelLugarEntrevista,
   etiquetaSeguimientoAgendaOtroRol,
+  leadCierreRegistradoSupervisor,
   leadSeguimientoPijPromotor,
   leadTieneCitaPrevia,
   puedeVenderProducto,
@@ -1652,9 +1653,11 @@ export function LeadModalForm({
                 {leadSeguimientoPijPromotor(lead)
                   ? ETIQUETA_SEGUIMIENTO_PIJ
                   : etiquetaSeguimientoAgendaOtroRol(lead, rol) ??
-                  (lead.seguimiento?.operadorNombre
-                    ? `Último seguimiento por ${lead.seguimiento.operadorNombre}`
-                    : ETIQUETA_CIERRE_SUPERVISOR)}
+                    (leadCierreRegistradoSupervisor(lead)
+                      ? ETIQUETA_CIERRE_SUPERVISOR
+                      : lead.seguimiento?.operadorNombre
+                        ? `Último seguimiento por ${lead.seguimiento.operadorNombre}`
+                        : 'Solo lectura')}
               </p>
               <p className="mt-0.5 text-[12px] leading-snug text-indigo-800/90">
                 {lead.seguimiento?.operadorNombre

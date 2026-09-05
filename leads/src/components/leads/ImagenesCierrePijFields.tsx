@@ -226,6 +226,9 @@ export function ImagenesCierrePijFields({
   disabled = false,
   editable = true,
   compact = false,
+  soloTipos,
+  titulo,
+  ayuda,
 }: {
   leadId: string;
   ventaKey: string;
@@ -238,11 +241,15 @@ export function ImagenesCierrePijFields({
   /** @deprecated Usar editable */
   soloLectura?: boolean;
   compact?: boolean;
+  /** Si se pasa, solo muestra estos slots (p. ej. fotos faltantes). */
+  soloTipos?: TipoImagenCierrePij[];
+  titulo?: string;
+  ayuda?: string;
 }) {
   const deVenta = imagenes.filter((i) => i.ventaKey === ventaKey);
   const puedeEditar = editable && !disabled;
-  const slotsVisibles = SLOTS_IMAGEN_CIERRE_PIJ.filter((tipo) =>
-    slotImagenCierrePijVisible(tipo, formaPago),
+  const slotsVisibles = (soloTipos?.length ? soloTipos : SLOTS_IMAGEN_CIERRE_PIJ).filter(
+    (tipo) => soloTipos?.length || slotImagenCierrePijVisible(tipo, formaPago),
   );
 
   function imagenPorTipo(tipo: TipoImagenCierrePij) {
@@ -265,12 +272,11 @@ export function ImagenesCierrePijFields({
   return (
     <div className={`space-y-2 ${compact ? '' : 'rounded-lg border border-zinc-100 bg-zinc-50/60 p-3'}`}>
       <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-        Documentación del cierre
+        {titulo ?? 'Documentación del cierre'}
       </p>
       <p className="text-[12px] text-zinc-600">
-        Podés guardar el cierre aunque falten fotos. Recomendadas: DNI frente/reverso,
-        solicitud de adhesión (ADH) y anexo. Con transferencia o mixto, también el
-        comprobante. En la tarjeta se marcan en verde las cargadas y en rojo las que faltan.
+        {ayuda ??
+          'Podés guardar el cierre aunque falten fotos. Recomendadas: DNI frente/reverso, solicitud de adhesión (ADH) y anexo. Con transferencia o mixto, también el comprobante. En la tarjeta se marcan en verde las cargadas y en rojo las que faltan.'}
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {slotsVisibles.map((tipo) => (

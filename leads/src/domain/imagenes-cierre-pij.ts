@@ -182,3 +182,40 @@ export function badgesFotosCierrePij(
     },
   ];
 }
+
+/** True si falta al menos una foto aplicable (ADH/ANEXO/DNI/COMPROBANTE). */
+export function faltanFotosCierrePij(
+  ventaKey: string,
+  formaPago: FormaPago | null | undefined,
+  imagenes: { ventaKey: string; tipo: string }[] | null | undefined,
+): boolean {
+  return badgesFotosCierrePij(ventaKey, formaPago, imagenes).some(
+    (b) => b.aplica && !b.cargada,
+  );
+}
+
+/**
+ * Slots a pedir en «Cargar fotos faltantes».
+ * DNI pide frente y/o reverso según lo que falte.
+ */
+export function tiposFotosCierrePijFaltantes(
+  ventaKey: string,
+  formaPago: FormaPago | null | undefined,
+  imagenes: { ventaKey: string; tipo: string }[] | null | undefined,
+): TipoImagenCierrePij[] {
+  const deVenta = (imagenes ?? []).filter((i) => i.ventaKey === ventaKey);
+  const tipos = new Set(
+    deVenta
+      .map((i) => normalizarTipoImagenCierrePij(i.tipo))
+      .filter((t): t is TipoImagenCierrePij => t != null),
+  );
+  const out: TipoImagenCierrePij[] = [];
+  if (!tipos.has('img5')) out.push('img5');
+  if (!tipos.has('img6')) out.push('img6');
+  if (!tipos.has('img1')) out.push('img1');
+  if (!tipos.has('img2')) out.push('img2');
+  if (formaPagoRequiereComprobanteTransferencia(formaPago) && !tipos.has('img7')) {
+    out.push('img7');
+  }
+  return out;
+}

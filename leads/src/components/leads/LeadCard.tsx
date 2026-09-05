@@ -26,6 +26,7 @@ import { prioridadTabInicial } from '../../domain/prioridad-leads';
 import { etiquetaCortaNumeroDocumentoVenta, etiquetaMedioPagoPij, etiquetaPagoProducto, esPlanInversion } from '../../domain/venta';
 import { etiquetaCajaEstadoUi, variantCajaEstado } from '../../domain/caja-estado';
 import { BadgesFotosCierrePij } from './BadgesFotosCierrePij';
+import { faltanFotosCierrePij } from '../../domain/imagenes-cierre-pij';
 import { etiquetaCampania } from '../../domain/campania';
 import { FUENTE_LABEL } from '../../domain/fuenteLabels';
 import type { Barrio, Lead, Producto, Promotor, RolUsuario, SeguimientoHistorialEntry } from '../../types';
@@ -70,6 +71,8 @@ interface LeadCardProps {
   onWhatsAppAutoContacto?: (lead: Lead) => void;
   /** Abre el drawer para agregar referidos sin modificar el seguimiento actual. */
   onAgregarReferidos?: (lead: Lead) => void;
+  /** Cierre con fotos incompletas: abre flujo solo de fotos. */
+  onCargarFotosFaltantes?: (lead: Lead) => void;
 }
 
 export function LeadCard({
@@ -87,6 +90,7 @@ export function LeadCard({
   fetchHistorial,
   onWhatsAppAutoContacto,
   onAgregarReferidos,
+  onCargarFotosFaltantes,
 }: LeadCardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -482,6 +486,23 @@ export function LeadCard({
                 imagenes={lead.seguimiento?.imagenesCierre}
               />
             </div>
+            {onCargarFotosFaltantes &&
+              faltanFotosCierrePij(
+                'principal',
+                lead.seguimiento?.formaPago,
+                lead.seguimiento?.imagenesCierre,
+              ) && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCargarFotosFaltantes(lead);
+                  }}
+                  className="mt-1 w-full rounded-lg border border-brand-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-brand-800 active:bg-brand-50"
+                >
+                  Cargar fotos faltantes
+                </button>
+              )}
           </div>
         )}
 

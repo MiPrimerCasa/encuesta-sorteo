@@ -59,7 +59,7 @@ import {
   montosPijDesdeEntrada,
   etiquetaMedioPagoPij,
 } from '../../domain/venta';
-import { validarImagenesCierrePij } from '../../domain/imagenes-cierre-pij';
+import { faltanFotosCierrePij, validarImagenesCierrePij } from '../../domain/imagenes-cierre-pij';
 import { normalizarDniCliente, validarDniCliente } from '../../domain/dni-cliente';
 import { etiquetaCajaEstadoUi, variantCajaEstado, detalleCajaEstado } from '../../domain/caja-estado';
 import { StatusPill } from '../ui/StatusPill';
@@ -343,6 +343,8 @@ interface LeadModalFormProps {
   todosLosLeads?: Lead[];
   /** Promotor consultando un cierre cargado por el supervisor. */
   soloLectura?: boolean;
+  /** Abre el sheet dedicado de fotos faltantes (gestionado por el panel). */
+  onCargarFotosFaltantes?: () => void;
   onClose: () => void;
   onSave: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
   /** Actualiza el lead en el listado tras reintento SOAP PIJ. */
@@ -357,6 +359,7 @@ export function LeadModalForm({
   barrios,
   todosLosLeads = [],
   soloLectura = false,
+  onCargarFotosFaltantes,
   onClose,
   onSave,
   onLeadUpdated,
@@ -1536,52 +1539,20 @@ export function LeadModalForm({
   const showReferidos = showReferidosObs && form.brindoReferidos === true;
   const mostrarImagenesCierrePij =
     showCompro && productoEsPij && estadoPagoCierre === 'entrega_33' && Boolean(lead);
-
-  async function guardarSoloImagenesCierre() {
-    if (!lead || !mostrarImagenesCierrePij) return;
-
-    const errPrincipal = validarImagenesCierrePij(
+  /** Cierre ya guardado con fotos incompletas → botón + modal dedicado. */
+  const mostrarCargarFotosFaltantes =
+    yaEsCierreCompro &&
+    productoEsPij &&
+    estadoPagoCierre === 'entrega_33' &&
+    Boolean(lead) &&
+    !lead.bloqueadoSupervisor48h &&
+    faltanFotosCierrePij(
       'principal',
       formaPagoCierre,
-      form.imagenesCierre,
+      form.imagenesCierre.length > 0
+        ? form.imagenesCierre
+        : lead.seguimiento?.imagenesCierre,
     );
-    if (errPrincipal) {
-      setErrorForm(errPrincipal);
-      return;
-    }
-    for (const compra of form.comprasAdicionales) {
-      if (!esPlanInversion(compra.idProducto) || compra.estadoPago !== 'entrega_33') continue;
-      const errAdic = validarImagenesCierrePij(compra.id, compra.formaPago, form.imagenesCierre);
-      if (errAdic) {
-        setErrorForm(`Compra adicional: ${errAdic}`);
-        return;
-      }
-    }
-
-    const base = lead.seguimiento ?? {};
-    const seguimiento: SeguimientoLead = {
-      ...base,
-      resultadoEntrevista: 'compro',
-      idProducto: base.idProducto ?? form.idProducto ?? ID_PRODUCTO_PIJ,
-      estadoPago: base.estadoPago ?? form.estadoPago ?? 'entrega_33',
-      numeroRecibo: base.numeroRecibo ?? form.numeroRecibo ?? null,
-      formaPago: base.formaPago ?? form.formaPago ?? null,
-      dniCliente: (base.dniCliente ?? normalizarDniCliente(form.dniCliente)) || null,
-      montoCierre: base.montoCierre ?? null,
-      montoEfectivo: base.montoEfectivo ?? null,
-      montoTransferencia: base.montoTransferencia ?? null,
-      fechaCierre: base.fechaCierre ?? null,
-      comprasAdicionales: base.comprasAdicionales ?? form.comprasAdicionales ?? null,
-      imagenesCierre: form.imagenesCierre.length > 0 ? form.imagenesCierre : null,
-    };
-    setErrorForm('');
-    try {
-      await onSave(lead.id, seguimiento);
-      onClose();
-    } catch (err) {
-      setErrorForm(err instanceof Error ? err.message : 'Error al guardar las fotos.');
-    }
-  }
 
   return (
     <Drawer.Root
@@ -2203,6 +2174,15 @@ export function LeadModalForm({
                               }
                             />
                           </div>
+                          {mostrarCargarFotosFaltantes && onCargarFotosFaltantes && (
+                            <button
+                              type="button"
+                              onClick={onCargarFotosFaltantes}
+                              className="mt-2 w-full rounded-lg border border-brand-300 bg-white px-3 py-2 text-[13px] font-semibold text-brand-800 active:bg-brand-50"
+                            >
+                              Cargar fotos faltantes
+                            </button>
+                          )}
                           {lead.seguimiento.idVentaIntegral != null &&
                             lead.seguimiento.cajaEstado === 'verificado' && (
                               <p className="mt-1 text-[12px]">
@@ -3254,7 +3234,7 @@ export function LeadModalForm({
               <div className="h-4" aria-hidden="true" />
             </fieldset>
 
-            {mostrarImagenesCierrePij && lead && (
+            {mostrarImagenesCierrePij && lead && !yaEsCierreCompro && (
               <div className="px-0 pt-4">
                 <ImagenesCierrePijFields
                   leadId={lead.id}
@@ -3301,14 +3281,14 @@ export function LeadModalForm({
           >
             {soloLectura ? (
               <div className="flex flex-col gap-2">
-                {mostrarImagenesCierrePij && (
+                {mostrarCargarFotosFaltantes && onCargarFotosFaltantes && (
                   <button
                     type="button"
-                    onClick={() => void guardarSoloImagenesCierre()}
+                    onClick={onCargarFotosFaltantes}
                     style={{ touchAction: 'manipulation' }}
                     className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:bg-brand-800 active:scale-[0.98]"
                   >
-                    Guardar fotos
+                    Cargar fotos faltantes
                   </button>
                 )}
                 <button

@@ -22,6 +22,7 @@ import { AlertasSinContactar } from './AlertasSinContactar';
 import { AgregarReferidosSheet } from './AgregarReferidosSheet';
 import { LeadCard } from './LeadCard';
 import { LeadModalForm } from './LeadModalForm';
+import { CargarFotosFaltantesSheet } from './CargarFotosFaltantesSheet';
 import { ModificarTelefonoSheet } from './ModificarTelefonoSheet';
 import { NuevoLeadSheet } from './NuevoLeadSheet';
 import { LinksRedesSection } from './LinksRedesSection';
@@ -185,6 +186,7 @@ export function LeadsPanel({
   const [tabActivo, setTabActivo] = useState('hoy');
   const [leadSeleccionado, setLeadSeleccionado] = useState<Lead | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [leadFotosFaltantes, setLeadFotosFaltantes] = useState<Lead | null>(null);
   const [agendarAbierto, setAgendarAbierto] = useState(false);
   const [leadModificarTelefono, setLeadModificarTelefono] = useState<Lead | null>(null);
   const [leadReferidos, setLeadReferidos] = useState<Lead | null>(null);
@@ -229,6 +231,13 @@ export function LeadsPanel({
     }
     setLeadSeleccionado(lead);
     setModalAbierto(true);
+  };
+
+  /** Solo fotos de un cierre ya guardado (no cambia fecha). */
+  const abrirCargarFotosFaltantes = (lead: Lead) => {
+    if (lead.bloqueadoSupervisor48h) return;
+    if (!leadCompro(lead)) return;
+    setLeadFotosFaltantes(lead);
   };
 
   useEffect(() => {
@@ -367,6 +376,7 @@ export function LeadsPanel({
         fetchHistorial={fetchHistorial}
         onWhatsAppAutoContacto={handleWhatsAppAutoContacto}
         onAgregarReferidos={abrirAgregarReferidos}
+        onCargarFotosFaltantes={abrirCargarFotosFaltantes}
       />
     );
 
@@ -667,6 +677,9 @@ export function LeadsPanel({
               : leadSoloLecturaSupervisor(leadSeleccionado)))
         }
         onClose={cerrarModal}
+        onCargarFotosFaltantes={() => {
+          if (leadSeleccionado) setLeadFotosFaltantes(leadSeleccionado);
+        }}
         onSave={async (leadId, seg) => {
           const result = await guardarSeguimientoLead(leadId, seg);
           if (result && typeof result === 'object' && 'lead' in result && result.lead) {
@@ -687,6 +700,21 @@ export function LeadsPanel({
             setTabActivo('hoy');
           } else if (seg.resultadoEntrevista === 'sin_interes') {
             setTabActivo('contacto');
+          }
+        }}
+      />
+
+      <CargarFotosFaltantesSheet
+        open={leadFotosFaltantes != null}
+        lead={leadFotosFaltantes}
+        onClose={() => setLeadFotosFaltantes(null)}
+        onSave={async (leadId, seg) => {
+          const result = await guardarSeguimientoLead(leadId, seg);
+          if (result && typeof result === 'object' && 'lead' in result && result.lead) {
+            setLeadFotosFaltantes(null);
+            if (leadSeleccionado?.id === leadId) {
+              setLeadSeleccionado(result.lead);
+            }
           }
         }}
       />

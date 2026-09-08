@@ -1,6 +1,6 @@
 /** Utilidades PIJ — serie/adhesión/anexo (compartido formulario + validación). */
 
-/** Serie/grupo de adhesión: A/B históricas (tipeo libre) o C+ (stock caja). */
+/** Serie/grupo de adhesión: A/B históricas (tipeo libre) o C+ (adhesión desde stock caja; anexo manual). */
 export type SeriePij = string;
 
 const SERIES_LIBRES = new Set(['A', 'B']);
@@ -11,7 +11,7 @@ export function normalizarSeriePij(serie: string | null | undefined): string {
     .toUpperCase();
 }
 
-/** true si debe elegirse del stock asignado en caja (C, D, …). */
+/** true si la adhesión debe elegirse del stock asignado en caja (C, D, …). El anexo es siempre tipeo libre. */
 export function serieUsaStockCaja(serie: string | null | undefined): boolean {
   const g = normalizarSeriePij(serie);
   if (!g || g.length > 4) return false;

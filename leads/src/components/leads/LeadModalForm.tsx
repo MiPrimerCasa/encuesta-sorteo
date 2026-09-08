@@ -32,7 +32,6 @@ import {
   indiceVentasDesdeComprasFormulario,
   serieUsaStockCaja,
   claveAdhesionPij,
-  claveAnexoPij,
   type IndiceVentasOcupados,
   type ExcluirRegistroVenta,
 } from '../../domain/pij-recibo';
@@ -582,30 +581,6 @@ export function LeadModalForm({
     });
   };
 
-  const opcionesAnexoDisponibles = (excluir?: ExcluirRegistroVenta) =>
-    (stockPij?.opcionesAnexo ?? []).filter((o) => {
-      const clave = claveAnexoPij(String(o.numero));
-      if (!clave) return true;
-      const ocup = indiceVentasCompleto.anexos[clave];
-      if (!ocup) return true;
-      if (
-        excluir?.leadId &&
-        String(ocup.leadId) === String(excluir.leadId) &&
-        excluir.esPrincipal &&
-        !ocup.esAdicional
-      ) {
-        return true;
-      }
-      if (
-        excluir?.compraId &&
-        ocup.esAdicional &&
-        String(ocup.compraId) === String(excluir.compraId)
-      ) {
-        return true;
-      }
-      return false;
-    });
-
   const cantidadAdicionales = form.comprasAdicionales?.length ?? 0;
   const indiceSiguienteAdicional = cantidadAdicionales + 1;
 
@@ -712,13 +687,6 @@ export function LeadModalForm({
           setErrorVenta(
             `La adhesión ${adicPijSerie}${adicPijAdh} no está en tu stock asignado (serie C+).`,
           );
-          return;
-        }
-        const anxOk = opcionesAnexoDisponibles().some(
-          (o) => String(o.numero) === String(Number(adicPijAnexo)),
-        );
-        if (!anxOk) {
-          setErrorVenta(`El anexo ${adicPijAnexo} no está en tu stock asignado.`);
           return;
         }
       }
@@ -1162,16 +1130,6 @@ export function LeadModalForm({
               `La adhesión ${pijSerie}${pijAdh} no está en tu stock asignado (serie C+).`,
             );
             return;
-          }
-          if (pijAnexo.trim()) {
-            const anxOk = opcionesAnexoDisponibles({
-              leadId: lead?.id,
-              esPrincipal: true,
-            }).some((o) => String(o.numero) === String(Number(pijAnexo)));
-            if (!anxOk) {
-              setErrorVenta(`El anexo ${pijAnexo} no está en tu stock asignado.`);
-              return;
-            }
           }
         }
       }
@@ -2503,15 +2461,12 @@ export function LeadModalForm({
                                       type="button"
                                       onClick={() => {
                                         setPijSerie(s);
-                                        const clearNums = usaStockPijSerie(s);
-                                        const nextAdh = clearNums ? '' : pijAdh;
-                                        const nextAnx = clearNums ? '' : pijAnexo;
-                                        if (clearNums) {
-                                          setPijAdh('');
-                                          setPijAnexo('');
-                                        }
+                                        // C+: adhesión del stock (se limpia); anexo siempre manual (se conserva).
+                                        const clearAdh = usaStockPijSerie(s);
+                                        const nextAdh = clearAdh ? '' : pijAdh;
+                                        if (clearAdh) setPijAdh('');
                                         patch({
-                                          numeroRecibo: buildPijRecibo(s, nextAdh, nextAnx),
+                                          numeroRecibo: buildPijRecibo(s, nextAdh, pijAnexo),
                                         });
                                       }}
                                       className={`min-w-[4.5rem] flex-1 h-11 rounded-lg border text-[15px] font-bold transition-all ${pijSerie === s
@@ -2532,7 +2487,7 @@ export function LeadModalForm({
                                         ? stockPij?.aviso ||
                                           'Sin ingest de caja: no se puede listar stock C+.'
                                         : (stockPij.gruposDisponibles?.length ?? 0) > 0
-                                          ? `Stock C+: series ${(stockPij.gruposDisponibles ?? []).join(', ')} — ${stockPij.resumen?.cantidadAdhesiones ?? 0} adhesiones, ${stockPij.resumen?.cantidadAnexos ?? 0} anexos.`
+                                          ? `Stock C+: series ${(stockPij.gruposDisponibles ?? []).join(', ')} — ${stockPij.resumen?.cantidadAdhesiones ?? 0} adhesiones (el anexo se tipea a mano).`
                                           : 'Sin stock C+ asignado para tu usuario. Pedí acta de entrega en caja.'}
                                 </p>
                                 {/* N° Adhesión / Anexo */}
@@ -2580,43 +2535,21 @@ export function LeadModalForm({
                                     <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
                                       N° Anexo
                                     </label>
-                                    {usaStockPijSerie(pijSerie) ? (
-                                      <select
-                                        value={pijAnexo}
-                                        onChange={(e) => {
-                                          const v = e.target.value.replace(/\D/g, '');
-                                          setPijAnexo(v);
-                                          patch({
-                                            numeroRecibo: buildPijRecibo(pijSerie, pijAdh, v),
-                                          });
-                                        }}
-                                        className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                                      >
-                                        <option value="">Sin anexo / elegí…</option>
-                                        {opcionesAnexoDisponibles({
-                                          leadId: lead?.id,
-                                          esPrincipal: true,
-                                        }).map((o) => (
-                                          <option key={o.notacion} value={String(o.numero)}>
-                                            {o.notacion}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    ) : (
-                                      <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={pijAnexo}
-                                        onChange={(e) => {
-                                          const v = e.target.value.replace(/\D/g, '');
-                                          setPijAnexo(v);
-                                          patch({ numeroRecibo: buildPijRecibo(pijSerie, pijAdh, v) });
-                                        }}
-                                        placeholder="400"
-                                        className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
-                                      />
-                                    )}
-                                    <p className="text-[11px] text-zinc-500">Número sucesivo (sin /300).</p>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      value={pijAnexo}
+                                      onChange={(e) => {
+                                        const v = e.target.value.replace(/\D/g, '');
+                                        setPijAnexo(v);
+                                        patch({ numeroRecibo: buildPijRecibo(pijSerie, pijAdh, v) });
+                                      }}
+                                      placeholder="400"
+                                      className="h-11 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[15px] tabular-nums focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15"
+                                    />
+                                    <p className="text-[11px] text-zinc-500">
+                                      Tipeo manual (sin /300). Caja solo controla la adhesión.
+                                    </p>
                                   </div>
                                 </div>
                                 {/* Preview del recibo ensamblado */}
@@ -2912,14 +2845,10 @@ export function LeadModalForm({
                                             type="button"
                                             onClick={() => {
                                               setAdicPijSerie(s);
-                                              const clearNums = usaStockPijSerie(s);
-                                              const nextAdh = clearNums ? '' : adicPijAdh;
-                                              const nextAnx = clearNums ? '' : adicPijAnexo;
-                                              if (clearNums) {
-                                                setAdicPijAdh('');
-                                                setAdicPijAnexo('');
-                                              }
-                                              const r = buildPijRecibo(s, nextAdh, nextAnx);
+                                              const clearAdh = usaStockPijSerie(s);
+                                              const nextAdh = clearAdh ? '' : adicPijAdh;
+                                              if (clearAdh) setAdicPijAdh('');
+                                              const r = buildPijRecibo(s, nextAdh, adicPijAnexo);
                                               setAdicionalForm((f) => ({ ...f, numeroRecibo: r }));
                                             }}
                                             className={`min-w-[4.5rem] flex-1 h-10 rounded-lg border text-[14px] font-bold transition-all ${adicPijSerie === s
@@ -2972,40 +2901,22 @@ export function LeadModalForm({
                                           <label className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
                                             N° Anexo
                                           </label>
-                                          {usaStockPijSerie(adicPijSerie) ? (
-                                            <select
-                                              value={adicPijAnexo}
-                                              onChange={(e) => {
-                                                const v = e.target.value.replace(/\D/g, '');
-                                                setAdicPijAnexo(v);
-                                                const r = buildPijRecibo(adicPijSerie, adicPijAdh, v);
-                                                setAdicionalForm((f) => ({ ...f, numeroRecibo: r }));
-                                              }}
-                                              className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
-                                            >
-                                              <option value="">Sin anexo / elegí…</option>
-                                              {opcionesAnexoDisponibles().map((o) => (
-                                                <option key={o.notacion} value={String(o.numero)}>
-                                                  {o.notacion}
-                                                </option>
-                                              ))}
-                                            </select>
-                                          ) : (
-                                            <input
-                                              type="text"
-                                              inputMode="numeric"
-                                              value={adicPijAnexo}
-                                              onChange={(e) => {
-                                                const v = e.target.value.replace(/\D/g, '');
-                                                setAdicPijAnexo(v);
-                                                const r = buildPijRecibo(adicPijSerie, adicPijAdh, v);
-                                                setAdicionalForm((f) => ({ ...f, numeroRecibo: r }));
-                                              }}
-                                              placeholder="400"
-                                              className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
-                                            />
-                                          )}
-                                          <p className="text-[10px] text-zinc-500">Número sucesivo (sin /300).</p>
+                                          <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={adicPijAnexo}
+                                            onChange={(e) => {
+                                              const v = e.target.value.replace(/\D/g, '');
+                                              setAdicPijAnexo(v);
+                                              const r = buildPijRecibo(adicPijSerie, adicPijAdh, v);
+                                              setAdicionalForm((f) => ({ ...f, numeroRecibo: r }));
+                                            }}
+                                            placeholder="400"
+                                            className="h-10 w-full rounded-lg border border-zinc-200 bg-white px-3 text-[14px] tabular-nums focus:outline-none focus:ring-1 focus:ring-brand-600"
+                                          />
+                                          <p className="text-[10px] text-zinc-500">
+                                            Tipeo manual (sin /300).
+                                          </p>
                                         </div>
                                       </div>
                                       {(adicPijAdh.trim() || adicPijAnexo.trim()) && (() => {

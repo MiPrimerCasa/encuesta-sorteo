@@ -1527,7 +1527,7 @@ function registerApiRoutes(api) {
       return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
     }
 
-    // Serie C+: validar adhesión/anexo contra stock pull de caja (A/B tipen libre).
+    // Serie C+: validar solo adhesión contra stock de caja (anexo es tipeo libre; A/B libres).
     // Superadmin / panel global pueden tipeo libre también en C+.
     const bypassStockPij =
       usuario.rol === 'superadmin' ||

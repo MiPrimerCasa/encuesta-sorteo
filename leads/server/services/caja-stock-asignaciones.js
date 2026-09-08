@@ -175,16 +175,20 @@ export async function listarStockPijParaCrm({
   };
 }
 
-/** Valida que adhesión (y anexo si viene) estén en el stock C+ del vendedor. */
+/**
+ * Valida que la adhesión C+ esté en el stock del vendedor.
+ * El anexo es tipeo libre (operativo: caja solo controla/consume adhesión).
+ */
 export async function validarNumerosEnStockCaja({
   serie,
   nroAdhesion,
-  nroAnexo,
+  nroAnexo: _nroAnexo,
   crmPromotorCodigo,
   idVendedor,
   sucursalCodigo,
   permitirSinStock = false,
 }) {
+  void _nroAnexo;
   const g = normalizarGrupoSerie(serie);
   if (!serieUsaStockCaja(g)) return { ok: true, motivo: 'serie_libre' };
 
@@ -222,20 +226,6 @@ export async function validarNumerosEnStockCaja({
     err.code = 'STOCK_PIJ_NO_ASIGNADO';
     err.status = 400;
     throw err;
-  }
-
-  const anxRaw = String(nroAnexo ?? '').replace(/\D/g, '');
-  if (anxRaw) {
-    const anx = Number.parseInt(anxRaw, 10);
-    const hitAnx = stock.opcionesAnexo.some((o) => o.numero === anx);
-    if (!hitAnx) {
-      const err = new Error(
-        `El anexo ${anx} no está en tu stock asignado. Revisá el acta de entrega en caja.`,
-      );
-      err.code = 'STOCK_PIJ_ANEXO_NO_ASIGNADO';
-      err.status = 400;
-      throw err;
-    }
   }
 
   return { ok: true };

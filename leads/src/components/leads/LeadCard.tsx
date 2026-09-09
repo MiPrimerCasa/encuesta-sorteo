@@ -509,7 +509,7 @@ export function LeadCard({
         {esArchivo && (lead.seguimiento?.comprasAdicionales?.length ?? 0) > 0 && (
           <div className="mt-2 space-y-1.5 border-t border-zinc-300/60 pt-2">
             {lead.seguimiento!.comprasAdicionales!.map((compra) => {
-              const prodAdic = getProductoNombre(compra.idProducto, productos);
+              const esPijAdic = esPlanInversion(compra.idProducto);
               const pagoAdic = etiquetaPagoProducto(
                 compra.idProducto,
                 compra.estadoPago,
@@ -517,37 +517,42 @@ export function LeadCard({
                 compra.idBarrio,
                 rolUsuario,
               );
+              const medioAdic = etiquetaMedioPagoPij(
+                compra.formaPago,
+                compra.montoCierre,
+                compra.montoEfectivo,
+                compra.montoTransferencia,
+              );
               return (
-                <div key={compra.id} className="text-[13px]">
-                  <span className="mr-1 inline-flex rounded border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand-700">
-                    Adic.
+                <div
+                  key={compra.id}
+                  className={`rounded-lg border px-2.5 py-1.5 text-[13px] ${
+                    esPijAdic
+                      ? 'border-brand-200 bg-brand-50/80'
+                      : 'border-zinc-300 bg-zinc-100/80'
+                  }`}
+                >
+                  <span
+                    className={`mr-1.5 inline-flex rounded border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                      esPijAdic
+                        ? 'border-brand-200 bg-brand-100 text-brand-800'
+                        : 'border-zinc-300 bg-zinc-200 text-zinc-800'
+                    }`}
+                  >
+                    {esPijAdic ? 'PIJ' : 'Terreno'}
                   </span>
-                  <span className="text-zinc-400">Producto: </span>
-                  <span className="font-medium text-zinc-700">{prodAdic ?? compra.idProducto}</span>
-                  {pagoAdic && <span className="ml-1 text-zinc-400">· {pagoAdic}</span>}
+                  <span className="font-medium text-zinc-800">
+                    {esPijAdic ? 'Plan Inversión Joven' : 'Terreno'}
+                  </span>
+                  {pagoAdic && <span className="ml-1 text-zinc-500">· {pagoAdic}</span>}
                   {compra.numeroRecibo && (
-                    <span className="ml-1 text-zinc-400">
+                    <span className="ml-1 text-zinc-500">
                       · {etiquetaCortaNumeroDocumentoVenta(compra.idProducto)}: {compra.numeroRecibo}
                     </span>
                   )}
-                  {etiquetaMedioPagoPij(
-                    compra.formaPago,
-                    compra.montoCierre,
-                    compra.montoEfectivo,
-                    compra.montoTransferencia,
-                  ) && (
-                    <span className="ml-1 text-zinc-400">
-                      ·{' '}
-                      {etiquetaMedioPagoPij(
-                        compra.formaPago,
-                        compra.montoCierre,
-                        compra.montoEfectivo,
-                        compra.montoTransferencia,
-                      )}
-                    </span>
-                  )}
+                  {medioAdic && <span className="ml-1 text-zinc-500">· {medioAdic}</span>}
                   {compra.fechaCierre && (
-                    <span className="ml-1 text-zinc-400">
+                    <span className="ml-1 text-zinc-500">
                       · Cierre: {formatearFechaHora(compra.fechaCierre)}
                     </span>
                   )}

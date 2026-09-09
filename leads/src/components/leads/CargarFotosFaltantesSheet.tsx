@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Drawer } from 'vaul';
+import { completarDniCierrePijEnVentas } from '../../api/client';
 import {
   ETIQUETAS_IMAGEN_CIERRE_PIJ,
+  dniReutilizadoDesdeFuente,
   tiposFotosCierrePijFaltantes,
 } from '../../domain/imagenes-cierre-pij';
 import type {
@@ -11,7 +13,7 @@ import type {
   SeguimientoLead,
   TipoImagenCierrePij,
 } from '../../types';
-import { ID_PRODUCTO_PIJ } from '../../domain/venta';
+import { ID_PRODUCTO_PIJ, esPlanInversion } from '../../domain/venta';
 import { ImagenesCierrePijFields } from './ImagenesCierrePijFields';
 
 type Props = {
@@ -38,18 +40,42 @@ export function CargarFotosFaltantesSheet({ open, lead, onClose, onSave }: Props
 
   useEffect(() => {
     if (!open || !lead) return;
-    const actuales = [...(lead.seguimiento?.imagenesCierre ?? [])];
-    setImagenes(actuales);
+    let cancelled = false;
+    const idsAdic = (lead.seguimiento?.comprasAdicionales ?? [])
+      .filter((c) => esPlanInversion(c.idProducto))
+      .map((c) => c.id);
+    const fuentes = ['principal', ...idsAdic];
+    const destinos = ['principal', ...idsAdic];
+    const base = [...(lead.seguimiento?.imagenesCierre ?? [])];
+    setImagenes(base);
     setSlotsPedidos(
-      tiposFotosCierrePijFaltantes('principal', lead.seguimiento?.formaPago, actuales),
+      tiposFotosCierrePijFaltantes('principal', lead.seguimiento?.formaPago, base),
     );
     setError('');
     setGuardando(false);
+
+    void completarDniCierrePijEnVentas(lead.id, base, destinos, fuentes).then((actuales) => {
+      if (cancelled) return;
+      setImagenes(actuales);
+      setSlotsPedidos(
+        tiposFotosCierrePijFaltantes('principal', lead.seguimiento?.formaPago, actuales),
+      );
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [open, lead]);
 
   const aunFaltan = lead
     ? tiposFotosCierrePijFaltantes('principal', formaPago, imagenes)
     : [];
+
+  const dniReutilizado = dniReutilizadoDesdeFuente(imagenes, 'principal', [
+    ...(lead?.seguimiento?.comprasAdicionales ?? [])
+      .filter((c) => esPlanInversion(c.idProducto))
+      .map((c) => c.id),
+  ]);
 
   async function handleGuardar() {
     if (!lead) return;
@@ -132,20 +158,38 @@ export function CargarFotosFaltantesSheet({ open, lead, onClose, onSave }: Props
 
           <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
             {lead && slotsPedidos.length > 0 && (
-              <ImagenesCierrePijFields
-                leadId={lead.id}
-                ventaKey="principal"
-                formaPago={formaPago}
-                imagenes={imagenes}
-                editable
-                soloTipos={slotsPedidos}
-                titulo="Fotos pendientes"
-                ayuda="Subí solo lo que falta. Al guardar se reenvían a caja y la fecha de cierre se mantiene."
-                onChange={(next) => {
-                  setError('');
-                  setImagenes(next);
-                }}
-              />
+              <div className="space-y-2">
+                {dniReutilizado ? (
+                  <p className="text-[12px] text-zinc-500">
+                    DNI reutilizado de otro plan de este cierre (podés reemplazarlo).
+                  </p>
+                ) : null}
+                <ImagenesCierrePijFields
+                  leadId={lead.id}
+                  ventaKey="principal"
+                  formaPago={formaPago}
+                  imagenes={imagenes}
+                  editable
+                  soloTipos={slotsPedidos}
+                  titulo="Fotos pendientes"
+                  ayuda="Subí solo lo que falta. Al guardar se reenvían a caja y la fecha de cierre se mantiene."
+                  onChange={(next) => {
+                    setError('');
+                    setImagenes(next);
+                    const idsAdic = (lead.seguimiento?.comprasAdicionales ?? [])
+                      .filter((c) => esPlanInversion(c.idProducto))
+                      .map((c) => c.id);
+                    void completarDniCierrePijEnVentas(
+                      lead.id,
+                      next,
+                      idsAdic,
+                      ['principal', ...idsAdic],
+                    ).then((propagadas) => {
+                      if (propagadas.length !== next.length) setImagenes(propagadas);
+                    });
+                  }}
+                />
+              </div>
             )}
             {lead && slotsPedidos.length === 0 && (
               <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] text-emerald-900">

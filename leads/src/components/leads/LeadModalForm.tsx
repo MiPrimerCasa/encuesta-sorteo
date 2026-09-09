@@ -58,7 +58,14 @@ import {
   montosPijDesdeEntrada,
   etiquetaMedioPagoPij,
 } from '../../domain/venta';
-import { faltanFotosCierrePij, validarImagenesCierrePij } from '../../domain/imagenes-cierre-pij';
+import {
+  dniReutilizadoDesdeFuente,
+  faltanFotosCierrePij,
+  hayDniPendienteDeClonar,
+  validarImagenesCierrePij,
+} from '../../domain/imagenes-cierre-pij';
+import { completarDniCierrePijEnVentas } from '../../api/client';
+import { planesPijDeLaMismaPersona } from '../../domain/planes-comprados-persona';
 import { normalizarDniCliente, validarDniCliente } from '../../domain/dni-cliente';
 import { etiquetaCajaEstadoUi, variantCajaEstado, detalleCajaEstado } from '../../domain/caja-estado';
 import { StatusPill } from '../ui/StatusPill';
@@ -278,8 +285,53 @@ function labelGuardarCompraAdicional(indiceSiguiente: number): string {
 }
 
 function labelAgregarCompraAdicional(indiceSiguiente: number, tipo: 'pij' | 'terreno'): string {
-  const producto = tipo === 'pij' ? 'Plan' : 'Terreno';
-  return `+ Agregar ${etiquetaOrdinalCompra(indiceSiguiente)} compra (${producto})`;
+  if (tipo === 'pij') {
+    return `+ ${etiquetaOrdinalCompra(indiceSiguiente)} Plan Inversión Joven`;
+  }
+  return `+ ${etiquetaOrdinalCompra(indiceSiguiente)} Terreno`;
+}
+
+/** Paleta visual alineada al design system (brand / zinc). */
+function temaProductoVenta(idProducto: string | null | undefined): {
+  key: 'pij' | 'terreno' | 'neutro';
+  badge: string;
+  panel: string;
+  titulo: string;
+  acentoSel: string;
+  acentoIdle: string;
+  chip: string;
+} {
+  if (esPlanInversion(idProducto)) {
+    return {
+      key: 'pij',
+      badge: 'Plan Inversión Joven',
+      panel: 'border-brand-100 bg-brand-50',
+      titulo: 'text-brand-900',
+      acentoSel: 'border-brand-700 bg-brand-600 text-white',
+      acentoIdle: 'border-brand-200 bg-white text-zinc-900 active:bg-brand-50',
+      chip: 'border-brand-200 bg-brand-100 text-brand-800',
+    };
+  }
+  if (esTerreno(idProducto)) {
+    return {
+      key: 'terreno',
+      badge: 'Terreno',
+      panel: 'border-zinc-300 bg-zinc-100',
+      titulo: 'text-zinc-900',
+      acentoSel: 'border-zinc-800 bg-zinc-800 text-white',
+      acentoIdle: 'border-zinc-300 bg-white text-zinc-900 active:bg-zinc-50',
+      chip: 'border-zinc-300 bg-zinc-200 text-zinc-800',
+    };
+  }
+  return {
+    key: 'neutro',
+    badge: 'Producto',
+    panel: 'border-brand-100 bg-brand-50',
+    titulo: 'text-brand-800',
+    acentoSel: 'border-brand-700 bg-brand-600 text-white',
+    acentoIdle: 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50',
+    chip: 'border-zinc-200 bg-zinc-100 text-zinc-700',
+  };
 }
 
 /** Fecha de cierre ya registrada (no usar “ahora” al corregir adhesión/anexo). */
@@ -547,6 +599,61 @@ export function LeadModalForm({
     return ['A', 'B', ...grupos];
   }, [stockPij]);
 
+  // Antes del early return: si no, al abrir el modal React rompe (pantalla en blanco).
+  const planesCompradosPersona = useMemo(() => {
+    if (!lead) return [];
+    return planesPijDeLaMismaPersona(lead, todosLosLeads, {
+      dniForm: form.dniCliente || lead.seguimiento?.dniCliente,
+      numeroReciboForm:
+        form.resultadoEntrevista === 'compro' ? form.numeroRecibo : null,
+      comprasForm: form.comprasAdicionales,
+      idProductoForm: form.idProducto,
+      fechaCierreForm: lead.seguimiento?.fechaCierre ?? null,
+      resultadoForm: form.resultadoEntrevista,
+    });
+  }, [
+    lead,
+    todosLosLeads,
+    form.dniCliente,
+    form.numeroRecibo,
+    form.comprasAdicionales,
+    form.idProducto,
+    form.resultadoEntrevista,
+  ]);
+
+  // Si el DNI del principal (u otro plan) aparece después, completar adicionales sin DNI.
+  useEffect(() => {
+    if (!open || !lead) return;
+    if (form.resultadoEntrevista !== 'compro') return;
+    const idsAdic = (form.comprasAdicionales ?? [])
+      .filter((c) => esPlanInversion(c.idProducto))
+      .map((c) => c.id);
+    const destinos = [...idsAdic, ...(adicionalDraftId ? [adicionalDraftId] : [])];
+    if (destinos.length === 0) return;
+    const fuentes = ['principal', ...idsAdic];
+    if (!hayDniPendienteDeClonar(form.imagenesCierre, destinos, fuentes)) return;
+    let cancelled = false;
+    void completarDniCierrePijEnVentas(lead.id, form.imagenesCierre, destinos, fuentes).then(
+      (imagenesCierre) => {
+        if (cancelled) return;
+        setForm((f) => {
+          if (imagenesCierre.length === f.imagenesCierre.length) return f;
+          return { ...f, imagenesCierre };
+        });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    open,
+    lead,
+    form.resultadoEntrevista,
+    form.comprasAdicionales,
+    form.imagenesCierre,
+    adicionalDraftId,
+  ]);
+
   if (!open || !lead) return null;
 
   const patch = (partial: Partial<FormState>) => setForm((f) => ({ ...f, ...partial }));
@@ -602,6 +709,22 @@ export function LeadModalForm({
       setAdicPijSerie('A');
       setAdicPijAdh('');
       setAdicPijAnexo('');
+      if (lead) {
+        const fuentesDni = [
+          'principal',
+          ...(form.comprasAdicionales ?? [])
+            .filter((c) => esPlanInversion(c.idProducto))
+            .map((c) => c.id),
+        ];
+        void completarDniCierrePijEnVentas(
+          lead.id,
+          form.imagenesCierre,
+          [draftId],
+          fuentesDni,
+        ).then((imagenesCierre) => {
+          setForm((f) => ({ ...f, imagenesCierre }));
+        });
+      }
     } else {
       setAdicionalDraftId('');
       setAdicionalForm({
@@ -959,6 +1082,12 @@ export function LeadModalForm({
     }
   };
 
+  /** Error de venta cerca del botón Guardar (si no, el vendedor cree que “guardó y no cargó”). */
+  const rechazarVenta = (msg: string) => {
+    setErrorVenta(msg);
+    setErrorForm(msg);
+  };
+
   const handleGuardar = (e?: FormEvent, opciones?: { actualizarFechaCierre?: boolean }) => {
     e?.preventDefault();
     setErrorForm('');
@@ -1073,27 +1202,27 @@ export function LeadModalForm({
 
     if (form.resultadoEntrevista === 'compro') {
       if (!form.idProducto) {
-        setErrorVenta('Seleccioná el producto que compró.');
+        rechazarVenta('Seleccioná el producto que compró.');
         return;
       }
       if (!puedeVenderProducto(productos, rol, form.idProducto)) {
-        setErrorVenta('Tu rol no puede registrar la venta de ese producto.');
+        rechazarVenta('Tu rol no puede registrar la venta de ese producto.');
         return;
       }
       if (!form.estadoPago) {
-        setErrorVenta('Indicá el estado del pago.');
+        rechazarVenta('Indicá el estado del pago.');
         return;
       }
       if (esPlanInversion(form.idProducto) && form.estadoPago !== 'entrega_33') {
-        setErrorVenta('Seleccioná Entrega $33.000.');
+        rechazarVenta('Seleccioná Entrega $33.000.');
         return;
       }
       if (esTerreno(form.idProducto) && !form.idBarrio) {
-        setErrorVenta('Seleccioná el barrio del terreno.');
+        rechazarVenta('Seleccioná el barrio del terreno.');
         return;
       }
       if (requiereNumeroRecibo(form.idProducto, form.estadoPago) && !form.numeroRecibo.trim()) {
-        setErrorVenta(mensajeErrorNumeroDocumentoVenta(form.idProducto));
+        rechazarVenta(mensajeErrorNumeroDocumentoVenta(form.idProducto));
         return;
       }
       if (esPlanInversion(form.idProducto) && pijAdh.trim()) {
@@ -1105,16 +1234,16 @@ export function LeadModalForm({
           form.comprasAdicionales,
         );
         if (dup) {
-          setErrorVenta(dup);
+          rechazarVenta(dup);
           return;
         }
         if (usaStockPijSerie(pijSerie)) {
           if (stockPijLoading) {
-            setErrorVenta('Esperá a que cargue el stock PIJ de caja.');
+            rechazarVenta('Esperá a que cargue el stock PIJ de caja.');
             return;
           }
           if (!stockPij?.configurado) {
-            setErrorVenta(
+            rechazarVenta(
               stockPij?.aviso ||
                 stockPijError ||
                 'No hay conexión al stock de caja. Configurá ERP_CAJA_INGEST_URL o pedí soporte.',
@@ -1126,7 +1255,7 @@ export function LeadModalForm({
             esPrincipal: true,
           }).some((o) => String(o.numero) === String(Number(pijAdh)));
           if (!adhOk) {
-            setErrorVenta(
+            rechazarVenta(
               `La adhesión ${pijSerie}${pijAdh} no está en tu stock asignado (serie C+).`,
             );
             return;
@@ -1140,14 +1269,14 @@ export function LeadModalForm({
           form.comprasAdicionales,
         );
         if (dup) {
-          setErrorVenta(dup);
+          rechazarVenta(dup);
           return;
         }
       }
       if (esPlanInversion(form.idProducto) && form.estadoPago === 'entrega_33') {
         const errDni = validarDniCliente(form.dniCliente);
         if (errDni) {
-          setErrorVenta(errDni);
+          rechazarVenta(errDni);
           return;
         }
         const errPago = validarMedioPagoPij(
@@ -1156,7 +1285,7 @@ export function LeadModalForm({
           form.montoTransferencia,
         );
         if (errPago) {
-          setErrorVenta(errPago);
+          rechazarVenta(errPago);
           return;
         }
         const errTitular = validarTitularTransferenciaPij(
@@ -1167,12 +1296,12 @@ export function LeadModalForm({
             : form.titularTransferencia,
         );
         if (errTitular) {
-          setErrorVenta(errTitular);
+          rechazarVenta(errTitular);
           return;
         }
         const errImg = validarImagenesCierrePij('principal', form.formaPago, form.imagenesCierre);
         if (errImg) {
-          setErrorVenta(errImg);
+          rechazarVenta(errImg);
           return;
         }
       }
@@ -1184,7 +1313,7 @@ export function LeadModalForm({
             compra.montoTransferencia,
           );
           if (errAdic) {
-            setErrorVenta(`Compra adicional: ${errAdic}`);
+            rechazarVenta(`Compra adicional: ${errAdic}`);
             return;
           }
           const errImgAdic = validarImagenesCierrePij(
@@ -1193,7 +1322,7 @@ export function LeadModalForm({
             form.imagenesCierre,
           );
           if (errImgAdic) {
-            setErrorVenta(`Compra adicional: ${errImgAdic}`);
+            rechazarVenta(`Compra adicional: ${errImgAdic}`);
             return;
           }
         }
@@ -1602,6 +1731,57 @@ export function LeadModalForm({
             onSubmit={handleGuardar}
             className="flex-1 space-y-6 overflow-y-auto overscroll-contain px-4 py-5"
           >
+            {planesCompradosPersona.length > 0 && (
+              <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-4 space-y-3">
+                <div>
+                  <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                    Planes comprados
+                  </h4>
+                  <p className="mt-0.5 text-[12px] text-zinc-500">
+                    Plan Inversión Joven de esta persona (mismo DNI o teléfono).
+                  </p>
+                </div>
+                <ul className="space-y-2">
+                  {planesCompradosPersona.map((plan) => (
+                    <li
+                      key={plan.key}
+                      className="rounded-lg border border-zinc-200 bg-white px-3 py-2.5"
+                    >
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="inline-flex rounded-md border border-brand-200 bg-brand-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-800">
+                          PIJ
+                        </span>
+                        <span className="text-[15px] font-semibold tabular-nums text-zinc-900">
+                          Adhesión {plan.adhesionDisplay}
+                        </span>
+                        {plan.anexo ? (
+                          <span className="text-[12px] tabular-nums text-zinc-500">
+                            · Anexo {plan.anexo}
+                          </span>
+                        ) : null}
+                        {!plan.esPrincipal && (
+                          <span className="text-[11px] font-medium text-zinc-400">
+                            · adicional
+                          </span>
+                        )}
+                        {!plan.esLeadActual && (
+                          <span className="text-[11px] font-medium text-zinc-400">
+                            · otro lead
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-[12px] text-zinc-500">
+                        {plan.numeroRecibo}
+                        {plan.fechaCierre
+                          ? ` · ${formatearFechaCierreCorta(plan.fechaCierre) ?? ''}`
+                          : ''}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <fieldset disabled={soloLectura} className="m-0 space-y-6 border-0 p-0">
               {/* Información de la encuesta (Conoce MPC / Sabía PIJ) */}
               {(lead.conoceMpc !== null || lead.sabiaPlanInversionJoven !== null) && (
@@ -2219,9 +2399,15 @@ export function LeadModalForm({
                       )}
 
                     {showCompro && !soloLectura && (
-                      <div className="space-y-5 rounded-xl border border-brand-100 bg-brand-50 p-4">
+                      <div
+                        className={`space-y-5 rounded-xl border p-4 ${
+                          form.idProducto
+                            ? temaProductoVenta(form.idProducto).panel
+                            : 'border-zinc-200 bg-zinc-50'
+                        }`}
+                      >
                         {lead.seguimiento?.fechaCierre && (
-                          <div className="text-[13px] font-semibold text-brand-800">
+                          <div className={`text-[13px] font-semibold ${temaProductoVenta(form.idProducto || idProductoCierre).titulo}`}>
                             Cierre registrado el:{' '}
                             {(() => {
                               try {
@@ -2239,19 +2425,25 @@ export function LeadModalForm({
                             })()}
                           </div>
                         )}
-                        {/* Producto */}
+                        {/* Producto: tarjetas bien diferenciadas */}
                         <div className="space-y-2">
                           <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                              ¿Qué producto cerró?
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-600">
+                              1 · ¿Qué producto cerró?
                             </p>
                             <p className="mt-0.5 text-[12px] text-zinc-500">
-                              {rol === 'promotor' ? 'Solo Plan Inversión Joven' : 'Plan Inversión Joven o Terreno'}
+                              Elegí uno. El formulario cambia según el producto.
                             </p>
                           </div>
-                          <div className="space-y-2">
+                          <div
+                            className={`grid gap-2 ${
+                              productosDisponibles.length > 1 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'
+                            }`}
+                          >
                             {productosDisponibles.map((prod) => {
                               const sel = form.idProducto === prod.id;
+                              const tema = temaProductoVenta(prod.id);
+                              const esPij = esPlanInversion(prod.id);
                               return (
                                 <button
                                   key={prod.id}
@@ -2261,23 +2453,52 @@ export function LeadModalForm({
                                     patch(resetCamposAlCambiarProducto(prod.id));
                                   }}
                                   style={{ touchAction: 'manipulation' }}
-                                  className={`h-12 w-full rounded-lg border px-4 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${sel
-                                      ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
-                                      : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
-                                    }`}
+                                  className={`min-h-[72px] rounded-xl border-2 px-3 py-3 text-left transition-all duration-[140ms] ease-out active:scale-[0.99] ${
+                                    sel
+                                      ? tema.acentoSel
+                                      : `${tema.acentoIdle} border-dashed`
+                                  }`}
                                 >
-                                  {prod.nombre}
+                                  <span
+                                    className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                                      sel
+                                        ? 'border-white/40 bg-white/15 text-white'
+                                        : tema.chip
+                                    }`}
+                                  >
+                                    {esPij ? 'PIJ' : 'Lote'}
+                                  </span>
+                                  <span className="mt-1.5 block text-[15px] font-semibold leading-snug">
+                                    {esPij ? 'Plan Inversión Joven' : 'Terreno'}
+                                  </span>
+                                  <span
+                                    className={`mt-0.5 block text-[12px] font-normal ${
+                                      sel ? 'text-white/85' : 'text-zinc-500'
+                                    }`}
+                                  >
+                                    {esPij
+                                      ? 'Adhesión · anexo · entrega $33.000'
+                                      : 'Barrio · seña o 100% · recibo'}
+                                  </span>
                                 </button>
                               );
                             })}
                           </div>
                         </div>
 
+                        {form.idProducto && (
+                          <div
+                            className={`rounded-lg border px-3 py-2 text-[13px] font-semibold ${temaProductoVenta(form.idProducto).chip}`}
+                          >
+                            Cargando: {temaProductoVenta(form.idProducto).badge}
+                          </div>
+                        )}
+
                         {/* Barrio (solo terrenos) */}
                         {productoEsTerreno && (
                           <div className="space-y-2">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                              Barrio
+                              2 · Barrio
                             </p>
                             {barrios.length === 0 ? (
                               <p className="text-[13px] text-red-600">No hay barrios cargados.</p>
@@ -2328,11 +2549,13 @@ export function LeadModalForm({
                         {/* Estado del pago */}
                         {form.idProducto && opcionesPago.length > 0 && (
                           <div className="space-y-2">
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                              {tituloEstadoCompra(rol)}
+                            <p
+                              className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700"
+                            >
+                              {productoEsTerreno ? '3' : '2'} · {tituloEstadoCompra(rol)}
                             </p>
                             {productoEsPij && (
-                              <p className="text-[12px] text-zinc-500">
+                              <p className="text-[12px] text-zinc-600">
                                 La entrega de $33.000 equivale al cierre del plan.
                               </p>
                             )}
@@ -2340,6 +2563,7 @@ export function LeadModalForm({
                               {opcionesPago.map((op) => {
                                 const sel = form.estadoPago === op.value;
                                 const bloqueada = Boolean(op.disabled);
+                                const tema = temaProductoVenta(form.idProducto);
                                 return (
                                   <button
                                     key={op.value}
@@ -2358,8 +2582,8 @@ export function LeadModalForm({
                                     className={`min-h-[48px] w-full rounded-lg border px-4 py-2 text-left text-[15px] font-medium transition-all duration-[140ms] ease-out ${bloqueada
                                         ? 'cursor-not-allowed border-zinc-100 bg-zinc-50 text-zinc-400'
                                         : sel
-                                          ? 'border-brand-700 bg-brand-600 text-white active:bg-brand-700'
-                                          : 'border-zinc-200 bg-white text-zinc-800 active:bg-brand-50 active:border-brand-600 active:text-brand-700'
+                                          ? tema.acentoSel
+                                          : 'border-zinc-200 bg-white text-zinc-800 active:bg-white'
                                       }`}
                                   >
                                     {op.label}
@@ -2383,7 +2607,7 @@ export function LeadModalForm({
                         {productoEsPij && form.estadoPago === 'entrega_33' && (
                           <div className="space-y-1.5">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                              DNI del cliente
+                              3 · DNI del cliente
                             </p>
                             <input
                               type="text"
@@ -2403,6 +2627,10 @@ export function LeadModalForm({
                         )}
 
                         {productoEsPij && form.estadoPago === 'entrega_33' && (
+                          <div className="space-y-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
+                              4 · Medio de pago
+                            </p>
                           <MedioPagoPijFields
                             formaPago={form.formaPago}
                             montoEfectivo={form.montoEfectivo}
@@ -2443,12 +2671,13 @@ export function LeadModalForm({
                               patch({ titularTransferencia: value })
                             }
                           />
+                          </div>
                         )}
 
                         {muestraRecibo && (
                           <div className="space-y-2">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand-700">
-                              {etiquetaNumeroDocumentoVenta(form.idProducto)}
+                              {productoEsPij ? '5' : '4'} · {etiquetaNumeroDocumentoVenta(form.idProducto)}
                             </p>
                             {esPlanInversion(form.idProducto) ? (
                               // Entrada estructurada solo para PIJ (serie + adh + anexo)
@@ -2628,14 +2857,15 @@ export function LeadModalForm({
                         {form.comprasAdicionales && form.comprasAdicionales.length > 0 && (
                           <div className="space-y-2 mt-4">
                             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                              Compras Adicionales
+                              Compras adicionales en este cierre
                             </p>
                             <div className="space-y-2">
-                              {form.comprasAdicionales.map((compra) => {
-                                const prodNombre = getProductoNombre(compra.idProducto, productos) ?? compra.idProducto;
+                              {form.comprasAdicionales.map((compra, idx) => {
+                                const tema = temaProductoVenta(compra.idProducto);
+                                const esPijAdic = esPlanInversion(compra.idProducto);
                                 const pagoLabel = etiquetaEstadoPagoVisible(rol, compra.estadoPago, compra.idProducto);
                                 const barrioNombre = compra.idBarrio ? (getBarrioNombre(compra.idBarrio, barrios) ?? '') : '';
-                                const docLabel = esPlanInversion(compra.idProducto) ? 'Anexo' : 'Recibo';
+                                const docLabel = esPijAdic ? 'Adhesión / anexo' : 'Recibo';
                                 const medioPagoAdic = etiquetaMedioPagoPij(
                                   compra.formaPago,
                                   compra.montoCierre,
@@ -2643,18 +2873,29 @@ export function LeadModalForm({
                                   compra.montoTransferencia,
                                 );
                                 return (
-                                  <div key={compra.id} className="relative flex items-center justify-between rounded-lg border border-zinc-200 bg-white p-3 shadow-sm">
-                                    <div className="space-y-0.5">
-                                      <div className="text-[14px] font-semibold text-zinc-800">
-                                        {prodNombre}
+                                  <div
+                                    key={compra.id}
+                                    className={`relative flex items-start justify-between gap-2 rounded-xl border-2 p-3 ${tema.panel}`}
+                                  >
+                                    <div className="min-w-0 space-y-1">
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${tema.chip}`}>
+                                          {esPijAdic ? 'PIJ' : 'Terreno'}
+                                        </span>
+                                        <span className="text-[11px] font-semibold text-zinc-500">
+                                          {etiquetaOrdinalCompra(idx + 1)} adicional
+                                        </span>
                                       </div>
-                                      <div className="text-[12px] text-zinc-500 font-medium">
+                                      <div className={`text-[15px] font-semibold ${tema.titulo}`}>
+                                        {tema.badge}
+                                      </div>
+                                      <div className="text-[12px] font-medium text-zinc-600">
                                         {pagoLabel} {barrioNombre ? `· ${barrioNombre}` : ''}
                                       </div>
                                       {medioPagoAdic && (
                                         <div className="text-[12px] text-zinc-500">{medioPagoAdic}</div>
                                       )}
-                                      <div className="text-[12px] tabular-nums font-semibold text-brand-600">
+                                      <div className={`text-[13px] font-semibold tabular-nums ${tema.titulo}`}>
                                         {docLabel}: {compra.numeroRecibo}
                                       </div>
                                     </div>
@@ -2666,7 +2907,7 @@ export function LeadModalForm({
                                             comprasAdicionales: form.comprasAdicionales?.filter((c) => c.id !== compra.id)
                                           });
                                         }}
-                                        className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"
+                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-zinc-400 hover:bg-red-50 hover:text-red-600 active:scale-95 transition-all"
                                         title="Eliminar compra"
                                       >
                                         ✕
@@ -2683,7 +2924,11 @@ export function LeadModalForm({
                         {!soloLectura && (
                           <>
                             {!showAddAdicional && (
-                              <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                              <div className="mt-4 space-y-2">
+                                <p className="text-[12px] text-zinc-500">
+                                  ¿El cliente compró otro plan o terreno en la misma visita?
+                                </p>
+                                <div className="flex flex-col gap-2 sm:flex-row">
                                 {productosDisponibles.some((p) => esPlanInversion(p.id)) && (
                                   <button
                                     type="button"
@@ -2693,11 +2938,12 @@ export function LeadModalForm({
                                       setErrorVenta('');
                                     }}
                                     style={{ touchAction: 'manipulation' }}
-                                    className="flex-1 h-11 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-[13px] font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
+                                    className="flex-1 min-h-[52px] rounded-xl border-2 border-brand-200 bg-brand-50 px-3 py-2 text-left text-[13px] font-semibold text-brand-950 shadow-sm active:bg-brand-100"
                                   >
-                                    <span>
-                                      {labelAgregarCompraAdicional(indiceSiguienteAdicional, 'pij')}
+                                    <span className="block text-[10px] font-bold uppercase tracking-wide text-brand-700">
+                                      PIJ
                                     </span>
+                                    {labelAgregarCompraAdicional(indiceSiguienteAdicional, 'pij')}
                                   </button>
                                 )}
                                 {productosDisponibles.some((p) => esTerreno(p.id)) && (
@@ -2709,26 +2955,55 @@ export function LeadModalForm({
                                       setErrorVenta('');
                                     }}
                                     style={{ touchAction: 'manipulation' }}
-                                    className="flex-1 h-11 flex items-center justify-center gap-1.5 rounded-lg border border-zinc-200 bg-white text-[13px] font-semibold text-zinc-700 shadow-sm hover:bg-zinc-50 active:bg-zinc-100 transition-colors"
+                                    className="flex-1 min-h-[52px] rounded-xl border-2 border-zinc-300 bg-zinc-100 px-3 py-2 text-left text-[13px] font-semibold text-zinc-900 shadow-sm active:bg-zinc-200"
                                   >
-                                    <span>
-                                      {labelAgregarCompraAdicional(
-                                        indiceSiguienteAdicional,
-                                        'terreno',
-                                      )}
+                                    <span className="block text-[10px] font-bold uppercase tracking-wide text-zinc-600">
+                                      Terreno
                                     </span>
+                                    {labelAgregarCompraAdicional(
+                                      indiceSiguienteAdicional,
+                                      'terreno',
+                                    )}
                                   </button>
                                 )}
+                                </div>
                               </div>
                             )}
 
                             {showAddAdicional && (
-                              <div className="mt-4 rounded-xl border border-dashed border-brand-200 bg-zinc-50/50 p-4 space-y-4">
-                                <div className="flex items-center justify-between">
-                                  <h5 className="text-[12px] font-bold uppercase tracking-wider text-brand-800">
-                                    {etiquetaOrdinalCompra(indiceSiguienteAdicional)} compra adicional (
-                                    {showAddAdicional === 'pij' ? 'Plan' : 'Terreno'})
-                                  </h5>
+                              <div
+                                className={`mt-4 rounded-xl border-2 p-4 space-y-4 ${
+                                  showAddAdicional === 'pij'
+                                    ? 'border-brand-200 bg-brand-50/80'
+                                    : 'border-zinc-300 bg-zinc-100/80'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <span
+                                      className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                                        showAddAdicional === 'pij'
+                                          ? 'border-brand-200 bg-brand-100 text-brand-800'
+                                          : 'border-zinc-300 bg-zinc-200 text-zinc-800'
+                                      }`}
+                                    >
+                                      {showAddAdicional === 'pij' ? 'PIJ' : 'Terreno'}
+                                    </span>
+                                    <h5
+                                      className={`mt-1.5 text-[14px] font-bold ${
+                                        showAddAdicional === 'pij' ? 'text-brand-900' : 'text-zinc-900'
+                                      }`}
+                                    >
+                                      {etiquetaOrdinalCompra(indiceSiguienteAdicional)}{' '}
+                                      {showAddAdicional === 'pij'
+                                        ? 'Plan Inversión Joven'
+                                        : 'Terreno'}{' '}
+                                      adicional
+                                    </h5>
+                                    <p className="mt-0.5 text-[12px] text-zinc-600">
+                                      Completá solo los datos de esta compra.
+                                    </p>
+                                  </div>
                                   <button
                                     type="button"
                                     onClick={() => {
@@ -2742,7 +3017,7 @@ export function LeadModalForm({
                                       setAdicionalDraftId('');
                                       setShowAddAdicional(null);
                                     }}
-                                    className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-600"
+                                    className="shrink-0 rounded-lg px-2 py-1 text-[12px] font-semibold text-zinc-500 active:bg-white"
                                   >
                                     Cancelar
                                   </button>
@@ -2817,18 +3092,49 @@ export function LeadModalForm({
                                 )}
 
                                 {showAddAdicional === 'pij' && lead && adicionalDraftId && (
-                                  <ImagenesCierrePijFields
-                                    compact
-                                    leadId={lead.id}
-                                    ventaKey={adicionalDraftId}
-                                    formaPago={adicionalForm.formaPago}
-                                    imagenes={form.imagenesCierre}
-                                    editable
-                                    onChange={(imagenesCierre) => {
-                                      setErrorVenta('');
-                                      patch({ imagenesCierre });
-                                    }}
-                                  />
+                                  <div className="space-y-2">
+                                    {dniReutilizadoDesdeFuente(
+                                      form.imagenesCierre,
+                                      adicionalDraftId,
+                                      [
+                                        'principal',
+                                        ...(form.comprasAdicionales ?? [])
+                                          .filter((c) => esPlanInversion(c.idProducto))
+                                          .map((c) => c.id),
+                                      ],
+                                    ) ? (
+                                      <p className="text-[12px] text-zinc-500">
+                                        DNI reutilizado del plan principal (podés reemplazarlo).
+                                      </p>
+                                    ) : form.imagenesCierre.some(
+                                        (i) =>
+                                          i.ventaKey === 'principal' &&
+                                          (i.tipo === 'img1' || i.tipo === 'img2'),
+                                      ) ? (
+                                      <p className="text-[12px] text-amber-800">
+                                        No se pudo reutilizar el DNI del principal (archivo no
+                                        encontrado en este entorno). Subilo de nuevo acá o en el
+                                        plan principal.
+                                      </p>
+                                    ) : (
+                                      <p className="text-[12px] text-zinc-500">
+                                        Cuando cargues el DNI en el plan principal, se reutiliza
+                                        acá automáticamente.
+                                      </p>
+                                    )}
+                                    <ImagenesCierrePijFields
+                                      compact
+                                      leadId={lead.id}
+                                      ventaKey={adicionalDraftId}
+                                      formaPago={adicionalForm.formaPago}
+                                      imagenes={form.imagenesCierre}
+                                      editable
+                                      onChange={(imagenesCierre) => {
+                                        setErrorVenta('');
+                                        patch({ imagenesCierre });
+                                      }}
+                                    />
+                                  </div>
                                 )}
 
                                 <div className="space-y-1.5">
@@ -3156,7 +3462,32 @@ export function LeadModalForm({
                   onChange={(imagenesCierre) => {
                     setErrorForm('');
                     setErrorVenta('');
+                    const idsAdic = form.comprasAdicionales
+                      .filter((c) => esPlanInversion(c.idProducto))
+                      .map((c) => c.id);
+                    const destinos = [
+                      ...idsAdic,
+                      ...(adicionalDraftId ? [adicionalDraftId] : []),
+                    ];
                     patch({ imagenesCierre });
+                    if (!lead || destinos.length === 0) return;
+                    if (
+                      !hayDniPendienteDeClonar(imagenesCierre, destinos, [
+                        'principal',
+                        ...idsAdic,
+                      ])
+                    ) {
+                      return;
+                    }
+                    void completarDniCierrePijEnVentas(
+                      lead.id,
+                      imagenesCierre,
+                      destinos,
+                      ['principal', ...idsAdic],
+                    ).then((next) => {
+                      if (next.length === imagenesCierre.length) return;
+                      patch({ imagenesCierre: next });
+                    });
                   }}
                 />
                 {form.comprasAdicionales
@@ -3166,6 +3497,16 @@ export function LeadModalForm({
                       <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
                         Fotos — anexo adicional {compra.numeroRecibo}
                       </p>
+                      {dniReutilizadoDesdeFuente(form.imagenesCierre, compra.id, [
+                        'principal',
+                        ...form.comprasAdicionales
+                          .filter((c) => esPlanInversion(c.idProducto))
+                          .map((c) => c.id),
+                      ]) ? (
+                        <p className="mb-2 text-[12px] text-zinc-500">
+                          DNI reutilizado del plan principal (podés reemplazarlo).
+                        </p>
+                      ) : null}
                       <ImagenesCierrePijFields
                         compact
                         leadId={lead.id}

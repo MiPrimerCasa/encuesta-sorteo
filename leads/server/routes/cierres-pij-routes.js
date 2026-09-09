@@ -10,6 +10,7 @@ import {
 } from '../config/cierres-pij-config.js';
 import {
   archivoCierrePijDisponible,
+  copyCierrePijToLeadDir,
   ensureCierresPijStorageReady,
   getCierresPijRoot,
   moveCierrePijToLeadDir,
@@ -179,6 +180,73 @@ export function registerCierresPijRoutes(api, { usuarioDesdeRequest }) {
         return res.status(500).json({ error: 'Error al guardar la imagen' });
       }
     });
+  });
+
+  /** Copia en disco una foto existente a otro ventaKey (reutilizar DNI entre planes). */
+  api.post('/cierres-pij/imagenes/clonar', (req, res) => {
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuarioLogueado(usuario)) {
+      return res.status(401).json({ error: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    if (!permitirUploadUsuario(usuario.id)) {
+      return res.status(429).json({
+        error:
+          'Demasiadas fotos seguidas. Esperá un minuto e intentá de nuevo (máx. por minuto).',
+      });
+    }
+
+    const leadId = String(req.body?.leadId ?? '').trim();
+    const ventaKey = String(req.body?.ventaKey ?? '').trim();
+    const tipo = String(req.body?.tipo ?? '').trim();
+    const storagePath = String(req.body?.storagePath ?? '').trim();
+    const mimeType = String(req.body?.mimeType ?? 'image/jpeg').trim() || 'image/jpeg';
+    const nombreOriginal = req.body?.nombreOriginal
+      ? String(req.body.nombreOriginal).slice(0, 120)
+      : null;
+
+    if (!leadId) return res.status(400).json({ error: 'Falta leadId' });
+    if (!ventaKey) {
+      return res.status(400).json({ error: 'Falta ventaKey (principal o id de compra adicional)' });
+    }
+    if (!TIPOS_IMAGEN.has(tipo)) {
+      return res.status(400).json({ error: 'tipo inválido (img1 | img2 | img5 | img6 | img7)' });
+    }
+    if (!storagePath) return res.status(400).json({ error: 'Falta storagePath de la imagen origen' });
+
+    try {
+      const finalPath = copyCierrePijToLeadDir(storagePath, { leadId, tipo, ventaKey });
+      const st = statSync(finalPath);
+      const relative = toRelativeCierrePijPath(finalPath).replace(/\\/g, '/');
+      const imagen = {
+        id: randomUUID(),
+        leadId,
+        ventaKey,
+        tipo,
+        storagePath: relative,
+        mimeType,
+        tamanoBytes: st.size,
+        nombreOriginal,
+        subidoEn: new Date().toISOString(),
+        operadorId: usuario.id != null ? String(usuario.id) : null,
+      };
+      if (!archivoCierrePijDisponible(imagen.storagePath)) {
+        return res.status(500).json({ error: 'No se pudo verificar la imagen clonada en disco' });
+      }
+      console.info(
+        '[cierres-pij] clonada lead=%s tipo=%s venta=%s path=%s',
+        leadId,
+        tipo,
+        ventaKey,
+        imagen.storagePath,
+      );
+      return res.json({ imagen });
+    } catch (e) {
+      const status = e?.status && Number.isFinite(e.status) ? e.status : 500;
+      console.error('[cierres-pij] clonar error:', e);
+      return res.status(status).json({
+        error: e instanceof Error ? e.message : 'Error al clonar la imagen',
+      });
+    }
   });
 
   api.get('/cierres-pij/imagenes/:imageId', (req, res) => {

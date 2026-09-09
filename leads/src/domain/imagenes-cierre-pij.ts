@@ -1,4 +1,4 @@
-import type { FormaPago, TipoImagenCierrePij } from '../types';
+import type { FormaPago, ImagenCierrePij, TipoImagenCierrePij } from '../types';
 
 /** Códigos alineados al sistema de administración (img1, img2, img5, img6, img7). */
 export const ETIQUETAS_IMAGEN_CIERRE_PIJ: Record<TipoImagenCierrePij, string> = {
@@ -8,6 +8,110 @@ export const ETIQUETAS_IMAGEN_CIERRE_PIJ: Record<TipoImagenCierrePij, string> = 
   img6: 'Foto de anexo',
   img7: 'Comprobante de transferencia',
 };
+
+/** DNI frente/reverso: se reutilizan entre planes del mismo lead. */
+export const TIPOS_DNI_CIERRE_PIJ: TipoImagenCierrePij[] = ['img1', 'img2'];
+
+function imagenDeTipoEnVenta(
+  imagenes: ImagenCierrePij[],
+  ventaKey: string,
+  tipo: TipoImagenCierrePij,
+): ImagenCierrePij | undefined {
+  return imagenes.find(
+    (i) =>
+      i.ventaKey === ventaKey &&
+      normalizarTipoImagenCierrePij(i.tipo) === tipo &&
+      Boolean(i.storagePath),
+  );
+}
+
+/**
+ * Slots DNI faltantes en destinos, con la imagen fuente a clonar (archivo real).
+ * No inventa metadatos: el clon debe copiar el archivo vía API.
+ */
+export type DniPendienteClonar = {
+  destinoVentaKey: string;
+  tipo: TipoImagenCierrePij;
+  fuente: ImagenCierrePij;
+};
+
+export function listarDniPendientesDeClonar(
+  imagenes: ImagenCierrePij[] | null | undefined,
+  destinos: string[],
+  fuentesPrioridad: string[],
+): DniPendienteClonar[] {
+  const list = imagenes ?? [];
+  const out: DniPendienteClonar[] = [];
+  for (const dest of destinos) {
+    if (!dest) continue;
+    for (const tipo of TIPOS_DNI_CIERRE_PIJ) {
+      if (imagenDeTipoEnVenta(list, dest, tipo)) continue;
+      let fuente: ImagenCierrePij | undefined;
+      for (const vk of fuentesPrioridad) {
+        if (vk === dest) continue;
+        fuente = imagenDeTipoEnVenta(list, vk, tipo);
+        if (fuente) break;
+      }
+      if (fuente) out.push({ destinoVentaKey: dest, tipo, fuente });
+    }
+  }
+  return out;
+}
+
+/**
+ * @deprecated Preferir listarDniPendientesDeClonar + clonarImagenCierrePij (copia en disco).
+ * Metadatos solos dejan vista previa rota.
+ */
+export function clonarDniEntreVentas(
+  imagenes: ImagenCierrePij[] | null | undefined,
+  destinoVentaKey: string,
+  fuentesPrioridad: string[],
+): ImagenCierrePij[] {
+  void destinoVentaKey;
+  void fuentesPrioridad;
+  return [...(imagenes ?? [])];
+}
+
+/** @deprecated Ver clonarDniEntreVentas. */
+export function propagarDniAVentasSinDni(
+  imagenes: ImagenCierrePij[] | null | undefined,
+  destinos: string[],
+  fuentesPrioridad: string[],
+): ImagenCierrePij[] {
+  void destinos;
+  void fuentesPrioridad;
+  return [...(imagenes ?? [])];
+}
+
+/**
+ * True si el destino ya tiene DNI y otra venta del cierre también (típico tras reutilizar).
+ */
+export function dniReutilizadoDesdeFuente(
+  imagenes: ImagenCierrePij[] | null | undefined,
+  destinoVentaKey: string,
+  fuentesPrioridad: string[],
+): boolean {
+  const list = imagenes ?? [];
+  for (const tipo of TIPOS_DNI_CIERRE_PIJ) {
+    const dest = imagenDeTipoEnVenta(list, destinoVentaKey, tipo);
+    if (!dest?.storagePath) continue;
+    for (const vk of fuentesPrioridad) {
+      if (vk === destinoVentaKey) continue;
+      const src = imagenDeTipoEnVenta(list, vk, tipo);
+      if (src && src.id !== dest.id) return true;
+    }
+  }
+  return false;
+}
+
+/** True si algún destino aún no tiene img1/img2 y hay fuente disponible. */
+export function hayDniPendienteDeClonar(
+  imagenes: ImagenCierrePij[] | null | undefined,
+  destinos: string[],
+  fuentesPrioridad: string[],
+): boolean {
+  return listarDniPendientesDeClonar(imagenes, destinos, fuentesPrioridad).length > 0;
+}
 
 /** Orden de carga en el formulario. */
 export const SLOTS_IMAGEN_CIERRE_PIJ: TipoImagenCierrePij[] = [

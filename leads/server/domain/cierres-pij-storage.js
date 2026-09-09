@@ -130,3 +130,31 @@ export function moveCierrePijToLeadDir(tempAbsolutePath, { leadId, tipo, ventaKe
   }
   return destAbsolute;
 }
+
+/**
+ * Copia un archivo ya guardado a un nuevo nombre para otro ventaKey (reutilizar DNI).
+ * @returns {string} ruta absoluta del destino
+ */
+export function copyCierrePijToLeadDir(sourceAbsoluteOrRelative, { leadId, tipo, ventaKey }) {
+  const src = resolveCierrePijPath(sourceAbsoluteOrRelative);
+  if (!src) {
+    throw Object.assign(new Error('Imagen origen no encontrada en disco'), { status: 404 });
+  }
+  const root = getCierresPijRoot();
+  const leadDir = path.join(root, sanitizeLeadIdForPath(leadId));
+  mkdirSync(leadDir, { recursive: true });
+
+  const ext = path.extname(src).toLowerCase() || '.jpg';
+  const safeVenta = String(ventaKey ?? 'principal')
+    .trim()
+    .replace(/[^\w.-]+/g, '_')
+    .slice(0, 40) || 'principal';
+  const safeTipo = String(tipo ?? 'img')
+    .trim()
+    .replace(/[^\w.-]+/g, '_')
+    .slice(0, 32) || 'img';
+  const destName = `${safeTipo}__${safeVenta}__${randomUUID()}${ext}`;
+  const destAbsolute = path.join(leadDir, destName);
+  copyFileSync(src, destAbsolute);
+  return destAbsolute;
+}

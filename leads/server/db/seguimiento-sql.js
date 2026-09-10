@@ -826,8 +826,13 @@ async function sincronizarImagenesBytesSql(leadId, idSeguimiento, imagenes, oper
 
   const pool = await getSqlPoolEncuestas();
   const proc = 'dbo.SP_RegistrarImagenCierrePij';
+  /** Mismo id de DNI compartido entre planes: un solo envío de bytes a SQL. */
+  const idsBytesYaEnviados = new Set();
 
   for (const img of imagenes) {
+    const idImg = String(img?.id ?? '').trim();
+    if (idImg && idsBytesYaEnviados.has(idImg)) continue;
+
     const absPath = resolveCierrePijPath(img.storagePath);
     if (!absPath) continue;
 
@@ -866,11 +871,49 @@ async function sincronizarImagenesBytesSql(leadId, idSeguimiento, imagenes, oper
       const fila = result.recordset?.[0];
       if (fila?.codigo !== 1) {
         console.warn('[seguimiento] imagen bytes SQL:', fila?.mensaje ?? tipo);
+      } else if (idImg) {
+        idsBytesYaEnviados.add(idImg);
       }
     } catch (error) {
       if (isSpMissing(error)) return;
       console.warn('[seguimiento] imagen bytes SQL error:', seguimientoErrorText(error));
     }
+  }
+}
+
+/**
+ * Lee bytes de una imagen PIJ desde SQL (fallback si no está en disco).
+ * No hay sync/pull automático VPS ↔ PC local.
+ * @returns {Promise<{ buffer: Buffer, mimeType: string, storagePath: string|null } | null>}
+ */
+export async function leerContenidoImagenCierrePijPorId(idImagen) {
+  const id = String(idImagen ?? '').trim();
+  if (!id || !useSeguimientoSql()) return null;
+  try {
+    const pool = await getSqlPoolEncuestas();
+    const result = await pool
+      .request()
+      .input('id_imagen', sql.NVarChar(36), id.slice(0, 36))
+      .query(`
+        SELECT TOP 1 mime_type, storage_path, contenido
+        FROM dbo.registrarSeguimientoLead_imagen
+        WHERE id_imagen = @id_imagen AND contenido IS NOT NULL
+        ORDER BY id DESC
+      `);
+    const row = result.recordset?.[0];
+    if (!row?.contenido) return null;
+    const buffer = Buffer.isBuffer(row.contenido)
+      ? row.contenido
+      : Buffer.from(row.contenido);
+    if (!buffer.length) return null;
+    return {
+      buffer,
+      mimeType: String(row.mime_type || 'image/jpeg'),
+      storagePath: row.storage_path ? String(row.storage_path) : null,
+    };
+  } catch (error) {
+    console.warn('[seguimiento] leer imagen SQL:', seguimientoErrorText(error));
+    return null;
   }
 }
 

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Drawer } from 'vaul';
-import { completarDniCierrePijEnVentas } from '../../api/client';
 import {
   ETIQUETAS_IMAGEN_CIERRE_PIJ,
   dniReutilizadoDesdeFuente,
+  propagarDniAVentasSinDni,
   tiposFotosCierrePijFaltantes,
 } from '../../domain/imagenes-cierre-pij';
 import type {
@@ -40,31 +40,22 @@ export function CargarFotosFaltantesSheet({ open, lead, onClose, onSave }: Props
 
   useEffect(() => {
     if (!open || !lead) return;
-    let cancelled = false;
     const idsAdic = (lead.seguimiento?.comprasAdicionales ?? [])
       .filter((c) => esPlanInversion(c.idProducto))
       .map((c) => c.id);
     const fuentes = ['principal', ...idsAdic];
     const destinos = ['principal', ...idsAdic];
-    const base = [...(lead.seguimiento?.imagenesCierre ?? [])];
-    setImagenes(base);
+    const actuales = propagarDniAVentasSinDni(
+      lead.seguimiento?.imagenesCierre ?? [],
+      destinos,
+      fuentes,
+    );
+    setImagenes(actuales);
     setSlotsPedidos(
-      tiposFotosCierrePijFaltantes('principal', lead.seguimiento?.formaPago, base),
+      tiposFotosCierrePijFaltantes('principal', lead.seguimiento?.formaPago, actuales),
     );
     setError('');
     setGuardando(false);
-
-    void completarDniCierrePijEnVentas(lead.id, base, destinos, fuentes).then((actuales) => {
-      if (cancelled) return;
-      setImagenes(actuales);
-      setSlotsPedidos(
-        tiposFotosCierrePijFaltantes('principal', lead.seguimiento?.formaPago, actuales),
-      );
-    });
-
-    return () => {
-      cancelled = true;
-    };
   }, [open, lead]);
 
   const aunFaltan = lead
@@ -161,7 +152,7 @@ export function CargarFotosFaltantesSheet({ open, lead, onClose, onSave }: Props
               <div className="space-y-2">
                 {dniReutilizado ? (
                   <p className="text-[12px] text-zinc-500">
-                    DNI reutilizado de otro plan de este cierre (podés reemplazarlo).
+                    DNI compartido con otro plan de este cierre (un solo archivo en el servidor).
                   </p>
                 ) : null}
                 <ImagenesCierrePijFields
@@ -175,18 +166,12 @@ export function CargarFotosFaltantesSheet({ open, lead, onClose, onSave }: Props
                   ayuda="Subí solo lo que falta. Al guardar se reenvían a caja y la fecha de cierre se mantiene."
                   onChange={(next) => {
                     setError('');
-                    setImagenes(next);
                     const idsAdic = (lead.seguimiento?.comprasAdicionales ?? [])
                       .filter((c) => esPlanInversion(c.idProducto))
                       .map((c) => c.id);
-                    void completarDniCierrePijEnVentas(
-                      lead.id,
-                      next,
-                      idsAdic,
-                      ['principal', ...idsAdic],
-                    ).then((propagadas) => {
-                      if (propagadas.length !== next.length) setImagenes(propagadas);
-                    });
+                    setImagenes(
+                      propagarDniAVentasSinDni(next, idsAdic, ['principal', ...idsAdic]),
+                    );
                   }}
                 />
               </div>

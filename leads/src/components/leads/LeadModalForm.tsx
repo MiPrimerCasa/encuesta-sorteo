@@ -59,18 +59,19 @@ import {
   etiquetaMedioPagoPij,
 } from '../../domain/venta';
 import {
-  dniReutilizadoDesdeFuente,
+  clonarDniEntreVentas,
   faltanFotosCierrePij,
   hayDniPendienteDeClonar,
+  propagarDniAVentasSinDni,
+  tiposFotoVariablesPorPlan,
   validarImagenesCierrePij,
 } from '../../domain/imagenes-cierre-pij';
-import { completarDniCierrePijEnVentas } from '../../api/client';
 import { planesPijDeLaMismaPersona } from '../../domain/planes-comprados-persona';
 import { normalizarDniCliente, validarDniCliente } from '../../domain/dni-cliente';
 import { etiquetaCajaEstadoUi, variantCajaEstado, detalleCajaEstado } from '../../domain/caja-estado';
 import { StatusPill } from '../ui/StatusPill';
 import { MedioPagoPijFields } from './MedioPagoPijFields';
-import { ImagenesCierrePijFields } from './ImagenesCierrePijFields';
+import { ImagenesCierrePijFields, VistaPreviaDniCompartido } from './ImagenesCierrePijFields';
 import { BadgesFotosCierrePij } from './BadgesFotosCierrePij';
 import type {
   Barrio,
@@ -622,6 +623,7 @@ export function LeadModalForm({
   ]);
 
   // Si el DNI del principal (u otro plan) aparece después, completar adicionales sin DNI.
+  // Comparte el mismo archivo (mismo id/path); no duplica en disco.
   useEffect(() => {
     if (!open || !lead) return;
     if (form.resultadoEntrevista !== 'compro') return;
@@ -632,19 +634,11 @@ export function LeadModalForm({
     if (destinos.length === 0) return;
     const fuentes = ['principal', ...idsAdic];
     if (!hayDniPendienteDeClonar(form.imagenesCierre, destinos, fuentes)) return;
-    let cancelled = false;
-    void completarDniCierrePijEnVentas(lead.id, form.imagenesCierre, destinos, fuentes).then(
-      (imagenesCierre) => {
-        if (cancelled) return;
-        setForm((f) => {
-          if (imagenesCierre.length === f.imagenesCierre.length) return f;
-          return { ...f, imagenesCierre };
-        });
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
+    setForm((f) => {
+      const next = propagarDniAVentasSinDni(f.imagenesCierre, destinos, fuentes);
+      if (next.length === f.imagenesCierre.length) return f;
+      return { ...f, imagenesCierre: next };
+    });
   }, [
     open,
     lead,
@@ -709,22 +703,18 @@ export function LeadModalForm({
       setAdicPijSerie('A');
       setAdicPijAdh('');
       setAdicPijAnexo('');
-      if (lead) {
+      setForm((f) => {
         const fuentesDni = [
           'principal',
-          ...(form.comprasAdicionales ?? [])
+          ...(f.comprasAdicionales ?? [])
             .filter((c) => esPlanInversion(c.idProducto))
             .map((c) => c.id),
         ];
-        void completarDniCierrePijEnVentas(
-          lead.id,
-          form.imagenesCierre,
-          [draftId],
-          fuentesDni,
-        ).then((imagenesCierre) => {
-          setForm((f) => ({ ...f, imagenesCierre }));
-        });
-      }
+        return {
+          ...f,
+          imagenesCierre: clonarDniEntreVentas(f.imagenesCierre, draftId, fuentesDni),
+        };
+      });
     } else {
       setAdicionalDraftId('');
       setAdicionalForm({
@@ -859,9 +849,24 @@ export function LeadModalForm({
           )
         : form.imagenesCierre;
 
+    const imagenesConDniCompartido =
+      showAddAdicional === 'pij'
+        ? propagarDniAVentasSinDni(
+            imagenesRemapeadas,
+            [newCompra.id],
+            [
+              'principal',
+              ...(form.comprasAdicionales ?? [])
+                .filter((c) => esPlanInversion(c.idProducto))
+                .map((c) => c.id),
+              newCompra.id,
+            ],
+          )
+        : imagenesRemapeadas;
+
     patch({
       comprasAdicionales: [...(form.comprasAdicionales || []), newCompra],
-      imagenesCierre: imagenesRemapeadas,
+      imagenesCierre: imagenesConDniCompartido,
     });
 
     if (seguirAgregando) {
@@ -3093,35 +3098,15 @@ export function LeadModalForm({
 
                                 {showAddAdicional === 'pij' && lead && adicionalDraftId && (
                                   <div className="space-y-2">
-                                    {dniReutilizadoDesdeFuente(
-                                      form.imagenesCierre,
-                                      adicionalDraftId,
-                                      [
+                                    <VistaPreviaDniCompartido
+                                      imagenes={form.imagenesCierre}
+                                      fuentesPrioridad={[
                                         'principal',
                                         ...(form.comprasAdicionales ?? [])
                                           .filter((c) => esPlanInversion(c.idProducto))
                                           .map((c) => c.id),
-                                      ],
-                                    ) ? (
-                                      <p className="text-[12px] text-zinc-500">
-                                        DNI reutilizado del plan principal (podés reemplazarlo).
-                                      </p>
-                                    ) : form.imagenesCierre.some(
-                                        (i) =>
-                                          i.ventaKey === 'principal' &&
-                                          (i.tipo === 'img1' || i.tipo === 'img2'),
-                                      ) ? (
-                                      <p className="text-[12px] text-amber-800">
-                                        No se pudo reutilizar el DNI del principal (archivo no
-                                        encontrado en este entorno). Subilo de nuevo acá o en el
-                                        plan principal.
-                                      </p>
-                                    ) : (
-                                      <p className="text-[12px] text-zinc-500">
-                                        Cuando cargues el DNI en el plan principal, se reutiliza
-                                        acá automáticamente.
-                                      </p>
-                                    )}
+                                      ]}
+                                    />
                                     <ImagenesCierrePijFields
                                       compact
                                       leadId={lead.id}
@@ -3129,6 +3114,9 @@ export function LeadModalForm({
                                       formaPago={adicionalForm.formaPago}
                                       imagenes={form.imagenesCierre}
                                       editable
+                                      soloTipos={tiposFotoVariablesPorPlan(adicionalForm.formaPago)}
+                                      titulo="Fotos de este plan"
+                                      ayuda="Adhesión, anexo y comprobante son de este plan. El DNI se reutiliza del principal."
                                       onChange={(imagenesCierre) => {
                                         setErrorVenta('');
                                         patch({ imagenesCierre });
@@ -3469,44 +3457,28 @@ export function LeadModalForm({
                       ...idsAdic,
                       ...(adicionalDraftId ? [adicionalDraftId] : []),
                     ];
-                    patch({ imagenesCierre });
-                    if (!lead || destinos.length === 0) return;
-                    if (
-                      !hayDniPendienteDeClonar(imagenesCierre, destinos, [
-                        'principal',
-                        ...idsAdic,
-                      ])
-                    ) {
-                      return;
-                    }
-                    void completarDniCierrePijEnVentas(
-                      lead.id,
-                      imagenesCierre,
-                      destinos,
-                      ['principal', ...idsAdic],
-                    ).then((next) => {
-                      if (next.length === imagenesCierre.length) return;
-                      patch({ imagenesCierre: next });
+                    patch({
+                      imagenesCierre: propagarDniAVentasSinDni(
+                        imagenesCierre,
+                        destinos,
+                        ['principal', ...idsAdic],
+                      ),
                     });
                   }}
                 />
                 {form.comprasAdicionales
                   .filter((c) => esPlanInversion(c.idProducto) && c.estadoPago === 'entrega_33')
                   .map((compra) => (
-                    <div key={compra.id} className="mt-4">
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                        Fotos — anexo adicional {compra.numeroRecibo}
-                      </p>
-                      {dniReutilizadoDesdeFuente(form.imagenesCierre, compra.id, [
-                        'principal',
-                        ...form.comprasAdicionales
-                          .filter((c) => esPlanInversion(c.idProducto))
-                          .map((c) => c.id),
-                      ]) ? (
-                        <p className="mb-2 text-[12px] text-zinc-500">
-                          DNI reutilizado del plan principal (podés reemplazarlo).
-                        </p>
-                      ) : null}
+                    <div key={compra.id} className="mt-4 space-y-2">
+                      <VistaPreviaDniCompartido
+                        imagenes={form.imagenesCierre}
+                        fuentesPrioridad={[
+                          'principal',
+                          ...form.comprasAdicionales
+                            .filter((c) => esPlanInversion(c.idProducto))
+                            .map((c) => c.id),
+                        ]}
+                      />
                       <ImagenesCierrePijFields
                         compact
                         leadId={lead.id}
@@ -3514,6 +3486,9 @@ export function LeadModalForm({
                         formaPago={compra.formaPago ?? null}
                         imagenes={form.imagenesCierre}
                         editable
+                        soloTipos={tiposFotoVariablesPorPlan(compra.formaPago ?? null)}
+                        titulo={`Fotos — plan ${compra.numeroRecibo}`}
+                        ayuda="Adhesión, anexo y comprobante de este plan."
                         onChange={(imagenesCierre) => {
                           setErrorForm('');
                           setErrorVenta('');
@@ -3524,6 +3499,84 @@ export function LeadModalForm({
                   ))}
               </div>
             )}
+
+            {/* Cierre ya guardado: consultar fotos en el modal (disco VPS o SQL). */}
+            {productoEsPij &&
+              yaEsCierreCompro &&
+              lead &&
+              (form.imagenesCierre.length > 0 ||
+                (lead.seguimiento?.imagenesCierre?.length ?? 0) > 0) && (
+                <div className="space-y-3 border-t border-zinc-100 px-0 pt-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                    Fotos del cierre
+                  </p>
+                  <p className="text-[12px] text-zinc-500">
+                    Consultá si están en este servidor (disco o SQL). No hay descarga automática
+                    desde otro entorno.
+                  </p>
+                  <ImagenesCierrePijFields
+                    leadId={lead.id}
+                    ventaKey="principal"
+                    formaPago={formaPagoCierre}
+                    imagenes={
+                      form.imagenesCierre.length > 0
+                        ? form.imagenesCierre
+                        : (lead.seguimiento?.imagenesCierre ?? [])
+                    }
+                    editable={!soloLectura}
+                    titulo="Plan principal"
+                    onChange={(imagenesCierre) => {
+                      if (soloLectura) return;
+                      setErrorForm('');
+                      setErrorVenta('');
+                      patch({ imagenesCierre });
+                    }}
+                  />
+                  {(form.comprasAdicionales.length
+                    ? form.comprasAdicionales
+                    : lead.seguimiento?.comprasAdicionales ?? []
+                  )
+                    .filter((c) => esPlanInversion(c.idProducto))
+                    .map((compra) => {
+                      const imgs =
+                        form.imagenesCierre.length > 0
+                          ? form.imagenesCierre
+                          : (lead.seguimiento?.imagenesCierre ?? []);
+                      return (
+                        <div key={compra.id} className="space-y-2">
+                          <VistaPreviaDniCompartido
+                            imagenes={imgs}
+                            fuentesPrioridad={[
+                              'principal',
+                              ...(form.comprasAdicionales.length
+                                ? form.comprasAdicionales
+                                : lead.seguimiento?.comprasAdicionales ?? []
+                              )
+                                .filter((c) => esPlanInversion(c.idProducto))
+                                .map((c) => c.id),
+                            ]}
+                          />
+                          <ImagenesCierrePijFields
+                            compact
+                            leadId={lead.id}
+                            ventaKey={compra.id}
+                            formaPago={compra.formaPago ?? null}
+                            imagenes={imgs}
+                            editable={!soloLectura}
+                            soloTipos={tiposFotoVariablesPorPlan(compra.formaPago ?? null)}
+                            titulo={`Plan adicional ${compra.numeroRecibo}`}
+                            onChange={(imagenesCierre) => {
+                              if (soloLectura) return;
+                              setErrorForm('');
+                              setErrorVenta('');
+                              patch({ imagenesCierre });
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
           </form>
 
           {/* Footer sticky con safe area */}

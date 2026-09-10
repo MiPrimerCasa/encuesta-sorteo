@@ -1379,8 +1379,8 @@ export async function clonarImagenCierrePij(payload: {
 }
 
 /**
- * Completa img1/img2 faltantes en destinos copiando el archivo del plan fuente.
- * No inventa metadatos sin archivo (evita vista previa rota).
+ * Completa img1/img2 faltantes compartiendo el mismo archivo (mismo id/path).
+ * No duplica fotos en disco del VPS.
  */
 export async function completarDniCierrePijEnVentas(
   leadId: string,
@@ -1388,35 +1388,9 @@ export async function completarDniCierrePijEnVentas(
   destinos: string[],
   fuentesPrioridad: string[],
 ): Promise<ImagenCierrePij[]> {
-  const { listarDniPendientesDeClonar } = await import('../domain/imagenes-cierre-pij');
-  const pendientes = listarDniPendientesDeClonar(imagenes, destinos, fuentesPrioridad);
-  if (pendientes.length === 0) return imagenes;
-
-  let list = [...imagenes];
-  for (const p of pendientes) {
-    // Otro pendiente del mismo loop pudo completar este slot.
-    if (
-      list.some(
-        (i) => i.ventaKey === p.destinoVentaKey && i.tipo === p.tipo && i.storagePath,
-      )
-    ) {
-      continue;
-    }
-    try {
-      const { imagen } = await clonarImagenCierrePij({
-        leadId,
-        ventaKey: p.destinoVentaKey,
-        tipo: p.tipo,
-        storagePath: p.fuente.storagePath,
-        mimeType: p.fuente.mimeType,
-        nombreOriginal: p.fuente.nombreOriginal,
-      });
-      list = [...list, imagen];
-    } catch (err) {
-      console.warn('[completarDniCierrePijEnVentas]', p.tipo, p.destinoVentaKey, err);
-    }
-  }
-  return list;
+  void leadId;
+  const { propagarDniAVentasSinDni } = await import('../domain/imagenes-cierre-pij');
+  return propagarDniAVentasSinDni(imagenes, destinos, fuentesPrioridad);
 }
 
 export async function enviarFeedback(payload: {

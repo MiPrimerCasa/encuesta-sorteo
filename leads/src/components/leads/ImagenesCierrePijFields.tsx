@@ -3,7 +3,9 @@ import { fetchImagenCierrePijBlob, uploadImagenCierrePij } from '../../api/clien
 import {
   ETIQUETAS_IMAGEN_CIERRE_PIJ,
   SLOTS_IMAGEN_CIERRE_PIJ,
+  TIPOS_DNI_CIERRE_PIJ,
   esImagenCierrePijObligatoria,
+  imagenesDniDesdeFuentes,
   slotImagenCierrePijVisible,
 } from '../../domain/imagenes-cierre-pij';
 import { prepararImagenCierreParaSubida } from '../../domain/preparar-imagen-cierre';
@@ -28,6 +30,97 @@ function ImagenMiniatura({
       ) : (
         <div className="flex h-28 items-center justify-center px-2 text-center text-[11px] text-zinc-500">
           Cargando…
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MiniaturaSoloLectura({ imagen }: { imagen: ImagenCierrePij }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [cargaError, setCargaError] = useState(false);
+
+  useEffect(() => {
+    let activo = true;
+    let objectUrl: string | null = null;
+    setUrl(null);
+    setCargaError(false);
+    fetchImagenCierrePijBlob(imagen.id, imagen.storagePath, imagen.mimeType)
+      .then((u) => {
+        if (!activo) return;
+        objectUrl = u;
+        setUrl(u);
+      })
+      .catch(() => {
+        if (activo) setCargaError(true);
+      });
+    return () => {
+      activo = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [imagen.id, imagen.storagePath, imagen.mimeType]);
+
+  const label =
+    ETIQUETAS_IMAGEN_CIERRE_PIJ[
+      (TIPOS_DNI_CIERRE_PIJ.includes(imagen.tipo as (typeof TIPOS_DNI_CIERRE_PIJ)[number])
+        ? imagen.tipo
+        : 'img1') as TipoImagenCierrePij
+    ] ?? imagen.tipo;
+
+  return (
+    <div className="space-y-1">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+        <span className="text-brand-700">{imagen.tipo}</span> — {label}
+      </p>
+      {cargaError ? (
+        <div className="flex h-28 items-center justify-center rounded-lg border border-rose-200 bg-rose-50 px-2 text-center text-[11px] text-rose-800">
+          No está en el servidor (o no se pudo leer). Revisá el DNI del plan principal.
+        </div>
+      ) : (
+        <ImagenMiniatura imagen={imagen} url={url} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Botón para traer/ver el DNI compartido del plan principal (sin volver a subir).
+ * Si carga, el archivo está en el VPS; si falla, avisa.
+ */
+export function VistaPreviaDniCompartido({
+  imagenes,
+  fuentesPrioridad,
+}: {
+  imagenes: ImagenCierrePij[];
+  fuentesPrioridad: string[];
+}) {
+  const [abierto, setAbierto] = useState(false);
+  const dni = imagenesDniDesdeFuentes(imagenes, fuentesPrioridad);
+  const tieneDni = dni.length > 0;
+
+  return (
+    <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2.5 space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[12px] text-zinc-600">
+          {tieneDni
+            ? 'DNI reutilizado del plan principal (mismo archivo en el servidor).'
+            : 'Todavía no hay DNI en el plan principal para reutilizar.'}
+        </p>
+        <button
+          type="button"
+          disabled={!tieneDni}
+          onClick={() => setAbierto((v) => !v)}
+          style={{ touchAction: 'manipulation' }}
+          className="shrink-0 rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-[12px] font-semibold text-brand-800 active:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {abierto ? 'Ocultar vista previa' : 'Ver vista previa del DNI'}
+        </button>
+      </div>
+      {abierto && tieneDni && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 pt-1">
+          {dni.map((img) => (
+            <MiniaturaSoloLectura key={`${img.id}:${img.tipo}`} imagen={img} />
+          ))}
         </div>
       )}
     </div>

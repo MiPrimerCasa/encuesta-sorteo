@@ -249,38 +249,61 @@ export function registerCierresPijRoutes(api, { usuarioDesdeRequest }) {
     }
   });
 
-  api.get('/cierres-pij/imagenes/:imageId', (req, res) => {
+  api.get('/cierres-pij/imagenes/:imageId', async (req, res) => {
     const usuario = usuarioDesdeRequest(req);
     if (!usuarioLogueado(usuario)) {
       return res.status(401).json({ error: 'Sesión inválida' });
     }
 
+    const imageId = String(req.params.imageId ?? '').trim();
     const storagePath = String(req.query?.path ?? '').trim();
-    if (!storagePath) {
-      return res.status(400).json({ error: 'Falta path de la imagen' });
+    if (!storagePath && !imageId) {
+      return res.status(400).json({ error: 'Falta path o id de la imagen' });
     }
 
-    const filePath = resolveCierrePijPath(storagePath);
-    if (!filePath) {
-      return res.status(404).json({ error: 'Imagen no encontrada en el servidor' });
+    // 1) Disco local del servidor (VPS o data/ en dev)
+    const filePath = storagePath ? resolveCierrePijPath(storagePath) : null;
+    if (filePath) {
+      try {
+        const st = statSync(filePath);
+        const mime =
+          String(req.query?.mime ?? '').trim() ||
+          (filePath.endsWith('.png')
+            ? 'image/png'
+            : filePath.endsWith('.webp')
+              ? 'image/webp'
+              : 'image/jpeg');
+        res.setHeader('Content-Type', mime);
+        res.setHeader('Content-Length', st.size);
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.setHeader('X-Cierres-Pij-Source', 'disk');
+        createReadStream(filePath).pipe(res);
+        return;
+      } catch (e) {
+        console.error('[cierres-pij] serve disk error:', e);
+      }
     }
 
+    // 2) Fallback: bytes en SQL (STRSYSTEM) — no hay pull app↔VPS
     try {
-      const st = statSync(filePath);
-      const mime =
-        String(req.query?.mime ?? '').trim() ||
-        (filePath.endsWith('.png')
-          ? 'image/png'
-          : filePath.endsWith('.webp')
-            ? 'image/webp'
-            : 'image/jpeg');
-      res.setHeader('Content-Type', mime);
-      res.setHeader('Content-Length', st.size);
-      res.setHeader('Cache-Control', 'private, max-age=3600');
-      createReadStream(filePath).pipe(res);
+      const { leerContenidoImagenCierrePijPorId } = await import('../db/seguimiento-sql.js');
+      const fromSql = await leerContenidoImagenCierrePijPorId(imageId);
+      if (fromSql?.buffer?.length) {
+        const mime =
+          String(req.query?.mime ?? '').trim() || fromSql.mimeType || 'image/jpeg';
+        res.setHeader('Content-Type', mime);
+        res.setHeader('Content-Length', fromSql.buffer.length);
+        res.setHeader('Cache-Control', 'private, max-age=3600');
+        res.setHeader('X-Cierres-Pij-Source', 'sql');
+        return res.end(fromSql.buffer);
+      }
     } catch (e) {
-      console.error('[cierres-pij] serve error:', e);
-      return res.status(500).json({ error: 'Error al leer la imagen' });
+      console.error('[cierres-pij] serve sql error:', e);
     }
+
+    return res.status(404).json({
+      error:
+        'Imagen no encontrada en disco ni en SQL. No hay pull desde el VPS: la foto tiene que estar en este servidor o en STRSYSTEM.',
+    });
   });
 }

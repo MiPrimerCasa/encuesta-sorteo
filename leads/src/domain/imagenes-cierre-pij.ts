@@ -12,6 +12,15 @@ export const ETIQUETAS_IMAGEN_CIERRE_PIJ: Record<TipoImagenCierrePij, string> = 
 /** DNI frente/reverso: se reutilizan entre planes del mismo lead. */
 export const TIPOS_DNI_CIERRE_PIJ: TipoImagenCierrePij[] = ['img1', 'img2'];
 
+/** Fotos que sí cambian por plan (adhesión, anexo, comprobante). */
+export function tiposFotoVariablesPorPlan(
+  formaPago?: FormaPago | null,
+): TipoImagenCierrePij[] {
+  const out: TipoImagenCierrePij[] = ['img5', 'img6'];
+  if (formaPagoRequiereComprobanteTransferencia(formaPago)) out.push('img7');
+  return out;
+}
+
 function imagenDeTipoEnVenta(
   imagenes: ImagenCierrePij[],
   ventaKey: string,
@@ -59,32 +68,57 @@ export function listarDniPendientesDeClonar(
 }
 
 /**
- * @deprecated Preferir listarDniPendientesDeClonar + clonarImagenCierrePij (copia en disco).
- * Metadatos solos dejan vista previa rota.
+ * Comparte DNI (img1/img2) entre ventas del mismo lead: mismo id y storagePath.
+ * No copia el archivo en disco. No toca img5/img6/img7.
  */
 export function clonarDniEntreVentas(
   imagenes: ImagenCierrePij[] | null | undefined,
   destinoVentaKey: string,
   fuentesPrioridad: string[],
 ): ImagenCierrePij[] {
-  void destinoVentaKey;
-  void fuentesPrioridad;
-  return [...(imagenes ?? [])];
+  const list = [...(imagenes ?? [])];
+  const destTipos = new Set(
+    list
+      .filter((i) => i.ventaKey === destinoVentaKey)
+      .map((i) => normalizarTipoImagenCierrePij(i.tipo))
+      .filter((t): t is TipoImagenCierrePij => t != null),
+  );
+
+  for (const tipo of TIPOS_DNI_CIERRE_PIJ) {
+    if (destTipos.has(tipo)) continue;
+    let fuente: ImagenCierrePij | undefined;
+    for (const vk of fuentesPrioridad) {
+      if (vk === destinoVentaKey) continue;
+      fuente = imagenDeTipoEnVenta(list, vk, tipo);
+      if (fuente) break;
+    }
+    if (!fuente?.storagePath) continue;
+    // Misma foto en disco: solo cambia ventaKey (caja/UI leen por venta).
+    list.push({
+      ...fuente,
+      ventaKey: destinoVentaKey,
+    });
+    destTipos.add(tipo);
+  }
+  return list;
 }
 
-/** @deprecated Ver clonarDniEntreVentas. */
+/** Comparte DNI a varios destinos sin duplicar archivos. */
 export function propagarDniAVentasSinDni(
   imagenes: ImagenCierrePij[] | null | undefined,
   destinos: string[],
   fuentesPrioridad: string[],
 ): ImagenCierrePij[] {
-  void destinos;
-  void fuentesPrioridad;
-  return [...(imagenes ?? [])];
+  let list = [...(imagenes ?? [])];
+  for (const dest of destinos) {
+    if (!dest) continue;
+    list = clonarDniEntreVentas(list, dest, fuentesPrioridad);
+  }
+  return list;
 }
 
 /**
- * True si el destino ya tiene DNI y otra venta del cierre también (típico tras reutilizar).
+ * True si el destino referencia el mismo archivo/id de DNI que alguna fuente.
  */
 export function dniReutilizadoDesdeFuente(
   imagenes: ImagenCierrePij[] | null | undefined,
@@ -98,7 +132,12 @@ export function dniReutilizadoDesdeFuente(
     for (const vk of fuentesPrioridad) {
       if (vk === destinoVentaKey) continue;
       const src = imagenDeTipoEnVenta(list, vk, tipo);
-      if (src && src.id !== dest.id) return true;
+      if (
+        src &&
+        (src.id === dest.id || src.storagePath === dest.storagePath)
+      ) {
+        return true;
+      }
     }
   }
   return false;
@@ -111,6 +150,25 @@ export function hayDniPendienteDeClonar(
   fuentesPrioridad: string[],
 ): boolean {
   return listarDniPendientesDeClonar(imagenes, destinos, fuentesPrioridad).length > 0;
+}
+
+/** DNI (frente/reverso) tomados de la primera fuente que los tenga. */
+export function imagenesDniDesdeFuentes(
+  imagenes: ImagenCierrePij[] | null | undefined,
+  fuentesPrioridad: string[],
+): ImagenCierrePij[] {
+  const list = imagenes ?? [];
+  const out: ImagenCierrePij[] = [];
+  for (const tipo of TIPOS_DNI_CIERRE_PIJ) {
+    for (const vk of fuentesPrioridad) {
+      const hit = imagenDeTipoEnVenta(list, vk, tipo);
+      if (hit) {
+        out.push(hit);
+        break;
+      }
+    }
+  }
+  return out;
 }
 
 /** Orden de carga en el formulario. */

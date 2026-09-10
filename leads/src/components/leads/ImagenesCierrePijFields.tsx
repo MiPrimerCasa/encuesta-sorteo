@@ -11,22 +11,98 @@ import {
 import { prepararImagenCierreParaSubida } from '../../domain/preparar-imagen-cierre';
 import type { FormaPago, ImagenCierrePij, TipoImagenCierrePij } from '../../types';
 
+/** Visor a pantalla completa para verificar que la foto cargada sea la correcta. */
+function VisorFotoAmplia({
+  open,
+  url,
+  titulo,
+  onClose,
+}: {
+  open: boolean;
+  url: string | null;
+  titulo: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
+  if (!open || !url) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] flex flex-col bg-zinc-950/95"
+      role="dialog"
+      aria-modal="true"
+      aria-label={titulo}
+    >
+      <div
+        className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-3 py-3"
+        style={{ paddingTop: 'max(12px, env(safe-area-inset-top))' }}
+      >
+        <p className="min-w-0 truncate text-[14px] font-semibold text-white">{titulo}</p>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{ touchAction: 'manipulation' }}
+          className="shrink-0 rounded-lg bg-white/15 px-3 py-2 text-[13px] font-semibold text-white active:bg-white/25"
+        >
+          Cerrar
+        </button>
+      </div>
+      <button
+        type="button"
+        aria-label="Cerrar vista ampliada"
+        className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-3"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+        onClick={onClose}
+      >
+        <img
+          src={url}
+          alt={titulo}
+          className="max-h-[min(85dvh,900px)] max-w-full object-contain"
+          onClick={(e) => e.stopPropagation()}
+        />
+      </button>
+    </div>
+  );
+}
+
 function ImagenMiniatura({
   imagen,
   url,
+  onAmpliar,
 }: {
   imagen: ImagenCierrePij;
   url: string | null;
-  error?: boolean;
+  onAmpliar?: () => void;
 }) {
+  const label = ETIQUETAS_IMAGEN_CIERRE_PIJ[imagen.tipo] ?? imagen.tipo;
+  const puedeAmpliar = Boolean(url && onAmpliar);
+
   return (
     <div className="overflow-hidden rounded-lg border border-zinc-200 bg-zinc-50">
       {url ? (
-        <img
-          src={url}
-          alt={ETIQUETAS_IMAGEN_CIERRE_PIJ[imagen.tipo]}
-          className="h-28 w-full object-cover"
-        />
+        <button
+          type="button"
+          disabled={!puedeAmpliar}
+          onClick={onAmpliar}
+          style={{ touchAction: 'manipulation' }}
+          className="group relative block w-full text-left disabled:cursor-default"
+          aria-label={puedeAmpliar ? `Ver ${label} ampliada` : label}
+        >
+          <img src={url} alt={label} className="h-28 w-full object-cover" />
+          {puedeAmpliar && (
+            <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-zinc-950/70 to-transparent px-2 pb-1.5 pt-5 text-center text-[11px] font-semibold text-white">
+              Tocá para ver completa
+            </span>
+          )}
+        </button>
       ) : (
         <div className="flex h-28 items-center justify-center px-2 text-center text-[11px] text-zinc-500">
           Cargando…
@@ -39,6 +115,7 @@ function ImagenMiniatura({
 function MiniaturaSoloLectura({ imagen }: { imagen: ImagenCierrePij }) {
   const [url, setUrl] = useState<string | null>(null);
   const [cargaError, setCargaError] = useState(false);
+  const [ampliada, setAmpliada] = useState(false);
 
   useEffect(() => {
     let activo = true;
@@ -77,8 +154,14 @@ function MiniaturaSoloLectura({ imagen }: { imagen: ImagenCierrePij }) {
           No está en el servidor (o no se pudo leer). Revisá el DNI del plan principal.
         </div>
       ) : (
-        <ImagenMiniatura imagen={imagen} url={url} />
+        <ImagenMiniatura imagen={imagen} url={url} onAmpliar={() => setAmpliada(true)} />
       )}
+      <VisorFotoAmplia
+        open={ampliada}
+        url={url}
+        titulo={`${imagen.tipo} — ${label}`}
+        onClose={() => setAmpliada(false)}
+      />
     </div>
   );
 }
@@ -245,6 +328,7 @@ function SlotImagen({
   const camaraRef = useRef<HTMLInputElement>(null);
   const galeriaRef = useRef<HTMLInputElement>(null);
   const [menuFuente, setMenuFuente] = useState(false);
+  const [ampliada, setAmpliada] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
   const [progreso, setProgreso] = useState(0);
   const [fase, setFase] = useState('Subiendo');
@@ -351,12 +435,25 @@ function SlotImagen({
               No se pudo cargar la vista previa
             </div>
           ) : (
-            <ImagenMiniatura imagen={imagen} url={url} />
+            <ImagenMiniatura
+              imagen={imagen}
+              url={url}
+              onAmpliar={url ? () => setAmpliada(true) : undefined}
+            />
           )}
           {editable && (
             <div className="space-y-2">
               {subiendo && <BarraProgresoSubida progreso={progreso} fase={fase} />}
               <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={disabled || subiendo || !url}
+                  onClick={() => setAmpliada(true)}
+                  style={{ touchAction: 'manipulation' }}
+                  className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-[12px] font-semibold text-zinc-700 disabled:opacity-50"
+                >
+                  Ver
+                </button>
                 <button
                   type="button"
                   disabled={disabled || subiendo}
@@ -377,6 +474,16 @@ function SlotImagen({
                 </button>
               </div>
             </div>
+          )}
+          {!editable && url && (
+            <button
+              type="button"
+              onClick={() => setAmpliada(true)}
+              style={{ touchAction: 'manipulation' }}
+              className="h-9 w-full rounded-lg border border-zinc-200 bg-white text-[12px] font-semibold text-zinc-700 active:bg-zinc-50"
+            >
+              Ver foto completa
+            </button>
           )}
         </div>
       ) : editable ? (
@@ -405,6 +512,12 @@ function SlotImagen({
         onClose={() => setMenuFuente(false)}
         onCamara={() => camaraRef.current?.click()}
         onGaleria={() => galeriaRef.current?.click()}
+      />
+      <VisorFotoAmplia
+        open={ampliada}
+        url={url}
+        titulo={`${codigo} — ${label}`}
+        onClose={() => setAmpliada(false)}
       />
       {error && <p className="text-[12px] font-medium text-red-600">{error}</p>}
     </div>

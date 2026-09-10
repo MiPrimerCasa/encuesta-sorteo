@@ -143,6 +143,80 @@ function BarraProgresoSubida({ progreso, fase }: { progreso: number; fase: strin
   );
 }
 
+const ACCEPT_IMAGEN = 'image/jpeg,image/png,image/webp,image/*';
+
+/** Menú: cámara vs galería/archivos (mismo flujo en cierre y fotos faltantes). */
+function MenuFuenteImagen({
+  open,
+  onClose,
+  onCamara,
+  onGaleria,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCamara: () => void;
+  onGaleria: () => void;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center sm:p-4">
+      <button
+        type="button"
+        aria-label="Cerrar"
+        className="absolute inset-0 bg-zinc-950/45"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="menu-fuente-imagen-title"
+        className="relative z-10 w-full max-w-sm rounded-t-2xl bg-white p-3 shadow-xl sm:rounded-2xl"
+        style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom))' }}
+      >
+        <p
+          id="menu-fuente-imagen-title"
+          className="px-1 pb-2 text-center text-[13px] font-semibold text-zinc-800"
+        >
+          ¿Cómo querés cargar la foto?
+        </p>
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            style={{ touchAction: 'manipulation' }}
+            onClick={() => {
+              // El click al input debe ir en el mismo gesto del usuario (iOS/Android).
+              onCamara();
+              onClose();
+            }}
+            className="h-12 w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white active:bg-brand-800"
+          >
+            Tomar foto con la cámara
+          </button>
+          <button
+            type="button"
+            style={{ touchAction: 'manipulation' }}
+            onClick={() => {
+              onGaleria();
+              onClose();
+            }}
+            className="h-12 w-full rounded-xl border border-brand-200 bg-brand-50 text-[15px] font-semibold text-brand-900 active:bg-brand-100"
+          >
+            Galería o archivos
+          </button>
+          <button
+            type="button"
+            style={{ touchAction: 'manipulation' }}
+            onClick={onClose}
+            className="h-11 w-full rounded-xl text-[14px] font-medium text-zinc-500 active:bg-zinc-100"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SlotImagen({
   label,
   codigo,
@@ -168,7 +242,9 @@ function SlotImagen({
   onSubida: (img: ImagenCierrePij) => void;
   onQuitar: () => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const camaraRef = useRef<HTMLInputElement>(null);
+  const galeriaRef = useRef<HTMLInputElement>(null);
+  const [menuFuente, setMenuFuente] = useState(false);
   const [subiendo, setSubiendo] = useState(false);
   const [progreso, setProgreso] = useState(0);
   const [fase, setFase] = useState('Subiendo');
@@ -227,18 +303,34 @@ function SlotImagen({
       setSubiendo(false);
       setProgreso(0);
       setFase('Subiendo');
-      if (inputRef.current) inputRef.current.value = '';
+      if (camaraRef.current) camaraRef.current.value = '';
+      if (galeriaRef.current) galeriaRef.current.value = '';
     }
   }
 
-  const inputOculto = (
-    <input
-      ref={inputRef}
-      type="file"
-      accept="image/jpeg,image/png,image/webp,image/*"
-      className="hidden"
-      onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
-    />
+  function abrirMenuFuente() {
+    if (disabled || subiendo || !editable) return;
+    setMenuFuente(true);
+  }
+
+  const inputsOcultos = (
+    <>
+      <input
+        ref={camaraRef}
+        type="file"
+        accept={ACCEPT_IMAGEN}
+        capture="environment"
+        className="hidden"
+        onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
+      />
+      <input
+        ref={galeriaRef}
+        type="file"
+        accept={ACCEPT_IMAGEN}
+        className="hidden"
+        onChange={(e) => void handleFile(e.target.files?.[0] ?? null)}
+      />
+    </>
   );
 
   return (
@@ -268,7 +360,8 @@ function SlotImagen({
                 <button
                   type="button"
                   disabled={disabled || subiendo}
-                  onClick={() => inputRef.current?.click()}
+                  onClick={abrirMenuFuente}
+                  style={{ touchAction: 'manipulation' }}
                   className="h-9 flex-1 rounded-lg border border-brand-200 bg-white text-[12px] font-semibold text-brand-800 disabled:opacity-50"
                 >
                   {subiendo ? `${fase}…` : 'Cambiar'}
@@ -277,6 +370,7 @@ function SlotImagen({
                   type="button"
                   disabled={disabled || subiendo}
                   onClick={onQuitar}
+                  style={{ touchAction: 'manipulation' }}
                   className="h-9 rounded-lg border border-zinc-200 bg-white px-3 text-[12px] font-semibold text-zinc-600 disabled:opacity-50"
                 >
                   Quitar
@@ -290,13 +384,14 @@ function SlotImagen({
           <button
             type="button"
             disabled={disabled || subiendo}
-            onClick={() => inputRef.current?.click()}
+            onClick={abrirMenuFuente}
+            style={{ touchAction: 'manipulation' }}
             className="flex min-h-[72px] w-full flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-brand-300 bg-brand-50/40 px-3 py-3 text-center text-[13px] font-medium text-brand-800 disabled:opacity-50"
           >
             {subiendo ? (
               <BarraProgresoSubida progreso={progreso} fase={fase} />
             ) : (
-              'Tomar foto o elegir imagen'
+              'Cargar'
             )}
           </button>
         </div>
@@ -304,7 +399,13 @@ function SlotImagen({
         <p className="text-[12px] text-zinc-400">Sin foto</p>
       )}
 
-      {inputOculto}
+      {inputsOcultos}
+      <MenuFuenteImagen
+        open={menuFuente}
+        onClose={() => setMenuFuente(false)}
+        onCamara={() => camaraRef.current?.click()}
+        onGaleria={() => galeriaRef.current?.click()}
+      />
       {error && <p className="text-[12px] font-medium text-red-600">{error}</p>}
     </div>
   );

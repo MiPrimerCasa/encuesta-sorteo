@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import {
   crearLead,
   modificarTelefonoLead,
+  modificarNombreLead,
   fetchAdminDashboard,
   fetchBarrios,
   fetchGrabacionesConfig,
@@ -309,6 +310,12 @@ function AppShell() {
     setError('');
   }, []);
 
+  const onModificarNombreLead = useCallback(async (leadId: string, nombre: string) => {
+    const updated = await modificarNombreLead(leadId, nombre);
+    setLeads((prev) => prev.map((l) => (l.id === leadId ? updated : l)));
+    setError('');
+  }, []);
+
   if (!usuario) {
     return <LoginPage onLogin={login} />;
   }
@@ -369,6 +376,7 @@ function AppShell() {
         onLeadActualizado={onLeadActualizado}
         onCrearLead={onCrearLead}
         onModificarTelefonoLead={onModificarTelefonoLead}
+        onModificarNombreLead={onModificarNombreLead}
         leadIdSeguimientoInicial={leadIdSeguimiento}
         onLeadSeguimientoConsumido={onLeadSeguimientoConsumido}
       />

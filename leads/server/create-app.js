@@ -24,6 +24,7 @@ import {
   LeadNoEncontradoError,
   LeadNoManualError,
   modificarTelefonoLeadManual,
+  modificarNombreLeadManual,
   resolveCargaEncuestaContext,
   reasignarLeadManual,
   duplicarLeadEnDb,
@@ -56,6 +57,7 @@ import {
   esFeedbackAdminLogin,
 } from './db/superadmin-auth.js';
 import { modificarTelefonoLeadSchema } from './schemas/modificar-telefono-lead.js';
+import { modificarNombreLeadSchema } from './schemas/modificar-nombre-lead.js';
 import { nuevoLeadSchema } from './schemas/nuevo-lead.js';
 import { verifyLoginSqlServer } from './db/mssql.js';
 import {
@@ -1372,9 +1374,69 @@ function registerApiRoutes(api) {
       if (error instanceof ContactoYaRegistradoError) {
         return res.status(409).json({ message: error.message, code: error.code });
       }
+      if (error instanceof CargaEncuestaSinPersistirError) {
+        return res.status(502).json({
+          message: error.message,
+          code: error.code,
+          detail: error.detail,
+        });
+      }
       console.error('Error al modificar teléfono:', error);
       return res.status(500).json({
         message: 'No se pudo modificar el teléfono.',
+        detail: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  });
+
+  api.patch('/leads/:id/nombre', async (req, res) => {
+    if (!respondIfNotConfigured(res)) return;
+
+    const parsed = modificarNombreLeadSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        message: 'Nombre inválido.',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+
+    const leadId = String(req.params.id || '').trim();
+    if (!leadId) {
+      return res.status(400).json({ message: 'Id de lead inválido.' });
+    }
+
+    try {
+      getDb();
+      const lead = await modificarNombreLeadManual(leadId, parsed.data.nombre, usuario);
+      return res.json({
+        message: 'Nombre actualizado correctamente.',
+        lead,
+      });
+    } catch (error) {
+      if (error instanceof LeadNoEncontradoError) {
+        return res.status(404).json({ message: error.message, code: error.code });
+      }
+      if (error instanceof LeadNoManualError) {
+        return res.status(403).json({ message: error.message, code: error.code });
+      }
+      if (error instanceof CodigoPromotorCargaError) {
+        return res.status(400).json({ message: error.message, code: error.code });
+      }
+      if (error instanceof CargaEncuestaSinPersistirError) {
+        return res.status(502).json({
+          message: error.message,
+          code: error.code,
+          detail: error.detail,
+        });
+      }
+      console.error('Error al modificar nombre:', error);
+      return res.status(500).json({
+        message: 'No se pudo modificar el nombre.',
         detail: error instanceof Error ? error.message : 'Error desconocido',
       });
     }

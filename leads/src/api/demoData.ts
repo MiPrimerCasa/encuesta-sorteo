@@ -690,9 +690,24 @@ export function updateDemoLeadTelefono(leadId: string, telefono: string): Lead {
   const lead = demoLeads.find((l) => l.id === leadId);
   if (!lead) throw new Error('Lead no encontrado en demo');
   if (lead.seguimiento?.fuente !== 'app') {
-    throw new Error('Solo podés modificar el teléfono de leads cargados manualmente desde la app.');
+    throw new Error('Solo podés modificar datos de leads cargados manualmente desde la app.');
   }
   const updated = { ...lead, telefono: telefono.trim() };
+  demoLeads = demoLeads.map((l) => (l.id === leadId ? updated : l));
+  return { ...updated };
+}
+
+export function updateDemoLeadNombre(leadId: string, nombre: string): Lead {
+  const lead = demoLeads.find((l) => l.id === leadId);
+  if (!lead) throw new Error('Lead no encontrado en demo');
+  if (lead.seguimiento?.fuente !== 'app') {
+    throw new Error('Solo podés modificar datos de leads cargados manualmente desde la app.');
+  }
+  const nombreNorm = nombre.trim().replace(/\s+/g, ' ');
+  if (nombreNorm.length < 2) {
+    throw new Error('Ingresá un nombre válido (mínimo 2 caracteres).');
+  }
+  const updated = { ...lead, nombre: nombreNorm };
   demoLeads = demoLeads.map((l) => (l.id === leadId ? updated : l));
   return { ...updated };
 }

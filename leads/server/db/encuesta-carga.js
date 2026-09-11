@@ -59,7 +59,7 @@ export class LeadNoEncontradoError extends Error {
 
 export class LeadNoManualError extends Error {
   constructor() {
-    super('Solo podés modificar el teléfono de leads cargados manualmente desde la app.');
+    super('Solo podés modificar datos de leads cargados manualmente desde la app.');
     this.name = 'LeadNoManualError';
     this.code = 'LEAD_NO_MANUAL';
     this.status = 403;
@@ -598,6 +598,60 @@ function leadEsCargaManualServidor(lead) {
   if (lead?.seguimiento?.fuente === 'app') return true;
   const raw = String(lead?.origenEncuesta ?? '').trim().toLowerCase();
   return raw === '2' || raw.includes('manual') || raw.includes('app');
+}
+
+/**
+ * Modifica nombre de un lead manual vía dbo.encuestaSorteo01Update (@campo1Valor).
+ */
+export async function modificarNombreLeadManual(leadId, nombreNuevo, usuarioSesion) {
+  const idEncuesta = Number.parseInt(String(leadId), 10);
+  if (!Number.isFinite(idEncuesta) || idEncuesta <= 0) {
+    throw new LeadNoEncontradoError();
+  }
+
+  const context = await resolveCargaEncuestaContext(usuarioSesion);
+  const usuario = enriquecerUsuarioConCodigoCarga(usuarioSesion, context.rows);
+  const leads = await listLeadsFromEncuestas(usuario);
+  const lead = leads.find((l) => String(l.id) === String(leadId));
+  if (!lead) throw new LeadNoEncontradoError();
+  if (!leadEsCargaManualServidor(lead)) throw new LeadNoManualError();
+
+  const nombreNorm = String(nombreNuevo ?? '').trim().replace(/\s+/g, ' ');
+  if (nombreNorm.length < 2) {
+    throw new Error('Ingresá un nombre válido (mínimo 2 caracteres).');
+  }
+
+  const nombreActual = String(lead.nombre ?? '').trim().replace(/\s+/g, ' ');
+  if (nombreActual.toLowerCase() === nombreNorm.toLowerCase()) {
+    return lead;
+  }
+
+  const usuarioSp =
+    lead.codigoPromotorCarga?.trim() ||
+    lead.encuestaUsuario?.trim() ||
+    resolveCodigoCargaOperador(usuario, context.rows) ||
+    null;
+  if (!usuarioSp) throw new CodigoPromotorCargaError();
+
+  const cargaParams = buildCargaParamsFromLead(lead, lead.telefono, usuarioSp);
+
+  await execEncuestaSorteo01Update({
+    ...cargaParams,
+    campo1Valor: nombreNorm,
+    idEncuesta,
+  });
+
+  const leadsPost = await listLeadsFromEncuestas(usuario);
+  const porId = leadsPost.find((l) => String(l.id) === String(leadId));
+  if (porId) {
+    const nombrePost = String(porId.nombre ?? '').trim().replace(/\s+/g, ' ');
+    if (nombrePost.toLowerCase() === nombreNorm.toLowerCase()) return porId;
+  }
+
+  throw new CargaEncuestaSinPersistirError(
+    'El SP ejecutó pero el nombre no aparece actualizado. Verificá SP_MODIFICAR_ENCUESTA=encuestaSorteo01Update.',
+    `SP ok leadId=${leadId}, nombreAnterior=${nombreActual}, nombreNuevo=${nombreNorm}`,
+  );
 }
 
 /**

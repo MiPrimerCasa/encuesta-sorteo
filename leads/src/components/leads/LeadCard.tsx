@@ -66,6 +66,7 @@ interface LeadCardProps {
   rolUsuario?: RolUsuario;
   historial?: SeguimientoHistorialEntry[];
   onModificarTelefono?: (lead: Lead) => void;
+  onModificarNombre?: (lead: Lead) => void;
   fetchHistorial?: (leadId: string) => void;
   /** Se invoca al presionar WhatsApp para registrar contacto automático. */
   onWhatsAppAutoContacto?: (lead: Lead) => void;
@@ -87,6 +88,7 @@ export function LeadCard({
   rolUsuario = 'supervisor',
   historial = [],
   onModificarTelefono,
+  onModificarNombre,
   fetchHistorial,
   onWhatsAppAutoContacto,
   onAgregarReferidos,
@@ -183,6 +185,10 @@ export function LeadCard({
     Boolean(onModificarTelefono) &&
     leadEsCargaManual(lead) &&
     !soloLectura;
+  const mostrarModificarNombre =
+    Boolean(onModificarNombre) &&
+    leadEsCargaManual(lead) &&
+    !soloLectura;
   const nombrePromotor =
     lead.promotorNombre ?? getPromotorNombre(lead.promotorId, promotores);
 
@@ -227,6 +233,21 @@ export function LeadCard({
             <h3 className={`text-[15px] font-semibold leading-snug ${esNoCompro ? 'text-white' : 'text-zinc-900'}`}>
               {lead.nombre}
             </h3>
+            {mostrarModificarNombre && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onModificarNombre?.(lead);
+                }}
+                style={{ touchAction: 'manipulation' }}
+                className={`mt-1 text-[12px] font-semibold underline-offset-2 hover:underline ${
+                  esNoCompro ? 'text-brand-200' : 'text-brand-600'
+                }`}
+              >
+                Modificar nombre
+              </button>
+            )}
             {etiquetaSorteo && (
               <span
                 className={`mt-1.5 inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${

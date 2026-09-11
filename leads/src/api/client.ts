@@ -45,6 +45,7 @@ import {
   processDemoReferidos,
   updateDemoLead,
   updateDemoLeadTelefono,
+  updateDemoLeadNombre,
   reassignDemoLead,
   getDemoOperadores,
   verificarTelefonoDemoCarga,
@@ -702,6 +703,18 @@ export async function modificarTelefonoLead(leadId: string, telefono: string): P
     {
       method: 'PATCH',
       body: JSON.stringify({ telefono }),
+    },
+  );
+  return data.lead;
+}
+
+export async function modificarNombreLead(leadId: string, nombre: string): Promise<Lead> {
+  if (_isDemoActive) return updateDemoLeadNombre(leadId, nombre);
+  const data = await apiFetch<{ lead: Lead; message?: string }>(
+    `/api/leads/${encodeURIComponent(leadId)}/nombre`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ nombre }),
     },
   );
   return data.lead;

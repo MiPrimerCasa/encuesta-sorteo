@@ -24,6 +24,7 @@ import { LeadCard } from './LeadCard';
 import { LeadModalForm } from './LeadModalForm';
 import { CargarFotosFaltantesSheet } from './CargarFotosFaltantesSheet';
 import { ModificarTelefonoSheet } from './ModificarTelefonoSheet';
+import { ModificarNombreSheet } from './ModificarNombreSheet';
 import { NuevoLeadSheet } from './NuevoLeadSheet';
 import { LinksRedesSection } from './LinksRedesSection';
 import { PromotorResumen } from './PromotorResumen';
@@ -104,6 +105,7 @@ interface LeadsPanelProps {
   onLeadActualizado?: (lead: Lead) => void;
   onCrearLead: (data: NuevoLeadData, options?: NuevoLeadSaveOptions) => void | Promise<void>;
   onModificarTelefonoLead?: (leadId: string, telefono: string) => void | Promise<void>;
+  onModificarNombreLead?: (leadId: string, nombre: string) => void | Promise<void>;
   direccionOficinas?: string;
   /** Desde calendario: abrir seguimiento de este lead al montar. */
   leadIdSeguimientoInicial?: string | null;
@@ -122,6 +124,7 @@ export function LeadsPanel({
   onLeadActualizado: _onLeadActualizado,
   onCrearLead,
   onModificarTelefonoLead,
+  onModificarNombreLead,
   leadIdSeguimientoInicial,
   onLeadSeguimientoConsumido,
 }: LeadsPanelProps) {
@@ -189,6 +192,7 @@ export function LeadsPanel({
   const [leadFotosFaltantes, setLeadFotosFaltantes] = useState<Lead | null>(null);
   const [agendarAbierto, setAgendarAbierto] = useState(false);
   const [leadModificarTelefono, setLeadModificarTelefono] = useState<Lead | null>(null);
+  const [leadModificarNombre, setLeadModificarNombre] = useState<Lead | null>(null);
   const [leadReferidos, setLeadReferidos] = useState<Lead | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [filtroPrioridad, setFiltroPrioridad] = useState<'prioridad' | 'primeros' | 'recientes' | 'entrevistas'>('prioridad');
@@ -337,6 +341,9 @@ export function LeadsPanel({
   const abrirModificarTelefono = onModificarTelefonoLead
     ? (lead: Lead) => setLeadModificarTelefono(lead)
     : undefined;
+  const abrirModificarNombre = onModificarNombreLead
+    ? (lead: Lead) => setLeadModificarNombre(lead)
+    : undefined;
 
   const abrirAgregarReferidos = (lead: Lead) => setLeadReferidos(lead);
 
@@ -356,6 +363,7 @@ export function LeadsPanel({
         onQuickSave={quickSaveSeguimiento}
         historial={historialPorLead[lead.id] ?? []}
         onModificarTelefono={abrirModificarTelefono}
+        onModificarNombre={abrirModificarNombre}
         fetchHistorial={fetchHistorial}
         onWhatsAppAutoContacto={handleWhatsAppAutoContacto}
       />
@@ -373,6 +381,7 @@ export function LeadsPanel({
         rolUsuario={rolUsuario}
         historial={historialPorLead[lead.id] ?? []}
         onModificarTelefono={abrirModificarTelefono}
+        onModificarNombre={abrirModificarNombre}
         fetchHistorial={fetchHistorial}
         onWhatsAppAutoContacto={handleWhatsAppAutoContacto}
         onAgregarReferidos={abrirAgregarReferidos}
@@ -489,6 +498,7 @@ export function LeadsPanel({
                     onQuickSave={quickSaveSeguimiento}
                     historial={historialPorLead[lead.id] ?? []}
                     onModificarTelefono={abrirModificarTelefono}
+                    onModificarNombre={abrirModificarNombre}
                     fetchHistorial={fetchHistorial}
                   />
                 ) : (
@@ -505,6 +515,7 @@ export function LeadsPanel({
                     rolUsuario={rolUsuario}
                     historial={historialPorLead[lead.id] ?? []}
                     onModificarTelefono={abrirModificarTelefono}
+                    onModificarNombre={abrirModificarNombre}
                     fetchHistorial={fetchHistorial}
                     onAgregarReferidos={abrirAgregarReferidos}
                   />
@@ -735,6 +746,15 @@ export function LeadsPanel({
           open={leadModificarTelefono != null}
           onClose={() => setLeadModificarTelefono(null)}
           onSave={onModificarTelefonoLead}
+        />
+      )}
+
+      {onModificarNombreLead && (
+        <ModificarNombreSheet
+          lead={leadModificarNombre}
+          open={leadModificarNombre != null}
+          onClose={() => setLeadModificarNombre(null)}
+          onSave={onModificarNombreLead}
         />
       )}
 

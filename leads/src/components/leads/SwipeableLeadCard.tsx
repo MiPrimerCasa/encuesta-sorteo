@@ -27,6 +27,7 @@ interface Props {
   onQuickSave: (leadId: string, seguimiento: SeguimientoLead) => void | Promise<void>;
   historial?: SeguimientoHistorialEntry[];
   onModificarTelefono?: (lead: Lead) => void;
+  onModificarNombre?: (lead: Lead) => void;
   fetchHistorial?: (leadId: string) => void;
   onWhatsAppAutoContacto?: (lead: Lead) => void;
 }
@@ -44,6 +45,7 @@ export function SwipeableLeadCard({
   onQuickSave,
   historial = [],
   onModificarTelefono,
+  onModificarNombre,
   fetchHistorial,
   onWhatsAppAutoContacto,
 }: Props) {
@@ -300,6 +302,7 @@ export function SwipeableLeadCard({
             rolUsuario={rolUsuario}
             historial={historial}
             onModificarTelefono={onModificarTelefono}
+            onModificarNombre={onModificarNombre}
             fetchHistorial={fetchHistorial}
             onWhatsAppAutoContacto={onWhatsAppAutoContacto}
           />

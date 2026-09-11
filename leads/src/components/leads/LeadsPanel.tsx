@@ -14,6 +14,15 @@ import {
   leadEnEntrevistaPendiente,
 } from '../../domain/leads';
 import { prioridadTabInicial } from '../../domain/prioridad-leads';
+import {
+  agruparCierresPorVendedor,
+  contarPlanesPijEnMes,
+  etiquetaPeriodoCierres,
+  filtrarCierresPorPeriodo,
+  mesAnteriorIso,
+  type PeriodoCierresBandeja,
+} from '../../domain/cierres-periodo';
+import { mesCalendarioIso } from '../../domain/admin-periodo';
 
 import { useHistorialLeads } from '../../hooks/useHistorialLeads';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
@@ -33,6 +42,12 @@ import { SwipeableLeadCard } from './SwipeableLeadCard';
 
 type ListaKey = 'actividadHoy' | 'entrevistaPendiente' | 'paraContactar' | 'seguimiento' | 'compraron';
 type VarianteCard = 'activo' | 'seguimiento' | 'compro';
+
+const FILTROS_PERIODO_CIERRES: Array<{ id: PeriodoCierresBandeja; label: string }> = [
+  { id: 'mes', label: 'Este mes' },
+  { id: 'mes_anterior', label: 'Mes ant.' },
+  { id: 'todos', label: 'Todos' },
+];
 
 const TABS: Array<{
   id: string;
@@ -196,6 +211,7 @@ export function LeadsPanel({
   const [leadReferidos, setLeadReferidos] = useState<Lead | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [filtroPrioridad, setFiltroPrioridad] = useState<'prioridad' | 'primeros' | 'recientes' | 'entrevistas'>('prioridad');
+  const [periodoCierres, setPeriodoCierres] = useState<PeriodoCierresBandeja>('mes');
 
   const todosLosLeads = useMemo(
     () => [...entrevistaPendiente, ...paraContactar, ...seguimiento, ...compraron],
@@ -270,7 +286,8 @@ export function LeadsPanel({
   const itemsActivos = listas[tabData.key];
   const itemsVisibles = useMemo(() => {
     if (tabActivo === 'compro') {
-      return sortLeadsPorVentaReciente(itemsActivos, historialPorLead);
+      const ordenados = sortLeadsPorVentaReciente(itemsActivos, historialPorLead);
+      return filtrarCierresPorPeriodo(ordenados, periodoCierres);
     }
     if (tabActivo === 'contacto' && rolUsuario === 'promotor') {
       return sortLeadsContactadosPromotor(itemsActivos, historialPorLead);
@@ -307,9 +324,27 @@ export function LeadsPanel({
       return result;
     }
     return itemsActivos;
-  }, [tabActivo, itemsActivos, historialPorLead, rolUsuario, filtroPrioridad]);
+  }, [tabActivo, itemsActivos, historialPorLead, rolUsuario, filtroPrioridad, periodoCierres]);
   const esPromotor = rolUsuario === 'promotor';
   const esTabPrioridad = tabActivo === 'entrevista';
+  const esTabCierres = tabActivo === 'compro';
+
+  const mesActualIso = useMemo(() => mesCalendarioIso(), []);
+  const pijMesActual = useMemo(
+    () => contarPlanesPijEnMes(listas.compraron, mesActualIso),
+    [listas.compraron, mesActualIso],
+  );
+  const gruposCierres = useMemo(() => {
+    if (!esTabCierres || esPromotor) return [];
+    return agruparCierresPorVendedor(itemsVisibles, periodoCierres);
+  }, [esTabCierres, esPromotor, itemsVisibles, periodoCierres]);
+  const planesVisiblesCierres = useMemo(() => {
+    if (!esTabCierres) return 0;
+    return itemsVisibles.reduce(
+      (acc, l) => acc + 1 + (l.seguimiento?.comprasAdicionales?.length ?? 0),
+      0,
+    );
+  }, [esTabCierres, itemsVisibles]);
 
   const guardarSeguimientoLead = async (leadId: string, seg: SeguimientoLead) => {
     const result = await onActualizarLead(leadId, seg);
@@ -586,9 +621,7 @@ export function LeadsPanel({
                 {tabData.tituloLargo}
               </h2>
               <span className="text-[13px] tabular-nums text-zinc-400">
-                {tabActivo === 'compro'
-                  ? itemsVisibles.reduce((acc, l) => acc + 1 + (l.seguimiento?.comprasAdicionales?.length ?? 0), 0)
-                  : itemsVisibles.length}
+                {esTabCierres ? planesVisiblesCierres : itemsVisibles.length}
               </span>
             </div>
 
@@ -640,13 +673,78 @@ export function LeadsPanel({
                 </button>
               </div>
             )}
+
+            {esTabCierres && (
+              <div className="flex flex-wrap gap-1 rounded-lg border border-zinc-200 bg-zinc-100 p-1">
+                {FILTROS_PERIODO_CIERRES.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setPeriodoCierres(f.id)}
+                    style={{ touchAction: 'manipulation' }}
+                    className={`rounded-md px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                      periodoCierres === f.id
+                        ? 'bg-white text-zinc-800 shadow-xs'
+                        : 'text-zinc-500 hover:text-zinc-700'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          {esTabCierres && (
+            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-emerald-700">
+                Plan Inversión Joven · {etiquetaPeriodoCierres('mes')}
+              </p>
+              <p className="mt-1 text-[28px] font-bold leading-none tabular-nums text-emerald-900">
+                {pijMesActual}
+              </p>
+              <p className="mt-1.5 text-[12px] text-emerald-800/80">
+                {esPromotor
+                  ? `Cerraste ${pijMesActual} plan${pijMesActual === 1 ? '' : 'es'} PIJ este mes.`
+                  : `El equipo cerró ${pijMesActual} plan${pijMesActual === 1 ? '' : 'es'} PIJ este mes.`}
+                {periodoCierres !== 'mes' && (
+                  <span className="block mt-0.5 text-emerald-700/70">
+                    Lista filtrada: {etiquetaPeriodoCierres(periodoCierres)}
+                    {periodoCierres === 'mes_anterior'
+                      ? ` (${mesAnteriorIso()})`
+                      : ''}
+                    {' · '}
+                    {planesVisiblesCierres} plan{planesVisiblesCierres === 1 ? '' : 'es'} en vista
+                  </span>
+                )}
+              </p>
+            </div>
+          )}
 
           {/* Lista */}
           {itemsVisibles.length === 0 ? (
             <p className="rounded-lg border border-dashed border-zinc-200 py-10 text-center text-[13px] text-zinc-400">
-              {tabData.vacio}
+              {esTabCierres && periodoCierres !== 'todos'
+                ? `No hay cierres en ${etiquetaPeriodoCierres(periodoCierres).toLowerCase()}.`
+                : tabData.vacio}
             </p>
+          ) : esTabCierres && !esPromotor ? (
+            <div className="space-y-5">
+              {gruposCierres.map((grupo) => (
+                <section key={grupo.key} className="space-y-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-zinc-100 pb-2">
+                    <h3 className="text-[14px] font-semibold text-zinc-900">{grupo.nombre}</h3>
+                    <p className="text-[12px] tabular-nums text-zinc-500">
+                      {grupo.planesEnPeriodo} en periodo ·{' '}
+                      <span className="font-semibold text-emerald-700">
+                        {grupo.planesPijEnMesActual} PIJ este mes
+                      </span>
+                    </p>
+                  </div>
+                  {grupo.leads.map((lead) => renderTarjetaLead(lead, 'compro'))}
+                </section>
+              ))}
+            </div>
           ) : (
             <div className="space-y-3">
               {itemsVisibles.map((lead) => {

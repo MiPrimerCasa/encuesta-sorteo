@@ -3,6 +3,8 @@ import {
   fechaDiaNegocio,
   filtrarLeadsActividadHoy,
 } from '../../domain/actividad-hoy';
+import { contarPlanesPijEnMes } from '../../domain/cierres-periodo';
+import { mesCalendarioIso, etiquetaMesCalendario } from '../../domain/admin-periodo';
 import { leadCompro, leadReagendaEntrevista } from '../../domain/leads';
 import type { Lead } from '../../types';
 
@@ -45,6 +47,9 @@ export function PromotorResumen({ leads, operadorId }: Props) {
     );
     const promedioDiario = total / (distinctDates.size || 1);
 
+    const mesIso = mesCalendarioIso();
+    const pijEsteMes = contarPlanesPijEnMes(leads, mesIso);
+
     return {
       total,
       vendidos,
@@ -54,12 +59,13 @@ export function PromotorResumen({ leads, operadorId }: Props) {
       conversion,
       ingresaronHoy,
       promedioDiario,
+      pijEsteMes,
+      etiquetaMes: etiquetaMesCalendario(mesIso),
     };
   }, [leads, operadorId]);
 
   return (
     <div className="mb-5 space-y-2.5">
-      {/* KPIs del día — visibles de un vistazo */}
       <div className="grid grid-cols-2 gap-2.5">
         <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3.5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-sky-600">
@@ -83,6 +89,18 @@ export function PromotorResumen({ leads, operadorId }: Props) {
             Clientes que gestionaste
           </p>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3.5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-emerald-700">
+          PIJ · {stats.etiquetaMes}
+        </p>
+        <p className="mt-1 text-[28px] font-bold leading-none tabular-nums text-emerald-900 sm:text-[32px]">
+          {stats.pijEsteMes}
+        </p>
+        <p className="mt-1.5 text-[11px] text-emerald-800/75">
+          Planes Inversión Joven cerrados este mes
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
@@ -125,7 +143,7 @@ export function PromotorResumen({ leads, operadorId }: Props) {
             {stats.conversion}%
           </p>
           <p className="mt-0.5 text-[11px] text-ok/60">
-            {stats.vendidos} cierre{stats.vendidos !== 1 ? 's' : ''}
+            {stats.vendidos} cierre{stats.vendidos !== 1 ? 's' : ''} acumulados
           </p>
         </div>
       </div>

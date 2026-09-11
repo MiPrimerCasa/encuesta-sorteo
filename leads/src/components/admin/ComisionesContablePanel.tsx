@@ -152,7 +152,8 @@ export function ComisionesContablePanel() {
             Informe de comisiones y salarios
           </h2>
           <p className="mt-1 text-[13px] text-zinc-500">
-            Salario fijo $800.000 · PIJ $2.000 c/u (mín. 100) · Terrenos 1% (mín. 30 adhesiones).
+            Salario fijo $800.000 · PIJ $2.000 c/u desde cierres del CRM (mín. 100) · Terrenos
+            1% (mín. 30 adhesiones).
           </p>
         </div>
 
@@ -231,8 +232,8 @@ export function ComisionesContablePanel() {
                 value={String(data.pij.cantidad)}
                 sub={
                   data.pij.objetivoCumplido
-                    ? `${formatearMontoArs(data.pij.unitario)} c/u · objetivo OK`
-                    : `Meta ${data.reglas.objetivoPij ?? 100} · sin comisión aún`
+                    ? `${formatearMontoArs(data.pij.unitario)} c/u · CRM · objetivo OK`
+                    : `Meta ${data.reglas.objetivoPij ?? 100} · desde CRM · sin comisión aún`
                 }
                 accent="text-indigo-700"
               />
@@ -369,7 +370,9 @@ export function ComisionesContablePanel() {
             <div className="grid gap-4 lg:grid-cols-2">
               <div className="rounded-xl border border-zinc-200 bg-white p-4">
                 <h3 className="text-[14px] font-semibold text-zinc-900">PIJ por vendedor</h3>
-                <p className="mt-0.5 text-[12px] text-zinc-500">Adhesiones del mes</p>
+                <p className="mt-0.5 text-[12px] text-zinc-500">
+                  Cierres del CRM en el mes (principal + adicionales)
+                </p>
                 <div className="mt-3 max-h-72 overflow-auto">
                   <table className="min-w-full text-[13px]">
                     <thead className="sticky top-0 bg-zinc-50 text-[11px] font-semibold uppercase tracking-wide text-zinc-400">
@@ -394,7 +397,7 @@ export function ComisionesContablePanel() {
                       {data.pij.porVendedor.length === 0 && (
                         <tr>
                           <td colSpan={3} className="px-2 py-6 text-center text-zinc-500">
-                            Sin adhesiones PIJ en el período.
+                            Sin cierres PIJ en el CRM para este período.
                           </td>
                         </tr>
                       )}

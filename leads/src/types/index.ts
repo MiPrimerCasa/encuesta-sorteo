@@ -656,6 +656,8 @@ export interface InformeComisionesContable {
       cantidad: number;
       clientes?: Array<{ nombre: string; recibo: string; fecha: string }>;
     }>;
+    /** Fuente del conteo: crm = sistema de leads. */
+    fuente?: 'crm' | 'excel';
   };
   terrenos: {
     cantidad: number;
@@ -684,6 +686,8 @@ export interface InformeComisionesContable {
   excelError?: string | null;
   error?: string | null;
   aplicable?: boolean;
+  /** PIJ contados desde el CRM (leads), no Excel Caja. */
+  fuentePij?: 'crm' | 'excel';
 }
 
 

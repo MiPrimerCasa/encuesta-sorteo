@@ -1,11 +1,12 @@
 /**
  * Informe de comisiones y salarios contable (Mi Primer Casa).
  * - Salario fijo: $800.000
- * - PIJ: $2.000 c/u solo si se alcanza el objetivo de 100 adhesiones
- * - Terrenos: 1% del recaudado solo si se alcanzan 30 adhesiones
+ * - PIJ: $2.000 c/u solo si se alcanza el objetivo de 100 adhesiones (fuente: CRM / leads)
+ * - Terrenos: 1% del recaudado solo si se alcanzan 30 adhesiones (fuente: SP)
  */
 import { periodoPanelAYyyyMm, resolverPeriodoPorYyyyMm } from '../db/informe-cierres.js';
 import { buildEnriquecimientoInformeOperaciones } from './informe-operaciones-enriquecimiento.js';
+import { buildPijLiquidacionDesdeLeads } from './pij-liquidacion-leads.js';
 
 export const COMISION_PIJ_UNITARIO = 2000;
 export const COMISION_TERRENO_PCT = 0.01;
@@ -68,10 +69,29 @@ function buildProgreso(cantidad, objetivo, cada, mensajes) {
  * @param {{ idOperador?: number }} [opts]
  */
 export async function buildInformeComisionesContable(periodoPanel, leadsDB, opts = {}) {
-  const enriquecimiento = await buildEnriquecimientoInformeOperaciones(periodoPanel, leadsDB, opts);
-  const yyyyMm = enriquecimiento.yyyyMm || periodoPanelAYyyyMm(periodoPanel);
+  const yyyyMm = periodoPanelAYyyyMm(periodoPanel);
+  const pijCrm = buildPijLiquidacionDesdeLeads(leadsDB, yyyyMm);
 
-  const cantidadPij = Number(enriquecimiento.pijExcelCantidad || 0);
+  // Terrenos siguen saliendo del SP vía enriquecimiento; PIJ ya no depende del Excel.
+  let enriquecimiento = {
+    aplicable: Boolean(yyyyMm),
+    yyyyMm,
+    idEjercicioDetalle: null,
+    periodoCodigo: null,
+    lotesSpCantidad: 0,
+    lotesSp: [],
+    lotesPorVendedor: [],
+    excelError: null,
+    error: null,
+  };
+  try {
+    enriquecimiento = await buildEnriquecimientoInformeOperaciones(periodoPanel, leadsDB, opts);
+  } catch (err) {
+    enriquecimiento.error =
+      err instanceof Error ? err.message : 'Error al enriquecer terrenos / período SP';
+  }
+
+  const cantidadPij = Number(pijCrm.cantidad || 0);
   const cantidadTerrenos = Number(enriquecimiento.lotesSpCantidad || 0);
   const montoTerrenos = (enriquecimiento.lotesSp || []).reduce(
     (acc, f) => acc + Number(f.totalCobradoPeriodo || 0),
@@ -117,7 +137,7 @@ export async function buildInformeComisionesContable(periodoPanel, leadsDB, opts
       salarioFijo: SALARIO_FIJO_MENSUAL,
       objetivoPij: OBJETIVO_PIJ,
       objetivoTerrenos: OBJETIVO_TERRENOS,
-      descripcionPij: `$${COMISION_PIJ_UNITARIO.toLocaleString('es-AR')} por cada PIJ, solo si se alcanzan ${OBJETIVO_PIJ} adhesiones`,
+      descripcionPij: `$${COMISION_PIJ_UNITARIO.toLocaleString('es-AR')} por cada PIJ del CRM (cierres del mes), solo si se alcanzan ${OBJETIVO_PIJ}`,
       descripcionTerreno: `${(COMISION_TERRENO_PCT * 100).toFixed(0)}% del recaudado en adhesiones de terrenos, solo si se alcanzan ${OBJETIVO_TERRENOS}`,
       descripcionSalario: `Salario fijo mensual $${SALARIO_FIJO_MENSUAL.toLocaleString('es-AR')}`,
     },
@@ -128,7 +148,8 @@ export async function buildInformeComisionesContable(periodoPanel, leadsDB, opts
       comisionBruta: comisionPijBruta,
       objetivoCumplido: progresoPij.cumplido,
       progreso: progresoPij,
-      porVendedor: enriquecimiento.pijExcelPorVendedor || enriquecimiento.pijPorVendedor || [],
+      porVendedor: pijCrm.porVendedor,
+      fuente: 'crm',
     },
     terrenos: {
       cantidad: cantidadTerrenos,
@@ -145,8 +166,10 @@ export async function buildInformeComisionesContable(periodoPanel, leadsDB, opts
     totalComision,
     /** Comisiones + salario fijo. */
     totalALiquidar,
-    excelError: enriquecimiento.excelError || null,
+    // Ya no bloqueamos la liquidación PIJ por falta de hoja Excel.
+    excelError: null,
     error: enriquecimiento.error || null,
-    aplicable: enriquecimiento.aplicable,
+    aplicable: Boolean(yyyyMm),
+    fuentePij: 'crm',
   };
 }

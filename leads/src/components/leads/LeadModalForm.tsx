@@ -655,9 +655,22 @@ export function LeadModalForm({
   const usaStockPijSerie = (serie: string) =>
     !bypassStockPij && serieUsaStockCaja(serie);
 
+  /** Misma adhesión C+ ya guardada en el cierre: no exigir que siga en stock (caja la consumió). */
+  const adhesionCPlusYaPersistida = (
+    serie: string,
+    adh: string,
+    reciboPrev: string | null | undefined,
+  ) => {
+    if (!reciboPrev || !adh.trim()) return false;
+    const prev = parsePijRecibo(reciboPrev);
+    const claveN = claveAdhesionPij(serie, adh);
+    const claveP = claveAdhesionPij(prev.serie, prev.adhesion);
+    return Boolean(claveN && claveP && claveN === claveP);
+  };
+
   const opcionesAdhesionParaSerie = (serie: string, excluir?: ExcluirRegistroVenta) => {
     const g = serie.trim().toUpperCase();
-    return (stockPij?.opcionesAdhesion ?? []).filter((o) => {
+    let opts = (stockPij?.opcionesAdhesion ?? []).filter((o) => {
       if (String(o.grupo || '').toUpperCase() !== g) return false;
       const clave = claveAdhesionPij(g, String(o.numero));
       if (!clave) return true;
@@ -680,6 +693,28 @@ export function LeadModalForm({
       }
       return false;
     });
+
+    // Si el lead ya tiene esta adhesión C+, mostrarla aunque caja ya la consumió.
+    if (excluir?.esPrincipal && lead?.seguimiento?.numeroRecibo) {
+      const prev = parsePijRecibo(lead.seguimiento.numeroRecibo);
+      if (
+        serieUsaStockCaja(prev.serie) &&
+        prev.serie === g &&
+        prev.adhesion &&
+        !opts.some((o) => String(o.numero) === String(Number(prev.adhesion)))
+      ) {
+        opts = [
+          ...opts,
+          {
+            grupo: g,
+            numero: Number(prev.adhesion),
+            notacion: `${g}${prev.adhesion}`,
+          },
+        ];
+      }
+    }
+
+    return opts;
   };
 
   const cantidadAdicionales = form.comprasAdicionales?.length ?? 0;
@@ -1243,27 +1278,34 @@ export function LeadModalForm({
           return;
         }
         if (usaStockPijSerie(pijSerie)) {
-          if (stockPijLoading) {
-            rechazarVenta('Esperá a que cargue el stock PIJ de caja.');
-            return;
-          }
-          if (!stockPij?.configurado) {
-            rechazarVenta(
-              stockPij?.aviso ||
-                stockPijError ||
-                'No hay conexión al stock de caja. Configurá ERP_CAJA_INGEST_URL o pedí soporte.',
-            );
-            return;
-          }
-          const adhOk = opcionesAdhesionParaSerie(pijSerie, {
-            leadId: lead?.id,
-            esPrincipal: true,
-          }).some((o) => String(o.numero) === String(Number(pijAdh)));
-          if (!adhOk) {
-            rechazarVenta(
-              `La adhesión ${pijSerie}${pijAdh} no está en tu stock asignado (serie C+).`,
-            );
-            return;
+          const yaPersistida = adhesionCPlusYaPersistida(
+            pijSerie,
+            pijAdh,
+            lead?.seguimiento?.numeroRecibo,
+          );
+          if (!yaPersistida) {
+            if (stockPijLoading) {
+              rechazarVenta('Esperá a que cargue el stock PIJ de caja.');
+              return;
+            }
+            if (!stockPij?.configurado) {
+              rechazarVenta(
+                stockPij?.aviso ||
+                  stockPijError ||
+                  'No hay conexión al stock de caja. Configurá ERP_CAJA_INGEST_URL o pedí soporte.',
+              );
+              return;
+            }
+            const adhOk = opcionesAdhesionParaSerie(pijSerie, {
+              leadId: lead?.id,
+              esPrincipal: true,
+            }).some((o) => String(o.numero) === String(Number(pijAdh)));
+            if (!adhOk) {
+              rechazarVenta(
+                `La adhesión ${pijSerie}${pijAdh} no está en tu stock asignado (serie C+).`,
+              );
+              return;
+            }
           }
         }
       }

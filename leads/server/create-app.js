@@ -1591,6 +1591,8 @@ function registerApiRoutes(api) {
 
     // Serie C+: validar solo adhesión contra stock de caja (anexo es tipeo libre; A/B libres).
     // Superadmin / panel global pueden tipeo libre también en C+.
+    // Si el cierre ya tenía la misma adhesión C+ (ej. solo cargan fotos), no revalidar:
+    // caja ya la consumió del stock al cerrar y volvería a fallar "no asignado".
     const bypassStockPij =
       usuario.rol === 'superadmin' ||
       usuario.panelGlobal === true ||
@@ -1602,14 +1604,44 @@ function registerApiRoutes(api) {
       data.numeroRecibo
     ) {
       try {
-        const { parsePijRecibo } = await import('./domain/pij-recibo.js');
+        const { parsePijRecibo, claveAdhesionPij } = await import('./domain/pij-recibo.js');
         const { serieUsaStockCaja } = await import('./domain/pij-stock-serie.js');
         const { validarNumerosEnStockCaja, paramsStockPijDesdeUsuario } = await import(
           './services/caja-stock-asignaciones.js'
         );
+        const { useSeguimientoSql } = await import('./db/seguimiento-sql.js');
+        const leadId = String(req.params.id || '').trim();
+        let prevSeg = {};
+        if (useSeguimientoSql()) {
+          const { getLatestSeguimientoSql } = await import('./db/seguimiento-sql.js');
+          const idOp = parseInt(String(usuario.id ?? ''), 10);
+          prevSeg =
+            (await getLatestSeguimientoSql(
+              leadId,
+              Number.isFinite(idOp) && idOp > 0 ? idOp : null,
+            )) || {};
+        } else {
+          const { getSeguimientoExterno } = await import('./db/sqlite.js');
+          prevSeg = getSeguimientoExterno(leadId) || {};
+        }
+
+        function adhesionCambio(reciboNuevo, reciboPrev) {
+          const n = parsePijRecibo(reciboNuevo);
+          if (!serieUsaStockCaja(n.serie)) return false;
+          const claveN = claveAdhesionPij(n.serie, n.adhesion);
+          if (!claveN) return true;
+          if (!reciboPrev) return true;
+          const p = parsePijRecibo(reciboPrev);
+          const claveP = claveAdhesionPij(p.serie, p.adhesion);
+          return claveN !== claveP;
+        }
+
         const stockParams = paramsStockPijDesdeUsuario(usuario);
         const parsed = parsePijRecibo(data.numeroRecibo);
-        if (serieUsaStockCaja(parsed.serie)) {
+        if (
+          serieUsaStockCaja(parsed.serie) &&
+          adhesionCambio(data.numeroRecibo, prevSeg.numeroRecibo)
+        ) {
           await validarNumerosEnStockCaja({
             serie: parsed.serie,
             nroAdhesion: parsed.adhesion,
@@ -1620,10 +1652,20 @@ function registerApiRoutes(api) {
         const adicionales = Array.isArray(data.comprasAdicionales)
           ? data.comprasAdicionales
           : [];
+        const prevAdic = Array.isArray(prevSeg.comprasAdicionales)
+          ? prevSeg.comprasAdicionales
+          : [];
         for (const c of adicionales) {
           if (String(c?.idProducto || '') !== 'prod-pij' || !c?.numeroRecibo) continue;
           const p = parsePijRecibo(c.numeroRecibo);
           if (!serieUsaStockCaja(p.serie)) continue;
+          const prevMisma =
+            prevAdic.find((x) => String(x?.id) === String(c.id)) ||
+            prevAdic.find(
+              (x) =>
+                String(x?.numeroRecibo || '') === String(c.numeroRecibo || ''),
+            );
+          if (!adhesionCambio(c.numeroRecibo, prevMisma?.numeroRecibo)) continue;
           await validarNumerosEnStockCaja({
             serie: p.serie,
             nroAdhesion: p.adhesion,

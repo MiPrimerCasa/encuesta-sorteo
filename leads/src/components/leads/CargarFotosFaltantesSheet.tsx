@@ -1,18 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Drawer } from 'vaul';
 import {
-  ETIQUETAS_IMAGEN_CIERRE_PIJ,
   dniReutilizadoDesdeFuente,
+  listarPlanesPijConFotosFaltantes,
   propagarDniAVentasSinDni,
   tiposFotosCierrePijFaltantes,
 } from '../../domain/imagenes-cierre-pij';
-import type {
-  FormaPago,
-  ImagenCierrePij,
-  Lead,
-  SeguimientoLead,
-  TipoImagenCierrePij,
-} from '../../types';
+import type { FormaPago, ImagenCierrePij, Lead, SeguimientoLead } from '../../types';
 import { ID_PRODUCTO_PIJ, esPlanInversion } from '../../domain/venta';
 import { ImagenesCierrePijFields } from './ImagenesCierrePijFields';
 
@@ -25,12 +19,11 @@ type Props = {
 };
 
 /**
- * Modal dedicado: solo completar fotos de un cierre ya registrado.
- * No toca adhesión, montos ni fecha de cierre.
+ * Modal dedicado: completar fotos de un cierre ya registrado (todos los planes PIJ).
+ * Las fotos no son obligatorias: se puede guardar lo cargado aunque falten slots.
  */
 export function CargarFotosFaltantesSheet({ open, lead, onClose, onSave }: Props) {
   const [imagenes, setImagenes] = useState<ImagenCierrePij[]>([]);
-  const [slotsPedidos, setSlotsPedidos] = useState<TipoImagenCierrePij[]>([]);
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
 
@@ -38,11 +31,16 @@ export function CargarFotosFaltantesSheet({ open, lead, onClose, onSave }: Props
     (lead?.seguimiento?.formaPago as FormaPago | null | undefined) ?? null;
   const fechaCierre = lead?.seguimiento?.fechaCierre ?? null;
 
+  const idsAdic = useMemo(
+    () =>
+      (lead?.seguimiento?.comprasAdicionales ?? [])
+        .filter((c) => esPlanInversion(c.idProducto))
+        .map((c) => c.id),
+    [lead],
+  );
+
   useEffect(() => {
     if (!open || !lead) return;
-    const idsAdic = (lead.seguimiento?.comprasAdicionales ?? [])
-      .filter((c) => esPlanInversion(c.idProducto))
-      .map((c) => c.id);
     const fuentes = ['principal', ...idsAdic];
     const destinos = ['principal', ...idsAdic];
     const actuales = propagarDniAVentasSinDni(
@@ -51,29 +49,33 @@ export function CargarFotosFaltantesSheet({ open, lead, onClose, onSave }: Props
       fuentes,
     );
     setImagenes(actuales);
-    setSlotsPedidos(
-      tiposFotosCierrePijFaltantes('principal', lead.seguimiento?.formaPago, actuales),
-    );
     setError('');
     setGuardando(false);
-  }, [open, lead]);
+  }, [open, lead, idsAdic]);
 
-  const aunFaltan = lead
-    ? tiposFotosCierrePijFaltantes('principal', formaPago, imagenes)
-    : [];
+  const planesFaltantes = useMemo(() => {
+    if (!lead) return [];
+    return listarPlanesPijConFotosFaltantes({
+      seguimiento: {
+        ...lead.seguimiento,
+        imagenesCierre: imagenes,
+      },
+    });
+  }, [lead, imagenes]);
 
-  const dniReutilizado = dniReutilizadoDesdeFuente(imagenes, 'principal', [
-    ...(lead?.seguimiento?.comprasAdicionales ?? [])
-      .filter((c) => esPlanInversion(c.idProducto))
-      .map((c) => c.id),
-  ]);
+  const dniReutilizado = dniReutilizadoDesdeFuente(imagenes, 'principal', idsAdic);
+
+  const hayAlgoNuevo = useMemo(() => {
+    const prev = lead?.seguimiento?.imagenesCierre ?? [];
+    if (imagenes.length !== prev.length) return true;
+    const prevIds = new Set(prev.map((i) => `${i.ventaKey}:${i.tipo}:${i.id}`));
+    return imagenes.some((i) => !prevIds.has(`${i.ventaKey}:${i.tipo}:${i.id}`));
+  }, [imagenes, lead]);
 
   async function handleGuardar() {
     if (!lead) return;
-    if (aunFaltan.length > 0) {
-      setError(
-        `Todavía falta: ${aunFaltan.map((t) => ETIQUETAS_IMAGEN_CIERRE_PIJ[t]).join(' · ')}.`,
-      );
+    if (!hayAlgoNuevo && planesFaltantes.length === 0) {
+      onClose();
       return;
     }
     const base = lead.seguimiento ?? {};
@@ -134,7 +136,7 @@ export function CargarFotosFaltantesSheet({ open, lead, onClose, onSave }: Props
               </p>
               {fechaCierre && (
                 <p className="mt-1 text-[12px] text-zinc-500">
-                  La fecha de cierre no se modifica.
+                  La fecha de cierre no se modifica. Podés guardar aunque falten fotos.
                 </p>
               )}
             </div>
@@ -147,42 +149,50 @@ export function CargarFotosFaltantesSheet({ open, lead, onClose, onSave }: Props
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4">
-            {lead && slotsPedidos.length > 0 && (
-              <div className="space-y-2">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-4">
+            {lead && planesFaltantes.length > 0 && (
+              <>
                 {dniReutilizado ? (
                   <p className="text-[12px] text-zinc-500">
-                    DNI compartido con otro plan de este cierre (un solo archivo en el servidor).
+                    DNI compartido entre planes (un solo archivo en el servidor).
                   </p>
                 ) : null}
-                <ImagenesCierrePijFields
-                  leadId={lead.id}
-                  ventaKey="principal"
-                  formaPago={formaPago}
-                  imagenes={imagenes}
-                  editable
-                  soloTipos={slotsPedidos}
-                  titulo="Fotos pendientes"
-                  ayuda="Subí solo lo que falta. Al guardar se reenvían a caja y la fecha de cierre se mantiene."
-                  onChange={(next) => {
-                    setError('');
-                    const idsAdic = (lead.seguimiento?.comprasAdicionales ?? [])
-                      .filter((c) => esPlanInversion(c.idProducto))
-                      .map((c) => c.id);
-                    setImagenes(
-                      propagarDniAVentasSinDni(next, idsAdic, ['principal', ...idsAdic]),
-                    );
-                  }}
-                />
-              </div>
+                {planesFaltantes.map((plan) => (
+                  <ImagenesCierrePijFields
+                    key={plan.ventaKey}
+                    leadId={lead.id}
+                    ventaKey={plan.ventaKey}
+                    formaPago={plan.formaPago}
+                    imagenes={imagenes}
+                    editable
+                    soloTipos={
+                      plan.faltantes.length
+                        ? plan.faltantes
+                        : tiposFotosCierrePijFaltantes(
+                            plan.ventaKey,
+                            plan.formaPago,
+                            imagenes,
+                          )
+                    }
+                    titulo={plan.etiqueta}
+                    ayuda="Ninguna foto es obligatoria: subí lo que tengas y guardá. Lo que falte queda en rojo en la tarjeta."
+                    onChange={(next) => {
+                      setError('');
+                      setImagenes(
+                        propagarDniAVentasSinDni(next, idsAdic, ['principal', ...idsAdic]),
+                      );
+                    }}
+                  />
+                ))}
+              </>
             )}
-            {lead && slotsPedidos.length === 0 && (
+            {lead && planesFaltantes.length === 0 && (
               <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] text-emerald-900">
-                No faltan fotos en este cierre.
+                No faltan fotos en ningún plan de este cierre.
               </p>
             )}
             {error && (
-              <p className="mt-3 rounded-lg bg-red-50 px-3 py-2.5 text-[13px] font-medium text-red-700">
+              <p className="rounded-lg bg-red-50 px-3 py-2.5 text-[13px] font-medium text-red-700">
                 {error}
               </p>
             )}
@@ -194,12 +204,16 @@ export function CargarFotosFaltantesSheet({ open, lead, onClose, onSave }: Props
           >
             <button
               type="button"
-              disabled={guardando || !lead || slotsPedidos.length === 0}
+              disabled={guardando || !lead || (!hayAlgoNuevo && planesFaltantes.length === 0)}
               onClick={() => void handleGuardar()}
               style={{ touchAction: 'manipulation' }}
               className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all duration-[120ms] ease-out active:scale-[0.98] active:bg-brand-800 disabled:opacity-60"
             >
-              {guardando ? 'Guardando…' : 'Guardar fotos'}
+              {guardando
+                ? 'Guardando…'
+                : planesFaltantes.length > 0
+                  ? 'Guardar fotos (aunque falten)'
+                  : 'Guardar fotos'}
             </button>
           </div>
         </Drawer.Content>

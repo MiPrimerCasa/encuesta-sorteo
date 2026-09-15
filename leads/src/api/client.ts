@@ -1345,25 +1345,28 @@ export async function fetchImagenCierrePijBlob(
   mimeType?: string,
 ): Promise<string> {
   if (_isDemoActive) throw new Error('Imagen no disponible en demo.');
-  const q = new URLSearchParams({
-    path: storagePath,
-    ...(mimeType ? { mime: mimeType } : {}),
-  });
-  const res = await fetch(apiUrl(`/api/cierres-pij/imagenes/${encodeURIComponent(imageId)}?${q}`), {
-    headers: authHeadersForSession(false),
-  });
-  if (!res.ok) {
-    let detalle = '';
-    try {
-      const body = (await res.json()) as { error?: string };
-      detalle = body?.error?.trim() ?? '';
-    } catch {
-      /* respuesta no JSON */
+  const { withImagenFetchLimit } = await import('../domain/imagen-fetch-limit');
+  return withImagenFetchLimit(async () => {
+    const q = new URLSearchParams({
+      path: storagePath,
+      ...(mimeType ? { mime: mimeType } : {}),
+    });
+    const res = await fetch(apiUrl(`/api/cierres-pij/imagenes/${encodeURIComponent(imageId)}?${q}`), {
+      headers: authHeadersForSession(false),
+    });
+    if (!res.ok) {
+      let detalle = '';
+      try {
+        const body = (await res.json()) as { error?: string };
+        detalle = body?.error?.trim() ?? '';
+      } catch {
+        /* respuesta no JSON */
+      }
+      throw new Error(detalle || 'No se pudo cargar la imagen');
     }
-    throw new Error(detalle || 'No se pudo cargar la imagen');
-  }
-  const blob = await res.blob();
-  return URL.createObjectURL(blob);
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  });
 }
 
 /** Copia en disco una imagen de cierre a otro ventaKey (mismo lead). */

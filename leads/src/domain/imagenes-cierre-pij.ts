@@ -356,6 +356,79 @@ export function faltanFotosCierrePij(
   );
 }
 
+export type PlanFotosFaltantes = {
+  ventaKey: string;
+  etiqueta: string;
+  formaPago: FormaPago | null | undefined;
+  faltantes: TipoImagenCierrePij[];
+};
+
+/**
+ * Planes PIJ del lead (principal + adicionales) con al menos una foto faltante.
+ * Sirve para badges en tarjeta y sheet «cargar faltantes».
+ */
+export function listarPlanesPijConFotosFaltantes(lead: {
+  seguimiento?: {
+    resultadoEntrevista?: string | null;
+    formaPago?: FormaPago | null;
+    imagenesCierre?: { ventaKey: string; tipo: string }[] | null;
+    comprasAdicionales?: Array<{
+      id: string;
+      idProducto?: string | null;
+      formaPago?: FormaPago | null;
+      numeroRecibo?: string | null;
+    }> | null;
+  } | null;
+}): PlanFotosFaltantes[] {
+  const seg = lead.seguimiento;
+  if (!seg || seg.resultadoEntrevista !== 'compro') return [];
+  const imagenes = seg.imagenesCierre ?? [];
+  const out: PlanFotosFaltantes[] = [];
+
+  const faltPrincipal = tiposFotosCierrePijFaltantes('principal', seg.formaPago, imagenes);
+  if (faltPrincipal.length) {
+    out.push({
+      ventaKey: 'principal',
+      etiqueta: 'Plan principal',
+      formaPago: seg.formaPago,
+      faltantes: faltPrincipal,
+    });
+  }
+
+  let idx = 1;
+  for (const c of seg.comprasAdicionales ?? []) {
+    if (String(c.idProducto || '') !== 'prod-pij') continue;
+    idx += 1;
+    const falt = tiposFotosCierrePijFaltantes(c.id, c.formaPago ?? seg.formaPago, imagenes);
+    if (!falt.length) continue;
+    out.push({
+      ventaKey: c.id,
+      etiqueta: c.numeroRecibo
+        ? `Plan ${idx} · ${c.numeroRecibo}`
+        : `Plan adicional ${idx - 1}`,
+      formaPago: c.formaPago ?? seg.formaPago,
+      faltantes: falt,
+    });
+  }
+  return out;
+}
+
+export function faltanFotosCierrePijEnLead(lead: {
+  seguimiento?: {
+    resultadoEntrevista?: string | null;
+    formaPago?: FormaPago | null;
+    imagenesCierre?: { ventaKey: string; tipo: string }[] | null;
+    comprasAdicionales?: Array<{
+      id: string;
+      idProducto?: string | null;
+      formaPago?: FormaPago | null;
+      numeroRecibo?: string | null;
+    }> | null;
+  } | null;
+}): boolean {
+  return listarPlanesPijConFotosFaltantes(lead).length > 0;
+}
+
 /**
  * Slots a pedir en «Cargar fotos faltantes».
  * DNI pide frente y/o reverso según lo que falte.

@@ -583,7 +583,8 @@ export function ImagenesCierrePijFields({
       </p>
       <p className="text-[12px] text-zinc-600">
         {ayuda ??
-          'Podés guardar el cierre aunque falten fotos. Recomendadas: DNI frente/reverso, solicitud de adhesión (ADH) y anexo. Con transferencia o mixto, también el comprobante. En la tarjeta se marcan en verde las cargadas y en rojo las que faltan.'}
+          'Podés guardar el cierre aunque falten fotos (ninguna es obligatoria). Recomendadas: DNI frente/reverso, solicitud de adhesión (ADH) y anexo. Con transferencia o mixto, también el comprobante. En la tarjeta se marcan en verde las cargadas y en rojo las que faltan (también en planes adicionales).'}
+
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {slotsVisibles.map((tipo) => (

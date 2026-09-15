@@ -24,6 +24,12 @@ import type {
   VerificarTelefonoCargaResult,
 } from '../../types';
 import { DateTimePicker } from '../ui/DateTimePicker';
+import {
+  clearJsonDraft,
+  loadJsonDraft,
+  nuevoLeadDraftKey,
+  saveJsonDraft,
+} from '../../domain/form-drafts';
 
 interface NuevoLeadSheetProps {
   open: boolean;
@@ -176,30 +182,115 @@ export function NuevoLeadSheet({
     sabiaPlanInversionJoven !== null;
 
   const verifySeqRef = useRef(0);
+  const [borradorRecuperado, setBorradorRecuperado] = useState(false);
+
+  const draftUserKey = String(usuario?.idOperador ?? usuario?.id ?? usuario?.loginId ?? 'anon');
 
   useEffect(() => {
     if (!open) return;
-    setNombre('');
-    setTelefono('');
-    setDomicilio('');
-    setConoceMpc(null);
-    setSabiaPlanInversionJoven(null);
-    setAgregarReferidos(false);
-    setReferidos([emptyReferido()]);
-    setAgendarEntrevista(false);
-    setHorarioEntrevista('');
-    setLugarEntrevista('');
-    setDomicilioEntrevista('');
+
+    type NuevoDraft = {
+      nombre?: string;
+      telefono?: string;
+      promotorId?: string;
+      domicilio?: string;
+      conoceMpc?: boolean | null;
+      sabiaPlanInversionJoven?: boolean | null;
+      agregarReferidos?: boolean;
+      referidos?: Referido[];
+      agendarEntrevista?: boolean;
+      horarioEntrevista?: string;
+      lugarEntrevista?: LugarEntrevista | '';
+      domicilioEntrevista?: string;
+    };
+    const draft = loadJsonDraft<NuevoDraft>(nuevoLeadDraftKey(draftUserKey));
+    if (draft) {
+      setNombre(draft.nombre ?? '');
+      setTelefono(draft.telefono ?? '');
+      setDomicilio(draft.domicilio ?? '');
+      setConoceMpc(draft.conoceMpc ?? null);
+      setSabiaPlanInversionJoven(draft.sabiaPlanInversionJoven ?? null);
+      setAgregarReferidos(Boolean(draft.agregarReferidos));
+      setReferidos(draft.referidos?.length ? draft.referidos : [emptyReferido()]);
+      setAgendarEntrevista(Boolean(draft.agendarEntrevista));
+      setHorarioEntrevista(draft.horarioEntrevista ?? '');
+      setLugarEntrevista(draft.lugarEntrevista ?? '');
+      setDomicilioEntrevista(draft.domicilioEntrevista ?? '');
+      setPromotorId(
+        draft.promotorId ||
+          (usuario ? String(usuario.idOperador ?? usuario.id ?? '').trim() : ''),
+      );
+      setBorradorRecuperado(true);
+    } else {
+      setNombre('');
+      setTelefono('');
+      setDomicilio('');
+      setConoceMpc(null);
+      setSabiaPlanInversionJoven(null);
+      setAgregarReferidos(false);
+      setReferidos([emptyReferido()]);
+      setAgendarEntrevista(false);
+      setHorarioEntrevista('');
+      setLugarEntrevista('');
+      setDomicilioEntrevista('');
+      setBorradorRecuperado(false);
+      if (usuario) {
+        setPromotorId(String(usuario.idOperador ?? usuario.id ?? '').trim());
+      } else {
+        setPromotorId('');
+      }
+    }
     setError('');
     setSaving(false);
     setVerificacion(null);
     setVerificando(false);
-    if (usuario) {
-      setPromotorId(String(usuario.idOperador ?? usuario.id ?? '').trim());
-    } else {
-      setPromotorId('');
+  }, [open, usuario, draftUserKey]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (
+      !nombre.trim() &&
+      !telefono.trim() &&
+      conoceMpc === null &&
+      sabiaPlanInversionJoven === null &&
+      !agendarEntrevista &&
+      !agregarReferidos
+    ) {
+      return;
     }
-  }, [open, usuario]);
+    const t = window.setTimeout(() => {
+      saveJsonDraft(nuevoLeadDraftKey(draftUserKey), {
+        nombre,
+        telefono,
+        promotorId,
+        domicilio,
+        conoceMpc,
+        sabiaPlanInversionJoven,
+        agregarReferidos,
+        referidos,
+        agendarEntrevista,
+        horarioEntrevista,
+        lugarEntrevista,
+        domicilioEntrevista,
+      });
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [
+    open,
+    draftUserKey,
+    nombre,
+    telefono,
+    promotorId,
+    domicilio,
+    conoceMpc,
+    sabiaPlanInversionJoven,
+    agregarReferidos,
+    referidos,
+    agendarEntrevista,
+    horarioEntrevista,
+    lugarEntrevista,
+    domicilioEntrevista,
+  ]);
 
   const direccionSucursalActiva =
     usuario?.sucursal?.trim() ||
@@ -359,6 +450,8 @@ export function NuevoLeadSheet({
         contactar,
         referidos: referidosValidos.length > 0 ? referidosValidos : undefined,
       });
+      clearJsonDraft(nuevoLeadDraftKey(draftUserKey));
+      setBorradorRecuperado(false);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al guardar');
@@ -375,7 +468,25 @@ export function NuevoLeadSheet({
   return (
     <Drawer.Root
       open={open}
-      onOpenChange={(isOpen) => !isOpen && onClose()}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          saveJsonDraft(nuevoLeadDraftKey(draftUserKey), {
+            nombre,
+            telefono,
+            promotorId,
+            domicilio,
+            conoceMpc,
+            sabiaPlanInversionJoven,
+            agregarReferidos,
+            referidos,
+            agendarEntrevista,
+            horarioEntrevista,
+            lugarEntrevista,
+            domicilioEntrevista,
+          });
+          onClose();
+        }
+      }}
       shouldScaleBackground
     >
       <Drawer.Portal>
@@ -399,6 +510,11 @@ export function NuevoLeadSheet({
               <p className="mt-0.5 text-[13px] text-zinc-400">
                 Datos del cliente, encuesta obligatoria; la entrevista es opcional
               </p>
+              {borradorRecuperado && (
+                <p className="mt-1 text-[12px] font-medium text-amber-800">
+                  Recuperamos un borrador de lo que habías escrito.
+                </p>
+              )}
             </div>
             <button
               type="button"

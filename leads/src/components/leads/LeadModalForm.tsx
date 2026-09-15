@@ -60,12 +60,18 @@ import {
 } from '../../domain/venta';
 import {
   clonarDniEntreVentas,
-  faltanFotosCierrePij,
+  faltanFotosCierrePijEnLead,
   hayDniPendienteDeClonar,
   propagarDniAVentasSinDni,
   tiposFotoVariablesPorPlan,
   validarImagenesCierrePij,
 } from '../../domain/imagenes-cierre-pij';
+import {
+  clearJsonDraft,
+  leadFormDraftKey,
+  loadJsonDraft,
+  saveJsonDraft,
+} from '../../domain/form-drafts';
 import { planesPijDeLaMismaPersona } from '../../domain/planes-comprados-persona';
 import { normalizarDniCliente, validarDniCliente } from '../../domain/dni-cliente';
 import { etiquetaCajaEstadoUi, variantCajaEstado, detalleCajaEstado } from '../../domain/caja-estado';
@@ -463,6 +469,7 @@ export function LeadModalForm({
   const [stockPij, setStockPij] = useState<StockPijCrmResponse | null>(null);
   const [stockPijLoading, setStockPijLoading] = useState(false);
   const [stockPijError, setStockPijError] = useState('');
+  const [borradorRecuperado, setBorradorRecuperado] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -575,23 +582,55 @@ export function LeadModalForm({
       ) {
         initial.idProducto = '';
       }
-      setForm(initial);
+
+      type LeadDraftPayload = {
+        form: FormState;
+        pijSerie?: string;
+        pijAdh?: string;
+        pijAnexo?: string;
+      };
+      const draft = !soloLectura
+        ? loadJsonDraft<LeadDraftPayload>(leadFormDraftKey(lead.id))
+        : null;
+
+      if (draft?.form) {
+        setForm({ ...initial, ...draft.form });
+        setBorradorRecuperado(true);
+        if (draft.pijSerie) setPijSerie(draft.pijSerie);
+        if (draft.pijAdh != null) setPijAdh(draft.pijAdh);
+        if (draft.pijAnexo != null) setPijAnexo(draft.pijAnexo);
+      } else {
+        setForm(initial);
+        setBorradorRecuperado(false);
+        if (initial.numeroRecibo && initial.idProducto === 'prod-pij') {
+          const parsed = parsePijRecibo(initial.numeroRecibo);
+          setPijSerie(parsed.serie);
+          setPijAdh(parsed.adhesion);
+          setPijAnexo(parsed.anexo);
+        } else {
+          setPijSerie('A');
+          setPijAdh('');
+          setPijAnexo('');
+        }
+      }
       setErrorVenta('');
       setErrorForm('');
-
-      // Sincronizar campos estructurados del recibo principal PIJ
-      if (initial.numeroRecibo && initial.idProducto === 'prod-pij') {
-        const parsed = parsePijRecibo(initial.numeroRecibo);
-        setPijSerie(parsed.serie);
-        setPijAdh(parsed.adhesion);
-        setPijAnexo(parsed.anexo);
-      } else {
-        setPijSerie('A');
-        setPijAdh('');
-        setPijAnexo('');
-      }
     }
   }, [open, lead, rol, productos, soloLectura]);
+
+  // Persistir borrador mientras editan (y al cerrar el modal).
+  useEffect(() => {
+    if (!open || !lead || soloLectura) return;
+    const t = window.setTimeout(() => {
+      saveJsonDraft(leadFormDraftKey(lead.id), {
+        form,
+        pijSerie,
+        pijAdh,
+        pijAnexo,
+      });
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [open, lead, soloLectura, form, pijSerie, pijAdh, pijAnexo]);
 
   const seriesPijBotones = useMemo(() => {
     const grupos = (stockPij?.gruposDisponibles ?? []).filter(
@@ -1484,6 +1523,8 @@ export function LeadModalForm({
     void (async () => {
       try {
         await onSave(lead.id, seguimiento);
+        clearJsonDraft(leadFormDraftKey(lead.id));
+        setBorradorRecuperado(false);
         onClose();
       } catch (err) {
         console.error('Error al guardar:', err);
@@ -1680,13 +1721,19 @@ export function LeadModalForm({
     estadoPagoCierre === 'entrega_33' &&
     Boolean(lead) &&
     !lead.bloqueadoSupervisor48h &&
-    faltanFotosCierrePij(
-      'principal',
-      formaPagoCierre,
-      form.imagenesCierre.length > 0
-        ? form.imagenesCierre
-        : lead.seguimiento?.imagenesCierre,
-    );
+    faltanFotosCierrePijEnLead({
+      seguimiento: {
+        resultadoEntrevista: 'compro',
+        formaPago: formaPagoCierre,
+        imagenesCierre:
+          form.imagenesCierre.length > 0
+            ? form.imagenesCierre
+            : lead.seguimiento?.imagenesCierre,
+        comprasAdicionales: form.comprasAdicionales?.length
+          ? form.comprasAdicionales
+          : lead.seguimiento?.comprasAdicionales,
+      },
+    });
 
   return (
     <Drawer.Root
@@ -1695,7 +1742,17 @@ export function LeadModalForm({
       onOpenChange={(isOpen) => {
         // Mantener el lead abierto mientras reportan / capturan
         if (!isOpen && feedback?.isOpen) return;
-        if (!isOpen) onClose();
+        if (!isOpen) {
+          if (lead && !soloLectura) {
+            saveJsonDraft(leadFormDraftKey(lead.id), {
+              form,
+              pijSerie,
+              pijAdh,
+              pijAnexo,
+            });
+          }
+          onClose();
+        }
       }}
       shouldScaleBackground
     >
@@ -1727,6 +1784,11 @@ export function LeadModalForm({
                 {lead.nombre}
               </Drawer.Title>
               <p className="mt-0.5 text-[13px] tabular-nums text-zinc-500">{cleanTelefonoSuffix(lead.telefono)}</p>
+              {borradorRecuperado && !soloLectura && (
+                <p className="mt-1 text-[12px] font-medium text-amber-800">
+                  Recuperamos un borrador de lo que habías escrito.
+                </p>
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
               <FeedbackHeaderButton />

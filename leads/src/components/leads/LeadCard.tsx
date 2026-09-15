@@ -26,7 +26,7 @@ import { prioridadTabInicial } from '../../domain/prioridad-leads';
 import { etiquetaCortaNumeroDocumentoVenta, etiquetaMedioPagoPij, etiquetaPagoProducto, esPlanInversion } from '../../domain/venta';
 import { etiquetaCajaEstadoUi, variantCajaEstado } from '../../domain/caja-estado';
 import { BadgesFotosCierrePij } from './BadgesFotosCierrePij';
-import { faltanFotosCierrePij } from '../../domain/imagenes-cierre-pij';
+import { faltanFotosCierrePijEnLead } from '../../domain/imagenes-cierre-pij';
 import { etiquetaCampania } from '../../domain/campania';
 import { FUENTE_LABEL } from '../../domain/fuenteLabels';
 import type { Barrio, Lead, Producto, Promotor, RolUsuario, SeguimientoHistorialEntry } from '../../types';
@@ -501,18 +501,15 @@ export function LeadCard({
               </p>
             )}
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="font-semibold text-zinc-800">Fotos:</span>
+              <span className="font-semibold text-zinc-800">Fotos plan 1:</span>
               <BadgesFotosCierrePij
+                ventaKey="principal"
                 formaPago={lead.seguimiento?.formaPago}
                 imagenes={lead.seguimiento?.imagenesCierre}
               />
             </div>
             {onCargarFotosFaltantes &&
-              faltanFotosCierrePij(
-                'principal',
-                lead.seguimiento?.formaPago,
-                lead.seguimiento?.imagenesCierre,
-              ) && (
+              faltanFotosCierrePijEnLead(lead) && (
                 <button
                   type="button"
                   onClick={(e) => {
@@ -529,7 +526,7 @@ export function LeadCard({
 
         {esArchivo && (lead.seguimiento?.comprasAdicionales?.length ?? 0) > 0 && (
           <div className="mt-2 space-y-1.5 border-t border-zinc-300/60 pt-2">
-            {lead.seguimiento!.comprasAdicionales!.map((compra) => {
+            {lead.seguimiento!.comprasAdicionales!.map((compra, idxAdic) => {
               const esPijAdic = esPlanInversion(compra.idProducto);
               const pagoAdic = etiquetaPagoProducto(
                 compra.idProducto,
@@ -563,7 +560,7 @@ export function LeadCard({
                     {esPijAdic ? 'PIJ' : 'Terreno'}
                   </span>
                   <span className="font-medium text-zinc-800">
-                    {esPijAdic ? 'Plan Inversión Joven' : 'Terreno'}
+                    {esPijAdic ? `Plan ${idxAdic + 2}` : 'Terreno'}
                   </span>
                   {pagoAdic && <span className="ml-1 text-zinc-500">· {pagoAdic}</span>}
                   {compra.numeroRecibo && (
@@ -576,6 +573,16 @@ export function LeadCard({
                     <span className="ml-1 text-zinc-500">
                       · Cierre: {formatearFechaHora(compra.fechaCierre)}
                     </span>
+                  )}
+                  {esPijAdic && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-zinc-600">Fotos:</span>
+                      <BadgesFotosCierrePij
+                        ventaKey={compra.id}
+                        formaPago={compra.formaPago ?? lead.seguimiento?.formaPago}
+                        imagenes={lead.seguimiento?.imagenesCierre}
+                      />
+                    </div>
                   )}
                 </div>
               );

@@ -299,33 +299,42 @@ function registerApiRoutes(api) {
 
     try {
       getDb();
-      const rowsEncuesta = await fetchEncuestaRowsParaUsuario(usuario);
-      const leads = await listLeadsFromEncuestas(usuario);
-      const direccionOficinasSupervisor = resolveDireccionOficinasSupervisor(rowsEncuesta);
-      const conTelefono = leads.filter((l) => l.telefono).length;
-      const conFuente = leads.filter((l) => l.seguimiento?.fuente).length;
-      const { consumeSeguimientoLecturaDegradada } = await import('./db/seguimiento-sql.js');
-      const seguimientoSinPermisoLectura = consumeSeguimientoLecturaDegradada();
-      return res.json({
-        leads,
-        source: 'produccion',
-        sp: process.env.SP_ENCUESTAS || 'encuestasMuestraOperador',
-        meta: {
-          telefonoDesde: 'encuesta.telefono (encuestasMuestraOperador)',
-          origenDesde: 'encuesta.origen → seguimiento.fuente (métricas de origen)',
-          direccionOficinasSupervisor,
-          leadsConTelefono: conTelefono,
-          leadsConFuente: conFuente,
-          leadsTotal: leads.length,
-          ...(seguimientoSinPermisoLectura
-            ? {
-                seguimientoSinPermisoLectura: true,
-                avisoSeguimiento:
-                  'No se puede leer el seguimiento guardado (falta EXECUTE en SP_HistorialSeguimientoLead / SP_UltimoSeguimientoOperador, o SELECT en la tabla). Tras F5 los leads vuelven al estado de la encuesta.',
-              }
-            : {}),
+      const { getLeadsListCached } = await import('./db/leads-list-cache.js');
+      const forceRefresh = String(req.query.refresh || '') === '1';
+      const payload = await getLeadsListCached(
+        usuario,
+        async () => {
+          const rowsEncuesta = await fetchEncuestaRowsParaUsuario(usuario);
+          const leads = await listLeadsFromEncuestas(usuario);
+          const direccionOficinasSupervisor = resolveDireccionOficinasSupervisor(rowsEncuesta);
+          const conTelefono = leads.filter((l) => l.telefono).length;
+          const conFuente = leads.filter((l) => l.seguimiento?.fuente).length;
+          const { consumeSeguimientoLecturaDegradada } = await import('./db/seguimiento-sql.js');
+          const seguimientoSinPermisoLectura = consumeSeguimientoLecturaDegradada();
+          return {
+            leads,
+            source: 'produccion',
+            sp: process.env.SP_ENCUESTAS || 'encuestasMuestraOperador',
+            meta: {
+              telefonoDesde: 'encuesta.telefono (encuestasMuestraOperador)',
+              origenDesde: 'encuesta.origen → seguimiento.fuente (métricas de origen)',
+              direccionOficinasSupervisor,
+              leadsConTelefono: conTelefono,
+              leadsConFuente: conFuente,
+              leadsTotal: leads.length,
+              ...(seguimientoSinPermisoLectura
+                ? {
+                    seguimientoSinPermisoLectura: true,
+                    avisoSeguimiento:
+                      'No se puede leer el seguimiento guardado (falta EXECUTE en SP_HistorialSeguimientoLead / SP_UltimoSeguimientoOperador, o SELECT en la tabla). Tras F5 los leads vuelven al estado de la encuesta.',
+                  }
+                : {}),
+            },
+          };
         },
-      });
+        { forceRefresh },
+      );
+      return res.json(payload);
     } catch (error) {
       console.error('Error al listar leads:', error);
       const err = formatSqlError(error);
@@ -1721,6 +1730,8 @@ function registerApiRoutes(api) {
       if (saved) {
         const { invalidateAdminDashboardCache } = await import('./db/admin-dashboard-cache.js');
         invalidateAdminDashboardCache();
+        const { invalidateLeadsListCache } = await import('./db/leads-list-cache.js');
+        invalidateLeadsListCache(usuario);
       }
 
       // 1) SQL Server ya persistió vía SP_RegistrarSeguimientoLead.

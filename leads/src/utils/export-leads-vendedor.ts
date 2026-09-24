@@ -35,6 +35,7 @@ export function downloadLeadsVendedorExcel(opts: {
   vendedorNombre: string;
   /** Solo contactos posteriores a esta fecha (última descarga guardada). */
   desdeIso?: string | null;
+  alcance?: 'nuevos' | 'todos';
   fechaDescargaIso?: string | null;
   ultimaFechaDescargaIso?: string | null;
 }): boolean {
@@ -74,7 +75,7 @@ export function downloadLeadsVendedorExcel(opts: {
   const counts = contarPorGrupo(filas);
   const resumen = [
     { Concepto: 'Vendedor', Valor: opts.vendedorNombre },
-    { Concepto: 'Alcance', Valor: 'Solo contactados nuevos' },
+    { Concepto: 'Alcance', Valor: opts.alcance === 'todos' ? 'Todos los contactados' : 'Solo contactados nuevos' },
     { Concepto: 'Fecha de descarga', Valor: formatearFechaDescarga(opts.fechaDescargaIso) || '—' },
     {
       Concepto: 'Última fecha de descarga',
@@ -109,6 +110,7 @@ export function downloadLeadsVendedorPdf(opts: {
   leads: Lead[];
   vendedorNombre: string;
   desdeIso?: string | null;
+  alcance?: 'nuevos' | 'todos';
   fechaDescargaIso?: string | null;
   ultimaFechaDescargaIso?: string | null;
 }): boolean {
@@ -132,9 +134,11 @@ export function downloadLeadsVendedorPdf(opts: {
     doc.setTextColor(70);
     doc.text(
       `${opts.vendedorNombre || 'Vendedor'}   ·   ${
-        opts.ultimaFechaDescargaIso
-          ? `Nuevos desde ${formatearFechaDescarga(opts.ultimaFechaDescargaIso)}`
-          : 'Primera descarga'
+        opts.alcance === 'todos' || !opts.ultimaFechaDescargaIso
+          ? opts.alcance === 'todos'
+            ? 'Todos los contactados'
+            : 'Primera descarga'
+          : `Nuevos desde ${formatearFechaDescarga(opts.ultimaFechaDescargaIso)}`
       }   ·   ${filas.length}`,
       margen + 52,
       y,

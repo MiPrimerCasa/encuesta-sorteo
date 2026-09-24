@@ -76,6 +76,10 @@ import {
   resetearSeguimientoLead,
 } from './db/seguimiento-sql.js';
 import { getHealthInfo, respondIfNotConfigured } from './require-production.js';
+import {
+  leerDescargaCargas,
+  registrarDescargaCargas,
+} from './db/descarga-cargas-vendedor.js';
 import { formatSqlError } from './sql-errors.js';
 import { loginSchema, seguimientoSchema } from './schemas/seguimiento.js';
 import { registerGrabacionesRoutes } from './routes/grabaciones-routes.js';
@@ -285,6 +289,36 @@ function registerApiRoutes(api) {
       return res.status(500).json({
         message: 'Error al obtener la lista de recibos ocupados.',
         detail: error instanceof Error ? error.message : 'Error desconocido'
+      });
+    }
+  });
+
+  api.get('/leads/descarga-cargas', (req, res) => {
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    try {
+      getDb();
+      return res.json(leerDescargaCargas(usuario.id));
+    } catch (error) {
+      console.error('Error al leer fecha de descarga:', error);
+      return res.status(500).json({ message: 'No se pudo leer la última descarga.' });
+    }
+  });
+
+  api.post('/leads/descarga-cargas', (req, res) => {
+    const usuario = usuarioDesdeRequest(req);
+    if (!usuario) {
+      return res.status(401).json({ message: 'Sesión inválida. Volvé a iniciar sesión.' });
+    }
+    try {
+      getDb();
+      return res.json(registrarDescargaCargas(usuario.id));
+    } catch (error) {
+      console.error('Error al guardar fecha de descarga:', error);
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : 'No se pudo guardar la descarga.',
       });
     }
   });
@@ -1346,8 +1380,9 @@ function registerApiRoutes(api) {
 
     const parsed = modificarTelefonoLeadSchema.safeParse(req.body);
     if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0];
       return res.status(400).json({
-        message: 'Teléfono inválido.',
+        message: firstIssue?.message || 'Teléfono inválido.',
         details: parsed.error.flatten(),
       });
     }
@@ -1369,6 +1404,8 @@ function registerApiRoutes(api) {
         parsed.data.telefono,
         usuario,
       );
+      const { invalidateLeadsListCache } = await import('./db/leads-list-cache.js');
+      invalidateLeadsListCache(usuario);
       return res.json({
         message: 'Teléfono actualizado correctamente.',
         lead,
@@ -1379,6 +1416,9 @@ function registerApiRoutes(api) {
       }
       if (error instanceof LeadNoManualError) {
         return res.status(403).json({ message: error.message, code: error.code });
+      }
+      if (error instanceof CodigoPromotorCargaError) {
+        return res.status(400).json({ message: error.message, code: error.code });
       }
       if (error instanceof ContactoYaRegistradoError) {
         return res.status(409).json({ message: error.message, code: error.code });
@@ -1392,7 +1432,10 @@ function registerApiRoutes(api) {
       }
       console.error('Error al modificar teléfono:', error);
       return res.status(500).json({
-        message: 'No se pudo modificar el teléfono.',
+        message:
+          error instanceof Error && error.message
+            ? error.message
+            : 'No se pudo modificar el teléfono.',
         detail: error instanceof Error ? error.message : 'Error desconocido',
       });
     }
@@ -1422,6 +1465,8 @@ function registerApiRoutes(api) {
     try {
       getDb();
       const lead = await modificarNombreLeadManual(leadId, parsed.data.nombre, usuario);
+      const { invalidateLeadsListCache } = await import('./db/leads-list-cache.js');
+      invalidateLeadsListCache(usuario);
       return res.json({
         message: 'Nombre actualizado correctamente.',
         lead,

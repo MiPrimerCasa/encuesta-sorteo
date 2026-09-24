@@ -25,6 +25,7 @@ import {
 } from './operadores-catalog.js';
 import { getSqlPoolEncuestas } from './mssql.js';
 import { resetearSeguimientoLead } from './seguimiento-sql.js';
+import { textoCargaMayusculas } from '../domain/texto-carga.js';
 
 const MSG_CONTACTO_YA_REGISTRADO = 'Este número ya se encuentra registrado en el sistema.';
 
@@ -441,7 +442,8 @@ export function buildCargaParamsFromPayload(payload, usuarioSesion, context) {
 
   let campo8 = null;
   if (agendar && payload.lugarEntrevista === 'domicilio') {
-    campo8 = payload.domicilioEntrevista?.trim() || payload.domicilio?.trim() || null;
+    const dir = payload.domicilioEntrevista?.trim() || payload.domicilio?.trim() || '';
+    campo8 = dir ? textoCargaMayusculas(dir) : null;
   } else if (agendar && payload.lugarEntrevista === 'sucursal') {
     campo8 =
       payload.domicilioEntrevista?.trim() ||
@@ -458,8 +460,8 @@ export function buildCargaParamsFromPayload(payload, usuarioSesion, context) {
     telefono: telefonoNorm,
     encuesta: getEncuestaCampaniaId(),
     usuario: usuarioSp,
-    campo1Valor: payload.nombre.trim(),
-    campo2Valor: payload.domicilio?.trim() || null,
+    campo1Valor: textoCargaMayusculas(payload.nombre),
+    campo2Valor: payload.domicilio?.trim() ? textoCargaMayusculas(payload.domicilio) : null,
     campo3Valor: siNoDesdeTriState(payload.conoceMpc),
     campo4Valor: siNoDesdeTriState(payload.sabiaPlanInversionJoven),
     campo6Valor: campo6,
@@ -482,7 +484,10 @@ export function buildCargaParamsFromLead(lead, telefonoNuevo, usuarioSp) {
   }
 
   const telefonoNorm =
-    digitsTelefono(telefonoNuevo) || String(telefonoNuevo ?? '').trim();
+    normalizarTelefonoCarga(telefonoNuevo) ||
+    digitsTelefono(telefonoNuevo) ||
+    String(telefonoNuevo ?? '').trim();
+  // El anterior debe coincidir con lo guardado en STRSYSTEM (no re-normalizar).
   const telefonoAnterior =
     digitsTelefono(lead.telefono) || String(lead.telefono ?? '').trim();
 
@@ -616,13 +621,13 @@ export async function modificarNombreLeadManual(leadId, nombreNuevo, usuarioSesi
   if (!lead) throw new LeadNoEncontradoError();
   if (!leadEsCargaManualServidor(lead)) throw new LeadNoManualError();
 
-  const nombreNorm = String(nombreNuevo ?? '').trim().replace(/\s+/g, ' ');
+  const nombreNorm = textoCargaMayusculas(nombreNuevo);
   if (nombreNorm.length < 2) {
     throw new Error('Ingresá un nombre válido (mínimo 2 caracteres).');
   }
 
   const nombreActual = String(lead.nombre ?? '').trim().replace(/\s+/g, ' ');
-  if (nombreActual.toLowerCase() === nombreNorm.toLowerCase()) {
+  if (nombreActual === nombreNorm) {
     return lead;
   }
 
@@ -670,12 +675,16 @@ export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuario
   if (!lead) throw new LeadNoEncontradoError();
   if (!leadEsCargaManualServidor(lead)) throw new LeadNoManualError();
 
-  const telefonoNorm =
-    digitsTelefono(telefonoNuevo) || String(telefonoNuevo ?? '').trim();
+  const telefonoNorm = normalizarTelefonoCarga(telefonoNuevo) || digitsTelefono(telefonoNuevo);
+  if (!telefonoNorm || String(telefonoNorm).replace(/\D/g, '').length < 8) {
+    throw new Error('Ingresá un teléfono válido (mínimo 8 dígitos).');
+  }
   const encuesta = lead.codigoCampania || getEncuestaCampaniaId();
 
-  if (digitsTelefono(lead.telefono) === telefonoNorm) {
-    return lead;
+  const actualNorm =
+    normalizarTelefonoCarga(lead.telefono) || digitsTelefono(lead.telefono);
+  if (actualNorm === telefonoNorm || digitsTelefono(lead.telefono) === telefonoNorm) {
+    return { ...lead, telefono: telefonoNorm };
   }
 
   const otros = leads.filter((l) => String(l.id) !== String(leadId));
@@ -703,11 +712,13 @@ export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuario
 
   const leadsPost = await listLeadsFromEncuestas(usuario);
   const porId = leadsPost.find((l) => String(l.id) === String(leadId));
-  if (porId && digitsTelefono(porId.telefono) === telefonoNorm) return porId;
+  if (porId && (digitsTelefono(porId.telefono) === digitsTelefono(telefonoNorm) || telefonosCoinciden(porId.telefono, telefonoNorm))) {
+    return { ...porId, telefono: telefonoNorm };
+  }
 
   const porTel = leadsPost.find(
     (l) =>
-      digitsTelefono(l.telefono) === telefonoNorm &&
+      telefonosCoinciden(l.telefono, telefonoNorm) &&
       normalizarEncuestaCargaId(l.codigoCampania || encuesta) ===
         normalizarEncuestaCargaId(encuesta),
   );
@@ -726,7 +737,7 @@ export async function modificarTelefonoLeadManual(leadId, telefonoNuevo, usuario
     );
   }
 
-  if (porTel) return porTel;
+  if (porTel) return { ...porTel, telefono: telefonoNorm };
 
   throw new CargaEncuestaSinPersistirError(
     'El SP ejecutó pero el teléfono no aparece actualizado. Verificá SP_MODIFICAR_ENCUESTA=encuestaSorteo01Update.',

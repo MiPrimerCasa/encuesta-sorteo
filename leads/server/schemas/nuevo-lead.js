@@ -1,20 +1,28 @@
 import { z } from 'zod';
+import { textoCargaMayusculas } from '../domain/texto-carga.js';
+
+const domicilioMayusculas = z
+  .string()
+  .trim()
+  .max(200)
+  .optional()
+  .transform((value) => (value ? textoCargaMayusculas(value) : undefined));
 
 export const nuevoLeadSchema = z
   .object({
-    nombre: z.string().trim().min(1).max(100),
+    nombre: z.string().trim().min(1).max(100).transform((value) => textoCargaMayusculas(value)),
     telefono: z.string().trim().min(6).max(50),
     promotorId: z.string().trim().min(1).max(80),
     /** Código SP @usuario (SORTEO01_V1). Obligatorio si el supervisor carga por un promotor. */
     promotorCodigo: z.string().trim().max(100).optional(),
     promotorNombre: z.string().trim().max(120).optional(),
-    domicilio: z.string().trim().max(200).optional(),
+    domicilio: domicilioMayusculas,
     lista: z.enum(['entrevista', 'contacto']).optional(),
     quiereEntrevista: z.boolean().optional(),
     agendarEntrevista: z.boolean().optional(),
     horarioEntrevista: z.string().trim().max(40).optional(),
     lugarEntrevista: z.enum(['sucursal', 'domicilio']).optional(),
-    domicilioEntrevista: z.string().trim().max(200).optional(),
+    domicilioEntrevista: domicilioMayusculas,
     origen: z.string().trim().max(32).optional(),
     /** Encuesta carga: campo3 / conoceMpc — obligatorio */
     conoceMpc: z.boolean(),

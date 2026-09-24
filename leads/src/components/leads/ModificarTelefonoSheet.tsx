@@ -1,6 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
 import type { Lead } from '../../types';
+import {
+  extraerDigitosTelefono,
+  formatearTelefonoCargaDisplay,
+  normalizarTelefonoCarga,
+  telefonoCargaEsValido,
+  telefonoCargaTieneLongitudMinima,
+} from '../../domain/telefono-carga';
 
 const INPUT_CLASS =
   'h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15';
@@ -18,29 +25,50 @@ export function ModificarTelefonoSheet({
   onClose,
   onSave,
 }: ModificarTelefonoSheetProps) {
-  const [telefono, setTelefono] = useState('');
+  const [telefonoDigits, setTelefonoDigits] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!open || !lead) return;
-    setTelefono(lead.telefono?.trim() ?? '');
+    setTelefonoDigits(extraerDigitosTelefono(lead.telefono ?? ''));
     setError('');
     setSaving(false);
   }, [open, lead]);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!lead) return;
-    const t = telefono.trim();
-    if (t.length < 6) {
-      setError('Ingresá un teléfono válido (mínimo 6 dígitos).');
+  const telefonoDisplay = formatearTelefonoCargaDisplay(telefonoDigits);
+  const puedeGuardar =
+    telefonoCargaTieneLongitudMinima(telefonoDigits) &&
+    telefonoCargaEsValido(telefonoDigits) &&
+    !saving;
+
+  const handleSubmit = async (e?: FormEvent) => {
+    e?.preventDefault();
+    if (!lead || saving) return;
+
+    if (!telefonoCargaTieneLongitudMinima(telefonoDigits)) {
+      setError('Ingresá un teléfono válido (mínimo 8 dígitos).');
       return;
     }
+    if (!telefonoCargaEsValido(telefonoDigits)) {
+      setError('Revisá el número: no parece un teléfono válido.');
+      return;
+    }
+
+    const telefonoNorm = normalizarTelefonoCarga(telefonoDigits);
+    const actualDigits = extraerDigitosTelefono(lead.telefono ?? '');
+    if (
+      telefonoNorm === normalizarTelefonoCarga(actualDigits) ||
+      telefonoNorm === actualDigits
+    ) {
+      setError('El número es el mismo que ya tiene el lead. Cambialo para guardar.');
+      return;
+    }
+
     setSaving(true);
     setError('');
     try {
-      await onSave(lead.id, t);
+      await onSave(lead.id, telefonoNorm);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo guardar');
@@ -74,45 +102,50 @@ export function ModificarTelefonoSheet({
           </div>
 
           <form
-            id="modificar-telefono-form"
-            onSubmit={handleSubmit}
-            className="flex-1 overflow-y-auto px-4 py-4"
+            onSubmit={(e) => void handleSubmit(e)}
+            className="flex min-h-0 flex-1 flex-col"
           >
-            <label className="block">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
-                Teléfono
-              </span>
-              <input
-                type="tel"
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-                inputMode="tel"
-                autoComplete="tel"
-                className={`${INPUT_CLASS} mt-1.5`}
-                placeholder="Ej. 3704123456"
-              />
-            </label>
-            {error && (
-              <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
-                {error}
+            <div className="flex-1 overflow-y-auto px-4 py-4">
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500">
+                  Teléfono
+                </span>
+                <input
+                  type="tel"
+                  value={telefonoDisplay}
+                  onChange={(e) =>
+                    setTelefonoDigits(extraerDigitosTelefono(e.target.value))
+                  }
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  className={`${INPUT_CLASS} mt-1.5`}
+                  placeholder="Ej. 3704123456"
+                />
+              </label>
+              <p className="mt-1.5 text-[12px] text-zinc-500">
+                Solo números. Mínimo 8 dígitos.
               </p>
-            )}
-          </form>
+              {error && (
+                <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800">
+                  {error}
+                </p>
+              )}
+            </div>
 
-          <div
-            className="shrink-0 border-t border-zinc-100 px-4 pt-3"
-            style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
-          >
-            <button
-              type="submit"
-              form="modificar-telefono-form"
-              disabled={saving}
-              style={{ touchAction: 'manipulation' }}
-              className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all active:bg-brand-800 disabled:opacity-60"
+            <div
+              className="shrink-0 border-t border-zinc-100 px-4 pt-3"
+              style={{ paddingBottom: 'calc(12px + env(safe-area-inset-bottom))' }}
             >
-              {saving ? 'Guardando…' : 'Guardar número'}
-            </button>
-          </div>
+              <button
+                type="submit"
+                disabled={!puedeGuardar}
+                style={{ touchAction: 'manipulation' }}
+                className="h-[52px] w-full rounded-xl bg-brand-600 text-[15px] font-semibold text-white transition-all active:bg-brand-800 disabled:opacity-60"
+              >
+                {saving ? 'Guardando…' : 'Guardar número'}
+              </button>
+            </div>
+          </form>
         </Drawer.Content>
       </Drawer.Portal>
     </Drawer.Root>

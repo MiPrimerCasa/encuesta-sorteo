@@ -696,6 +696,62 @@ export async function crearLead(nuevoLead: NuevoLeadData, opciones?: { promotorN
   return data.lead;
 }
 
+export interface MarcaDescargaCargas {
+  fechaDescarga: string | null;
+  ultimaFechaDescarga: string | null;
+}
+
+const DESCARGA_CARGAS_KEY = 'descarga-cargas-vendedor';
+
+function marcaDescargaLocal(): MarcaDescargaCargas {
+  const session = getSession();
+  const id = session?.usuario.id || 'anon';
+  try {
+    const raw = localStorage.getItem(`${DESCARGA_CARGAS_KEY}:${id}`);
+    if (!raw) return { fechaDescarga: null, ultimaFechaDescarga: null };
+    const data = JSON.parse(raw) as MarcaDescargaCargas;
+    return {
+      fechaDescarga: data.fechaDescarga ?? null,
+      ultimaFechaDescarga: data.ultimaFechaDescarga ?? null,
+    };
+  } catch {
+    return { fechaDescarga: null, ultimaFechaDescarga: null };
+  }
+}
+
+function guardarMarcaDescargaLocal(marca: MarcaDescargaCargas) {
+  const session = getSession();
+  const id = session?.usuario.id || 'anon';
+  localStorage.setItem(`${DESCARGA_CARGAS_KEY}:${id}`, JSON.stringify(marca));
+}
+
+export async function obtenerDescargaCargas(): Promise<MarcaDescargaCargas> {
+  if (_isDemoActive) return marcaDescargaLocal();
+  try {
+    return await apiFetch<MarcaDescargaCargas>('/api/leads/descarga-cargas');
+  } catch {
+    return marcaDescargaLocal();
+  }
+}
+
+export async function registrarDescargaCargas(): Promise<MarcaDescargaCargas> {
+  if (_isDemoActive) {
+    const previa = marcaDescargaLocal();
+    const marca = {
+      fechaDescarga: new Date().toISOString(),
+      ultimaFechaDescarga: previa.fechaDescarga,
+    };
+    guardarMarcaDescargaLocal(marca);
+    return marca;
+  }
+  const marca = await apiFetch<MarcaDescargaCargas>('/api/leads/descarga-cargas', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  guardarMarcaDescargaLocal(marca);
+  return marca;
+}
+
 export async function modificarTelefonoLead(leadId: string, telefono: string): Promise<Lead> {
   if (_isDemoActive) return updateDemoLeadTelefono(leadId, telefono);
   const data = await apiFetch<{ lead: Lead; message?: string }>(

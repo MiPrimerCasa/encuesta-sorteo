@@ -10,6 +10,7 @@ import {
   telefonoCargaTieneLongitudMinima,
   telefonoListoParaVerificarCarga,
 } from '../../domain/telefono-carga';
+import { textoCargaMayusculas } from '../../domain/texto-carga';
 import {
   referidoIncompleto,
   referidoListoParaCarga,
@@ -205,9 +206,9 @@ export function NuevoLeadSheet({
     };
     const draft = loadJsonDraft<NuevoDraft>(nuevoLeadDraftKey(draftUserKey));
     if (draft) {
-      setNombre(draft.nombre ?? '');
+      setNombre(textoCargaMayusculas(draft.nombre ?? ''));
       setTelefono(draft.telefono ?? '');
-      setDomicilio(draft.domicilio ?? '');
+      setDomicilio(textoCargaMayusculas(draft.domicilio ?? ''));
       setConoceMpc(draft.conoceMpc ?? null);
       setSabiaPlanInversionJoven(draft.sabiaPlanInversionJoven ?? null);
       setAgregarReferidos(Boolean(draft.agregarReferidos));
@@ -215,7 +216,7 @@ export function NuevoLeadSheet({
       setAgendarEntrevista(Boolean(draft.agendarEntrevista));
       setHorarioEntrevista(draft.horarioEntrevista ?? '');
       setLugarEntrevista(draft.lugarEntrevista ?? '');
-      setDomicilioEntrevista(draft.domicilioEntrevista ?? '');
+      setDomicilioEntrevista(textoCargaMayusculas(draft.domicilioEntrevista ?? ''));
       setPromotorId(
         draft.promotorId ||
           (usuario ? String(usuario.idOperador ?? usuario.id ?? '').trim() : ''),
@@ -424,7 +425,7 @@ export function NuevoLeadSheet({
     setError('');
     try {
       const payload: NuevoLeadData = {
-        nombre: nombre.trim(),
+        nombre: textoCargaMayusculas(nombre),
         telefono: telefonoNormalizado,
         lista: agendarEntrevista ? 'entrevista' : 'contacto',
         quiereEntrevista: agendarEntrevista,
@@ -432,7 +433,7 @@ export function NuevoLeadSheet({
         promotorId,
         promotorCodigo,
         promotorNombre: usuario.nombre,
-        domicilio: domicilio.trim() || undefined,
+        domicilio: textoCargaMayusculas(domicilio) || undefined,
         origen: 'manual',
         conoceMpc,
         sabiaPlanInversionJoven,
@@ -442,7 +443,7 @@ export function NuevoLeadSheet({
         payload.lugarEntrevista = lugarEntrevista as LugarEntrevista;
         payload.domicilioEntrevista =
           lugarEntrevista === 'domicilio'
-            ? (domicilioEntrevista.trim() || domicilio.trim())
+            ? (textoCargaMayusculas(domicilioEntrevista) || textoCargaMayusculas(domicilio) || undefined)
             : undefined;
       }
       await onSave(payload, {
@@ -540,7 +541,7 @@ export function NuevoLeadSheet({
                 id="nl-nombre"
                 type="text"
                 value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                onChange={(e) => setNombre(textoCargaMayusculas(e.target.value))}
                 placeholder="Ej. Juan Pérez"
                 autoComplete="name"
                 required
@@ -775,7 +776,7 @@ export function NuevoLeadSheet({
                         id="nl-dom-entrevista"
                         type="text"
                         value={domicilioEntrevista}
-                        onChange={(e) => setDomicilioEntrevista(e.target.value)}
+                        onChange={(e) => setDomicilioEntrevista(textoCargaMayusculas(e.target.value))}
                         placeholder={domicilio.trim() || 'Ej. Av. Colón 1234'}
                         className={INPUT_CLASS}
                       />
@@ -842,7 +843,7 @@ export function NuevoLeadSheet({
                         value={ref.nombre}
                         onChange={(e) => {
                           const next = [...referidos];
-                          next[idx] = { ...next[idx], nombre: e.target.value };
+                          next[idx] = { ...next[idx], nombre: textoCargaMayusculas(e.target.value) };
                           setReferidos(next);
                         }}
                         autoComplete="name"
@@ -899,7 +900,7 @@ export function NuevoLeadSheet({
                 id="nl-domicilio"
                 type="text"
                 value={domicilio}
-                onChange={(e) => setDomicilio(e.target.value)}
+                onChange={(e) => setDomicilio(textoCargaMayusculas(e.target.value))}
                 placeholder="Ej. Av. Colón 1234, Córdoba"
                 autoComplete="street-address"
                 className={INPUT_CLASS}

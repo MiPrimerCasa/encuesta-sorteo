@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Drawer } from 'vaul';
 import type { Lead } from '../../types';
+import { textoCargaMayusculas } from '../../domain/texto-carga';
 
 const INPUT_CLASS =
   'h-12 w-full rounded-lg border border-zinc-200 bg-white px-3 text-base focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-600/15';
@@ -24,7 +25,7 @@ export function ModificarNombreSheet({
 
   useEffect(() => {
     if (!open || !lead) return;
-    setNombre(lead.nombre?.trim() ?? '');
+    setNombre(textoCargaMayusculas(lead.nombre ?? ''));
     setError('');
     setSaving(false);
   }, [open, lead]);
@@ -85,7 +86,7 @@ export function ModificarNombreSheet({
               <input
                 type="text"
                 value={nombre}
-                onChange={(e) => setNombre(e.target.value)}
+                onChange={(e) => setNombre(textoCargaMayusculas(e.target.value))}
                 autoComplete="name"
                 autoCapitalize="words"
                 className={`${INPUT_CLASS} mt-1.5`}

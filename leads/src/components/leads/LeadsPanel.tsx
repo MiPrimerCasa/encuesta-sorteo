@@ -28,6 +28,7 @@ import { useHistorialLeads } from '../../hooks/useHistorialLeads';
 import { useLeadsFilter } from '../../hooks/useLeadsFilter';
 import type { Barrio, GuardarSeguimientoResult, Lead, NuevoLeadData, NuevoLeadSaveOptions, Producto, Promotor, RolUsuario, SeguimientoLead } from '../../types';
 import { AlertasSinContactar } from './AlertasSinContactar';
+import { DescargarCargasVendedor } from './DescargarCargasVendedor';
 import { AgregarReferidosSheet } from './AgregarReferidosSheet';
 import { LeadCard } from './LeadCard';
 import { LeadModalForm } from './LeadModalForm';
@@ -466,6 +467,14 @@ export function LeadsPanel({
           )}
         </p>
       </div>
+
+      {(esPromotor || rolUsuario === 'supervisor') && (
+        <DescargarCargasVendedor
+          leads={leads}
+          vendedorNombre={nombreUsuario?.trim() || 'Vendedor'}
+          incluirPromotor={rolUsuario === 'supervisor'}
+        />
+      )}
 
       {/* Buscador */}
       <div className="relative mb-5">

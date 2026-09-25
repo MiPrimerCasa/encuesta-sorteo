@@ -90,6 +90,7 @@ import { syncPijSistemaIntegral } from './services/pij-integral-sync.js';
 import {
   esCierrePublicableACaja,
   publicarCierreACajaMysql,
+  sincronizarFotosFaltantesCaja,
 } from './services/caja-publicar-cierre.js';
 import { publicarCierreAIngestHttp } from './services/caja-ingest-http.js';
 import { isCajaIngestHttpEnabled } from './config/caja-ingest-config.js';
@@ -1807,6 +1808,30 @@ function registerApiRoutes(api) {
           async () => {
             let pub = null;
             let ingest = null;
+            // Ya verificado: no se reabre la verificación. Sí se mandan fotos que falten en caja.
+            if (segSnap.cajaEstado === 'verificado') {
+              try {
+                const fotos = await sincronizarFotosFaltantesCaja({
+                  lead: leadSnap,
+                  seguimiento: segSnap,
+                  usuario: usuarioSnap,
+                });
+                console.info(
+                  '[caja] bg lead=%s verificado, fotos faltantes: %s ins=%s act=%s',
+                  leadIdStr,
+                  fotos?.reason || 'enviadas',
+                  fotos?.insertadas ?? 0,
+                  fotos?.actualizadas ?? 0,
+                );
+              } catch (fotosErr) {
+                console.warn(
+                  '[caja] bg lead=%s no se pudieron sincronizar fotos:',
+                  leadIdStr,
+                  fotosErr instanceof Error ? fotosErr.message : fotosErr,
+                );
+              }
+              return;
+            }
             try {
               pub = await publicarCierreACajaMysql({
                 lead: leadSnap,
@@ -1828,20 +1853,85 @@ function registerApiRoutes(api) {
               };
             }
 
+            const cajaYaConfirmo = pub?.skipped && pub.reason === 'ya_confirmada';
             try {
-              ingest = await publicarCierreAIngestHttp({
-                lead: leadSnap,
-                seguimiento: segSnap,
-                usuario: usuarioSnap,
-                origenRegistroId: origenCaja,
-              });
-              if (ingest?.error) {
-                console.warn('[caja-ingest] bg lead=%s:', leadIdStr, ingest.error);
-              } else if (ingest && !ingest.skipped && ingest.ok) {
-                console.info('[caja-ingest] bg OK lead=%s', leadIdStr);
+              if (cajaYaConfirmo) {
+                ingest = { skipped: true, reason: 'ya_confirmada', error: null };
+              } else {
+                ingest = await publicarCierreAIngestHttp({
+                  lead: leadSnap,
+                  seguimiento: segSnap,
+                  usuario: usuarioSnap,
+                  origenRegistroId: origenCaja,
+                });
+                if (ingest?.error) {
+                  console.warn('[caja-ingest] bg lead=%s:', leadIdStr, ingest.error);
+                } else if (ingest && !ingest.skipped && ingest.ok) {
+                  console.info('[caja-ingest] bg OK lead=%s', leadIdStr);
+                }
               }
             } catch (ingestErr) {
               console.error('[caja-ingest] bg error lead=%s:', leadIdStr, ingestErr);
+            }
+
+            // Caja ya confirmó este lead (aunque el CRM haya quedado en pendiente).
+            if (pub?.skipped && pub.reason === 'ya_confirmada') {
+              try {
+                const fotos = await sincronizarFotosFaltantesCaja({
+                  lead: leadSnap,
+                  seguimiento: segSnap,
+                  usuario: usuarioSnap,
+                });
+                if ((fotos?.insertadas ?? 0) + (fotos?.actualizadas ?? 0) > 0) {
+                  console.info(
+                    '[caja] bg lead=%s fotos faltantes sobre venta confirmada ins=%s act=%s',
+                    leadIdStr,
+                    fotos.insertadas,
+                    fotos.actualizadas,
+                  );
+                }
+              } catch (fotosErr) {
+                console.warn(
+                  '[caja] bg lead=%s no se pudieron sincronizar fotos:',
+                  leadIdStr,
+                  fotosErr instanceof Error ? fotosErr.message : fotosErr,
+                );
+              }
+              try {
+                await persistirSeguimientoLead(
+                  leadIdStr,
+                  {
+                    cajaEstado: 'verificado',
+                    cajaSucursal:
+                      (pub.sucursalCodigo ? String(pub.sucursalCodigo) : null) ||
+                      segSnap.cajaSucursal ||
+                      null,
+                    cajaMotivoRechazo: null,
+                    ...(segSnap.cajaVerificadoEn
+                      ? { cajaVerificadoEn: segSnap.cajaVerificadoEn }
+                      : {}),
+                    ...(segSnap.cajaConfirmadoPor
+                      ? { cajaConfirmadoPor: segSnap.cajaConfirmadoPor }
+                      : {}),
+                  },
+                  usuarioSnap,
+                  {
+                    ...leadSnap,
+                    seguimiento: { ...(leadSnap?.seguimiento ?? {}), ...segSnap },
+                  },
+                );
+                console.info(
+                  '[caja] bg lead=%s verificación restaurada: caja ya había confirmado',
+                  leadIdStr,
+                );
+              } catch (restoreErr) {
+                console.warn(
+                  '[caja] bg no se pudo restaurar verificado lead=%s:',
+                  leadIdStr,
+                  restoreErr instanceof Error ? restoreErr.message : restoreErr,
+                );
+              }
+              return;
             }
 
             const publicadoCaja =

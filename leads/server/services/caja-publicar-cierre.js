@@ -215,6 +215,184 @@ async function upsertCajaCierreConImagenes({
 }
 
 /**
+ * En un cierre ya confirmado, manda a caja solo las fotos que todavía no están
+ * (o el reemplazo del mismo tipo). No crea otra venta pendiente.
+ * La fila ya CONFIRMADA vuelve a PENDIENTE para que el pull baje los adjuntos nuevos;
+ * el estado del CRM no se toca acá.
+ */
+export async function sincronizarFotosFaltantesCaja({
+  lead,
+  seguimiento,
+  usuario,
+  basePath,
+}) {
+  if (!isCajaMysqlEnabled()) {
+    return { skipped: true, reason: 'disabled', insertadas: 0, actualizadas: 0 };
+  }
+  const leadId = Number.parseInt(String(lead?.id ?? ''), 10);
+  if (!Number.isFinite(leadId) || leadId <= 0) {
+    return { skipped: true, reason: 'lead_invalido', insertadas: 0, actualizadas: 0 };
+  }
+  const imgs = (Array.isArray(seguimiento?.imagenesCierre) ? seguimiento.imagenesCierre : []).filter(
+    (i) => i && i.id && i.tipo,
+  );
+  if (!imgs.length) {
+    return { skipped: true, reason: 'sin_fotos', insertadas: 0, actualizadas: 0 };
+  }
+
+  const pool = getCajaMysqlPool();
+  const [cierres] = await pool.query(
+    `SELECT id, venta_key FROM caja_cierre WHERE lead_id = ?`,
+    [leadId],
+  );
+  if (!cierres?.length) {
+    return { skipped: true, reason: 'sin_cierre_caja', insertadas: 0, actualizadas: 0 };
+  }
+  const cierrePorVenta = new Map(cierres.map((c) => [String(c.venta_key), c]));
+  const cierrePrincipal = cierrePorVenta.get('principal') || cierres[0];
+
+  const [existentes] = await pool.query(
+    `SELECT id, venta_key, id_imagen, tipo_imagen
+     FROM caja_cierre_imagen WHERE lead_id = ?`,
+    [leadId],
+  );
+  const porId = new Set((existentes || []).map((r) => String(r.id_imagen)));
+  const porSlot = new Map(
+    (existentes || []).map((r) => [`${r.venta_key}|${r.tipo_imagen}`, r]),
+  );
+
+  const operadorId = parseIdOrNull(usuario?.id);
+  let insertadas = 0;
+  let actualizadas = 0;
+
+  for (const img of imgs) {
+    const ventaKey = String(img.ventaKey || 'principal').slice(0, 40);
+    const idImagen = String(img.id).slice(0, 36);
+    if (porId.has(idImagen)) continue;
+
+    const cierre = cierrePorVenta.get(ventaKey) || cierrePrincipal;
+    if (!cierre?.id) continue;
+
+    const tipoImagen = String(img.tipo).slice(0, 16);
+    const storagePath = img.storagePath ? String(img.storagePath).slice(0, 500) : null;
+    const downloadUrl = urlDescargaImagenCaja(idImagen, basePath).slice(0, 500);
+    const sha256 = storagePath ? await sha256DeStoragePath(storagePath) : null;
+    const slot = porSlot.get(`${ventaKey}|${tipoImagen}`);
+    const mimeType = String(img.mimeType || 'image/jpeg').slice(0, 32);
+    const nombreOriginal = img.nombreOriginal ? String(img.nombreOriginal).slice(0, 260) : null;
+    const tamanoBytes = Number(img.tamanoBytes) || null;
+
+    if (!slot) {
+      await pool.query(
+        `INSERT INTO caja_cierre_imagen (
+           cierre_id, lead_id, venta_key, id_imagen, tipo_imagen,
+           mime_type, nombre_original, tamano_bytes, storage_path, download_url, sha256,
+           operador_id, subido_en, estado_descarga
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(), 'pendiente')`,
+        [
+          Number(cierre.id),
+          leadId,
+          ventaKey,
+          idImagen,
+          tipoImagen,
+          mimeType,
+          nombreOriginal,
+          tamanoBytes,
+          storagePath,
+          downloadUrl,
+          sha256,
+          operadorId,
+        ],
+      );
+      insertadas += 1;
+    } else {
+      await pool.query(
+        `UPDATE caja_cierre_imagen
+         SET id_imagen = ?,
+             mime_type = ?,
+             nombre_original = ?,
+             tamano_bytes = ?,
+             storage_path = ?,
+             download_url = ?,
+             sha256 = COALESCE(?, sha256),
+             operador_id = ?,
+             subido_en = UTC_TIMESTAMP(),
+             estado_descarga = 'pendiente'
+         WHERE id = ?`,
+        [
+          idImagen,
+          mimeType,
+          nombreOriginal,
+          tamanoBytes,
+          storagePath,
+          downloadUrl,
+          sha256,
+          operadorId,
+          Number(slot.id),
+        ],
+      );
+      actualizadas += 1;
+    }
+    porId.add(idImagen);
+    porSlot.set(`${ventaKey}|${tipoImagen}`, {
+      id: slot?.id,
+      venta_key: ventaKey,
+      id_imagen: idImagen,
+      tipo_imagen: tipoImagen,
+    });
+  }
+
+  if (insertadas + actualizadas === 0) {
+    return { skipped: true, reason: 'ya_estan', insertadas: 0, actualizadas: 0 };
+  }
+
+  const sucursalCodigo = resolveSucursalParaCaja(usuario, lead);
+  const payload = await buildCrmIngestPayload({
+    lead,
+    seguimiento,
+    usuario,
+    sucursalCodigo,
+    basePath,
+  });
+  if (payload) {
+    const [confirmadas] = await pool.query(
+      `SELECT id FROM crm_venta_pendiente
+       WHERE crm_lead_external_id = ?
+         AND estado = 'CONFIRMADA'
+       ORDER BY id DESC
+       LIMIT 1`,
+      [String(leadId)],
+    );
+    const pendienteId = confirmadas?.[0]?.id;
+    if (pendienteId) {
+      await pool.query(
+        `UPDATE crm_venta_pendiente
+         SET payload_json = CAST(? AS JSON),
+             estado = 'PENDIENTE',
+             updated_at = CURRENT_TIMESTAMP(3)
+         WHERE id = ?`,
+        [JSON.stringify(payload), pendienteId],
+      );
+    }
+    await pool.query(
+      `UPDATE caja_cierre
+       SET payload_json = CAST(? AS JSON),
+           updated_at = CURRENT_TIMESTAMP(3)
+       WHERE lead_id = ? AND venta_key = 'principal'`,
+      [JSON.stringify(payload), leadId],
+    );
+  }
+
+  console.info(
+    '[caja-mysql] fotos faltantes lead=%s insertadas=%s actualizadas=%s',
+    leadId,
+    insertadas,
+    actualizadas,
+  );
+  return { skipped: false, insertadas, actualizadas, sucursalCodigo: sucursalCodigo || null };
+}
+
+/**
  * Upsert en crm_venta_pendiente (+ caja_cierre / imágenes).
  * Idempotente por crm_venta_external_id (= origen_registro_id del SP).
  *
@@ -286,6 +464,34 @@ export async function publicarCierreACajaMysql({
 
   try {
     const pool = getCajaMysqlPool();
+
+    // Un guardado posterior del mismo cierre no debe abrir otra venta pendiente
+    // si caja ya confirmó este lead (el origen cambia en cada seguimiento).
+    const [confirmadasLead] = await pool.query(
+      `SELECT id, uuid, estado, sucursal_codigo
+       FROM crm_venta_pendiente
+       WHERE crm_lead_external_id = ?
+         AND estado = 'CONFIRMADA'
+       ORDER BY id DESC
+       LIMIT 1`,
+      [String(payload.leadId)],
+    );
+    if (confirmadasLead?.[0]) {
+      console.info(
+        '[caja-mysql] skip re-publicar lead=%s: ya CONFIRMADA uuid=%s',
+        payload.leadId,
+        confirmadasLead[0].uuid,
+      );
+      return {
+        skipped: true,
+        reason: 'ya_confirmada',
+        pendienteId: Number(confirmadasLead[0].id) || null,
+        pendienteUuid: confirmadasLead[0].uuid || null,
+        cierreId: null,
+        sucursalCodigo: confirmadasLead[0].sucursal_codigo || sucursalCodigo,
+        error: null,
+      };
+    }
 
     // Idempotencia: si ya hay fila con este origen, actualizar payload (salvo cerrada).
     const [existentes] = await pool.query(

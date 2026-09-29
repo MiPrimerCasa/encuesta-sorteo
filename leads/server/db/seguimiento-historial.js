@@ -27,10 +27,12 @@ export function pestanaDesdeSeguimiento(seguimiento, lead = {}) {
   const lista = lead.lista;
   const horario = lead.horarioEntrevista || lead.fechaAlta;
   const placeholder = horario && /T09:00:00$/.test(String(horario));
+  const contactado =
+    seguimiento?.canal != null || seguimiento?.huboEntrevista != null;
+  if (contactado) return 'contacto';
   const entrevistaPendiente =
     lista === 'entrevista' && r !== 'reagenda' && r !== 'compro' && horario && !placeholder;
   if (entrevistaPendiente) return 'entrevista';
-  if (seguimiento?.canal != null || seguimiento?.huboEntrevista != null) return 'contacto';
   return 'entrevista';
 }
 

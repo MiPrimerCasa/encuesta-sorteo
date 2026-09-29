@@ -38,9 +38,11 @@ export function leadActivoNoCerrado(lead: Lead) {
 /** null = no va en la pestaña inicial (va a Contactado, Seguimiento o Cierres). */
 export function prioridadTabInicial(lead: Lead): PrioridadTabInicial | null {
   if (!leadActivoNoCerrado(lead)) return null;
+  // Un contacto (WhatsApp, llamada o presencial) saca el lead de Prioridad
+  // aunque conserve el horario de la cita.
+  if (fueContactadoLead(lead)) return null;
   if (leadEnEntrevistaPendiente(lead)) return 1;
-  if (!fueContactadoLead(lead)) return 2;
-  return null;
+  return 2;
 }
 
 export function perteneceTabInicial(lead: Lead) {

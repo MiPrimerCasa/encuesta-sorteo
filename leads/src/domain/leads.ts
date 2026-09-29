@@ -351,9 +351,10 @@ export function tabIdListaLead(lead: Lead): 'entrevista' | 'contacto' | 'seguimi
   if (leadEnSeguimientoActivo(lead)) return 'seguimiento';
   // Resultados negativos (no compró / sin interés) → Contactado.
   if (esCerradoNegativoLead(lead)) return 'contacto';
-  // Entrevistas pendientes van a Prioridad, no a Contactado.
+  // Ya contactado (aunque tenga horario de cita) → Contactado.
+  if (fueContactadoLead(lead)) return 'contacto';
+  // Entrevistas pendientes sin contacto van a Prioridad.
   if (leadEnEntrevistaPendiente(lead)) return 'entrevista';
-  if (lead.seguimiento?.canal != null || lead.seguimiento?.huboEntrevista != null) return 'contacto';
   return 'entrevista';
 }
 

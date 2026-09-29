@@ -365,7 +365,9 @@ export function LeadsPanel({
   };
 
   const handleWhatsAppAutoContacto = async (lead: Lead) => {
-    if (prioridadTabInicial(lead) === 2) {
+    const prioridad = prioridadTabInicial(lead);
+    // 1 = tiene horario o pidió asesoramiento. 2 = encuesta sin contactar.
+    if (prioridad === 1 || prioridad === 2) {
       const seg: SeguimientoLead = {
         canal: 'mensaje',
         huboEntrevista: false,

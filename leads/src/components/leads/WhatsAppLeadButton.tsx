@@ -1,7 +1,7 @@
 import {
-  abrirChatWhatsApp,
   mensajeWhatsAppLead,
   telefonoParaWhatsApp,
+  urlWhatsAppChat,
 } from '../../domain/whatsapp';
 
 interface WhatsAppLeadButtonProps {
@@ -10,8 +10,8 @@ interface WhatsAppLeadButtonProps {
   nombreUsuario?: string;
   tieneCitaPrevia?: boolean;
   className?: string;
-  /** Callback opcional: se invoca tras abrir WhatsApp (para registrar contacto automático). */
-  onAutoContacto?: () => void;
+  /** Registra el contacto. Se espera antes de abrir el chat para que el guardado no se corte. */
+  onAutoContacto?: () => void | Promise<void>;
   bloqueadoSupervisor48h?: boolean;
   disabled?: boolean;
   disabledTooltip?: string;
@@ -80,8 +80,18 @@ export function WhatsAppLeadButton({
       aria-label={titulo}
       onClick={(e) => {
         e.stopPropagation();
-        abrirChatWhatsApp(telefono, mensaje);
-        onAutoContacto?.();
+        const url = urlWhatsAppChat(telefono, mensaje);
+        // Se abre en el mismo gesto; el destino se asigna después de guardar el contacto.
+        const popup = url ? window.open('about:blank', '_blank') : null;
+        void (async () => {
+          try {
+            await onAutoContacto?.();
+            if (url && popup && !popup.closed) popup.location.href = url;
+            else if (url) window.open(url, '_blank', 'noopener,noreferrer');
+          } catch {
+            popup?.close();
+          }
+        })();
       }}
       style={{ touchAction: 'manipulation' }}
       className={`flex h-9 w-9 items-center justify-center rounded-full bg-[#25D366] text-white shadow-sm transition-transform duration-[120ms] active:scale-90 ${className}`}

@@ -645,6 +645,8 @@ export async function guardarSeguimiento(
   }>(`/api/leads/${leadId}/seguimiento`, {
     method: 'PATCH',
     body: JSON.stringify(seguimiento),
+    // Sigue el guardado si el celular abre WhatsApp y suspende la pestaña.
+    keepalive: true,
   });
   return {
     lead: data.lead,

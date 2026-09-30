@@ -203,6 +203,7 @@ export function LeadsPanel({
   };
 
   const [tabActivo, setTabActivo] = useState('hoy');
+  const [errorWhatsapp, setErrorWhatsapp] = useState('');
   const [leadSeleccionado, setLeadSeleccionado] = useState<Lead | null>(null);
   const [modalAbierto, setModalAbierto] = useState(false);
   const [leadFotosFaltantes, setLeadFotosFaltantes] = useState<Lead | null>(null);
@@ -367,12 +368,17 @@ export function LeadsPanel({
   const handleWhatsAppAutoContacto = async (lead: Lead) => {
     const prioridad = prioridadTabInicial(lead);
     // 1 = tiene horario o pidió asesoramiento. 2 = encuesta sin contactar.
-    if (prioridad === 1 || prioridad === 2) {
-      const seg: SeguimientoLead = {
+    if (prioridad !== 1 && prioridad !== 2) return;
+    setErrorWhatsapp('');
+    try {
+      await guardarSeguimientoLead(lead.id, {
         canal: 'mensaje',
         huboEntrevista: false,
-      };
-      await guardarSeguimientoLead(lead.id, seg);
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'No se pudo marcar el lead como contactado.';
+      setErrorWhatsapp(msg);
+      throw err;
     }
   };
 
@@ -469,6 +475,12 @@ export function LeadsPanel({
           )}
         </p>
       </div>
+
+      {errorWhatsapp && (
+        <p className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-700">
+          {errorWhatsapp}
+        </p>
+      )}
 
       {(esPromotor || rolUsuario === 'supervisor') && (
         <DescargarCargasVendedor
